@@ -721,10 +721,6 @@ impl UngDung {
                 let day = egui::Rect::from_min_max(egui::pos2(o.left(), o.bottom() - 2.0), o.max);
                 painter.rect_filled(day, 0.0, VIEN_TAB_CHON);
             }
-            // Vạch ngăn ngắn giữa các tab
-            if i > 0 {
-                painter.vline(o.left(), (o.top() + 7.0)..=(o.bottom() - 7.0), Stroke::new(1.0, VIEN_NHAT));
-            }
             let mut chu = RichText::new(chu);
             chu = if dang_chon { chu.dam() } else if bat { chu } else { chu.color(CHU_MO) };
             let galley = egui::WidgetText::from(chu).into_galley(ui, Some(egui::TextWrapMode::Truncate), o.width() - 8.0, TextStyle::Button);
