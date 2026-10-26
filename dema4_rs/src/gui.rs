@@ -124,7 +124,7 @@ fn cai_giao_dien(ctx: &egui::Context) {
         v.window_fill = NEN;
         v.extreme_bg_color = Color32::WHITE;
         v.text_edit_bg_color = Some(Color32::WHITE);
-        v.faint_bg_color = Color32::from_rgb(0xF7, 0xF7, 0xF7);
+        v.faint_bg_color = NEN_XEN_KE; // màu dòng xen kẽ của bảng (striped)
         v.selection.bg_fill = Color32::from_rgb(0xCC, 0xE4, 0xF7);
         v.selection.stroke = Stroke::new(1.0, CHU);
         v.hyperlink_color = CHU;
@@ -332,6 +332,13 @@ const NEN_XEN_KE: Color32 = Color32::from_rgb(0xF6, 0xF6, 0xF6);
 const LE_O: f32 = 8.0;
 const CAO_TIEU_DE: f32 = 26.0;
 const CAO_DONG: f32 = 22.0;
+
+/// Làm tròn một kích thước (điểm) về số pixel nguyên theo tỷ lệ màn hình.
+/// Windows phóng 125%/175% làm 22pt = 27,5px → các hàng bị vẽ luân phiên 27/28px, nhìn to bé không đều.
+fn tron_pixel(ui: &egui::Ui, diem: f32) -> f32 {
+    let ppp = ui.ctx().pixels_per_point();
+    (diem * ppp).round() / ppp
+}
 /// Các cột bảng chi tiết: tên, căn lề, độ rộng (None = cột File giãn theo cửa sổ)
 const COT_BANG: [(&str, CanLe, Option<f32>); SO_COT] = [
     ("STT", CanLe::Giua, Some(76.0)),
@@ -858,15 +865,20 @@ impl UngDung {
             };
             // Chừa chỗ cho dòng chân (số dòng / số file) ở đáy bảng: bảng chiếm phần còn lại
             const CAO_CHAN: f32 = 28.0;
-            let cao_bang = (ui.available_height() - CAO_CHAN).max(60.0);
+            // Khe giữa các dòng và chiều cao dòng/tiêu đề/chân làm tròn về pixel nguyên để mọi hàng cao bằng nhau
+            let khe = tron_pixel(ui, ui.spacing().item_spacing.y);
+            ui.spacing_mut().item_spacing.y = khe;
+            let cao_tieu_de = tron_pixel(ui, CAO_TIEU_DE);
+            let cao_dong = tron_pixel(ui, CAO_DONG + khe) - khe;
+            let cao_chan = tron_pixel(ui, CAO_CHAN);
+            let cao_bang = (ui.available_height() - cao_chan).max(60.0);
             let rong_bang = ui.available_width();
             let file_can_mo = ui.allocate_ui_with_layout(egui::vec2(rong_bang, cao_bang), Layout::top_down(Align::Min), |ui| {
                 let mut file_can_mo: Option<String> = None;
 
                 // Nền xám nhạt và đường kẻ dưới cho hàng tiêu đề
-                let x_bang = ui.max_rect().expand2(egui::vec2(2.0, 0.0)).x_range();
                 let khe = ui.spacing().item_spacing.y;
-                let vung_dau = egui::Rect::from_min_size(ui.cursor().min - egui::vec2(2.0, 0.0), egui::vec2(ui.available_width() + 4.0, CAO_TIEU_DE + khe / 2.0));
+                let vung_dau = egui::Rect::from_min_size(ui.cursor().min - egui::vec2(2.0, 0.0), egui::vec2(ui.available_width() + 4.0, cao_tieu_de + khe / 2.0));
                 ui.painter().rect_filled(vung_dau, 0.0, NEN_TIEU_DE);
                 ui.painter().hline(vung_dau.x_range(), vung_dau.bottom(), Stroke::new(1.0, VIEN_NHAT));
 
@@ -877,7 +889,8 @@ impl UngDung {
                 if cuon_cuoi {
                     ui.ctx().request_repaint();
                 }
-                let mut bang = TableBuilder::new(ui).striped(false).resizable(true).stick_to_bottom(true).auto_shrink(false).cell_layout(Layout::left_to_right(Align::Center));
+                // striped: bảng tự tô xen kẽ theo đúng bước dòng (tự vẽ theo ô sẽ lệch trên Windows)
+                let mut bang = TableBuilder::new(ui).striped(true).resizable(true).stick_to_bottom(true).auto_shrink(false).cell_layout(Layout::left_to_right(Align::Center));
                 if cuon_cuoi {
                     bang = bang.scroll_to_row(so_dong - 1, Some(Align::BOTTOM));
                 }
@@ -887,29 +900,19 @@ impl UngDung {
                     None => Column::remainder().at_least(120.0).clip(true),
                 });
             }
-            bang.header(CAO_TIEU_DE, |mut h| {
+            bang.header(cao_tieu_de, |mut h| {
                 for (ten, can, _) in COT_BANG.iter() {
                     h.col(|ui| o_bang(ui, RichText::new(*ten), *can));
                 }
             })
             .body(|body| {
-                body.rows(CAO_DONG, so_dong, |mut row| {
+                body.rows(cao_dong, so_dong, |mut row| {
                     let i = loc.as_ref().map_or(row.index(), |v| v[row.index()]);
-                    let xen_ke = row.index() % 2 == 1;
-                    // Ô đầu tiên tô nền cả dòng (xám nhạt xen kẽ) trước khi các ô vẽ chữ
-                    let to_nen = move |ui: &egui::Ui| {
-                        if xen_ke {
-                            let y = ui.max_rect().expand2(egui::vec2(0.0, ui.spacing().item_spacing.y / 2.0)).y_range();
-                            let gioi_han = egui::Rect::from_x_y_ranges(x_bang, ui.clip_rect().y_range());
-                            ui.ctx().layer_painter(ui.layer_id()).with_clip_rect(gioi_han).rect_filled(egui::Rect::from_x_y_ranges(x_bang, y), 0.0, NEN_XEN_KE);
-                        }
-                    };
                     match &self.dong[i] {
                         DongBang::Loi(duong_dan) => {
                             let ten = Path::new(duong_dan).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| duong_dan.clone());
                             row.col(|ui| {
-                                to_nen(ui);
-                                o_bang(ui, RichText::new("—").color(CHU_PHU), CanLe::Giua);
+                                o_bang(ui,RichText::new("—").color(CHU_PHU), CanLe::Giua);
                             });
                             row.col(|ui| {
                                 ui.add_space(LE_O);
@@ -927,8 +930,7 @@ impl UngDung {
                             let dam = matches!(bo_loc, BoLoc::Kho(k) if *kho == Some(k));
                             let chu = |s: &str| if dam { RichText::new(s).dam() } else { RichText::new(s) };
                             row.col(|ui| {
-                                to_nen(ui);
-                                o_bang(ui, chu(&o[0]).color(CHU_PHU), CanLe::Giua);
+                                o_bang(ui,chu(&o[0]).color(CHU_PHU), CanLe::Giua);
                             });
                             row.col(|ui| {
                                 ui.add_space(LE_O);
@@ -970,7 +972,7 @@ impl UngDung {
             // Trái: thời gian đếm (chạy khi đang đếm, giữ lại khi xong) · Phải: số dòng / số file đang hiển thị
             egui::Frame::new().fill(NEN_XEN_KE).inner_margin(Margin { left: 10, right: 12, top: 0, bottom: 0 }).show(ui, |ui| {
                 let rong = ui.available_width();
-                ui.allocate_ui_with_layout(egui::vec2(rong, CAO_CHAN), Layout::left_to_right(Align::Center), |ui| {
+                ui.allocate_ui_with_layout(egui::vec2(rong, cao_chan), Layout::left_to_right(Align::Center), |ui| {
                     // Đồng hồ: khi đang đếm thì chạy; đếm xong vẫn hiện nếu bảng có kết quả
                     let giay = match &self.dang_dem {
                         Some(d) => Some(d.bat_dau.elapsed().as_secs()),
