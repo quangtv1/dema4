@@ -22,5 +22,8 @@ telegram.txt
 __pycache__/
 *.pyc
 
+# Thư mục chứa code Python cũ và ảnh không dùng (giữ cục bộ, không đưa lên repo)
+temp/
+
 # macOS / editor
 .DS_Store

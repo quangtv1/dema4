@@ -3,7 +3,8 @@
 Đếm số trang A4 trong thư mục PDF: phân loại khổ giấy A0–A7, quy đổi ra số trang A4 theo hệ số, cảnh báo trang sát ngưỡng chuyển khổ và trang có DPI bất thường.
 
 - `dema4_rs/` — bản Rust (giao diện egui + chế độ dòng lệnh). Đây là bản được build qua GitHub Actions.
-- Các file `*.py` — bản gốc viết bằng Python (PyQt5 + PyMuPDF).
+
+Bản gốc viết bằng Python (PyQt5 + PyMuPDF) được giữ cục bộ trong thư mục `temp/`, không đưa lên repo.
 
 ## Build bản Rust
 
