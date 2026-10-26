@@ -69,14 +69,17 @@ impl ChuDam for RichText {
 
 /// Tông xám, font hệ thống có dấu tiếng Việt; áp cho cả chế độ sáng và tối của hệ điều hành
 fn cai_giao_dien(ctx: &egui::Context) {
-    const FONT_THUONG: [&str; 5] = [
+    // Windows: ưu tiên Tahoma, sau đó Segoe UI / Arial làm dự phòng
+    const FONT_THUONG: [&str; 6] = [
+        r"C:\Windows\Fonts\tahoma.ttf",
         r"C:\Windows\Fonts\segoeui.ttf",
         r"C:\Windows\Fonts\arial.ttf",
         "/System/Library/Fonts/Supplemental/Arial.ttf",
         "/Library/Fonts/Arial.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ];
-    const FONT_DAM: [&str; 5] = [
+    const FONT_DAM: [&str; 6] = [
+        r"C:\Windows\Fonts\tahomabd.ttf",
         r"C:\Windows\Fonts\segoeuib.ttf",
         r"C:\Windows\Fonts\arialbd.ttf",
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
