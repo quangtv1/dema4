@@ -18,7 +18,7 @@ const TIEU_DE: &str = "Đếm số trang A4 - SaoMai";
 const SU_KIEN_MOI_KHUNG: usize = 20_000;
 const RONG_NUT: f32 = 80.0;
 /// Dòng báo công khai ở góc dưới khi có cấu hình Telegram; chỉ đổi sang chữ đỏ khi gửi lỗi
-const THONG_BAO_THONG_KE: &str = "Đã thu thập thông tin người dùng";
+const THONG_BAO_THONG_KE: &str = "Thông tin đếm thư mục đã được ghi lại";
 /// Số cột của bảng chi tiết
 const SO_COT: usize = 9;
 
