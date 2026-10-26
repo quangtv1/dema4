@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 description = "Đếm số trang A4 trong thư mục PDF (bản Rust của dema4_gom.py, chức năng 1)"
 
+# Tên file chạy: sm-dema4 (sm-dema4.exe trên Windows)
+[[bin]]
+name = "sm-dema4"
+path = "src/main.rs"
+
 [dependencies]
 # Chỉ cần đọc PDF: tắt các định dạng và font không dùng tới cho nhẹ
 mupdf = { version = "0.8", default-features = false }

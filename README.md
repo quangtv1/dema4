@@ -14,7 +14,7 @@ cd dema4_rs
 cargo build --release
 ```
 
-File chạy: `dema4_rs/target/release/dema4_rs` (Windows: `dema4_rs.exe`).
+File chạy: `dema4_rs/target/release/sm-dema4` (Windows: `sm-dema4.exe`).
 
 GitHub Actions tự build cho macOS (arm64) và Windows (x64) mỗi khi push lên `main`.
 Tạo tag `vX.Y.Z` để sinh Release kèm file chạy.
@@ -22,9 +22,9 @@ Tạo tag `vX.Y.Z` để sinh Release kèm file chạy.
 ## Chế độ dòng lệnh
 
 ```
-dema4_rs <thư mục>             # đếm, ghi <thư mục>/<tên>_dem.txt và _dem_chitiet.txt
-dema4_rs <thư mục> --dpi       # kiểm tra DPI ảnh scan (chậm hơn)
-dema4_rs <thư mục> --khong-ghi # chỉ in kết quả, không ghi file
+sm-dema4 <thư mục>             # đếm, ghi <thư mục>/<tên>_dem.txt và _dem_chitiet.txt
+sm-dema4 <thư mục> --dpi       # kiểm tra DPI ảnh scan (chậm hơn)
+sm-dema4 <thư mục> --khong-ghi # chỉ in kết quả, không ghi file
 ```
 
 ## Gửi thống kê về Telegram (tuỳ chọn)
