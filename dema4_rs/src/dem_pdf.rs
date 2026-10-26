@@ -11,9 +11,44 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::time::Instant;
 
+use mupdf::pdf::{PdfDocument, PdfObject};
 use mupdf::{ColorParams, Colorspace, Device, Document, Image, Matrix, NativeDevice};
 use rayon::prelude::*;
-use walkdir::WalkDir;
+
+fn co_truong_da_ky(pdf: &PdfDocument) -> Result<bool, mupdf::Error> {
+    let Some(acro) = pdf.catalog()?.get_dict("AcroForm")? else {
+        return Ok(false);
+    };
+    let Some(fields) = acro.get_dict("Fields")? else {
+        return Ok(false);
+    };
+    duyet_truong_ky(&fields, 0)
+}
+
+/// Duyệt mảng Fields (và Kids) tìm trường chữ ký đã ký; giới hạn độ sâu để tránh vòng lặp
+fn duyet_truong_ky(mang: &PdfObject, do_sau: u32) -> Result<bool, mupdf::Error> {
+    if do_sau > 8 {
+        return Ok(false);
+    }
+    for i in 0..mang.len().unwrap_or(0) as i32 {
+        let Some(f) = mang.get_array(i)? else { continue };
+        let f = f.resolve()?.unwrap_or(f);
+        let la_sig = f.get_dict("FT")?.and_then(|ft| ft.as_name().ok()).map(|n| n == b"Sig").unwrap_or(false);
+        if la_sig {
+            if let Some(v) = f.get_dict("V")? {
+                if !v.is_null().unwrap_or(true) {
+                    return Ok(true); // có /V = đã ký
+                }
+            }
+        }
+        if let Some(kids) = f.get_dict("Kids")? {
+            if duyet_truong_ky(&kids, do_sau + 1)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
 
 pub const KHO: [&str; 8] = ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7"];
 /// Cạnh dài chuẩn (pt) của từng khổ, từ lớn đến nhỏ
@@ -26,7 +61,7 @@ pub const DPI_CHUAN: f64 = 300.0;
 pub const DPI_SAI_SO: f64 = 0.03;
 
 pub const TIEU_DE_TONG_HOP: &str = "STT\tDuong dan\tSo trang (len)\tA0\tA1\tA2\tA3\tA4\tA5\tA6\tA7\t'=>\tQuy A4\tVi tri page";
-pub const TIEU_DE_CHI_TIET: &str = "STT\tTrang\tChieu rong\tChieu cao\tHuong trang\tKho giay\tDPI\tCanh bao";
+pub const TIEU_DE_CHI_TIET: &str = "STT\tTrang\tChieu rong\tChieu cao\tHuong trang\tKho giay\tDPI\tCanh bao\tKy so";
 const GACH: &str = "------------------------------------------------------";
 
 /// Xếp vào khổ có cạnh dài chuẩn gần nhất (ngưỡng là điểm giữa hai khổ liền kề).
@@ -148,17 +183,51 @@ pub struct KetQuaFile {
     pub lech_dpi: usize,
     /// Số trang có ít nhất một cảnh báo
     pub trang_canh_bao: usize,
+    /// Chữ ký số của file: Some(true)=đã ký, Some(false)=chưa, None=không kiểm tra/không tra được
+    pub ky_so: Option<bool>,
 }
 
 /// Đọc một file PDF; trang nào cũng có dòng chi tiết. Lỗi mở file trả về Err.
 /// `kiem_tra_dpi = false` bỏ qua bước tính DPI (phải chạy nội dung trang, chậm với tài liệu văn bản nhiều trang)
-fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], kiem_tra_dpi: bool, dung: &AtomicBool) -> Result<KetQuaFile, String> {
+/// Tài liệu mở một lần, dùng chung cho đọc trang và (khi cần) kiểm tra chữ ký.
+/// PdfDocument kế thừa Document nên đọc trang qua deref, không phải mở file hai lần.
+enum TaiLieu {
+    Pdf(PdfDocument),
+    Doc(Document),
+}
+
+impl TaiLieu {
+    fn doc(&self) -> &Document {
+        match self {
+            TaiLieu::Pdf(p) => p, // deref PdfDocument -> Document
+            TaiLieu::Doc(d) => d,
+        }
+    }
+}
+
+fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], kiem_tra_dpi: bool, kiem_tra_ky: bool, dung: &AtomicBool) -> Result<KetQuaFile, String> {
     let ten = duong_dan.to_string_lossy();
-    let tai_lieu = Document::open(ten.as_ref()).map_err(|e| e.to_string())?;
+    // Khi cần kiểm tra chữ ký thì mở dạng PdfDocument (vẫn đọc trang được); nếu không thì mở Document như cũ
+    let (tai_lieu, ky_so) = if kiem_tra_ky {
+        let pdf = PdfDocument::open(ten.as_ref()).map_err(|e| e.to_string())?;
+        let ky = Some(co_truong_da_ky(&pdf).unwrap_or(false));
+        (TaiLieu::Pdf(pdf), ky)
+    } else {
+        (TaiLieu::Doc(Document::open(ten.as_ref()).map_err(|e| e.to_string())?), None)
+    };
+    let tai_lieu = tai_lieu.doc();
     let so_trang = tai_lieu.page_count().map_err(|e| e.to_string())? as usize;
     let duong_dan_tuyet_doi = duong_dan_tuyet_doi(duong_dan);
 
-    let mut kq = KetQuaFile { dong_chi_tiet: Vec::with_capacity(so_trang), dong_tong_hop: String::new(), dem: [0; 8], quy_a4: 0.0, sat_nguong: 0, lech_dpi: 0, trang_canh_bao: 0 };
+    // Cột chữ ký: Có / Khong / "-" (không kiểm tra hoặc không tra được)
+    let ky_so_str = match (kiem_tra_ky, ky_so) {
+        (false, _) => "-",
+        (true, Some(true)) => "Có",
+        (true, Some(false)) => "Không",
+        (true, None) => "-",
+    };
+
+    let mut kq = KetQuaFile { dong_chi_tiet: Vec::with_capacity(so_trang), dong_tong_hop: String::new(), dem: [0; 8], quy_a4: 0.0, sat_nguong: 0, lech_dpi: 0, trang_canh_bao: 0, ky_so };
     let mut chuoi_kho: Vec<(usize, usize)> = Vec::new();
 
     for i in 0..so_trang {
@@ -169,7 +238,7 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
         let r = trang.bounds().map_err(|e| e.to_string())?;
         let chieu_rong = lam_tron_3(r.x1 as f64 - r.x0 as f64);
         let chieu_cao = lam_tron_3(r.y1 as f64 - r.y0 as f64);
-        let huong_trang = if chieu_rong > chieu_cao { "Ngang" } else { "Doc" };
+        let huong_trang = if chieu_rong > chieu_cao { "Ngang" } else { "Dọc" };
         let kho = xac_dinh_kho_a(chieu_rong, chieu_cao);
         kq.dem[kho] += 1;
 
@@ -186,9 +255,14 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
             Some((dpi_ngang, dpi_doc)) => {
                 // round() của Python làm tròn nửa về số chẵn
                 let (n, d) = (dpi_ngang.round_ties_even() as i64, dpi_doc.round_ties_even() as i64);
-                let s = if n == d { n.to_string() } else { format!("{n}x{d}") };
+                // Hai trục chênh ≤ 2 DPI coi như bằng nhau (sai số làm tròn ảnh scan): gộp thành 1 số
+                let s = if (n - d).abs() <= 2 {
+                    ((dpi_ngang + dpi_doc) / 2.0).round_ties_even().to_string()
+                } else {
+                    format!("{n}x{d}")
+                };
                 if [dpi_ngang, dpi_doc].iter().any(|x| (x - DPI_CHUAN).abs() > DPI_CHUAN * DPI_SAI_SO) {
-                    canh_bao.push(format!("DPI {s} khac {DPI_CHUAN}"));
+                    canh_bao.push(format!("DPI {s} khác {DPI_CHUAN}"));
                     kq.lech_dpi += 1;
                 }
                 s
@@ -199,7 +273,7 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
             kq.trang_canh_bao += 1;
         }
         kq.dong_chi_tiet.push(format!(
-            "{stt}/{tong}\t{duong_dan_tuyet_doi} => trang: {}\t{}\t{}\t{huong_trang}\t{}\t{dpi_str}\t{}",
+            "{stt}/{tong}\t{duong_dan_tuyet_doi} => trang: {}\t{}\t{}\t{huong_trang}\t{}\t{dpi_str}\t{}\t{ky_so_str}",
             i + 1,
             so_kieu_python(chieu_rong),
             so_kieu_python(chieu_cao),
@@ -224,6 +298,8 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
 pub enum SuKien {
     /// Một dòng hiển thị (tiêu đề, dòng chi tiết trang, hoặc thông báo lỗi mở file)
     Dong(String),
+    /// Đang quét tìm file PDF: số file .pdf đã thấy tới thời điểm này
+    DangTim(usize),
     TienDo(usize, usize),
     Xong(KetQuaDem),
 }
@@ -251,21 +327,72 @@ fn ten_thu_muc(thu_muc: &str) -> String {
 }
 
 /// Danh sách file .pdf trong thư mục và thư mục con, sắp theo đường dẫn như sorted() của Python
-fn tim_file_pdf(thu_muc: &str) -> Vec<PathBuf> {
-    let mut ds: Vec<(String, PathBuf)> = WalkDir::new(thu_muc)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| !e.file_type().is_dir() && e.file_name().to_string_lossy().ends_with(".pdf"))
-        .map(|e| (e.path().to_string_lossy().into_owned(), e.into_path()))
-        .collect();
+/// Thư mục con bị bỏ qua khi quét (rác/hệ thống/cache) để không chui vào vùng chậm.
+/// Chỉ áp cho THƯ MỤC CON; thư mục gốc người dùng chọn luôn được quét.
+/// Lưu ý KHÔNG bỏ qua CloudStorage (Google Drive/iCloud) vì tài liệu có thể nằm ở đó.
+fn bo_qua_thu_muc(ten: &std::ffi::OsStr) -> bool {
+    let ten = ten.to_string_lossy();
+    if ten.starts_with('.') {
+        return true; // thư mục ẩn: .Trash, .git, .cache…
+    }
+    const DANH_SACH: [&str; 7] = [
+        "node_modules",
+        "Library",                   // macOS: cache/app data của người dùng
+        "AppData",                   // Windows: dữ liệu ứng dụng
+        "Windows",                   // Windows: thư mục hệ thống
+        "Program Files",
+        "Program Files (x86)",
+        "$Recycle.Bin",
+    ];
+    DANH_SACH.iter().any(|x| ten.eq_ignore_ascii_case(x))
+}
+
+/// Quét tìm file .pdf bằng bộ duyệt song song jwalk (nhanh hơn nhiều trên cây lớn và thư mục mạng).
+/// Vừa duyệt vừa báo số file đã thấy và kiểm tra cờ dừng để app không "đơ" và bấm Dừng là dừng ngay.
+/// Bỏ qua thư mục hệ thống/cache (bo_qua_thu_muc), thư mục không đọc được, và không đi theo symlink.
+fn tim_file_pdf(thu_muc: &str, dung: &AtomicBool, gui: &Sender<SuKien>) -> Vec<PathBuf> {
+    let duyet = jwalk::WalkDir::new(thu_muc)
+        .skip_hidden(false) // tự lọc ẩn trong bo_qua_thu_muc để vẫn quét được thư mục gốc là ẩn
+        .follow_links(false)
+        .process_read_dir(|depth, _path, _state, children| {
+            // depth None là lần đọc ảo sinh ra entry thư mục gốc: gốc người dùng chọn luôn được quét,
+            // kể cả khi tên là ".", bắt đầu bằng "." hay trùng danh sách bỏ qua
+            if depth.is_none() {
+                return;
+            }
+            // Cắt nhánh: không đi vào thư mục con rác/hệ thống; bỏ entry không đọc được
+            children.retain(|r| match r {
+                Ok(e) => !(e.file_type.is_dir() && bo_qua_thu_muc(&e.file_name)),
+                Err(_) => false,
+            });
+        });
+
+    let mut ds: Vec<(String, PathBuf)> = Vec::new();
+    for muc in duyet {
+        if dung.load(Ordering::Relaxed) {
+            break;
+        }
+        let Ok(muc) = muc else {
+            continue;
+        };
+        // Đuôi .pdf không phân biệt hoa/thường (.PDF, .Pdf…); so trên byte để không cắt giữa ký tự UTF-8
+        let ten = muc.file_name().to_string_lossy();
+        let la_pdf = ten.len() >= 4 && ten.as_bytes()[ten.len() - 4..].eq_ignore_ascii_case(b".pdf");
+        if !muc.file_type().is_dir() && la_pdf {
+            ds.push((muc.path().to_string_lossy().into_owned(), muc.path()));
+            if ds.len() % 100 == 0 {
+                let _ = gui.send(SuKien::DangTim(ds.len()));
+            }
+        }
+    }
     ds.sort_by(|a, b| a.0.cmp(&b.0));
     ds.into_iter().map(|(_, p)| p).collect()
 }
 
 /// Đếm cả thư mục. Các file được đọc song song nhưng kết quả gửi về đúng thứ tự file.
-pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, dung: &AtomicBool, gui: &Sender<SuKien>) {
+pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, kiem_tra_ky: bool, dung: &AtomicBool, gui: &Sender<SuKien>) {
     let bat_dau = Instant::now();
-    let cac_file = tim_file_pdf(thu_muc);
+    let cac_file = tim_file_pdf(thu_muc, dung, gui);
     let tong = cac_file.len();
     let _ = gui.send(SuKien::Dong(TIEU_DE_CHI_TIET.to_string()));
 
@@ -273,7 +400,7 @@ pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, dung: &At
     let mut dong_chi_tiet = Vec::new();
     let mut dem_tong = [0usize; 8];
     let mut quy_a4_tong: Option<f64> = None; // None: chưa đếm được file nào (Python in ra "0")
-    let (mut sat_nguong, mut lech_dpi, mut trang_canh_bao) = (0usize, 0usize, 0usize);
+    let (mut sat_nguong, mut lech_dpi, mut trang_canh_bao, mut so_file_ky_so) = (0usize, 0usize, 0usize, 0usize);
     let mut file_loi = Vec::new();
     let mut da_xong = 0usize;
 
@@ -285,7 +412,7 @@ pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, dung: &At
                 if dung.load(Ordering::Relaxed) {
                     return;
                 }
-                let _ = tx.send((i, phan_tich_file(p, i + 1, tong, &he_so, kiem_tra_dpi, dung)));
+                let _ = tx.send((i, phan_tich_file(p, i + 1, tong, &he_so, kiem_tra_dpi, kiem_tra_ky, dung)));
             });
         });
 
@@ -304,6 +431,9 @@ pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, dung: &At
                         }
                         quy_a4_tong = Some(quy_a4_tong.unwrap_or(0.0) + kq.quy_a4);
                         sat_nguong += kq.sat_nguong;
+                        if kq.ky_so == Some(true) {
+                            so_file_ky_so += 1;
+                        }
                         trang_canh_bao += kq.trang_canh_bao;
                         lech_dpi += kq.lech_dpi;
                         dong_chi_tiet.extend(kq.dong_chi_tiet);
@@ -346,9 +476,11 @@ pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, dung: &At
     tong_hop += &format!(
         "{GACH}\nCảnh báo cần kiểm tra (xem cột Canh bao ở danh sách trang):\n\
          \x20- Số trang sát ngưỡng chuyển khổ (>= {}% nửa khoảng): {sat_nguong}\n\
-         \x20- Số trang có DPI khác {DPI_CHUAN}: {}\n{GACH}\n",
+         \x20- Số trang có DPI khác {DPI_CHUAN}: {}\n\
+         \x20- Số file đã ký số: {}\n{GACH}\n",
         (NGUONG_CANH_BAO * 100.0).round() as i64,
-        if kiem_tra_dpi { lech_dpi.to_string() } else { "không kiểm tra".to_string() }
+        if kiem_tra_dpi { lech_dpi.to_string() } else { "không kiểm tra".to_string() },
+        if kiem_tra_ky { so_file_ky_so.to_string() } else { "không kiểm tra".to_string() }
     );
     if !file_loi.is_empty() {
         tong_hop += &format!("Danh sách file PDF bị lỗi ({} file, không được đếm):\n{}\n{GACH}\n", file_loi.len(), file_loi.join("\n"));
@@ -394,6 +526,17 @@ pub fn luu_ket_qua(kq: &KetQuaDem, duong_dan: &Path) -> io::Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bo_qua_thu_muc_he_thong_va_an_nhung_giu_cloudstorage() {
+        use std::ffi::OsStr;
+        for ten in ["node_modules", "Library", ".git", ".Trash", "AppData", "Windows", "$Recycle.Bin"] {
+            assert!(bo_qua_thu_muc(OsStr::new(ten)), "phải bỏ qua {ten}");
+        }
+        for ten in ["02", "CloudStorage", "GoogleDrive", "Documents", "ho_so"] {
+            assert!(!bo_qua_thu_muc(OsStr::new(ten)), "KHÔNG được bỏ qua {ten}");
+        }
+    }
 
     const PT: f64 = 72.0 / 25.4;
 
@@ -441,6 +584,118 @@ mod tests {
         assert_eq!(so_kieu_python(2526.0), "2526.0");
         assert_eq!(so_kieu_python(0.125), "0.125");
         assert_eq!(lam_tron_3(841.8897637795275), 841.89);
+    }
+
+    /// PDF tối thiểu không có xref (MuPDF tự sửa được): chèn thêm vào Page, object rời, và Catalog
+    fn pdf_toi_thieu(trang_them: &[u8], obj_them: &[u8], catalog_them: &[u8]) -> Vec<u8> {
+        let mut v = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R".to_vec();
+        v.extend_from_slice(catalog_them);
+        v.extend_from_slice(b">>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]");
+        v.extend_from_slice(trang_them);
+        v.extend_from_slice(b">>endobj\n");
+        v.extend_from_slice(obj_them);
+        v.extend_from_slice(b"trailer<</Root 1 0 R>>\n%%EOF\n");
+        v
+    }
+
+    fn thu_muc_tam(ten: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("dema4_test_{ten}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn quet_ca_thu_muc_goc_an_hoac_trung_danh_sach_bo_qua_nhung_van_bo_qua_thu_muc_con() {
+        let goc = thu_muc_tam("goc_an");
+        let pdf = pdf_toi_thieu(b"", b"", b"");
+        for ten_goc in [".an", "node_modules"] {
+            let d = goc.join(ten_goc);
+            let con = d.join("node_modules");
+            std::fs::create_dir_all(&con).unwrap();
+            for ten in ["a.pdf", "B.PDF", "c.Pdf", "d.pdfx", "e.txt"] {
+                std::fs::write(d.join(ten), &pdf).unwrap();
+            }
+            std::fs::write(con.join("b.pdf"), &pdf).unwrap();
+            let (gui, _nhan) = mpsc::channel();
+            let ds = tim_file_pdf(d.to_str().unwrap(), &AtomicBool::new(false), &gui);
+            // Đuôi .pdf không phân biệt hoa/thường; .pdfx và .txt bị bỏ; con node_modules bị bỏ
+            assert_eq!(ds, vec![d.join("B.PDF"), d.join("a.pdf"), d.join("c.Pdf")], "gốc {ten_goc} phải được quét đúng");
+        }
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    #[test]
+    fn pdf_co_widget_chu_ky_tren_trang_mo_duoc_va_bao_da_ky() {
+        let d = thu_muc_tam("widget_ky");
+        let pdf = pdf_toi_thieu(
+            b"/Annots[4 0 R]",
+            b"4 0 obj<</Type/Annot/Subtype/Widget/FT/Sig/T(chuky)/Rect[50 50 250 120]/P 3 0 R/F 4/V 5 0 R>>endobj\n\
+              5 0 obj<</Type/Sig/Filter/Adobe.PPKLite/SubFilter/adbe.pkcs7.detached/ByteRange[0 0 0 0]/Contents<00>>>endobj\n",
+            b"/AcroForm<</Fields[4 0 R]/SigFlags 3>>",
+        );
+        let p = d.join("ky.pdf");
+        std::fs::write(&p, &pdf).unwrap();
+        let kq = phan_tich_file(&p, 1, 1, &HE_SO_MAC_DINH, true, true, &AtomicBool::new(false)).expect("phải mở được PDF có widget chữ ký");
+        assert_eq!(kq.ky_so, Some(true));
+        assert_eq!(kq.dong_chi_tiet.len(), 1);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn file_hong_khong_lam_dung_dem_va_bam_dung_van_nhan_duoc_xong() {
+        let d = thu_muc_tam("hong_va_dung");
+        let pdf = pdf_toi_thieu(b"", b"", b"");
+        std::fs::write(d.join("00_rong.pdf"), b"").unwrap();
+        std::fs::write(d.join("01_rac.pdf"), b"khong phai pdf").unwrap();
+        const SO_FILE_OK: usize = 1500;
+        for i in 0..SO_FILE_OK {
+            std::fs::write(d.join(format!("{:04}_ok.pdf", i + 10)), &pdf).unwrap();
+        }
+        let thu_muc = d.to_str().unwrap();
+
+        // Đếm trọn: 2 file hỏng được báo lỗi, các file còn lại vẫn đếm đủ
+        let (gui, nhan) = mpsc::channel();
+        dem_thu_muc(thu_muc, HE_SO_MAC_DINH, false, true, &AtomicBool::new(false), &gui);
+        drop(gui);
+        let xong = nhan.into_iter().find_map(|s| if let SuKien::Xong(kq) = s { Some(kq) } else { None }).expect("phải có Xong");
+        assert_eq!(xong.so_file_loi, 2);
+        assert_eq!(xong.dong_tong_hop.len(), SO_FILE_OK);
+        assert_eq!(xong.tong_so_trang, SO_FILE_OK);
+
+        // Bấm Dừng ngay khi có tiến độ đầu tiên: vẫn phải nhận được Xong, không panic
+        let dung = AtomicBool::new(false);
+        let (gui, nhan) = mpsc::channel();
+        let xong = std::thread::scope(|s| {
+            s.spawn(|| dem_thu_muc(thu_muc, HE_SO_MAC_DINH, false, false, &dung, &gui));
+            let mut xong = None;
+            for su_kien in &nhan {
+                match su_kien {
+                    SuKien::TienDo(..) => dung.store(true, Ordering::Relaxed),
+                    SuKien::Xong(kq) => {
+                        xong = Some(kq);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            xong
+        })
+        .expect("bấm Dừng vẫn phải có Xong");
+        assert!(xong.dong_tong_hop.len() <= SO_FILE_OK);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Chẩn đoán tay: in lý do một file không mở được.
+    /// Chạy: DEMA4_FILE=<đường dẫn> cargo test -- --ignored --nocapture in_ly_do_loi_mo_file
+    #[test]
+    #[ignore = "chẩn đoán tay, cần DEMA4_FILE"]
+    fn in_ly_do_loi_mo_file() {
+        let p = PathBuf::from(std::env::var("DEMA4_FILE").expect("DEMA4_FILE"));
+        match phan_tich_file(&p, 1, 1, &HE_SO_MAC_DINH, true, true, &AtomicBool::new(false)) {
+            Ok(kq) => println!("Mở OK: {} trang, ký số {:?}", kq.dong_chi_tiet.len(), kq.ky_so),
+            Err(e) => println!("LỖI: {e}"),
+        }
     }
 
     #[test]

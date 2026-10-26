@@ -4,7 +4,7 @@
 //! Đếm số trang A4 trong thư mục PDF.
 //! - Không tham số: mở giao diện.
 //! - `dema4_rs <thư mục>`: đếm không cần giao diện, ghi <thư mục>/<tên>_dem.txt và <tên>_dem_chitiet.txt.
-//! - Thêm `--dpi` để kiểm tra DPI ảnh scan (mặc định không kiểm tra cho nhanh).
+//! - Thêm `--dpi` để kiểm tra DPI ảnh scan, `--kyso` để kiểm tra chữ ký số (mặc định tắt).
 //! - `dema4_rs <thư mục> --khong-ghi`: chỉ đếm và in kết quả (không ghi file, không gửi thống kê), dùng để đo tốc độ.
 
 mod dem_pdf;
@@ -25,7 +25,8 @@ fn main() {
             }
             let khong_ghi = std::env::args().any(|a| a == "--khong-ghi");
             let kiem_tra_dpi = std::env::args().any(|a| a == "--dpi");
-            std::process::exit(chay_dong_lenh(&thu_muc, kiem_tra_dpi, khong_ghi));
+            let kiem_tra_ky = std::env::args().any(|a| a == "--kyso");
+            std::process::exit(chay_dong_lenh(&thu_muc, kiem_tra_dpi, kiem_tra_ky, khong_ghi));
         }
         None => {
             if let Err(e) = gui::chay() {
@@ -36,10 +37,10 @@ fn main() {
     }
 }
 
-fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, khong_ghi: bool) -> i32 {
+fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_ghi: bool) -> i32 {
     let bat_dau = std::time::Instant::now();
     let (gui, nhan) = mpsc::channel();
-    dem_pdf::dem_thu_muc(thu_muc, dem_pdf::HE_SO_MAC_DINH, kiem_tra_dpi, &AtomicBool::new(false), &gui);
+    dem_pdf::dem_thu_muc(thu_muc, dem_pdf::HE_SO_MAC_DINH, kiem_tra_dpi, kiem_tra_ky, &AtomicBool::new(false), &gui);
     drop(gui);
 
     let mut ket_qua = None;

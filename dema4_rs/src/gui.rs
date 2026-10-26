@@ -20,7 +20,7 @@ const RONG_NUT: f32 = 80.0;
 /// Dòng báo công khai ở góc dưới khi có cấu hình Telegram; chỉ đổi sang chữ đỏ khi gửi lỗi
 const THONG_BAO_THONG_KE: &str = "Thông tin đếm thư mục đã được ghi lại";
 /// Số cột của bảng chi tiết
-const SO_COT: usize = 9;
+const SO_COT: usize = 10;
 
 // Bảng màu xám kiểu Windows cổ điển; chỉ nút Đếm/Dừng và chữ cảnh báo có màu
 const NEN: Color32 = Color32::from_rgb(0xF0, 0xF0, 0xF0);
@@ -36,6 +36,7 @@ const DO_SAM: Color32 = Color32::from_rgb(0xA0, 0x10, 0x10);
 const CHU_MO: Color32 = Color32::from_rgb(0xA8, 0xA8, 0xA8);
 /// Màu phần đã chạy của thanh tiến độ (xanh nhạt cho dễ nhìn)
 const XAM_TIEN_DO: Color32 = Color32::from_rgb(0xA8, 0xD1, 0xF5);
+const XANH_COBALT: Color32 = Color32::from_rgb(0x00, 0x47, 0xAB);
 
 pub fn chay() -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default().with_inner_size([980.0, 600.0]).with_min_inner_size([800.0, 420.0]).with_title(TIEU_DE);
@@ -163,6 +164,8 @@ struct ThongKe {
     theo_kho: [usize; 8],
     canh_bao: usize,
     loi: usize,
+    /// Số file đã ký số (đếm theo file, dựa trên trang đầu của mỗi file)
+    da_ky: usize,
 }
 
 struct DangDem {
@@ -193,6 +196,12 @@ struct ThongBaoXong {
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
+enum LocKySo {
+    TatCa,
+    Co,
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum BoLoc {
     TatCa,
     /// Trang có cảnh báo
@@ -210,7 +219,9 @@ struct UngDung {
     kho_cua_file: Vec<u8>,
     bo_loc: BoLoc,
     /// Kết quả lọc đã tính: (bộ lọc, số dòng lúc tính, chỉ số các dòng hiện)
-    da_loc: Option<(BoLoc, usize, Vec<usize>)>,
+    /// Lọc theo cột Ký số (dropdown ở header)
+    loc_ky_so: LocKySo,
+    da_loc: Option<((BoLoc, LocKySo, usize), Vec<usize>)>,
     thong_ke: ThongKe,
     tien_do: Option<(usize, usize)>,
     dang_dem: Option<DangDem>,
@@ -221,11 +232,19 @@ struct UngDung {
     /// Hệ số đã dùng cho lần đếm gần nhất (để nhắc khi người dùng đổi hệ số sau đó)
     he_so_da_dung: Option<[f64; 8]>,
     thong_bao: Option<ThongBaoXong>,
+    /// Thời gian của lần đếm xong gần nhất (hiện ở dòng chân khi bảng có kết quả)
+    thoi_gian_dem: Option<Duration>,
+    /// Đường dẫn và chỉ số file của dòng trang gần nhất, để gom các trang cùng file
+    file_cuoi: Option<(String, usize)>,
+    /// Số dòng của bảng lúc cuộn tới cuối lần gần nhất; khác dong.len() là có dòng mới cần cuộn theo
+    so_dong_da_cuon: usize,
     /// Khối "KẾT QUẢ ĐẾM" của lần đếm xong gần nhất, dùng cho nút copy
     ket_qua_chep: Option<String>,
     da_chep_luc: Option<Instant>,
     /// Ô "Check DPI": mặc định tắt cho nhanh
     kiem_tra_dpi: bool,
+    /// Ô "Check chữ ký": mặc định tắt
+    kiem_tra_ky: bool,
     /// Có file telegram.txt cạnh file chạy (đọc lúc mở app); quyết định có hiện dòng báo trong popup không
     co_telegram: bool,
 }
@@ -237,6 +256,7 @@ impl Default for UngDung {
             dong: Vec::new(),
             kho_cua_file: Vec::new(),
             bo_loc: BoLoc::TatCa,
+            loc_ky_so: LocKySo::TatCa,
             da_loc: None,
             thong_ke: ThongKe::default(),
             tien_do: None,
@@ -246,9 +266,13 @@ impl Default for UngDung {
             he_so: HE_SO_MAC_DINH.map(dem_pdf::so_kieu_python),
             he_so_da_dung: None,
             thong_bao: None,
+            thoi_gian_dem: None,
+            file_cuoi: None,
+            so_dong_da_cuon: 0,
             ket_qua_chep: None,
             da_chep_luc: None,
             kiem_tra_dpi: false,
+            kiem_tra_ky: true,
             co_telegram: telegram::doc_cau_hinh().is_some(),
         }
     }
@@ -312,11 +336,12 @@ const CAO_DONG: f32 = 22.0;
 const COT_BANG: [(&str, CanLe, Option<f32>); SO_COT] = [
     ("STT", CanLe::Giua, Some(76.0)),
     ("File (bấm để mở)", CanLe::Trai, None),
-    ("Trang", CanLe::Phai, Some(58.0)),
-    ("Chiều rộng", CanLe::Phai, Some(86.0)),
-    ("Chiều cao", CanLe::Phai, Some(86.0)),
+    ("Trang", CanLe::Phai, Some(48.0)),
+    ("Chiều rộng", CanLe::Phai, Some(78.0)),
+    ("Chiều cao", CanLe::Phai, Some(78.0)),
     ("Hướng", CanLe::Giua, Some(68.0)),
     ("Khổ", CanLe::Giua, Some(52.0)),
+    ("Ký số", CanLe::Giua, Some(84.0)),
     ("DPI", CanLe::Giua, Some(58.0)),
     ("Cảnh báo", CanLe::Trai, Some(176.0)),
 ];
@@ -383,6 +408,25 @@ fn nut_mau(chu: &str, nen: Color32) -> egui::Button<'static> {
 }
 
 impl UngDung {
+    /// Xoá kết quả bảng về như lúc mới mở ứng dụng (giữ thư mục, hệ số, tuỳ chọn)
+    fn xoa_ket_qua(&mut self) {
+        self.dong.clear();
+        self.kho_cua_file.clear();
+        self.da_loc = None;
+        self.bo_loc = BoLoc::TatCa;
+        self.loc_ky_so = LocKySo::TatCa;
+        self.thong_ke = ThongKe::default();
+        self.tien_do = None;
+        self.ket_qua_chep = None;
+        self.da_chep_luc = None;
+        self.thong_bao = None;
+        self.thoi_gian_dem = None;
+        self.file_cuoi = None;
+        self.so_dong_da_cuon = 0;
+        self.he_so_da_dung = None;
+        self.trang_thai = String::new();
+    }
+
     fn bat_dau_dem(&mut self, ctx: &egui::Context) {
         let thu_muc = self.thu_muc.trim().to_string();
         if thu_muc.is_empty() {
@@ -402,20 +446,14 @@ impl UngDung {
             }
         };
 
-        self.dong.clear();
-        self.kho_cua_file.clear();
-        self.da_loc = None;
-        self.bo_loc = BoLoc::TatCa;
-        self.thong_ke = ThongKe::default();
-        self.tien_do = None;
-        self.ket_qua_chep = None;
+        self.xoa_ket_qua();
         self.trang_thai = "Đang tìm file PDF…".into();
 
         let (gui, nhan) = mpsc::channel();
         let dung = Arc::new(AtomicBool::new(false));
-        let (tm, dung_luong, ctx, kiem_tra_dpi) = (thu_muc.clone(), Arc::clone(&dung), ctx.clone(), self.kiem_tra_dpi);
+        let (tm, dung_luong, ctx, kiem_tra_dpi, kiem_tra_ky) = (thu_muc.clone(), Arc::clone(&dung), ctx.clone(), self.kiem_tra_dpi, self.kiem_tra_ky);
         std::thread::spawn(move || {
-            dem_pdf::dem_thu_muc(&tm, he_so, kiem_tra_dpi, &dung_luong, &gui);
+            dem_pdf::dem_thu_muc(&tm, he_so, kiem_tra_dpi, kiem_tra_ky, &dung_luong, &gui);
             ctx.request_repaint();
         });
         self.he_so_da_dung = Some(he_so);
@@ -429,11 +467,18 @@ impl UngDung {
             return;
         }
         let o: Vec<String> = s.split('\t').map(str::to_owned).collect();
-        if o.len() != 8 || o[0] == "STT" {
+        if o.len() != 9 || o[0] == "STT" {
             return; // dòng tiêu đề
         }
-        // Cột STT dạng "114/121" -> file thứ 113
-        let file = o[0].split('/').next().and_then(|x| x.parse::<usize>().ok()).unwrap_or(1).saturating_sub(1);
+        // Các trang của một file đến liền nhau: đổi đường dẫn (phần trước " => trang: ") là sang file mới.
+        // Đánh chỉ số file theo cách này nên không phụ thuộc cột STT và không thể cấp phát vô hạn
+        let duong_dan = o[1].rsplit_once(" => trang: ").map_or(o[1].as_str(), |(d, _)| d);
+        let file = match &self.file_cuoi {
+            Some((d, i)) if d == duong_dan => *i,
+            Some((_, i)) => i + 1,
+            None => 0,
+        };
+        self.file_cuoi = Some((duong_dan.to_string(), file));
         if self.kho_cua_file.len() <= file {
             self.kho_cua_file.resize(file + 1, 0);
         }
@@ -446,6 +491,10 @@ impl UngDung {
         self.thong_ke.trang += 1;
         if canh_bao {
             self.thong_ke.canh_bao += 1;
+        }
+        // Ký số là thuộc tính của file: đếm một lần ở trang đầu mỗi file
+        if o[8] == "Có" && o[1].ends_with(" => trang: 1") {
+            self.thong_ke.da_ky += 1;
         }
         self.dong.push(DongBang::Trang { o, canh_bao, file, kho });
     }
@@ -467,26 +516,37 @@ impl UngDung {
 
     /// Chỉ số các dòng hiện theo bộ lọc; tính lại khi đổi bộ lọc hoặc có thêm dòng
     fn dong_hien(&mut self) -> Option<&[usize]> {
-        if self.bo_loc == BoLoc::TatCa {
+        // Không lọc gì cả thì hiện toàn bộ (None)
+        if self.bo_loc == BoLoc::TatCa && self.loc_ky_so == LocKySo::TatCa {
             return None;
         }
-        let can_tinh = !matches!(&self.da_loc, Some((loc, n, _)) if *loc == self.bo_loc && *n == self.dong.len());
+        let khoa = (self.bo_loc, self.loc_ky_so, self.dong.len());
+        let can_tinh = !matches!(&self.da_loc, Some((k, _)) if *k == khoa);
         if can_tinh {
+            let (bo_loc, loc_ky) = (self.bo_loc, self.loc_ky_so);
             let chon: Vec<usize> = self
                 .dong
                 .iter()
                 .enumerate()
-                .filter(|(_, d)| match (self.bo_loc, d) {
-                    (BoLoc::CanhBao, DongBang::Trang { canh_bao, .. }) => *canh_bao,
-                    (BoLoc::Loi, DongBang::Loi(_)) => true,
-                    (BoLoc::Kho(k), DongBang::Trang { file, .. }) => self.kho_cua_file[*file] & (1 << k) != 0,
-                    _ => false,
+                .filter(|(_, d)| {
+                    let hop_bo_loc = match (bo_loc, d) {
+                        (BoLoc::TatCa, _) => true,
+                        (BoLoc::CanhBao, DongBang::Trang { canh_bao, .. }) => *canh_bao,
+                        (BoLoc::Loi, DongBang::Loi(_)) => true,
+                        (BoLoc::Kho(k), DongBang::Trang { file, .. }) => self.kho_cua_file[*file] & (1 << k) != 0,
+                        _ => false,
+                    };
+                    let hop_ky = match loc_ky {
+                        LocKySo::TatCa => true,
+                        LocKySo::Co => matches!(d, DongBang::Trang { o, .. } if o[8] == "Có"),
+                    };
+                    hop_bo_loc && hop_ky
                 })
                 .map(|(i, _)| i)
                 .collect();
-            self.da_loc = Some((self.bo_loc, self.dong.len(), chon));
+            self.da_loc = Some((khoa, chon));
         }
-        self.da_loc.as_ref().map(|(_, _, v)| v.as_slice())
+        self.da_loc.as_ref().map(|(_, v)| v.as_slice())
     }
 
     /// Nhận kết quả từ luồng đếm; trả về kết quả cuối cùng khi đếm xong
@@ -498,6 +558,7 @@ impl UngDung {
         for _ in 0..SU_KIEN_MOI_KHUNG {
             match dang_dem.nhan.try_recv() {
                 Ok(SuKien::Dong(s)) => moi.push(s),
+                Ok(SuKien::DangTim(n)) => self.trang_thai = format!("Đang tìm file PDF… đã thấy {}", so_nguyen(n)),
                 Ok(SuKien::TienDo(d, t)) => self.tien_do = Some((d, t)),
                 Ok(SuKien::Xong(kq)) => {
                     xong = Some(kq);
@@ -530,6 +591,7 @@ impl UngDung {
     /// Tự lưu vào <thư mục>/<tên thư mục>_dem.txt (ghi đè nếu đã có) rồi mở popup tóm tắt
     fn luu_va_thong_bao(&mut self, kq: &KetQuaDem, xong: DaXong) {
         self.ket_qua_chep = Some(kq.tong_hop.trim_start_matches('\n').to_string());
+        self.thoi_gian_dem = Some(xong.thoi_gian);
         let duong_dan = dem_pdf::duong_dan_luu_mac_dinh(&xong.thu_muc);
         let ket_qua = match dem_pdf::luu_ket_qua(kq, &duong_dan) {
             Ok(_) => Ok(duong_dan),
@@ -574,6 +636,8 @@ impl UngDung {
             if ui.add_enabled(ranh, nut("Chọn")).clicked() {
                 if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục chứa PDF").pick_folder() {
                     self.thu_muc = p.display().to_string();
+                    // Chọn thư mục mới: xoá bảng kết quả cũ như lúc mới mở ứng dụng
+                    self.xoa_ket_qua();
                 }
             }
             match &self.dang_dem {
@@ -646,43 +710,57 @@ impl UngDung {
                 }
                 ui.add_space(14.0);
             }
+            // Ký số: liên kết lọc nhanh các file đã ký số
+            ui.label(RichText::new("Ký số:").color(CHU_PHU));
+            let dang_loc_ky = self.loc_ky_so == LocKySo::Co;
+            let mau_ky = if tk.da_ky > 0 { XANH_COBALT } else { CHU };
+            if lien_ket(ui, RichText::new(so_nguyen(tk.da_ky)).color(mau_ky), dang_loc_ky, tk.da_ky > 0) {
+                self.loc_ky_so = if dang_loc_ky { LocKySo::TatCa } else { LocKySo::Co };
+            }
+            ui.add_space(14.0);
+
+            // Nút copy ngay sau "File lỗi": chép khối "KẾT QUẢ ĐẾM", chỉ bấm được sau khi đếm xong
+            let co_ket_qua = self.dang_dem.is_none() && self.ket_qua_chep.is_some();
+            let nut = nut_copy(ui, co_ket_qua);
+            let nut = if co_ket_qua { nut.on_hover_text("Sao chép kết quả đếm") } else { nut.on_hover_text("Chỉ sao chép được sau khi đếm xong") };
+            if co_ket_qua && nut.clicked() {
+                if let Some(chu) = &self.ket_qua_chep {
+                    ui.ctx().copy_text(chu.clone());
+                    self.da_chep_luc = Some(Instant::now());
+                }
+            }
+            if let Some(luc) = self.da_chep_luc {
+                if luc.elapsed() < Duration::from_secs(2) {
+                    ui.add_space(6.0);
+                    ui.label(RichText::new("Đã sao chép").color(CHU_PHU));
+                    ui.ctx().request_repaint_after(Duration::from_millis(200));
+                } else {
+                    self.da_chep_luc = None;
+                }
+            }
+
             let he_so_doi = matches!((self.he_so_da_dung, self.he_so_hien_tai()), (Some(cu), Ok(moi)) if cu != moi);
             if he_so_doi && self.dang_dem.is_none() {
+                ui.add_space(14.0);
                 ui.label(RichText::new("Hệ số đã đổi – bấm Đếm để ghi lại file kết quả").italics().color(CHU_PHU));
             }
 
-            // Nút copy căn phải: chép khối "KẾT QUẢ ĐẾM", chỉ bấm được sau khi đếm xong
+            // Bên phải: Check ký số, Check DPI, liên kết Hệ số
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let co_ket_qua = self.dang_dem.is_none() && self.ket_qua_chep.is_some();
-                let nut = nut_copy(ui, co_ket_qua);
-                let nut = if co_ket_qua { nut.on_hover_text("Sao chép kết quả đếm") } else { nut.on_hover_text("Chỉ sao chép được sau khi đếm xong") };
-                if co_ket_qua && nut.clicked() {
-                    if let Some(chu) = &self.ket_qua_chep {
-                        ui.ctx().copy_text(chu.clone());
-                        self.da_chep_luc = Some(Instant::now());
-                    }
-                }
-                // Ô "Check DPI" ngay bên trái icon copy
-                ui.add_space(6.0);
                 ui.add_enabled(self.dang_dem.is_none(), egui::Checkbox::new(&mut self.kiem_tra_dpi, "Check DPI")).on_hover_text(
                     "Tính DPI ảnh scan và cảnh báo trang có DPI khác 300.\nChạy nội dung từng trang nên chậm với tài liệu văn bản nhiều trang; tắt để đếm nhanh.",
                 );
+                ui.add_space(6.0);
+                ui.add_enabled(self.dang_dem.is_none(), egui::Checkbox::new(&mut self.kiem_tra_ky, "Check ký số")).on_hover_text(
+                    "Kiểm tra từng file PDF đã ký số hay chưa (đọc AcroForm, một lần mỗi file).\nNhẹ hơn Check DPI nhiều.",
+                );
                 // Liên kết "Hệ số" bên trái ô Check DPI: bấm để mở / thu hàng hệ số ngay bên dưới
                 ui.add_space(10.0);
-                let chu_he_so = if self.hien_he_so { "Hệ số ▲" } else { "Hệ số ▼" };
-                let ui_lien_ket = ui.scope(|ui| lien_ket(ui, RichText::new(chu_he_so), false, true));
+                let ui_lien_ket = ui.scope(|ui| lien_ket(ui, RichText::new("Hệ số"), self.hien_he_so, true));
                 if ui_lien_ket.inner {
                     self.hien_he_so = !self.hien_he_so;
                 }
                 ui_lien_ket.response.on_hover_text("Hệ số nhân với số trang mỗi khổ để ra số trang quy A4");
-                if let Some(luc) = self.da_chep_luc {
-                    if luc.elapsed() < Duration::from_secs(2) {
-                        ui.label(RichText::new("Đã sao chép").color(CHU_PHU));
-                        ui.ctx().request_repaint_after(Duration::from_millis(200));
-                    } else {
-                        self.da_chep_luc = None;
-                    }
-                }
             });
         });
     }
@@ -746,7 +824,13 @@ impl UngDung {
             ui.add_space(-ui.spacing().item_spacing.y);
             if self.dong.is_empty() {
                 ui.allocate_ui_with_layout(ui.available_size(), Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
-                    let goi_y = if self.dang_dem.is_some() { "Đang đọc file…" } else { "Chọn thư mục chứa PDF rồi bấm Đếm" };
+                    let goi_y = if self.dang_dem.is_some() {
+                        "Đang đọc file…"
+                    } else if !self.thu_muc.trim().is_empty() {
+                        "Click nút Đếm để thực hiện"
+                    } else {
+                        "Chọn thư mục chứa PDF rồi bấm Đếm"
+                    };
                     ui.label(RichText::new(goi_y).color(CHU_PHU));
                 });
                 return;
@@ -754,17 +838,49 @@ impl UngDung {
             let bo_loc = self.bo_loc;
             let loc: Option<Vec<usize>> = self.dong_hien().map(<[usize]>::to_vec);
             let so_dong = loc.as_ref().map_or(self.dong.len(), Vec::len);
-            let mut file_can_mo: Option<String> = None;
+            // Số file pdf trong phần đang hiển thị: không lọc thì lấy tổng (O(1)),
+            // có lọc thì đếm file khác nhau trong danh sách đã lọc (nhỏ)
+            let so_file = match &loc {
+                None => self.tien_do.map_or(0, |(d, _)| d),
+                Some(v) => {
+                    let mut files = std::collections::HashSet::new();
+                    let mut loi = 0usize;
+                    for &i in v {
+                        match &self.dong[i] {
+                            DongBang::Trang { file, .. } => {
+                                files.insert(*file);
+                            }
+                            DongBang::Loi(_) => loi += 1,
+                        }
+                    }
+                    files.len() + loi
+                }
+            };
+            // Chừa chỗ cho dòng chân (số dòng / số file) ở đáy bảng: bảng chiếm phần còn lại
+            const CAO_CHAN: f32 = 28.0;
+            let cao_bang = (ui.available_height() - CAO_CHAN).max(60.0);
+            let rong_bang = ui.available_width();
+            let file_can_mo = ui.allocate_ui_with_layout(egui::vec2(rong_bang, cao_bang), Layout::top_down(Align::Min), |ui| {
+                let mut file_can_mo: Option<String> = None;
 
-            // Nền xám nhạt và đường kẻ dưới cho hàng tiêu đề
-            let x_bang = ui.max_rect().expand2(egui::vec2(2.0, 0.0)).x_range();
-            let khe = ui.spacing().item_spacing.y;
-            let vung_dau = egui::Rect::from_min_size(ui.cursor().min - egui::vec2(2.0, 0.0), egui::vec2(ui.available_width() + 4.0, CAO_TIEU_DE + khe / 2.0));
-            ui.painter().rect_filled(vung_dau, 0.0, NEN_TIEU_DE);
-            ui.painter().hline(vung_dau.x_range(), vung_dau.bottom(), Stroke::new(1.0, VIEN_NHAT));
+                // Nền xám nhạt và đường kẻ dưới cho hàng tiêu đề
+                let x_bang = ui.max_rect().expand2(egui::vec2(2.0, 0.0)).x_range();
+                let khe = ui.spacing().item_spacing.y;
+                let vung_dau = egui::Rect::from_min_size(ui.cursor().min - egui::vec2(2.0, 0.0), egui::vec2(ui.available_width() + 4.0, CAO_TIEU_DE + khe / 2.0));
+                ui.painter().rect_filled(vung_dau, 0.0, NEN_TIEU_DE);
+                ui.painter().hline(vung_dau.x_range(), vung_dau.bottom(), Stroke::new(1.0, VIEN_NHAT));
 
-            // resizable: kéo mép cột để đổi độ rộng; dùng Column::initial để cột co giãn được
-            let mut bang = TableBuilder::new(ui).striped(false).resizable(true).stick_to_bottom(true).auto_shrink(false).cell_layout(Layout::left_to_right(Align::Center));
+                // resizable: kéo mép cột để đổi độ rộng; dùng Column::initial để cột co giãn được
+                // Có dòng mới (đang đếm, hoặc đợt cuối tới cùng khung hình với "Xong"): cuộn theo dòng mới nhất.
+                // Vẽ thêm một khung để bảng biết kích thước nội dung mới rồi mới cuộn chắc chắn
+                let cuon_cuoi = so_dong > 0 && (self.dang_dem.is_some() || self.dong.len() != self.so_dong_da_cuon);
+                if cuon_cuoi {
+                    ui.ctx().request_repaint();
+                }
+                let mut bang = TableBuilder::new(ui).striped(false).resizable(true).stick_to_bottom(true).auto_shrink(false).cell_layout(Layout::left_to_right(Align::Center));
+                if cuon_cuoi {
+                    bang = bang.scroll_to_row(so_dong - 1, Some(Align::BOTTOM));
+                }
             for (_, _, rong) in COT_BANG {
                 bang = bang.column(match rong {
                     Some(w) => Column::initial(w).at_least(36.0).clip(true),
@@ -772,8 +888,8 @@ impl UngDung {
                 });
             }
             bang.header(CAO_TIEU_DE, |mut h| {
-                for (ten, can, _) in COT_BANG {
-                    h.col(|ui| o_bang(ui, RichText::new(ten), can));
+                for (ten, can, _) in COT_BANG.iter() {
+                    h.col(|ui| o_bang(ui, RichText::new(*ten), *can));
                 }
             })
             .body(|body| {
@@ -797,7 +913,7 @@ impl UngDung {
                             });
                             row.col(|ui| {
                                 ui.add_space(LE_O);
-                                ui.label(RichText::new(&ten).color(DO_SAM)).on_hover_text(duong_dan);
+                                ui.add(egui::Label::new(RichText::new(&ten).color(DO_SAM)).truncate()).on_hover_text(duong_dan);
                             });
                             for _ in 2..SO_COT - 1 {
                                 row.col(|_| {});
@@ -816,7 +932,7 @@ impl UngDung {
                             });
                             row.col(|ui| {
                                 ui.add_space(LE_O);
-                                let lien_ket = ui.add(egui::Label::new(chu(&ten)).sense(egui::Sense::click())).on_hover_text(format!("{duong_dan}\nBấm để mở file PDF"));
+                                let lien_ket = ui.add(egui::Label::new(chu(&ten)).truncate().sense(egui::Sense::click())).on_hover_text(format!("{duong_dan}\nBấm để mở file PDF"));
                                 let lien_ket = lien_ket.on_hover_cursor(egui::CursorIcon::PointingHand);
                                 if lien_ket.hovered() {
                                     let r = lien_ket.rect;
@@ -826,19 +942,54 @@ impl UngDung {
                                     file_can_mo = Some(duong_dan.to_string());
                                 }
                             });
-                            let gia_tri = [so_trang, &o[2], &o[3], &o[4], &o[5], &o[6]];
+                            // Cột 2..6: Trang, Chiều rộng, Chiều cao, Hướng, Khổ
+                            let gia_tri = [so_trang, &o[2], &o[3], &o[4], &o[5]];
                             for (c, gt) in gia_tri.into_iter().enumerate() {
                                 row.col(|ui| o_bang(ui, chu(gt), COT_BANG[c + 2].1));
                             }
-                            row.col(|ui| o_bang(ui, RichText::new(&o[7]).color(DO_SAM), CanLe::Trai));
+                            // Ký số (o[8]) đứng trước DPI: "Có" tô xanh cobalt; còn lại ("Không"/"-") để đen
+                            let mau_ky = if o[8] == "Có" { XANH_COBALT } else { CHU };
+                            row.col(|ui| o_bang(ui, RichText::new(&o[8]).color(mau_ky), CanLe::Giua));
+                            row.col(|ui| o_bang(ui, chu(&o[6]), CanLe::Giua)); // DPI
+                            row.col(|ui| o_bang(ui, RichText::new(&o[7]).color(DO_SAM), CanLe::Trai)); // Cảnh báo
                         }
                     }
                 });
-            });
+                });
 
+                file_can_mo
+            })
+            .inner;
+
+            self.so_dong_da_cuon = self.dong.len();
             if let Some(p) = file_can_mo {
                 mo_bang_he_dieu_hanh(Path::new(&p));
             }
+
+            // Dòng chân: nền xám mờ, canh giữa theo chiều dọc.
+            // Trái: thời gian đếm (chạy khi đang đếm, giữ lại khi xong) · Phải: số dòng / số file đang hiển thị
+            egui::Frame::new().fill(NEN_XEN_KE).inner_margin(Margin { left: 10, right: 12, top: 0, bottom: 0 }).show(ui, |ui| {
+                let rong = ui.available_width();
+                ui.allocate_ui_with_layout(egui::vec2(rong, CAO_CHAN), Layout::left_to_right(Align::Center), |ui| {
+                    // Đồng hồ: khi đang đếm thì chạy; đếm xong vẫn hiện nếu bảng có kết quả
+                    let giay = match &self.dang_dem {
+                        Some(d) => Some(d.bat_dau.elapsed().as_secs()),
+                        None if !self.dong.is_empty() => self.thoi_gian_dem.map(|t| t.as_secs()),
+                        None => None,
+                    };
+                    if let Some(s) = giay {
+                        ui.label(RichText::new(format!("Thời gian đếm: {}:{:02}", s / 60, s % 60)).small().color(CHU_PHU));
+                        if self.dang_dem.is_some() {
+                            // Ép vẽ lại đều đặn để đồng hồ chạy ngay cả khi chưa có dòng mới
+                            ui.ctx().request_repaint_after(Duration::from_millis(250));
+                        }
+                    }
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let chan = format!("Hiển thị: {} dòng ; {} file pdf", so_nguyen(so_dong), so_nguyen(so_file));
+                        ui.label(RichText::new(chan).small().color(CHU_PHU));
+                    });
+                });
+            });
         });
         // Vẽ viền sau cùng, nằm trên nền tiêu đề và nền dòng xen kẽ, để viền liền ở mọi dòng
         ui.painter().rect_stroke(khung_bang.response.rect, 0.0, Stroke::new(1.0, VIEN), egui::StrokeKind::Inside);
@@ -867,6 +1018,7 @@ impl UngDung {
     /// Popup kiểu hộp thoại: phần đầu (tiêu đề, thư mục), phần thông tin 2 cột, phần nút căn phải
     fn popup_xong(&mut self, ctx: &egui::Context) {
         let co_telegram = self.co_telegram;
+        let chep = self.ket_qua_chep.clone();
         let Some(tb) = &self.thong_bao else {
             return;
         };
@@ -877,6 +1029,8 @@ impl UngDung {
         let phan_hoi = egui::Modal::new(egui::Id::unique("popup_xong")).frame(khung).show(ctx, |ui| {
             ui.set_width(RONG);
             ui.spacing_mut().item_spacing.y = 0.0;
+            // Chữ trong popup nhỏ hơn cửa sổ chính một chút cho cân đối với khung 420px
+            ui.style_mut().text_styles.insert(TextStyle::Body, egui::FontId::proportional(12.5));
 
             // Phần đầu: nền xám nhạt, tiêu đề và tên thư mục
             let dau = CornerRadius { nw: BO_GOC, ne: BO_GOC, sw: 0, se: 0 };
@@ -886,9 +1040,9 @@ impl UngDung {
                 // Một dòng: "Đã đếm xong" + tên thư mục in đậm
                 let tieu_de = if tb.da_dung { "Đã dừng đếm " } else { "Đã đếm xong " };
                 let mut dong_tieu_de = egui::text::LayoutJob::default();
-                let co_chu = egui::FontId::proportional(17.0);
+                let co_chu = egui::FontId::proportional(15.0);
                 dong_tieu_de.append(tieu_de, 0.0, egui::TextFormat { font_id: co_chu, color: CHU, ..Default::default() });
-                dong_tieu_de.append(&tb.ten_thu_muc, 0.0, egui::TextFormat { font_id: egui::FontId::new(17.0, egui::FontFamily::Name(HO_FONT_DAM.into())), color: CHU, ..Default::default() });
+                dong_tieu_de.append(&tb.ten_thu_muc, 0.0, egui::TextFormat { font_id: egui::FontId::new(15.0, egui::FontFamily::Name(HO_FONT_DAM.into())), color: CHU, ..Default::default() });
                 ui.add(egui::Label::new(dong_tieu_de).truncate());
             });
             ui.painter().hline(ui.max_rect().x_range(), ui.cursor().top(), Stroke::new(1.0, VIEN_NHAT));
@@ -924,16 +1078,29 @@ impl UngDung {
             });
             ui.painter().hline(ui.max_rect().x_range(), ui.cursor().top(), Stroke::new(1.0, VIEN_NHAT));
 
-            // Phần nút: nền xám như cửa sổ chính, nút căn phải
+            // Phần nút: nền xám như cửa sổ chính.
+            // Trái: Mở kết quả (nền như nút thường) · Giữa: Copy dữ liệu · Phải: Đóng
             let cuoi = CornerRadius { nw: 0, ne: 0, sw: BO_GOC, se: BO_GOC };
             egui::Frame::new().fill(NEN).corner_radius(cuoi).inner_margin(Margin { left: 20, right: 20, top: 12, bottom: 12 }).show(ui, |ui| {
                 ui.set_width(RONG - 40.0);
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.spacing_mut().item_spacing.x = 8.0;
-                    dong = ui.add(nut("Đóng").min_size(egui::vec2(90.0, 28.0))).clicked();
-                    if tb.ket_qua.is_ok() {
-                        mo = ui.add(nut_mau("Mở kết quả", XANH_LA).min_size(egui::vec2(110.0, 28.0))).clicked();
-                    }
+                // Ba nút cùng độ rộng, căn giữa mỗi cột đều nhau → khoảng cách giữa các nút bằng nhau
+                let rong_nut = egui::vec2(104.0, 28.0);
+                ui.columns(3, |c| {
+                    c[0].with_layout(Layout::top_down(Align::Center), |ui| {
+                        if tb.ket_qua.is_ok() {
+                            mo = ui.add(nut("Mở kết quả").min_size(rong_nut)).clicked();
+                        }
+                    });
+                    c[1].with_layout(Layout::top_down(Align::Center), |ui| {
+                        if ui.add_enabled(chep.is_some(), nut("Copy dữ liệu").min_size(rong_nut)).clicked() {
+                            if let Some(s) = &chep {
+                                ui.ctx().copy_text(s.clone());
+                            }
+                        }
+                    });
+                    c[2].with_layout(Layout::top_down(Align::Center), |ui| {
+                        dong = ui.add(nut("Đóng").min_size(rong_nut)).clicked();
+                    });
                 });
             });
         });
@@ -998,9 +1165,9 @@ mod tests {
 
     #[test]
     fn loc_theo_kho_hien_moi_trang_cua_file_co_kho_do() {
-        let noi_dung = "1/2\t/a/x.pdf => trang: 1\t595.0\t842.0\tDoc\tA4\t300\t\n\
-                        1/2\t/a/x.pdf => trang: 2\t842.0\t1191.0\tDoc\tA3\t300\t\n\
-                        2/2\t/a/y.pdf => trang: 1\t595.0\t842.0\tDoc\tA4\t300\tSat nguong A5 (90%)";
+        let noi_dung = "1/2\t/a/x.pdf => trang: 1\t595.0\t842.0\tDoc\tA4\t300\t\t-\n\
+                        1/2\t/a/x.pdf => trang: 2\t842.0\t1191.0\tDoc\tA3\t300\t\t-\n\
+                        2/2\t/a/y.pdf => trang: 1\t595.0\t842.0\tDoc\tA4\t300\tSat nguong A5 (90%)\tCó";
         let mut app = app_mau(noi_dung);
         app.bo_loc = BoLoc::Kho(3); // A3: chỉ file x.pdf, cả 2 trang
         assert_eq!(app.dong_hien().unwrap(), &[0, 1]);
@@ -1015,11 +1182,20 @@ mod tests {
         assert_eq!(app.dong_hien().unwrap(), &[2]);
         app.bo_loc = BoLoc::TatCa;
         assert!(app.dong_hien().is_none());
+
+        // Lọc theo cột Ký số: x.pdf (2 trang) = "-", y.pdf (1 trang) = "Có"
+        app.loc_ky_so = LocKySo::Co;
+        assert_eq!(app.dong_hien().unwrap(), &[2]);
+        app.loc_ky_so = LocKySo::TatCa;
+        // Kết hợp tab A4 + ký số Có: chỉ trang A4 của y.pdf
+        app.bo_loc = BoLoc::Kho(4);
+        app.loc_ky_so = LocKySo::Co;
+        assert_eq!(app.dong_hien().unwrap(), &[2]);
     }
 
     #[test]
     fn quy_a4_tinh_lai_khi_doi_he_so() {
-        let mut app = app_mau("1/1\t/a/x.pdf => trang: 1\t595.0\t842.0\tDoc\tA4\t300\t\n1/1\t/a/x.pdf => trang: 2\t842.0\t1191.0\tDoc\tA3\t300\t");
+        let mut app = app_mau("1/1\t/a/x.pdf => trang: 1\t595.0\t842.0\tDoc\tA4\t300\t\t-\n1/1\t/a/x.pdf => trang: 2\t842.0\t1191.0\tDoc\tA3\t300\t\t-");
         assert_eq!(app.quy_a4_hien_tai(), Some(3.0)); // mặc định: 1 trang A4 × 1 + 1 trang A3 × 2
         app.he_so[3] = "2.5".into();
         assert_eq!(app.quy_a4_hien_tai(), Some(3.5));
@@ -1034,7 +1210,7 @@ mod tests {
         use egui_kittest::kittest::Queryable;
         let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(980.0, 600.0)).build_eframe(|cc| {
             cai_giao_dien(&cc.egui_ctx);
-            let mut app = app_mau("1/1\t/a/x.pdf => trang: 1\t842.0\t1191.0\tDoc\tA3\t300\t");
+            let mut app = app_mau("1/1\t/a/x.pdf => trang: 1\t842.0\t1191.0\tDoc\tA3\t300\t\t-");
             app.hien_he_so = true;
             app
         });
@@ -1047,6 +1223,46 @@ mod tests {
         harness.run();
         assert_eq!(harness.state().he_so[3], "5");
         assert_eq!(harness.state().quy_a4_hien_tai(), Some(5.0));
+    }
+
+    #[test]
+    fn luong_dem_chet_khong_lam_sap_giao_dien() {
+        let mut app = UngDung::default();
+        let (gui, nhan) = mpsc::channel::<SuKien>();
+        app.dang_dem = Some(DangDem { nhan, dung: Arc::new(AtomicBool::new(false)), thu_muc: "x".into(), bat_dau: Instant::now() });
+        drop(gui); // luồng đếm panic/chết: đầu gửi bị huỷ mà chưa có Xong
+        assert!(app.nhan_su_kien().is_none());
+        assert!(app.dang_dem.is_none());
+        assert!(app.trang_thai.starts_with("Lỗi"), "{}", app.trang_thai);
+    }
+
+    #[test]
+    fn them_dong_du_lieu_di_dang_khong_panic() {
+        let mut app = UngDung::default();
+        for dong in [
+            "",
+            "\t",
+            "STT\tTrang",
+            "1/2",
+            "a\tb\tc\td\te\tf\tg\th",       // thiếu cột
+            "a\tb\tc\td\te\tf\tg\th\ti\tj", // thừa cột
+            "abc/5\t/a/x.pdf => trang: 1\t595\t842\tDọc\tA4\t300\t\tCó",
+            "0/5\t/a/x.pdf => trang: 2\t595\t842\tDọc\tA4\t300\t\tCó",
+            "18446744073709551615/18446744073709551615\t/a/y.pdf => trang: 1\t\t\t\tZZ\t\t\t",
+            "5/0\t/a/z.pdf\t-\t-\t-\t-\t-\t-\t-",
+            "Lỗi mở tệp: ",
+        ] {
+            app.them_dong(dong.to_string());
+        }
+        // 4 dòng 9 cột + 1 dòng lỗi được nhận, các dòng khác bị bỏ qua; mọi bộ lọc chạy không panic
+        assert_eq!(app.dong.len(), 5);
+        assert_eq!(app.kho_cua_file.len(), 3, "x.pdf, y.pdf, z.pdf là 3 file");
+        for loc in [BoLoc::CanhBao, BoLoc::Loi, BoLoc::Kho(0), BoLoc::Kho(4), BoLoc::TatCa] {
+            app.bo_loc = loc;
+            let _ = app.dong_hien();
+        }
+        app.loc_ky_so = LocKySo::Co;
+        assert_eq!(app.dong_hien().unwrap(), &[0, 1]);
     }
 
     #[test]

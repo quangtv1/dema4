@@ -25,7 +25,8 @@ Tạo tag `vX.Y.Z` để sinh Release kèm file chạy.
 ```
 sm-dema4 <thư mục>             # đếm, ghi <thư mục>/<tên>_dem.txt và _dem_chitiet.txt
 sm-dema4 <thư mục> --dpi       # kiểm tra DPI ảnh scan (chậm hơn)
-sm-dema4 <thư mục> --khong-ghi # chỉ in kết quả, không ghi file
+sm-dema4 <thư mục> --kyso      # kiểm tra file đã ký số (AcroForm) hay chưa
+sm-dema4 <thư mục> --khong-ghi # chỉ in kết quả, không ghi file, không gửi thống kê
 ```
 
 ## Gửi thống kê về Telegram
