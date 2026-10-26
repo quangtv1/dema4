@@ -1,0 +1,32 @@
+[package]
+name = "dema4_rs"
+version = "0.1.0"
+edition = "2021"
+description = "Đếm số trang A4 trong thư mục PDF (bản Rust của dema4_gom.py, chức năng 1)"
+
+[dependencies]
+# Chỉ cần đọc PDF: tắt các định dạng và font không dùng tới cho nhẹ
+mupdf = { version = "0.8", default-features = false }
+walkdir = "2.5"
+rayon = "1.12"
+eframe = "0.37"
+rfd = "0.17"
+egui_extras = "0.37"
+ureq = "3.5.0"
+whoami = "2.1.3"
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+mac_address = "1.2.1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_Console"] }
+
+[build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[dev-dependencies]
+egui_kittest = { version = "0.37", features = ["wgpu", "snapshot", "eframe"] }

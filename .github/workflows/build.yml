@@ -1,0 +1,75 @@
+name: Build dema4_rs
+
+# Build bản Rust cho macOS và Windows.
+# - Chạy khi push lên main, khi tạo tag v*, hoặc bấm tay (workflow_dispatch).
+# - Mỗi lần chạy tải lên artifact chứa file chạy; khi push tag v* thì tạo Release kèm file.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # cần để tạo Release khi push tag
+
+defaults:
+  run:
+    working-directory: dema4_rs # crate Rust nằm trong thư mục con
+
+jobs:
+  build:
+    name: Build ${{ matrix.ten }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            ten: macOS-arm64
+            file_chay: dema4_rs
+            artifact: dema4_rs-macos-arm64
+          - os: windows-latest
+            ten: Windows-x64
+            file_chay: dema4_rs.exe
+            artifact: dema4_rs-windows-x64.exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cài Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: dema4_rs
+
+      # mupdf-sys dùng bindgen (cần libclang) và build MuPDF từ nguồn bằng MSVC trên Windows
+      - name: Cài LLVM (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install llvm --no-progress -y
+          echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Tải lên artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dema4_rs/target/release/${{ matrix.file_chay }}
+          if-no-files-found: error
+
+      # Khi push tag v* thì đính kèm file chạy vào Release
+      - name: Đổi tên file cho Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: cp "target/release/${{ matrix.file_chay }}" "${{ matrix.artifact }}"
+
+      - name: Tạo/cập nhật Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dema4_rs/${{ matrix.artifact }}

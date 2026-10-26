@@ -1,0 +1,26 @@
+# Dữ liệu PDF và file lớn (không đưa lên repo)
+*.pdf
+*.zip
+02/
+build/
+dist/
+
+# Kết quả đếm sinh ra khi chạy
+*_dem.txt
+*_dem_chitiet.txt
+*_dempdf_tonghop.txt
+*_dempdf_chitiet.txt
+
+# Rust
+dema4_rs/target/
+target/
+
+# Cấu hình Telegram (chứa token – KHÔNG đưa lên repo)
+telegram.txt
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS / editor
+.DS_Store
