@@ -28,13 +28,13 @@ sm-dema4 <thư mục> --dpi       # kiểm tra DPI ảnh scan (chậm hơn)
 sm-dema4 <thư mục> --khong-ghi # chỉ in kết quả, không ghi file
 ```
 
-## Gửi thống kê về Telegram (tuỳ chọn)
+## Gửi thống kê về Telegram
 
-Đặt file `telegram.txt` cạnh file chạy:
+Token và id nhóm được nhúng sẵn trong file chạy (xem `dema4_rs/src/telegram.rs`), nên exe gửi thống kê ngay, không cần file cấu hình.
+
+Có thể ghi đè bằng file `telegram.txt` cạnh file chạy (ưu tiên hơn giá trị nhúng) để trỏ sang nhóm khác mà không build lại:
 
 ```
 token=<bot token>
 chat_id=<id nhóm>
 ```
-
-Không có file này thì app không gửi gì. File `telegram.txt` đã được loại khỏi repo (chứa token).

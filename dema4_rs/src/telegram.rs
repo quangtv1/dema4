@@ -26,8 +26,21 @@ pub fn duong_dan_cau_hinh() -> Option<PathBuf> {
 }
 
 /// Đọc cấu hình cạnh file chạy; None nếu không có file hoặc thiếu token / chat_id
+// Token + chat_id nhúng thẳng vào file chạy: exe build ra gửi Telegram ngay, không cần file txt.
+// Lưu ý: ai có file exe cũng có thể moi token ra. Đổi token: @BotFather -> /revoke rồi sửa ở đây.
+const TOKEN_NHUNG: &str = "7776430644:AAHw7eeDVRXSOsmOiOUl2ktiRSIoqTK4ykc";
+const CHAT_ID_NHUNG: &str = "-878766449";
+
+fn cau_hinh_nhung() -> Option<CauHinh> {
+    if TOKEN_NHUNG.is_empty() || CHAT_ID_NHUNG.is_empty() {
+        return None;
+    }
+    Some(CauHinh { token: TOKEN_NHUNG.to_string(), chat_id: CHAT_ID_NHUNG.to_string() })
+}
+
+/// Ưu tiên telegram.txt cạnh file chạy (nếu có, để đổi nhóm mà không build lại); nếu không thì dùng cấu hình nhúng
 pub fn doc_cau_hinh() -> Option<CauHinh> {
-    doc_cau_hinh_tu(&duong_dan_cau_hinh()?)
+    duong_dan_cau_hinh().and_then(|p| doc_cau_hinh_tu(&p)).or_else(cau_hinh_nhung)
 }
 
 pub fn doc_cau_hinh_tu(duong_dan: &Path) -> Option<CauHinh> {

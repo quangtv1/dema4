@@ -69,19 +69,17 @@ impl ChuDam for RichText {
 
 /// Tông xám, font hệ thống có dấu tiếng Việt; áp cho cả chế độ sáng và tối của hệ điều hành
 fn cai_giao_dien(ctx: &egui::Context) {
-    // Windows: ưu tiên Tahoma, sau đó Segoe UI / Arial làm dự phòng
-    const FONT_THUONG: [&str; 6] = [
-        r"C:\Windows\Fonts\tahoma.ttf",
-        r"C:\Windows\Fonts\segoeui.ttf",
+    // Ưu tiên Arial trên mọi hệ điều hành
+    const FONT_THUONG: [&str; 5] = [
         r"C:\Windows\Fonts\arial.ttf",
+        r"C:\Windows\Fonts\segoeui.ttf",
         "/System/Library/Fonts/Supplemental/Arial.ttf",
         "/Library/Fonts/Arial.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ];
-    const FONT_DAM: [&str; 6] = [
-        r"C:\Windows\Fonts\tahomabd.ttf",
-        r"C:\Windows\Fonts\segoeuib.ttf",
+    const FONT_DAM: [&str; 5] = [
         r"C:\Windows\Fonts\arialbd.ttf",
+        r"C:\Windows\Fonts\segoeuib.ttf",
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
         "/Library/Fonts/Arial Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -769,16 +767,17 @@ impl UngDung {
             ui.painter().rect_filled(vung_dau, 0.0, NEN_TIEU_DE);
             ui.painter().hline(vung_dau.x_range(), vung_dau.bottom(), Stroke::new(1.0, VIEN_NHAT));
 
-            let mut bang = TableBuilder::new(ui).striped(false).stick_to_bottom(true).auto_shrink(false).cell_layout(Layout::left_to_right(Align::Center));
+            // resizable: kéo mép cột để đổi độ rộng; dùng Column::initial để cột co giãn được
+            let mut bang = TableBuilder::new(ui).striped(false).resizable(true).stick_to_bottom(true).auto_shrink(false).cell_layout(Layout::left_to_right(Align::Center));
             for (_, _, rong) in COT_BANG {
                 bang = bang.column(match rong {
-                    Some(w) => Column::exact(w),
-                    None => Column::remainder().at_least(160.0).clip(true),
+                    Some(w) => Column::initial(w).at_least(36.0).clip(true),
+                    None => Column::remainder().at_least(120.0).clip(true),
                 });
             }
             bang.header(CAO_TIEU_DE, |mut h| {
                 for (ten, can, _) in COT_BANG {
-                    h.col(|ui| o_bang(ui, RichText::new(ten).dam(), can));
+                    h.col(|ui| o_bang(ui, RichText::new(ten), can));
                 }
             })
             .body(|body| {
