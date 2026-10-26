@@ -107,10 +107,10 @@ fn cai_giao_dien(ctx: &egui::Context) {
         use egui::{FontFamily::Proportional, FontId};
         style.visuals = egui::Visuals::light();
         style.text_styles = [
-            (TextStyle::Heading, FontId::new(16.0, Proportional)),
-            (TextStyle::Body, FontId::new(13.5, Proportional)),
-            (TextStyle::Button, FontId::new(13.5, Proportional)),
-            (TextStyle::Small, FontId::new(12.0, Proportional)),
+            (TextStyle::Heading, FontId::new(15.0, Proportional)),
+            (TextStyle::Body, FontId::new(12.5, Proportional)),
+            (TextStyle::Button, FontId::new(12.5, Proportional)),
+            (TextStyle::Small, FontId::new(11.0, Proportional)),
             (TextStyle::Monospace, FontId::new(13.0, egui::FontFamily::Monospace)),
         ]
         .into();
@@ -978,7 +978,8 @@ impl UngDung {
                         None => None,
                     };
                     if let Some(s) = giay {
-                        ui.label(RichText::new(format!("Thời gian đếm: {}:{:02}", s / 60, s % 60)).small().color(CHU_PHU));
+                        // Không xuống dòng: dòng chân chỉ cao một dòng, chữ bị gói sẽ mất phần sau
+                        ui.add(egui::Label::new(RichText::new(format!("Thời gian đếm: {}:{:02}", s / 60, s % 60)).small().color(CHU_PHU)).extend());
                         if self.dang_dem.is_some() {
                             // Ép vẽ lại đều đặn để đồng hồ chạy ngay cả khi chưa có dòng mới
                             ui.ctx().request_repaint_after(Duration::from_millis(250));
@@ -986,7 +987,7 @@ impl UngDung {
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let chan = format!("Hiển thị: {} dòng ; {} file pdf", so_nguyen(so_dong), so_nguyen(so_file));
-                        ui.label(RichText::new(chan).small().color(CHU_PHU));
+                        ui.add(egui::Label::new(RichText::new(chan).small().color(CHU_PHU)).extend());
                     });
                 });
             });
@@ -1030,7 +1031,7 @@ impl UngDung {
             ui.set_width(RONG);
             ui.spacing_mut().item_spacing.y = 0.0;
             // Chữ trong popup nhỏ hơn cửa sổ chính một chút cho cân đối với khung 420px
-            ui.style_mut().text_styles.insert(TextStyle::Body, egui::FontId::proportional(12.5));
+            ui.style_mut().text_styles.insert(TextStyle::Body, egui::FontId::proportional(12.0));
 
             // Phần đầu: nền xám nhạt, tiêu đề và tên thư mục
             let dau = CornerRadius { nw: BO_GOC, ne: BO_GOC, sw: 0, se: 0 };
@@ -1040,9 +1041,9 @@ impl UngDung {
                 // Một dòng: "Đã đếm xong" + tên thư mục in đậm
                 let tieu_de = if tb.da_dung { "Đã dừng đếm " } else { "Đã đếm xong " };
                 let mut dong_tieu_de = egui::text::LayoutJob::default();
-                let co_chu = egui::FontId::proportional(15.0);
+                let co_chu = egui::FontId::proportional(14.0);
                 dong_tieu_de.append(tieu_de, 0.0, egui::TextFormat { font_id: co_chu, color: CHU, ..Default::default() });
-                dong_tieu_de.append(&tb.ten_thu_muc, 0.0, egui::TextFormat { font_id: egui::FontId::new(15.0, egui::FontFamily::Name(HO_FONT_DAM.into())), color: CHU, ..Default::default() });
+                dong_tieu_de.append(&tb.ten_thu_muc, 0.0, egui::TextFormat { font_id: egui::FontId::new(14.0, egui::FontFamily::Name(HO_FONT_DAM.into())), color: CHU, ..Default::default() });
                 ui.add(egui::Label::new(dong_tieu_de).truncate());
             });
             ui.painter().hline(ui.max_rect().x_range(), ui.cursor().top(), Stroke::new(1.0, VIEN_NHAT));
