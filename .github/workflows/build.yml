@@ -13,6 +13,11 @@ on:
 permissions:
   contents: write # cần để tạo Release khi push tag
 
+# Mỗi nhánh/tag một nhóm riêng: push mới vào CÙNG ref mới huỷ run cũ; tag không bị nhánh cắt nhầm
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 defaults:
   run:
     working-directory: dema4_rs # crate Rust nằm trong thư mục con
