@@ -166,6 +166,8 @@ struct ThongKe {
     loi: usize,
     /// Số file đã ký số (đếm theo file, dựa trên trang đầu của mỗi file)
     da_ky: usize,
+    /// Kích thước (rộng, cao) các trang khổ A0: quy A4 theo diện tích thật nên cần giữ để tính lại khi đổi hệ số
+    kich_thuoc_a0: Vec<(f64, f64)>,
 }
 
 struct DangDem {
@@ -493,6 +495,10 @@ impl UngDung {
         if let Some(k) = kho {
             self.kho_cua_file[file] |= 1 << k;
             self.thong_ke.theo_kho[k] += 1;
+            if k == 0 {
+                let so = |x: &str| x.trim().parse::<f64>().unwrap_or(0.0);
+                self.thong_ke.kich_thuoc_a0.push((so(&o[2]), so(&o[3])));
+            }
         }
         let canh_bao = !o[7].is_empty();
         self.thong_ke.trang += 1;
@@ -518,7 +524,9 @@ impl UngDung {
     /// Quy ra A4 = Σ (số trang khổ Ax × hệ số Ax) theo hệ số đang nhập; None nếu có ô nhập sai
     fn quy_a4_hien_tai(&self) -> Option<f64> {
         let he_so = self.he_so_hien_tai().ok()?;
-        Some((0..8).map(|k| self.thong_ke.theo_kho[k] as f64 * he_so[k]).sum())
+        // A0 quy theo diện tích thật từng trang (cùng công thức với lõi đếm), các khổ khác theo hệ số
+        let quy_a0: f64 = self.thong_ke.kich_thuoc_a0.iter().map(|&(r, c)| dem_pdf::quy_a4_trang(0, r, c, &he_so)).sum();
+        Some(dem_pdf::lam_tron_2((1..8).fold(quy_a0, |tong, k| tong + self.thong_ke.theo_kho[k] as f64 * he_so[k])))
     }
 
     /// Chỉ số các dòng hiện theo bộ lọc; tính lại khi đổi bộ lọc hoặc có thêm dòng
@@ -1205,6 +1213,20 @@ mod tests {
         app.he_so[4] = "abc".into();
         assert_eq!(app.quy_a4_hien_tai(), None);
         assert_eq!(app.he_so_hien_tai(), Err(4));
+    }
+
+    #[test]
+    fn trang_lon_hon_a0_quy_a4_theo_dien_tich_that() {
+        // Trang A0 chuẩn tính 16; trang 2x A0 (4767,88 x 3370,39) vẫn là khổ A0 nhưng quy ~32,06 A4
+        let mut app = app_mau(
+            "1/1\t/a/x.pdf => trang: 1\t2383.94\t3370.39\tDọc\tA0\t-\t\t-\n\
+             1/1\t/a/x.pdf => trang: 2\t4767.88\t3370.39\tNgang\tA0\t-\t\t-",
+        );
+        let q = app.quy_a4_hien_tai().unwrap();
+        assert_eq!(q, 48.06); // 16 + 32,06 (2 x 16,03), làm tròn 2 chữ số
+        // Hệ số A0 là mức sàn: nâng lên 40 thì trang chuẩn tính 40, trang lớn (~32) cũng lên 40
+        app.he_so[0] = "40".into();
+        assert_eq!(app.quy_a4_hien_tai(), Some(80.0));
     }
 
     /// Gõ vào ô hệ số qua giao diện thật (không mở cửa sổ): ô sửa được và Quy ra A4 đổi theo

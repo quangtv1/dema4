@@ -53,6 +53,23 @@ fn duyet_truong_ky(mang: &PdfObject, do_sau: u32) -> Result<bool, mupdf::Error> 
 pub const KHO: [&str; 8] = ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7"];
 /// Cạnh dài chuẩn (pt) của từng khổ, từ lớn đến nhỏ
 pub const A_SIZES: [f64; 8] = [3370.39, 2383.94, 1683.78, 1190.55, 841.89, 595.28, 419.53, 297.64];
+/// Diện tích trang A4 chuẩn (pt²): cạnh ngắn A4 = cạnh dài A5
+pub const DIEN_TICH_A4: f64 = A_SIZES[4] * A_SIZES[5];
+/// Cạnh dài tối đa (pt) để trang khổ A0 vẫn tính theo hệ số A0:
+/// dài A0 + cạnh ngắn A4 = 1189 + 210 = 1399 mm
+pub const NGUONG_A0_THEO_DIEN_TICH: f64 = A_SIZES[0] + A_SIZES[5];
+
+/// Số trang A4 quy đổi của một trang.
+/// Trang khổ A0 có cạnh dài > 1399 mm (dài A0 + cạnh ngắn A4) quy đổi = diện tích thật / diện tích A4,
+/// không thấp hơn hệ số A0. Trang A0 ngắn hơn và các khổ khác dùng hệ số.
+pub fn quy_a4_trang(kho: usize, chieu_rong: f64, chieu_cao: f64, he_so: &[f64; 8]) -> f64 {
+    if kho == 0 && chieu_rong.max(chieu_cao) > NGUONG_A0_THEO_DIEN_TICH {
+        he_so[0].max(lam_tron_2(chieu_rong * chieu_cao / DIEN_TICH_A4))
+    } else {
+        he_so[kho]
+    }
+}
+
 pub const HE_SO_MAC_DINH: [f64; 8] = [16.0, 8.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.125];
 /// Cảnh báo khi cạnh dài đã lệch >= 80% nửa khoảng tới khổ kề bên
 pub const NGUONG_CANH_BAO: f64 = 0.8;
@@ -106,6 +123,11 @@ pub fn muc_sat_nguong(chieu_rong: f64, chieu_cao: f64, kho: usize) -> (f64, Opti
 /// round(x, 3) của Python (làm tròn thập phân chính xác)
 fn lam_tron_3(x: f64) -> f64 {
     format!("{x:.3}").parse().unwrap_or(x)
+}
+
+/// Làm tròn 2 chữ số thập phân cho số trang quy A4 (tránh in 446.75984611351856)
+pub fn lam_tron_2(x: f64) -> f64 {
+    format!("{x:.2}").parse().unwrap_or(x)
 }
 
 /// Ghi số thực giống str(float) của Python cho các giá trị gặp ở đây: 606.24, 2526.0, 885.0
@@ -229,6 +251,7 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
 
     let mut kq = KetQuaFile { dong_chi_tiet: Vec::with_capacity(so_trang), dong_tong_hop: String::new(), dem: [0; 8], quy_a4: 0.0, sat_nguong: 0, lech_dpi: 0, trang_canh_bao: 0, ky_so };
     let mut chuoi_kho: Vec<(usize, usize)> = Vec::new();
+    let mut quy_a0 = 0.0; // trang A0 quy theo diện tích thật (>= hệ số A0)
 
     for i in 0..so_trang {
         if dung.load(Ordering::Relaxed) {
@@ -241,12 +264,15 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
         let huong_trang = if chieu_rong > chieu_cao { "Ngang" } else { "Dọc" };
         let kho = xac_dinh_kho_a(chieu_rong, chieu_cao);
         kq.dem[kho] += 1;
+        if kho == 0 {
+            quy_a0 += quy_a4_trang(0, chieu_rong, chieu_cao, he_so);
+        }
 
         let mut canh_bao = Vec::new();
         let (ty_le, kho_ke_ben) = muc_sat_nguong(chieu_rong, chieu_cao, kho);
         if ty_le >= NGUONG_CANH_BAO {
             // Làm tròn xuống để trang chưa vượt ngưỡng không bị hiển thị 100%
-            canh_bao.push(format!("Sat nguong {} ({}%)", KHO[kho_ke_ben.unwrap()], (ty_le * 100.0) as i64));
+            canh_bao.push(format!("Sát ngưỡng {} ({}%)", KHO[kho_ke_ben.unwrap()], (ty_le * 100.0) as i64));
             kq.sat_nguong += 1;
         }
         let dpi = if kiem_tra_dpi { tinh_dpi(&trang) } else { None };
@@ -287,7 +313,7 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
     }
 
     // Cộng theo đúng thứ tự A0..A7 như Python để số thực ra giống hệt
-    kq.quy_a4 = (0..8).fold(0.0, |tong, i| tong + kq.dem[i] as f64 * he_so[i]);
+    kq.quy_a4 = lam_tron_2((1..8).fold(quy_a0, |tong, i| tong + kq.dem[i] as f64 * he_so[i]));
     let dem: Vec<String> = kq.dem.iter().map(|d| d.to_string()).collect();
     let chuoi: Vec<String> = chuoi_kho.iter().map(|(n, k)| format!("{n}{}", KHO[*k])).collect();
     kq.dong_tong_hop = format!("{stt}/{tong}\t{duong_dan_tuyet_doi}\t{so_trang}\t{}\t'=>\t{}\t{}", dem.join("\t"), so_kieu_python(kq.quy_a4), chuoi.join(", "));
@@ -429,7 +455,7 @@ pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, kiem_tra_
                         for k in 0..8 {
                             dem_tong[k] += kq.dem[k];
                         }
-                        quy_a4_tong = Some(quy_a4_tong.unwrap_or(0.0) + kq.quy_a4);
+                        quy_a4_tong = Some(lam_tron_2(quy_a4_tong.unwrap_or(0.0) + kq.quy_a4));
                         sat_nguong += kq.sat_nguong;
                         if kq.ky_so == Some(true) {
                             so_file_ky_so += 1;
@@ -576,6 +602,25 @@ mod tests {
         assert_eq!(ke, Some(6));
         assert!(ty_le > 0.99 && ty_le < 1.0);
         assert_eq!(muc_sat_nguong(9000.0, 5000.0, 0), (0.0, None));
+    }
+
+    #[test]
+    fn a0_quy_a4_theo_dien_tich_khong_thap_hon_he_so_a0() {
+        let hs = HE_SO_MAC_DINH;
+        // Đúng A0 hoặc nhỏ hơn: theo hệ số A0 (16)
+        assert_eq!(quy_a4_trang(0, A_SIZES[1], A_SIZES[0], &hs), 16.0);
+        assert_eq!(quy_a4_trang(0, 2000.0, 3000.0, &hs), 16.0);
+        // Cạnh dài 1398 mm (chưa vượt 1189 + 210): vẫn 16 dù diện tích lớn hơn A0
+        assert_eq!(quy_a4_trang(0, 841.0 * PT, 1398.0 * PT, &hs), 16.0);
+        // Cạnh dài 1400 mm: theo diện tích 841 x 1400 / (210 x 297) = 18,88
+        assert_eq!(quy_a4_trang(0, 841.0 * PT, 1400.0 * PT, &hs), 18.88);
+        // Dải dài nhưng hẹp: vượt ngưỡng chiều dài nhưng diện tích nhỏ → không thấp hơn 16
+        assert_eq!(quy_a4_trang(0, 1.0, 14400.0, &hs), 16.0);
+        // Khổ 1189 x 1682 mm (2 x A0): theo diện tích thật ~ 32 A4
+        let q = quy_a4_trang(0, 1189.0 * PT, 1682.0 * PT, &hs);
+        assert!((q - 32.0).abs() < 0.1, "{q}");
+        // Khổ khác vẫn theo hệ số
+        assert_eq!(quy_a4_trang(4, 9999.0, 9999.0, &hs), 1.0);
     }
 
     #[test]
