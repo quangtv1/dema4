@@ -60,6 +60,10 @@ jobs:
       - name: Build release
         run: cargo build --release
 
+      # Test phần tách văn bản: chạy thật zxing-cpp (C++) và ONNX Runtime liên kết tĩnh trên từng hệ điều hành
+      - name: Test tách văn bản
+        run: cargo test --release tach_vb
+
       - name: Tải lên artifact
         uses: actions/upload-artifact@v4
         with:
