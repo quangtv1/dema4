@@ -9,6 +9,8 @@
 
 mod dem_pdf;
 mod gui;
+#[allow(dead_code)] // dùng dần từ các phần phân tích / giao diện tách văn bản
+mod tach_vb;
 mod telegram;
 
 use std::sync::atomic::AtomicBool;

@@ -1,0 +1,8 @@
+doc_ori_b1.onnx — mô hình nhận hướng trang tài liệu (0/90/180/270°)
+
+Nguồn: PaddlePaddle/PP-LCNet_x1_0_doc_ori_onnx (Hugging Face), bản ONNX chính thức của PaddleX.
+Giấy phép: Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0
+Thay đổi: chiều batch của đầu vào/đầu ra đặt cố định = 1 (bản gốc dùng tên chiều "DynamicDimension.0");
+trọng số giữ nguyên.
+
+Đầu vào: float32 [1, 3, 224, 224] (RGB, chuẩn hoá ImageNet), đầu ra: xác suất 4 lớp [0, 90, 180, 270].
