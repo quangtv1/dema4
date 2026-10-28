@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Lõi nhãn trang và dải cắt"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "0,5 ngày"
@@ -42,8 +42,8 @@ Mô hình dữ liệu thuần (không MuPDF, không GUI): nhãn từng trang, đ
 4. Hiện thực tới khi xanh.
 
 ## Success Criteria
-- [ ] Mọi case bảng xanh; test vàng khớp 211/211 dải với b3.
-- [ ] Đọc/ghi khứ hồi ổn định; lỗi định dạng có số dòng.
+- [x] Mọi case bảng xanh (+ 200.000 tổ hợp ngẫu nhiên khớp hàm chuẩn); test vàng khớp 211/211 dải với b3 (b3 ghi danh sách trang trắng đếm từ 0 trong log — đã đối chiếu: nhãn trang 53, part6 có 28 trang).
+- [x] Đọc/ghi khứ hồi ổn định; lỗi định dạng có số dòng. Code: `dema4_rs/src/tach_vb/nhan.rs`.
 
 ## Risk Assessment
 - Ngữ nghĩa lệch b3 (đặc biệt index liền nhau / cuối file) → khoá bằng test vàng từ `ketqua_tach.txt`.

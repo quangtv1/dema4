@@ -13,7 +13,7 @@ use egui_extras::{Column, TableBuilder};
 use crate::dem_pdf::{self, KetQuaDem, SuKien, HE_SO_MAC_DINH, KHO};
 use crate::telegram;
 
-const TIEU_DE: &str = "Đếm số trang A4 - SaoMai";
+const TIEU_DE: &str = "Đếm trang A4 (Giải pháp số Sao Mai)";
 /// Số sự kiện xử lý tối đa mỗi khung hình để giao diện không bị đơ khi đếm nhanh
 const SU_KIEN_MOI_KHUNG: usize = 20_000;
 const RONG_NUT: f32 = 80.0;

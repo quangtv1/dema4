@@ -4,7 +4,8 @@
 //! 1. nhị phân hoá LocalAverage, giữ cả mã đọc ra nhưng sai checksum;
 //! 2. nhị phân hoá GlobalHistogram;
 //! 3. ảnh thu 0,5 — tờ index scan ảnh rất nhỏ (mẫu 1: ~27 dpi) bị nhoè khi phóng lên 150 dpi;
-//! 4. ảnh thu 0,9 — tránh răng cưa lấy mẫu ở đúng 150 dpi (mẫu 2: 1 trang).
+//! 4. ảnh thu 0,8 rồi 0,9 — tránh răng cưa lấy mẫu ở đúng 150 dpi (mẫu 2: trang 4762 tr.122 chỉ ra ở 0,8, dạng mã lỗi
+//!    checksum lệch 1 ký tự — được nhận vì khớp mã index trong cấu hình).
 //!
 //! Đo: mẫu 1 đủ 209/209, mẫu 2 đủ 1.780/1.780 tờ index, không gán thừa.
 
@@ -28,7 +29,7 @@ pub fn doc_ma_code128(xam: &[u8], rong: u32, cao: u32) -> Vec<MaDoc> {
     if !luot_2.is_empty() {
         return luot_2;
     }
-    for ty_le in [0.5, 0.9] {
+    for ty_le in [0.5, 0.8, 0.9] {
         let (nho, rong_nho, cao_nho) = thu_nho(xam, rong, cao, ty_le);
         let luot = doc_mot_luot(&nho, rong_nho, cao_nho, Binarizer::LocalAverage, true);
         if luot.iter().any(|m| !m.loi_checksum) {
@@ -236,8 +237,28 @@ mod mau_2 {
         let sot: Vec<_> = chuan.difference(&tim).collect();
         let thua: Vec<_> = tim.difference(&chuan).collect();
         println!("{} PDF, {:.0} s: index {}/{}, sót {:?}, thừa {:?}", pdf.len(), t0.elapsed().as_secs_f64(), chuan.len() - sot.len(), chuan.len(), sot, thua);
-        // 2 trang "Van-ban-khac" (mã khác cấu hình) là index trong nhãn tay nhưng không khớp NAMSAO-TACH
-        assert!(sot.len() <= 2, "sót {sot:?}");
+        // Chỉ được sót 2 trang mã "Van-ban-khac": nhãn tay ghi là index nhưng mã khác mã index trong cấu hình
+        let van_ban_khac: std::collections::HashSet<(String, i32)> = [("4632".to_string(), 29), ("4705".to_string(), 90)].into_iter().collect();
+        assert!(sot.iter().all(|k| van_ban_khac.contains(*k)), "sót {sot:?}");
         assert!(thua.is_empty(), "thừa {thua:?}");
+    }
+}
+
+#[cfg(test)]
+mod chan_doan_trang_kho {
+    use super::*;
+    /// Trang 4762 tr.122 mẫu 2: chỉ đọc được ở vài độ phân giải — dò tỷ lệ thu nhỏ nào cứu được.
+    #[test]
+    #[ignore = "chẩn đoán tay, cần DEMA4_MAU2"]
+    fn do_trang_4762_122() {
+        let p = std::path::PathBuf::from(std::env::var_os("DEMA4_MAU2").unwrap()).join("HOP 461/4762/4762.pdf");
+        let doc = mupdf::Document::open(p.to_str().unwrap()).unwrap();
+        let s = 150.0 / 72.0;
+        let pix = doc.load_page(121).unwrap().to_pixmap(&mupdf::Matrix::new_scale(s, s), &mupdf::Colorspace::device_gray(), false, false).unwrap();
+        let (w, h, xam) = (pix.width(), pix.height(), pix.samples().to_vec());
+        for k in [1.0f32, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.67, 0.6, 0.5] {
+            let (a, w2, h2) = if k < 1.0 { thu_nho(&xam, w, h, k) } else { (xam.clone(), w, h) };
+            println!("{k}: {:?}", doc_mot_luot(&a, w2, h2, Binarizer::LocalAverage, true));
+        }
     }
 }

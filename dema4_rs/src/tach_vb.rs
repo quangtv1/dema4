@@ -3,6 +3,7 @@
 pub mod cat_pdf;
 pub mod doc_ma;
 pub mod huong_trang;
+pub mod nhan;
 
 /// Thư mục mẫu 1 (`temp/function2/mau`) cho các test vàng chạy tay (`cargo test -- --ignored`).
 #[cfg(test)]

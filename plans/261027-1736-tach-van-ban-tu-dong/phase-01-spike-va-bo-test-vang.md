@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Spike và bộ test vàng"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "1–1,5 ngày"
@@ -41,11 +41,13 @@ Xoá 2 ẩn số kỹ thuật trước khi viết thật: (a) crate `zxing-cpp` 
 6. Ghi kết quả spike (tốc độ render + đọc mã, build CI, cách cắt chọn, kích thước exe tăng) vào `reports/` của plan.
 
 ## Success Criteria
-- [ ] zxing-cpp đọc đúng 209/209 trang index trên mẫu 1, 0 thừa; thời gian/trang đã đo; CI Windows + macOS build xanh.
-- [ ] Đã chọn cách cắt; part1 khớp hash ảnh với b3.
-- [ ] Exe tăng kích thước đã đo (zxing-cpp + ort + mô hình) — chấp nhận tới vài chục MB (người dùng đồng ý 2026-10-28).
-- [ ] `ort` chạy PP-LCNet ≤ ~12 ms/lần/lõi (dự phòng tract ≤ ~25 ms), khớp ONNX Runtime; exe 1 file, không DLL kèm.
-- [ ] Toàn bộ test cũ vẫn xanh.
+- [x] zxing-cpp đọc đúng 209/209 trang index trên mẫu 1, 0 thừa (mẫu 2: 1.778/1.780, 2 sót là `Van-ban-khac`); thời gian/trang đã đo; CI Windows + macOS build xanh.
+- [x] Đã chọn cách cắt (ghép trang, 1,2 s / 211 part); part1 khớp hash ảnh với b3.
+- [ ] (đo lại ở phase 5 khi code được gọi — LTO đang bỏ code chưa dùng) Exe tăng kích thước đã đo (zxing-cpp + ort + mô hình) — chấp nhận tới vài chục MB (người dùng đồng ý 2026-10-28).
+- [x] `ort` chạy PP-LCNet 10,7 ms/lần/lõi, khớp ONNX Runtime; test chạy trên CI Windows không DLL kèm (liên kết tĩnh) → không cần `tract`.
+- [x] Toàn bộ test cũ vẫn xanh.
+
+Kết quả: `reports/ket-qua-spike-phase-1-261029-0040-report.md`.
 
 ## Risk Assessment
 - `ort` tải bản ONNX Runtime dựng sẵn lúc build (cần mạng trên CI; nguồn của nhà phát triển crate) và liên kết tĩnh trên Windows MSVC có thể vướng → khoá phiên bản `ort`, cache trên CI; hỏng thì dùng `tract-onnx` (chậm hơn ~2,3 lần, cùng kết quả).
