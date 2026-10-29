@@ -17,7 +17,9 @@ pub fn thu_muc_an(goc: &Path) -> PathBuf {
         .file_name()
         .map(|t| t.to_string_lossy().chars().map(|c| if c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.') { c } else { '_' }).take(40).collect())
         .unwrap_or_default();
-    goc_du_lieu().join(format!("{}-{:016x}", ten.trim(), bam(&duong_dan)))
+    // Windows không phân biệt hoa thường trong đường dẫn: băm theo chữ thường, tên hiển thị giữ nguyên
+    let khoa = if cfg!(windows) { duong_dan.to_lowercase() } else { duong_dan };
+    goc_du_lieu().join(format!("{}-{:016x}", ten.trim(), bam(&khoa)))
 }
 
 /// Chuyển dữ liệu cũ trong `<goc>/.sm-dema4/` sang chỗ mới (1 lần) rồi xoá bản cũ; ghi `thu_muc_goc.txt`.
@@ -38,12 +40,11 @@ pub fn chuyen_du_lieu_cu(goc: &Path) {
     }
 }
 
-/// Đường dẫn tuyệt đối thống nhất (cùng thư mục gõ khác kiểu → cùng khoá); Windows không phân biệt hoa thường.
+/// Đường dẫn tuyệt đối thống nhất (cùng thư mục gõ khác kiểu → cùng chuỗi), giữ nguyên hoa thường.
 fn chuan_hoa(goc: &Path) -> String {
     let p = std::fs::canonicalize(goc).or_else(|_| std::path::absolute(goc)).unwrap_or_else(|_| goc.to_path_buf());
     let s = p.to_string_lossy();
-    let s = s.strip_prefix(r"\\?\").unwrap_or(&s).trim_end_matches(['/', '\\']).to_string();
-    if cfg!(windows) { s.to_lowercase() } else { s }
+    s.strip_prefix(r"\\?\").unwrap_or(&s).trim_end_matches(['/', '\\']).to_string()
 }
 
 /// FNV-1a 64 bit: ổn định giữa các lần chạy / phiên bản (khác `DefaultHasher`).
