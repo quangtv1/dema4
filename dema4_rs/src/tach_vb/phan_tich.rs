@@ -23,7 +23,7 @@ pub struct CauHinhPhanTich {
 
 impl Default for CauHinhPhanTich {
     fn default() -> Self {
-        Self { quet_trang: true, quet_ma: true, quet_xoay: true, ma_index: "NAMSAO-TACH".into(), nguong_trang: 0.01, nguong_nghi: 0.03, tin_cay_xoay: 0.8 }
+        Self { quet_trang: true, quet_ma: true, quet_xoay: true, ma_index: "NAMSAO-TACH".into(), nguong_trang: 0.01, nguong_nghi: 0.032, tin_cay_xoay: 0.8 }
     }
 }
 

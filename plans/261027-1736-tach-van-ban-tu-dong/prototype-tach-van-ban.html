@@ -682,7 +682,7 @@
 
       <div class="thanch" id="tabchTach">
         <div class="nhom" id="nhomTuDong"><div class="dongch rong"><span class="nhanch tieunhom">1. Tự động nhận dạng khi Phân tích <span class="tip ich-tip" data-tip="Tắt bớt để Phân tích nhanh hơn khi máy chậm hoặc hồ sơ quá nhiều trang; trang không quét thì gán nhãn bằng tay (I / B)."><span class="ich">i</span></span></span></div>
-        <div class="dongch" id="hangTrang"><label class="nhanbat" for="chBatTrang"><input type="checkbox" id="chBatTrang"> Trang trắng <span class="tip ich-tip" data-tip="% = phần diện tích trang có nét mực đậm. Dưới số đầu (1 %): Trắng · đến số sau (3 %): Nghi trắng · trên: có chữ."><span class="ich">i</span></span></label>
+        <div class="dongch" id="hangTrang"><label class="nhanbat" for="chBatTrang"><input type="checkbox" id="chBatTrang"> Trang trắng <span class="tip ich-tip" data-tip="% = phần diện tích trang có nét mực đậm. Dưới số đầu (1 %): Trắng · đến số sau (3,2 %): Nghi trắng · trên: có chữ."><span class="ich">i</span></span></label>
           <span class="o2"><input id="chNguong" type="number" min="0" max="10" step="0.01"> – <input id="chNghi" type="number" min="0" max="10" step="0.01"> %<span class="chuthichng"><span><i class="t"></i>Trắng</span><span><i class="n"></i>Nghi trắng</span><span><i class="c"></i>Có chữ</span></span></span>
           <div class="khoang" id="chKhoang"></div>
           <span class="goiy" id="chNguongGoiY"></span></div>
@@ -774,7 +774,7 @@
   var CANH_MM = [1189, 841, 594, 420, 297, 210, 148, 105];
   var RANH_MD = [0, 1, 2, 3, 4, 5, 6].map(function (i) { return (CANH_MM[i] + CANH_MM[i + 1]) / 2; });
   var A0_DT_MD = 1399, A0_DT_MAX = 2500; // A0 có cạnh dài > ngưỡng này: quy A4 theo diện tích thật (dài A0 + cạnh ngắn A4)
-  var MAC_DINH = { heSo: HE_SO_MD.slice(), ranh: RANH_MD.slice(), a0dt: A0_DT_MD, a0lon: 'dientich', a0lonHs: 16, batTrang: true, batMa: true, batXoay: true, tinCay: '0.80', nguong: '1.00', nghi: '3.00', loaiMa: 'code128', ma: 'NAMSAO-TACH', ten: '{hoso}_part{n}', luu: 'tudong', ra: '' };
+  var MAC_DINH = { heSo: HE_SO_MD.slice(), ranh: RANH_MD.slice(), a0dt: A0_DT_MD, a0lon: 'dientich', a0lonHs: 16, batTrang: true, batMa: true, batXoay: true, tinCay: '0.80', nguong: '1.00', nghi: '3.20', loaiMa: 'code128', ma: 'NAMSAO-TACH', ten: '{hoso}_part{n}', luu: 'tudong', ra: '' };
   var cauHinh = Object.assign({}, MAC_DINH);
   var TM_GOC = 'G:\\SoHoa\\Lo_L1\\pdf_goc';
   // Thư mục kết quả = <thư mục cha>/<tên thư mục gốc>_vanban; cha mặc định là cha của thư mục gốc

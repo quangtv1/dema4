@@ -6,7 +6,8 @@
 //! - `mau` = tỷ lệ khối 8×8 có ≥ 6 điểm mực đỏ / xanh (dấu, chữ ký, viết tay màu);
 //! - chỉ số = `dam + 0,3 × mau`.
 //!
-//! Chốt theo nhãn tay mẫu 2 (21.113 trang): ngưỡng 1,0 % / 3,0 % → Trắng đúng 99,85 %, trắng lọt Content 0,95 %.
+//! Chốt theo nhãn tay mẫu 2 (21.113 trang, chạy bằng Rust: ảnh 150 dpi thu về 100 dpi): ngưỡng mặc định 1,0 % / 3,2 %
+//! → Trắng đúng 99,82 %, trắng lọt Content 0,87 %, Nghi trắng 872 trang.
 
 use super::anh::Anh;
 
