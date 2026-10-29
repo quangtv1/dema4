@@ -6,6 +6,8 @@
 //! - `dema4_rs <thư mục>`: đếm không cần giao diện, ghi <thư mục>/<tên>_dem.txt và <tên>_dem_chitiet.txt.
 //! - Thêm `--dpi` để kiểm tra DPI ảnh scan, `--kyso` để kiểm tra chữ ký số (mặc định tắt).
 //! - `dema4_rs <thư mục> --khong-ghi`: chỉ đếm và in kết quả (không ghi file, không gửi thống kê), dùng để đo tốc độ.
+//! - `dema4_rs --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]`: tách văn bản theo nhãn,
+//!   ghi `<cha>/<tên>_vanban/…` và `<thư mục pdf>/.sm-dema4/ketqua_tach.txt`.
 
 mod dem_pdf;
 mod gui;
@@ -24,6 +26,9 @@ fn main() {
             unsafe {
                 use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
                 AttachConsole(ATTACH_PARENT_PROCESS);
+            }
+            if thu_muc == "--tach" {
+                std::process::exit(chay_tach(&std::env::args().skip(2).collect::<Vec<_>>()));
             }
             let khong_ghi = std::env::args().any(|a| a == "--khong-ghi");
             let kiem_tra_dpi = std::env::args().any(|a| a == "--dpi");
@@ -78,5 +83,102 @@ fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_gh
             eprintln!("Lỗi khi ghi file {}: {e}", duong_dan.display());
             1
         }
+    }
+}
+
+/// `--tach <thư mục pdf> [--nhan <file>] [--ra <thư mục cha>]`: cắt theo nhãn có sẵn (không phân tích).
+/// Nhãn mặc định `<thư mục>/.sm-dema4/index_and_blank.txt`; góc xoay `<thư mục>/.sm-dema4/xoay_trang.txt` nếu có.
+fn chay_tach(tham_so: &[String]) -> i32 {
+    use std::path::{Path, PathBuf};
+    use tach_vb::{nhan, tach};
+    let mut thu_muc: Option<PathBuf> = None;
+    let (mut file_nhan, mut cha_ra): (Option<PathBuf>, Option<PathBuf>) = (None, None);
+    let mut i = 0;
+    while i < tham_so.len() {
+        match tham_so[i].as_str() {
+            "--nhan" => { file_nhan = tham_so.get(i + 1).map(PathBuf::from); i += 1; }
+            "--ra" => { cha_ra = tham_so.get(i + 1).map(PathBuf::from); i += 1; }
+            khac => thu_muc = Some(PathBuf::from(khac)),
+        }
+        i += 1;
+    }
+    let Some(thu_muc) = thu_muc.filter(|p| p.is_dir()) else {
+        eprintln!("Cách dùng: sm-dema4 --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]\nThiếu thư mục PDF hoặc thư mục không tồn tại.");
+        return 2;
+    };
+    let thu_muc = std::fs::canonicalize(&thu_muc).unwrap_or(thu_muc);
+    let an = thu_muc.join(".sm-dema4");
+    let file_nhan = file_nhan.unwrap_or_else(|| an.join("index_and_blank.txt"));
+    let Ok(noi_dung) = std::fs::read_to_string(&file_nhan) else {
+        eprintln!("Chưa có file nhãn {} — mở thư mục trong giao diện để Phân tích, hoặc chỉ file bằng --nhan.", file_nhan.display());
+        return 2;
+    };
+    let goc_nhan = if file_nhan.starts_with(&an) { thu_muc.clone() } else { file_nhan.parent().map(Path::to_path_buf).unwrap_or_else(|| thu_muc.clone()) };
+    let bang_nhan = match nhan::doc_file_nhan(&noi_dung, &|_| None) {
+        Ok((b, cb)) => { cb.iter().for_each(|c| eprintln!("Cảnh báo: {c}")); b }
+        Err(loi) => { loi.iter().for_each(|l| eprintln!("{}: dòng {}: {}", file_nhan.display(), l.dong, l.ly_do)); return 1; }
+    };
+    let file_xoay = an.join("xoay_trang.txt");
+    let bang_xoay = match std::fs::read_to_string(&file_xoay) {
+        Err(_) => Default::default(),
+        Ok(nd) => match nhan::doc_file_xoay(&nd, &|_| None) {
+            Ok(b) => b,
+            Err(loi) => { loi.iter().for_each(|l| eprintln!("{}: dòng {}: {}", file_xoay.display(), l.dong, l.ly_do)); return 1; }
+        },
+    };
+    let (gui, _nhan_su_kien) = mpsc::channel();
+    let pdf = dem_pdf::tim_file_pdf(&thu_muc.to_string_lossy(), &AtomicBool::new(false), &gui);
+    let (ho_so, canh_bao) = tach::ghep_ho_so(&pdf, bang_nhan, &goc_nhan, bang_xoay, &thu_muc);
+    canh_bao.iter().for_each(|c| eprintln!("Cảnh báo: {c}"));
+    let ra = match tach::thu_muc_ra(&thu_muc, cha_ra.as_deref()) {
+        Ok(r) => r,
+        Err(e) => { eprintln!("{e}"); return 2; }
+    };
+    let bat_dau = std::time::Instant::now();
+    let kq = match tach::tach_thu_muc(&thu_muc, &ra, &ho_so, tach::MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}) {
+        Ok(k) => k,
+        Err(e) => { eprintln!("{e}"); return 2; }
+    };
+    kq.canh_bao.iter().for_each(|c| eprintln!("Cảnh báo: {c}"));
+    kq.loi.iter().for_each(|(p, e)| eprintln!("Lỗi {}: {e}", p.display()));
+    let log = an.join("ketqua_tach.txt");
+    if let Err(e) = std::fs::create_dir_all(&an).and_then(|_| std::fs::write(&log, tach::noi_dung_log(&kq.dong))) {
+        eprintln!("Không ghi được {}: {e}", log.display());
+        return 1;
+    }
+    println!("Tách {} hồ sơ → {} văn bản ({} hồ sơ chép nguyên) trong {:.1} s\nKết quả: {}\nLog: {}", ho_so.len(), kq.dong.len(), kq.sao_nguyen, bat_dau.elapsed().as_secs_f64(), ra.display(), log.display());
+    if kq.loi.is_empty() { 0 } else { 1 }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::chay_tach;
+
+    #[test]
+    fn tach_thieu_thu_muc_bao_loi() {
+        assert_eq!(chay_tach(&[]), 2);
+        assert_eq!(chay_tach(&["/khong/co/thu/muc/nay".to_string()]), 2);
+    }
+
+    #[test]
+    fn tach_ap_goc_xoay_va_ghi_log() {
+        let goc = std::env::temp_dir().join(format!("dema4_cli_tach_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let nguon = goc.join("ho so");
+        std::fs::create_dir_all(nguon.join(".sm-dema4")).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&nguon.join("a.pdf"), 4);
+        std::fs::write(nguon.join(".sm-dema4/index_and_blank.txt"), "a.pdf;2;index\n").unwrap();
+        std::fs::write(nguon.join(".sm-dema4/xoay_trang.txt"), "a.pdf;4;180\n").unwrap();
+        // Chưa có nhãn ở thư mục khác → mã thoát 2
+        std::fs::create_dir_all(goc.join("trong")).unwrap();
+        assert_eq!(chay_tach(&[goc.join("trong").to_string_lossy().into_owned()]), 2);
+        assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned()]), 0);
+        let ra = goc.join("ho so_vanban").join("a");
+        let doc = mupdf::pdf::PdfDocument::open(ra.join("a_part2.pdf").to_str().unwrap()).unwrap();
+        assert_eq!(doc.page_count().unwrap(), 2);
+        assert_eq!(doc.find_page(1).unwrap().get_dict("Rotate").unwrap().unwrap().as_int().unwrap(), 180);
+        let log = std::fs::read_to_string(nguon.join(".sm-dema4/ketqua_tach.txt")).unwrap();
+        assert_eq!(log.lines().count(), 3);
+        let _ = std::fs::remove_dir_all(&goc);
     }
 }

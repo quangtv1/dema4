@@ -59,7 +59,7 @@ Nguồn: brainstorm `temp/function2/plans/reports/brainstorm-261027-1700-tach-va
 | 1 | [Spike và bộ test vàng](./phase-01-spike-va-bo-test-vang.md) | 1–1,5 ngày (+ zxing-cpp, ort, CI Windows) | **Done** |
 | 2 | [Lõi nhãn trang và dải cắt](./phase-02-loi-nhan-trang-va-dai-cat.md) | 0,5 ngày | **Done** |
 | 3 | [Phát hiện tự động (đọc dung lượng trước, phân tích nền, cache)](./phase-03-phat-hien-tu-dong.md) | 2,5 ngày (+ mô hình hướng trang 2 tầng) | Pending |
-| 4 | [Cắt PDF và lệnh tách](./phase-04-cat-pdf-va-lenh-tach.md) | 0,5–1 ngày | Pending |
+| 4 | [Cắt PDF và lệnh tách](./phase-04-cat-pdf-va-lenh-tach.md) | 0,5–1 ngày | **Gần xong** (còn nhánh CLI tự phân tích — chờ phase 3) |
 | 5 | [Khung màn Tách + tab Hồ sơ + Cấu hình](./phase-05-giao-dien-duyet-va-tach.md) | 4,5 ngày (+ duyệt Nghi trắng/Nghi xoay, hoàn tác theo nhóm) | Pending |
 | 6 | [Tab Văn bản + phóng to trang + nút Tách](./phase-06-tab-van-ban-phong-to-va-tach.md) | 3 ngày (+ chặn Tách khi còn trang Nghi) | Pending |
 | 7 | [Phát hành](./phase-07-phat-hanh.md) | 0,5 ngày | Pending |

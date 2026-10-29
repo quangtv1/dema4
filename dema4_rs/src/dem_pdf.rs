@@ -376,7 +376,7 @@ fn bo_qua_thu_muc(ten: &std::ffi::OsStr) -> bool {
 /// Quét tìm file .pdf bằng bộ duyệt song song jwalk (nhanh hơn nhiều trên cây lớn và thư mục mạng).
 /// Vừa duyệt vừa báo số file đã thấy và kiểm tra cờ dừng để app không "đơ" và bấm Dừng là dừng ngay.
 /// Bỏ qua thư mục hệ thống/cache (bo_qua_thu_muc), thư mục không đọc được, và không đi theo symlink.
-fn tim_file_pdf(thu_muc: &str, dung: &AtomicBool, gui: &Sender<SuKien>) -> Vec<PathBuf> {
+pub(crate) fn tim_file_pdf(thu_muc: &str, dung: &AtomicBool, gui: &Sender<SuKien>) -> Vec<PathBuf> {
     let duyet = jwalk::WalkDir::new(thu_muc)
         .skip_hidden(false) // tự lọc ẩn trong bo_qua_thu_muc để vẫn quét được thư mục gốc là ẩn
         .follow_links(false)
