@@ -20,6 +20,14 @@ pub enum BieuTuong {
     Keo,
     But,
     HoiDap,
+    /// Tab Văn bản / hộp phóng to
+    TraiChevron,
+    PhaiChevron,
+    Luoi,
+    MotTrang,
+    HaiTrang,
+    BoKhoi,
+    Dong,
 }
 
 const NET: f32 = 1.75;
@@ -87,6 +95,33 @@ pub fn ve(painter: &egui::Painter, r: Rect, bt: BieuTuong, mau: Color32) {
         BieuTuong::HoiDap => {
             painter.circle_stroke(c, 0.85 * k, Stroke::new(1.2, mau));
             painter.text(c + Vec2::new(0.0, 0.05 * k), egui::Align2::CENTER_CENTER, "?", egui::FontId::proportional(1.2 * k), mau);
+        }
+        BieuTuong::TraiChevron | BieuTuong::PhaiChevron => {
+            let l = if bt == BieuTuong::TraiChevron { 1.0 } else { -1.0 };
+            painter.add(Shape::line(vec![c + Vec2::new(0.25 * l, -0.6) * k, c + Vec2::new(-0.25 * l, 0.0) * k, c + Vec2::new(0.25 * l, 0.6) * k], s));
+        }
+        BieuTuong::Luoi => {
+            for (x, y) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                painter.rect_stroke(Rect::from_center_size(c + Vec2::new(x, y) * 0.42 * k, Vec2::splat(0.62 * k)), 1.0, s, egui::StrokeKind::Middle);
+            }
+        }
+        BieuTuong::MotTrang => {
+            painter.rect_stroke(Rect::from_center_size(c, Vec2::new(1.1, 1.6) * k), 1.0, s, egui::StrokeKind::Middle);
+        }
+        BieuTuong::HaiTrang => {
+            for x in [-0.45, 0.45] {
+                painter.rect_stroke(Rect::from_center_size(c + Vec2::new(x, 0.0) * k, Vec2::new(0.75, 1.5) * k), 1.0, s, egui::StrokeKind::Middle);
+            }
+        }
+        BieuTuong::BoKhoi => {
+            // Trang có dấu trừ: bỏ trang khỏi văn bản
+            painter.rect_stroke(Rect::from_center_size(c + Vec2::new(-0.15, 0.0) * k, Vec2::new(1.0, 1.5) * k), 1.0, s, egui::StrokeKind::Middle);
+            painter.circle_filled(c + Vec2::new(0.45, 0.45) * k, 0.42 * k, painter.ctx().global_style().visuals.window_fill);
+            painter.line_segment([c + Vec2::new(0.22, 0.45) * k, c + Vec2::new(0.68, 0.45) * k], Stroke::new(NET * 1.2, mau));
+        }
+        BieuTuong::Dong => {
+            painter.line_segment([c + Vec2::new(-0.55, -0.55) * k, c + Vec2::new(0.55, 0.55) * k], s);
+            painter.line_segment([c + Vec2::new(0.55, -0.55) * k, c + Vec2::new(-0.55, 0.55) * k], s);
         }
         BieuTuong::XoayPhai | BieuTuong::Xoay180 => {
             // Vòng 3/4 theo chiều kim đồng hồ, mũi tên ở cuối

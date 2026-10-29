@@ -1570,6 +1570,26 @@ mod tests {
         harness.state_mut().tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(crate::tro_giup::TabHuongDan::Tach));
         harness.run_steps(3);
         harness.render().unwrap().save(thu_muc_anh.join("tach_5_huong_dan.png")).unwrap();
+        // Tab Văn bản: Lưới, 1 trang 100 %, 2 trang 75 %, hộp phóng to
+        harness.state_mut().tro_giup = None;
+        harness.state_mut().tach.tab = crate::gui_tach::Tab::VanBan;
+        harness.state_mut().tach.vb = 1;
+        for (ten, che_do, ty_le) in [("tach_6_vb_luoi", crate::cau_hinh::CheDoVb::Luoi, 100), ("tach_7_vb_1trang", crate::cau_hinh::CheDoVb::MotTrang, 100), ("tach_8_vb_2trang", crate::cau_hinh::CheDoVb::HaiTrang, 75)] {
+            harness.state_mut().cfg.che_do_vb = che_do;
+            harness.state_mut().cfg.ty_le_vb = ty_le;
+            for _ in 0..30 {
+                harness.run_steps(1);
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            harness.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
+        }
+        let ds = harness.state().tach.thu_tu_hien().to_vec();
+        harness.state_mut().tach.phong_to = Some(crate::gui_tach::phong_to::PhongTo::moi(ds.clone(), ds[0]));
+        for _ in 0..30 {
+            harness.run_steps(1);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        harness.render().unwrap().save(thu_muc_anh.join("tach_9_phong_to.png")).unwrap();
     }
 
     /// Vẽ giao diện ra ảnh PNG (không mở cửa sổ) từ một file chi tiết thật để xem bố cục.
