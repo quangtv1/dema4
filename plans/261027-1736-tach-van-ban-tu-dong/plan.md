@@ -60,7 +60,7 @@ Nguồn: brainstorm `temp/function2/plans/reports/brainstorm-261027-1700-tach-va
 | 2 | [Lõi nhãn trang và dải cắt](./phase-02-loi-nhan-trang-va-dai-cat.md) | 0,5 ngày | **Done** |
 | 3 | [Phát hiện tự động (đọc dung lượng trước, phân tích nền, cache)](./phase-03-phat-hien-tu-dong.md) | 2,5 ngày (+ mô hình hướng trang 2 tầng) | Pending |
 | 4 | [Cắt PDF và lệnh tách](./phase-04-cat-pdf-va-lenh-tach.md) | 0,5–1 ngày | **Gần xong** (còn nhánh CLI tự phân tích — chờ phase 3) |
-| 5 | [Khung màn Tách + tab Hồ sơ + Cấu hình](./phase-05-giao-dien-duyet-va-tach.md) | 4,5 ngày (+ duyệt Nghi trắng/Nghi xoay, hoàn tác theo nhóm) | Pending |
+| 5 | [Khung màn Tách + tab Hồ sơ + Cấu hình](./phase-05-giao-dien-duyet-va-tach.md) | 4,5 ngày (+ duyệt Nghi trắng/Nghi xoay, hoàn tác theo nhóm) | In progress — lõi + màn Tách + Cấu hình + Trợ giúp xong; còn test giao diện kittest |
 | 6 | [Tab Văn bản + phóng to trang + nút Tách](./phase-06-tab-van-ban-phong-to-va-tach.md) | 3 ngày (+ chặn Tách khi còn trang Nghi) | Pending |
 | 7 | [Phát hành](./phase-07-phat-hanh.md) | 0,5 ngày | Pending |
 
@@ -229,3 +229,5 @@ Sửa ~30 điểm: plan.md (Chiều trang 2 bước, cấu hình chiều trang +
 | Lưu trạng thái duyệt | `index_and_blank.txt` giữ đúng định dạng cũ (`index`/`blank`/`split`) cho Python; trạng thái "giữ nội dung", trang đã xoá khỏi lưới, Nghi xoay đang chỉnh lưu trong cache `.sm-dema4/cache/` (mở lại giữ nguyên trạng thái cuối; PDF đổi hoặc Phân tích lại thì mất) — phase 2, 3, 5 (2026-10-28) |
 | Ngưỡng nghi trắng 3,2 % | Đo lại bằng Rust trên mẫu 2: 3,0 % → trắng lọt 1,04 %; 3,2 % → 0,87 % (Nghi +14 trang), Trắng đúng 99,82 % không đổi. Đổi ngưỡng không cần render lại (cache lưu số đo thô) — phase 3, 5, prototype (2026-10-29) |
 | Thu thập ngưỡng trắng: B + C | Mỗi lần tách: Telegram tin + CSV histogram (chỉ số × nhãn cuối sau duyệt) và 1 dòng Google Sheet qua webhook Apps Script (URL nhúng như token). Chỉ số đếm, không ảnh/tên file. Script `tong-hop-nguong.py` tổng hợp; đổi mặc định do người quyết — phase 6 (2026-10-29) |
+| Không cache ảnh nhỏ JPEG | Đo: render ảnh 120 px 7,2 ms/ảnh (mẫu 2) → 1 màn ~60 ô / 2 luồng ≈ 0,21 s, đạt "lưới đầy ảnh < 1 s" không cần cache. 100k trang giả: đọc dung lượng 1,33 s, dựng bảng 1 ms, sắp 3 ms, bảng ~2 MB — phase 5 (2026-10-29) |
+| Hệ số quy A4 chuyển vào Cấu hình | Màn Đếm bỏ hàng Hệ số, đọc hệ số + ranh giới khổ + A0 lớn từ `sm-dema4.cfg` (cả CLI). Mặc định giữ đúng công thức cũ: so CLI bản trước/sau trên mẫu 1 và mẫu 2 (có DPI, ký số) giống hệt. Ví dụ 1500×900 mm = 21,64 (A4 tính theo pt như lõi cũ), không phải 21,65 — phase 5 (2026-10-29) |

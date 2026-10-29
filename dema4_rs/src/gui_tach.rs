@@ -1380,4 +1380,62 @@ mod tests {
         assert!(!man2.dang_chay(), "không đổi gì thì không chạy");
         let _ = std::fs::remove_dir_all(&goc);
     }
+
+    /// Đo bộ 100k trang sinh giả (200 file × 500 trang): mở thư mục (đọc dung lượng), dựng bảng, lọc / sắp.
+    /// Chạy: cargo test --release -- --ignored --nocapture do_100k_trang
+    #[test]
+    #[ignore = "đo hiệu năng, tạo ~200 PDF tạm"]
+    fn do_100k_trang() {
+        let goc = std::env::temp_dir().join("dema4_100k");
+        if !goc.join("199/hs.pdf").exists() {
+            for f in 0..200 {
+                std::fs::create_dir_all(goc.join(f.to_string())).unwrap();
+                crate::tach_vb::tach::tests::tao_pdf(&goc.join(format!("{f}/hs.pdf")), 500);
+            }
+        }
+        let t = Instant::now();
+        let phien = PhienPhanTich::mo(&goc, &AtomicBool::new(false));
+        let t_mo = t.elapsed();
+        let ch = CauHinhPhanTich::default();
+        let t = Instant::now();
+        let b = BangTrang::tu_phien(&phien, &ch, None, None);
+        let t_bang = t.elapsed();
+        let t = Instant::now();
+        let tt = b.thu_tu(Loc::TatCa, None, Sap::DungLuongTang);
+        let t_sap = t.elapsed();
+        let t = Instant::now();
+        let n_vb: usize = (0..b.ho_so.len()).map(|h| b.van_ban(h).van_ban.len()).sum();
+        let t_vb = t.elapsed();
+        println!(
+            "{} trang: mở {:.2} s · bảng {:.0} ms · sắp dung lượng {:.0} ms · tính {} văn bản {:.0} ms · bảng ~{} MB",
+            tt.len(),
+            t_mo.as_secs_f64(),
+            t_bang.as_secs_f64() * 1e3,
+            t_sap.as_secs_f64() * 1e3,
+            n_vb,
+            t_vb.as_secs_f64() * 1e3,
+            b.trang.len() * std::mem::size_of::<bang_trang::TrangMeta>() / 1_000_000
+        );
+        assert_eq!(tt.len(), 100_000);
+    }
+
+    /// Đo render ảnh nhỏ 120 px (đủ 1 màn ~60 ô) trên trang scan thật.
+    #[test]
+    #[ignore = "cần DEMA4_MAU2"]
+    fn do_render_anh_nho() {
+        let thu_muc = std::env::var("DEMA4_MAU2").expect("DEMA4_MAU2");
+        let (gui, _n) = mpsc::channel();
+        let pdf = crate::dem_pdf::tim_file_pdf(&thu_muc, &AtomicBool::new(false), &gui);
+        let doc = mupdf::Document::open(pdf[0].to_str().unwrap()).unwrap();
+        let n = doc.page_count().unwrap().min(60) as usize;
+        let t = Instant::now();
+        for so in 1..=n {
+            let trang = doc.load_page(so as i32 - 1).unwrap();
+            let hop = trang.bounds().unwrap();
+            let k = 120.0 / (hop.x1 - hop.x0);
+            trang.to_pixmap(&mupdf::Matrix::new_scale(k, k), &mupdf::Colorspace::device_rgb(), false, false).unwrap();
+        }
+        let ms = t.elapsed().as_secs_f64() * 1e3 / n as f64;
+        println!("{n} ảnh nhỏ: {ms:.1} ms/ảnh → 60 ô / 2 luồng ≈ {:.2} s", ms * 30.0 / 1e3);
+    }
 }

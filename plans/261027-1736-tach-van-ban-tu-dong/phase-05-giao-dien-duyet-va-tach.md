@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Khung màn Tách + tab Hồ sơ (duyệt, gán nhãn) + Cấu hình"
-status: pending
+status: in-progress
 priority: P1
 dependencies: [3]
 effort: "4,5 ngày"
@@ -88,7 +88,7 @@ Màn "Tách văn bản" trong cửa sổ egui hiện có: menu, Cấu hình (lư
 | Lưới gộp hàng trăm nghìn trang | Tự dựng: `ScrollArea::vertical().show_rows(cao_hàng, số_hàng)`; số cột = bề ngang / (cỡ + khe); chỉ vẽ hàng đang hiện; vị trí ô tính bằng công thức (hàng, cột) |
 | Kéo khung, chọn kiểu Explorer | Một `ui.interact(rect_lưới, Sense::click_and_drag())` cho cả lưới; giao khung với ô tính theo công thức, không duyệt widget; vẽ khung bằng `painter.rect` |
 | Ctrl + cuộn | `ctx.input(|i| i.zoom_delta())` khi con trỏ trên lưới; tắt phóng giao diện mặc định của egui (`zoom_with_keyboard = false`, nuốt `zoom_delta`) |
-| Ảnh nhỏ | Thứ tự lấy: texture LRU → ảnh nhỏ từ phase 3 / cache `.sm-dema4/` (0,15 ms) → render MuPDF ~14 dpi (~10 ms). Hàng đợi render **chỉ giữ ô đang hiện**: mỗi khung thay danh sách yêu cầu, ô đã cuộn qua bị bỏ (cuộn vèo tới trang 50.000 chỉ render ~60 ô). `ColorImage` → `TextureHandle`; **LRU giới hạn** (~600 texture) |
+| Ảnh nhỏ | Thứ tự lấy: texture LRU → ảnh xám từ phân tích (ô đang hiện) → render MuPDF 120/240 px (7,2 ms đo trên mẫu 2; không cache JPEG — đủ nhanh). Hàng đợi render **chỉ giữ ô đang hiện**: mỗi khung thay danh sách yêu cầu, ô đã cuộn qua bị bỏ (cuộn vèo tới trang 50.000 chỉ render ~60 ô). `ColorImage` → `TextureHandle`; **LRU giới hạn** (~600 texture) |
 | Tooltip khi nút vô hiệu | `.on_disabled_hover_text(...)` |
 | Dữ liệu trang | `Vec<TrangMeta { ho_so: u32, so: u32, nhan_tu_dong: u8 /* content/index/trang */, nhan_tay: u8 /* 0 = chưa sửa, hoặc content/index/trang/split */, co: u8 /* bit: NGHI_TRANG, NGHI_XOAY, DA_CHINH (chờ xác nhận), XAC_NHAN_XOAY, GIU_NOI_DUNG (đã duyệt Nghi trắng), DA_XOA */, goc: u8 /* 2 bit góc đang đặt + 2 bit góc đề xuất */, dam: u16, mau: u16 /* phần vạn: tính lại Trắng/Nghi trắng khi đổi ngưỡng */, huong: [u8; 8] /* phân bố hướng tầng 1 + tầng 2 (0 = chưa chạy): gán lại Nghi xoay khi đổi độ tin cậy */, dung_luong: u32, rong: f32, cao: f32 }>` (~36 byte/trang → 700k trang ≈ 25 MB; nhãn dùng = `nhan_tay` nếu ≠ 0, không thì `nhan_tu_dong`; rộng/cao để tính Quy A4); thứ tự hiển thị = `Vec<u32>` chỉ số, tính lại khi đổi lọc/sắp |
 | Nhãn 2 lớp (tránh ghi đè sửa tay) | Mỗi trang: `nhan_tu_dong` (phân tích / đổi ngưỡng ghi vào) + `nhan_tay: Option<Nhan>` (người sửa ghi vào); **nhãn dùng = `nhan_tay.unwrap_or(nhan_tu_dong)`**. Kết quả phân tích tới muộn, đổi ngưỡng, nạp cache chỉ chạm `nhan_tu_dong` → không bao giờ đè sửa tay. Xoá trang / Bỏ nhãn = `nhan_tay = Some(NoiDung)`. `index_and_blank.txt` ghi nhãn dùng; Phân tích lại xoá `nhan_tay`. Mọi thay đổi đi qua **một hàm** `sua(ds_trang, thao_tac)`: ghi bước hoàn tác (chỉ trang bị đổi + giá trị cũ), đặt cờ chưa lưu, cập nhật cộng dồn số liệu (đếm nhãn theo hồ sơ, Số trang, Quy A4, danh sách văn bản của hồ sơ bị đổi) — không quét lại 100k trang |
