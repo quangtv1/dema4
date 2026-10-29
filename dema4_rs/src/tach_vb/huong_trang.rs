@@ -262,4 +262,70 @@ mod tests {
         assert_eq!(sai, 0);
         assert!(quyet * 100 >= lan * 85, "quyết {quyet}/{lan}");
     }
+
+    /// Tiêu chí plan: mẫu 2, 200 trang có chữ (chọn theo bước đều, tái lập được) × 4 chiều xoay giả ⇒ 2 tầng quyết
+    /// ≥ 97 % số lần, sai 0. Trang gốc vốn bị xoay sẵn: chiều gốc = chiều mà ≥ 3/4 lần đoán cùng chỉ ra (báo cáo spike
+    /// phải sửa tay 8 trang như vậy).
+    #[test]
+    #[ignore = "cần DEMA4_MAU2 + DEMA4_MAU2_NHAN, chạy ~1 phút"]
+    fn doan_chieu_trang_mau_2_xoay_gia() {
+        use mupdf::{Colorspace, Document, Matrix};
+        let thu_muc = std::path::PathBuf::from(std::env::var("DEMA4_MAU2").expect("DEMA4_MAU2"));
+        let nhan_tay = std::fs::read_to_string(std::env::var("DEMA4_MAU2_NHAN").expect("DEMA4_MAU2_NHAN")).unwrap();
+        let (bang, _) = crate::tach_vb::nhan::doc_file_nhan(&nhan_tay, &|_| None).unwrap();
+        let (gui, _n) = std::sync::mpsc::channel();
+        let pdf = crate::dem_pdf::tim_file_pdf(&thu_muc.to_string_lossy(), &std::sync::atomic::AtomicBool::new(false), &gui);
+        // Ứng viên: mọi trang không có nhãn (nội dung) của mọi hồ sơ
+        let mut ung_vien = Vec::new();
+        for p in &pdf {
+            let ten = p.file_name().unwrap().to_string_lossy().to_string();
+            let nhan = bang.iter().find(|(k, _)| k.rsplit('/').next() == Some(ten.as_str())).map(|(_, v)| v.clone()).unwrap_or_default();
+            let n = Document::open(p.to_str().unwrap()).unwrap().page_count().unwrap() as usize;
+            ung_vien.extend((1..=n).filter(|t| !nhan.contains_key(t)).map(|t| (p.clone(), t)));
+        }
+        let buoc = ung_vien.len() / 200;
+        let chon: Vec<_> = ung_vien.iter().step_by(buoc).take(200).cloned().collect();
+        let mut mh = MoHinhHuong::nap().unwrap();
+        let (mut quyet, mut sai, mut lan, mut lech_goc) = (0, 0, 0, 0);
+        for (p, trang) in &chon {
+            let doc = Document::open(p.to_str().unwrap()).unwrap();
+            let s = 150.0 / 72.0;
+            let pix = doc.load_page(*trang as i32 - 1).unwrap().to_pixmap(&Matrix::new_scale(s, s), &Colorspace::device_rgb(), false, false).unwrap();
+            let (w, h) = (pix.width() as usize, pix.height() as usize);
+            let rgb: Vec<u8> = if pix.n() == 3 { pix.samples().to_vec() } else { pix.samples().chunks_exact(pix.n() as usize).flat_map(|q| [q[0], q[1], q[2]]).collect() };
+            let doan: Vec<Option<u16>> = (0..4)
+                .map(|r| {
+                    let (a, w2, h2) = xoay_rgb(&rgb, w, h, r);
+                    let pb = mh.phan_bo(&a, w2, h2, 0.8).unwrap();
+                    if std::env::var("DEMA4_IN_PHAN_BO").is_ok() {
+                        println!("pb\t{}:{trang}\t{r}\t{:?}\t{:?}", p.file_name().unwrap().to_string_lossy(), pb.tang_1, pb.tang_2);
+                    }
+                    ket_luan(&pb, 0.8).map(|k| k.goc)
+                })
+                .collect();
+            // Chiều gốc suy ra từ mỗi lần đoán: góc đoán − góc xoay giả
+            let mut dem = [0; 4];
+            for (r, d) in doan.iter().enumerate() {
+                if let Some(g) = d {
+                    dem[((*g as usize / 90) + 4 - r) % 4] += 1;
+                }
+            }
+            let goc = dem.iter().position(|&c| c >= 3).unwrap_or(0);
+            lech_goc += (goc != 0) as usize;
+            for (r, d) in doan.iter().enumerate() {
+                lan += 1;
+                if let Some(g) = d {
+                    quyet += 1;
+                    if *g as usize != (goc + r) % 4 * 90 {
+                        sai += 1;
+                        println!("sai: {}:{trang} xoay {} → đoán {g} (gốc {})", p.file_name().unwrap().to_string_lossy(), r * 90, goc * 90);
+                    }
+                }
+            }
+        }
+        println!("{} trang × 4 = {lan} lần: quyết {quyet} ({:.1} %), sai {sai}; trang gốc vốn xoay sẵn: {lech_goc}", chon.len(), quyet as f64 * 100.0 / lan as f64);
+        assert_eq!(sai, 0);
+        assert!(quyet * 100 >= lan * 97, "quyết {quyet}/{lan}");
+    }
 }
+

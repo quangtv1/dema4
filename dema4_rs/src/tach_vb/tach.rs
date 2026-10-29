@@ -364,4 +364,49 @@ pub(crate) mod tests {
         }
         let _ = std::fs::remove_dir_all(&ra);
     }
+
+    /// Mẫu 2 (234 hồ sơ, nhãn tay): mỗi hồ sơ 1 thư mục giữ cấu trúc nguồn; tổng part = tổng văn bản theo dải cắt;
+    /// hồ sơ không nhãn (4613, 4727) chép nguyên từng byte; log đủ dòng.
+    #[test]
+    #[ignore = "cần DEMA4_MAU2 + DEMA4_MAU2_NHAN, chạy ~1 phút"]
+    fn tach_mau_2_cau_truc_thu_muc() {
+        use super::super::nhan::{doc_file_nhan, tinh_dai};
+        let nguon = PathBuf::from(std::env::var("DEMA4_MAU2").expect("DEMA4_MAU2"));
+        let (bang, _) = doc_file_nhan(&std::fs::read_to_string(std::env::var("DEMA4_MAU2_NHAN").expect("DEMA4_MAU2_NHAN")).unwrap(), &|_| None).unwrap();
+        let (gui, _n) = std::sync::mpsc::channel();
+        let pdf = crate::dem_pdf::tim_file_pdf(&nguon.to_string_lossy(), &AtomicBool::new(false), &gui);
+        assert_eq!(pdf.len(), 234);
+        // File nhãn mẫu 2 ghi đường dẫn tuyệt đối của máy khác → ghép theo tên file
+        let ho_so: Vec<HoSoTach> = pdf
+            .iter()
+            .map(|p| {
+                let ten = p.file_name().unwrap().to_string_lossy().to_string();
+                let nhan = bang.iter().find(|(k, _)| k.rsplit(['/', '\\']).next() == Some(ten.as_str())).map(|(_, v)| v.clone()).unwrap_or_default();
+                HoSoTach { pdf: p.clone(), nhan, xoay: BTreeMap::new() }
+            })
+            .collect();
+        let tong_vb: usize = ho_so.iter().map(|h| tinh_dai(so_trang_pdf(&h.pdf).unwrap(), &h.nhan, &h.xoay).van_ban.len()).sum();
+        let ra = std::env::temp_dir().join("dema4_tach_mau2");
+        let _ = std::fs::remove_dir_all(&ra);
+        let t0 = std::time::Instant::now();
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        println!("{} hồ sơ → {} part ({} chép nguyên) trong {:.1} s", ho_so.len(), kq.dong.len(), kq.sao_nguyen, t0.elapsed().as_secs_f64());
+        assert!(kq.loi.is_empty(), "{:?}", kq.loi);
+        assert_eq!(kq.dong.len(), tong_vb);
+        assert_eq!(kq.sao_nguyen, 2, "4613 và 4727 không có nhãn");
+        for h in &ho_so {
+            let con = h.pdf.parent().unwrap().strip_prefix(&nguon).unwrap();
+            let thu_muc_hs = ra.join(con).join(h.pdf.file_stem().unwrap());
+            assert!(thu_muc_hs.is_dir(), "{}", thu_muc_hs.display());
+        }
+        let so_part: usize = walk_pdf(&ra);
+        assert_eq!(so_part, tong_vb, "không có file thừa");
+        assert_eq!(noi_dung_log(&kq.dong).lines().count(), tong_vb + 1);
+        let _ = std::fs::remove_dir_all(&ra);
+    }
+
+    fn walk_pdf(d: &Path) -> usize {
+        std::fs::read_dir(d).unwrap().flatten().map(|m| if m.path().is_dir() { walk_pdf(&m.path()) } else { (m.path().extension().is_some_and(|e| e == "pdf")) as usize }).sum()
+    }
 }
+

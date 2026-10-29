@@ -34,3 +34,6 @@ temp/
 # Lối tắt Google Drive (Sheet/Doc) — không phải mã nguồn
 *.gsheet
 *.gdoc
+
+# Cấu hình người dùng sinh khi chạy
+sm-dema4.cfg
