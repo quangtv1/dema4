@@ -32,7 +32,7 @@ Menu **Chức năng › Tách văn bản** (chi tiết trong **Trợ giúp › H
 
 ![Tab Hồ sơ](docs/anh/tach-ho-so.png)
 
-**3. Duyệt Nghi trắng và Nghi xoay** (menu lọc) — bắt buộc trước khi tách. Mỗi trang nghi: Enter giữ / B trắng / xác nhận góc xoay rồi tự sang trang kế.
+**3. Duyệt Nghi trắng và Nghi xoay** (menu lọc) — bắt buộc trước khi tách. Nghi trắng: bấm B / C / I / S để chọn nhãn thật (mặc định Trắng) rồi Enter; Nghi xoay: Enter xoay thử, Enter lần nữa xác nhận. Xong tự sang trang nghi kế, phóng to 1 trang vẫn duyệt được như vậy.
 
 ![Duyệt Nghi trắng](docs/anh/tach-duyet-nghi-trang.png)
 

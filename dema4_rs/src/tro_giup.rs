@@ -209,8 +209,8 @@ const HD_TACH: &[Khoi] = &[
     ]),
     Khoi::Muc("Duyệt trang Nghi|chỉ có tác dụng trong bộ lọc tương ứng"),
     Khoi::Bang(&[
-        ("{nghi}Nghi trắng", "[Enter] / [B] Trắng · [C] giữ nội dung · [I] Index → tự sang trang tiếp."),
-        ("{xoay}Nghi xoay", "*1.* [Enter] xoay đề xuất · *2.* sai thì [R] / [Shift+R] chỉnh, [C] về gốc · *3.* [Enter] xác nhận và tiếp."),
+        ("{nghi}Nghi trắng", "Chọn nhãn thật: [B] Trắng (mặc định) · [C] Nội dung · [I] Index · [S] Split, rồi [Enter] áp → tự sang trang nghi tiếp. Phóng to 1 trang vẫn duyệt được như vậy."),
+        ("{xoay}Nghi xoay", "*1.* [Enter] xoay thử · *2.* sai thì [R] / [Shift+R] xoay tay, [C] về như cũ · *3.* [Enter] đúng rồi, tiếp."),
     ]),
     Khoi::Muc("Phím tắt"),
     Khoi::Bang(&[

@@ -1,13 +1,14 @@
 //! Hộp phóng to 1 trang (bấm đúp / Enter ở tab Hồ sơ và tab Văn bản): ‹ › / ←→ theo thứ tự đang xem,
 //! − / + 50–250 %, Esc / ✕ / bấm nền để đóng. Ảnh render nền theo cỡ hiển thị, có ảnh nhỏ tạm trong lúc chờ.
-//! Trong bộ lọc Nghi trắng / Nghi xoay: thanh hỏi duyệt và phím (Enter, B, C, I, R) y như lưới, duyệt xong tự sang trang nghi kế.
+//! Trong bộ lọc Nghi trắng / Nghi xoay: thanh hỏi duyệt và phím y như lưới (B / C / I / S chọn nhãn, Enter áp), duyệt xong
+//! tự sang trang nghi kế; Hoàn tác / Làm lại (Ctrl+Z / Ctrl+Y) ngay trong hộp.
 
 use eframe::egui::{self, Align, Color32, Margin, Rect, RichText, Stroke, StrokeKind};
 
 use super::anh_nho::{self, bac_cho, KhoaAnh, YeuCau};
 use super::bang_trang::EnterXoay;
 use super::bieu_tuong::{self, BieuTuong};
-use super::{nhom_nut, ngan_nho, nut_nhom, ve_net_dut, Loc, ManTach, NoiDungNut, Tab, Viec, CAM, MAU_S};
+use super::{nhom_nut, ngan_nho, nut_nhom, ten_loc, ve_net_dut, Loc, ManTach, NoiDungNut, Tab, Viec, CAM, MAU_S};
 use crate::cau_hinh::CauHinh;
 use crate::gui::{ChuDam, CHU_PHU, VIEN_NHAT, XANH_COBALT};
 use crate::tach_vb::nhan::Nhan;
@@ -58,6 +59,8 @@ impl ManTach {
         let loc = if la_vb { Loc::TatCa } else { self.loc };
         let duyet = matches!(loc, Loc::NghiTrang | Loc::NghiXoay);
         let mut viec: Vec<Viec> = Vec::new();
+        let nhan_duyet = self.nhan_duyet_cua(self.phong_to.as_ref().and_then(|p| p.trang()));
+        let nhom = self.nhom();
         let Some(pt) = &mut self.phong_to else { return };
         let (Some(b), Some(k)) = (&self.bang, pt.trang()) else {
             self.phong_to = None;
@@ -65,9 +68,9 @@ impl ManTach {
         };
         let t = b.trang[k as usize];
         let enter_xoay = b.viec_enter_xoay(&[k]);
-        // Nhãn / duyệt cho trang đang xem: trong bộ lọc Nghi dùng đúng việc duyệt như lưới
+        // Nhãn cho trang đang xem: Nghi trắng chỉ chọn (Enter mới áp), Nghi xoay C = về chiều gốc, còn lại gán như lưới
         let gan = |n: Nhan| match (loc, n) {
-            (Loc::NghiTrang, n) if n != Nhan::Split => Viec::DuyetNghiTrang(n),
+            (Loc::NghiTrang, n) => Viec::ChonNghi(n),
             (Loc::NghiXoay, Nhan::NoiDung) => Viec::VeGoc,
             _ => Viec::Gan(n),
         };
@@ -87,19 +90,27 @@ impl ManTach {
             }
             // Gán nhãn / xoay / xoá ngay trong hộp, cùng phím với lưới
             if !i.modifiers.command && !la_vb {
-                for (phim, v) in [(egui::Key::S, Viec::Gan(Nhan::Split)), (egui::Key::I, gan(Nhan::Index)), (egui::Key::B, gan(Nhan::Trang)), (egui::Key::C, gan(Nhan::NoiDung))] {
+                for (phim, v) in [(egui::Key::S, gan(Nhan::Split)), (egui::Key::I, gan(Nhan::Index)), (egui::Key::B, gan(Nhan::Trang)), (egui::Key::C, gan(Nhan::NoiDung))] {
                     if i.key_pressed(phim) {
                         viec.push(v);
                     }
                 }
-                // Enter duyệt như lưới: Nghi trắng → Trắng; Nghi xoay → 1. xoay đề xuất, 2. xác nhận và tiếp
+                // Enter duyệt như lưới: Nghi trắng → áp nhãn đang chọn; Nghi xoay → 1. xoay thử, 2. đúng rồi tiếp
                 if i.key_pressed(egui::Key::Enter) {
                     match (loc, enter_xoay) {
-                        (Loc::NghiTrang, _) => viec.push(Viec::DuyetNghiTrang(Nhan::Trang)),
+                        (Loc::NghiTrang, _) => viec.push(Viec::DuyetNghiTrang(nhan_duyet)),
                         (Loc::NghiXoay, EnterXoay::XoayDeXuat) => viec.push(Viec::XoayDeXuat),
                         (Loc::NghiXoay, EnterXoay::XacNhan) => viec.push(Viec::XacNhanXoay),
                         _ => {}
                     }
+                }
+            }
+            if i.modifiers.command && !la_vb {
+                if i.key_pressed(egui::Key::Z) {
+                    viec.push(if i.modifiers.shift { Viec::LamLai } else { Viec::HoanTac });
+                }
+                if i.key_pressed(egui::Key::Y) {
+                    viec.push(Viec::LamLai);
                 }
             }
             if !i.modifiers.command {
@@ -148,7 +159,7 @@ impl ManTach {
                 if !la_vb {
                     nhom_nut(ui, |ui| {
                         if nut_nhom(ui, NoiDungNut::Chu("S", Some(MAU_S)), (nhan_t == Nhan::Split, false), matches!(nhan_t, Nhan::NoiDung | Nhan::Split), "Split — văn bản mới bắt đầu từ trang này (S, bấm lại để huỷ)").clicked() {
-                            viec.push(Viec::Gan(Nhan::Split));
+                            viec.push(gan(Nhan::Split));
                         }
                         ngan_nho(ui);
                         if nut_nhom(ui, NoiDungNut::Chu("I", None), (nhan_t == Nhan::Index, false), true, "Index — tờ mã vạch, bỏ khi tách (I, bấm lại để huỷ)").clicked() {
@@ -157,6 +168,23 @@ impl ManTach {
                         ngan_nho(ui);
                         if nut_nhom(ui, NoiDungNut::Chu("B", None), (nhan_t == Nhan::Trang, false), true, "Trắng — bỏ khi tách (B, bấm lại để huỷ)").clicked() {
                             viec.push(gan(Nhan::Trang));
+                        }
+                    });
+                    ui.add_space(8.0);
+                    // Hoàn tác / Làm lại của nhóm lọc đang xem, như thanh công cụ lưới
+                    nhom_nut(ui, |ui| {
+                        for (bt, lam_lai, phim) in [(BieuTuong::HoanTac, false, "Ctrl+Z"), (BieuTuong::LamLai, true, "Ctrl+Y")] {
+                            let buoc = b.buoc_ke(nhom, lam_lai);
+                            let goi_y = match &buoc {
+                                Some(m) => format!("{} trong nhóm {}: {m} ({phim})", if lam_lai { "Làm lại" } else { "Hoàn tác" }, ten_loc(loc)),
+                                None => format!("Không còn thao tác để {} ({phim})", if lam_lai { "làm lại" } else { "hoàn tác" }),
+                            };
+                            if nut_nhom(ui, NoiDungNut::Icon(bt), (false, false), buoc.is_some(), &goi_y).clicked() {
+                                viec.push(if lam_lai { Viec::LamLai } else { Viec::HoanTac });
+                            }
+                            if !lam_lai {
+                                ngan_nho(ui);
+                            }
                         }
                     });
                     ui.add_space(8.0);
@@ -192,7 +220,7 @@ impl ManTach {
             // Bộ lọc Nghi: thanh hỏi duyệt y như dưới thanh công cụ lưới, áp cho trang đang xem
             let cao_hoi = if duyet {
                 let tren = ui.cursor().top();
-                ManTach::thanh_hoi_cua(ui, b, &self.ten_hien, loc, &[k], &mut viec);
+                ManTach::thanh_hoi_cua(ui, b, &self.ten_hien, loc, &[k], nhan_duyet, true, &mut viec);
                 ui.cursor().top() - tren
             } else {
                 0.0
@@ -268,6 +296,19 @@ impl ManTach {
                     break;
                 }
             }
+            // Hoàn tác / làm lại: trang về / rời bộ lọc → nạp lại thứ tự lưới, hộp đứng ở trang lưới vừa chọn
+            if !la_vb && matches!(v, Viec::HoanTac | Viec::LamLai) {
+                self.cap_nhat_thu_tu();
+                let ke = self.chon.tieu_diem;
+                if let Some(pt) = &mut self.phong_to {
+                    pt.ds = self.thu_tu.clone();
+                    pt.i = ke.and_then(|k2| pt.ds.iter().position(|&x| x == k2)).unwrap_or(pt.i.min(pt.ds.len().saturating_sub(1)));
+                    if pt.ds.is_empty() {
+                        self.phong_to = None;
+                        break;
+                    }
+                }
+            }
             // Xoá / bỏ khỏi văn bản: trang ra khỏi danh sách → hộp sang trang kế
             if matches!(v, Viec::Xoa | Viec::BoKhoiVb) {
                 if let Some(pt) = &mut self.phong_to {
@@ -299,17 +340,29 @@ mod tests {
         man.phong_to = Some(PhongTo::moi(man.thu_tu.clone(), 1));
         let mut cfg = CauHinh::default();
         let ctx = egui::Context::default();
-        let bam_enter = |man: &mut ManTach, cfg: &mut CauHinh| {
+        let bam = |man: &mut ManTach, cfg: &mut CauHinh, key: egui::Key, command: bool| {
             let mut raw = egui::RawInput::default();
-            raw.events.push(egui::Event::Key { key: egui::Key::Enter, physical_key: None, pressed: true, repeat: false, modifiers: Default::default() });
+            let modifiers = egui::Modifiers { command, ..Default::default() };
+            raw.events.push(egui::Event::ModifiersChanged(modifiers));
+            raw.events.push(egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers });
             let _ = ctx.run_ui(raw, |ui| man.hop_phong_to(&ui.ctx().clone(), cfg));
             man.cap_nhat_thu_tu();
         };
-        bam_enter(&mut man, &mut cfg);
-        let b = man.bang.as_ref().unwrap();
-        assert_eq!(b.trang[1].nhan(), Nhan::Trang, "Enter trong hộp = duyệt Trắng");
+        // I chỉ chọn nhãn, chưa đổi gì; Enter mới áp Index và sang trang nghi kế
+        bam(&mut man, &mut cfg, egui::Key::I, false);
+        assert!(man.bang.as_ref().unwrap().trang[1].nghi_trang(), "I chỉ chọn, trang vẫn nghi");
+        assert_eq!(man.nhan_duyet_cua(Some(1)), Nhan::Index);
+        bam(&mut man, &mut cfg, egui::Key::Enter, false);
+        assert_eq!(man.bang.as_ref().unwrap().trang[1].nhan(), Nhan::Index, "Enter áp nhãn đã chọn");
         assert_eq!(man.phong_to.as_ref().and_then(|p| p.trang()), Some(3), "sang trang nghi kế");
-        bam_enter(&mut man, &mut cfg);
+        // Ctrl+Z trong hộp: trang 2 nghi trở lại, hộp quay về trang 2
+        bam(&mut man, &mut cfg, egui::Key::Z, true);
+        assert!(man.bang.as_ref().unwrap().trang[1].nghi_trang());
+        assert_eq!(man.phong_to.as_ref().and_then(|p| p.trang()), Some(1));
+        // Enter không chọn gì = Trắng
+        bam(&mut man, &mut cfg, egui::Key::Enter, false);
+        assert_eq!(man.bang.as_ref().unwrap().trang[1].nhan(), Nhan::Trang, "mặc định Trắng");
+        bam(&mut man, &mut cfg, egui::Key::Enter, false);
         assert_eq!(man.bang.as_ref().unwrap().trang[3].nhan(), Nhan::Trang);
         assert!(man.phong_to.is_none(), "hết trang nghi → đóng hộp");
         let _ = Nhom::Loc(Loc::TatCa);

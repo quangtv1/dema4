@@ -98,6 +98,8 @@ enum Viec {
     VeGoc,
     XacNhanXoay,
     DuyetNghiTrang(Nhan),
+    /// Chọn nhãn sẽ áp khi Enter trong bộ lọc Nghi trắng (chưa đổi gì).
+    ChonNghi(Nhan),
     HoanTac,
     LamLai,
     ChonTat,
@@ -136,6 +138,8 @@ pub struct ManTach {
     /// Tên hồ sơ ở cột trái: `ten_hien` + đuôi gốc (`.pdf` / `.PDF`).
     ten_cot: Vec<String>,
     bao: Option<(String, Instant)>,
+    /// Nhãn đang chọn để duyệt Nghi trắng: (trang tiêu điểm, nhãn). I / C / S / B chọn, Enter áp.
+    chon_nghi: Option<(u32, Nhan)>,
     trang_thai: String,
     so_cot: usize,
     /// Số hàng lưới thấy được (PageUp / PageDown dời đúng 1 vùng nhìn).
@@ -228,6 +232,7 @@ impl Default for ManTach {
             ten_hien: Vec::new(),
             ten_cot: Vec::new(),
             bao: None,
+            chon_nghi: None,
             trang_thai: String::new(),
             so_cot: 1,
             so_hang_nhin: 1,
@@ -832,7 +837,9 @@ impl ManTach {
             Viec::DuyetNghiTrang(n) => {
                 doi = b.duyet_nghi_trang(&ds, &ds, n);
                 sang_ke = ds.last().map(|&k| (Loc::NghiTrang, k));
+                self.chon_nghi = None;
             }
+            Viec::ChonNghi(n) => self.chon_nghi = self.chon.tieu_diem.map(|k| (k, n)),
             Viec::HoanTac | Viec::LamLai => {
                 let kq = if viec == Viec::HoanTac { b.hoan_tac(nhom) } else { b.lam_lai(nhom) };
                 let ten = if la_vb { "Văn bản" } else { ten_loc(self.loc) };
@@ -909,6 +916,7 @@ impl ManTach {
         let thu_tu = &self.thu_tu;
         let enter_xoay = self.bang.as_ref().map(|b| b.viec_enter_xoay(&self.chon.theo_thu_tu(thu_tu)));
         let tieu_diem = self.chon.tieu_diem;
+        let nhan_duyet = self.nhan_duyet_cua(tieu_diem);
         ctx.input(|i| {
             let m = i.modifiers;
             let phu = PhimPhu { ctrl: m.command, shift: m.shift };
@@ -955,19 +963,19 @@ impl ManTach {
             if bam(egui::Key::R) {
                 viec.push(Viec::Xoay(if m.shift { 180 } else { 90 }));
             }
-            if bam(egui::Key::S) {
+            if loc != Loc::NghiTrang && bam(egui::Key::S) {
                 viec.push(Viec::Gan(Nhan::Split));
             }
             match loc {
+                // Nghi trắng: B / C / I / S chỉ chọn nhãn, Enter mới áp (tránh đánh nhầm trang kế)
                 Loc::NghiTrang => {
-                    if bam(egui::Key::Enter) || bam(egui::Key::B) {
-                        viec.push(Viec::DuyetNghiTrang(Nhan::Trang));
+                    for (phim, n) in [(egui::Key::B, Nhan::Trang), (egui::Key::C, Nhan::NoiDung), (egui::Key::I, Nhan::Index), (egui::Key::S, Nhan::Split)] {
+                        if bam(phim) {
+                            viec.push(Viec::ChonNghi(n));
+                        }
                     }
-                    if bam(egui::Key::C) {
-                        viec.push(Viec::DuyetNghiTrang(Nhan::NoiDung));
-                    }
-                    if bam(egui::Key::I) {
-                        viec.push(Viec::DuyetNghiTrang(Nhan::Index));
+                    if bam(egui::Key::Enter) {
+                        viec.push(Viec::DuyetNghiTrang(nhan_duyet));
                     }
                 }
                 _ => {
@@ -1500,70 +1508,95 @@ impl ManTach {
         self.thanh_hoi(ui, &ds, viec);
     }
 
-    /// Thanh hỏi duyệt trong bộ lọc Nghi trắng / Nghi xoay.
+    /// Thanh hỏi duyệt trong bộ lọc Nghi trắng / Nghi xoay (dưới thanh công cụ lưới).
     fn thanh_hoi(&self, ui: &mut egui::Ui, ds: &[u32], viec: &mut Vec<Viec>) {
         if let Some(b) = &self.bang {
-            Self::thanh_hoi_cua(ui, b, &self.ten_hien, self.loc, ds, viec);
+            Self::thanh_hoi_cua(ui, b, &self.ten_hien, self.loc, ds, self.nhan_duyet_cua(self.chon.tieu_diem), false, viec);
         }
     }
 
-    /// Thanh hỏi duyệt dùng chung cho lưới và hộp phóng to (cùng nút, cùng phím).
-    fn thanh_hoi_cua(ui: &mut egui::Ui, b: &BangTrang, ten_hien: &[String], loc: Loc, ds: &[u32], viec: &mut Vec<Viec>) {
+    /// Nhãn đang chọn để duyệt trang Nghi trắng `k` (I / C / S / B chọn, Enter áp); chưa chọn = Trắng.
+    pub(super) fn nhan_duyet_cua(&self, k: Option<u32>) -> Nhan {
+        match (self.chon_nghi, k) {
+            (Some((kc, n)), Some(k)) if kc == k => n,
+            _ => Nhan::Trang,
+        }
+    }
+
+    /// Thanh hỏi duyệt dùng chung cho lưới và hộp phóng to (`trong_hop`: căn giữa, không nhắc tên trang vì tiêu đề đã có).
+    /// Nghi trắng: nút nhãn chỉ chọn (nút đang chọn màu xanh), *Xong / Enter* mới áp và sang trang nghi kế.
+    fn thanh_hoi_cua(ui: &mut egui::Ui, b: &BangTrang, ten_hien: &[String], loc: Loc, ds: &[u32], nhan_chon: Nhan, trong_hop: bool, viec: &mut Vec<Viec>) {
         let ten = |k: u32| {
             let t = &b.trang[k as usize];
             format!("{}.{}", ten_hien[t.ho_so as usize], t.so)
         };
-        match loc {
-            Loc::NghiTrang => {
-                let co: Vec<u32> = ds.iter().copied().filter(|&k| b.trang[k as usize].nghi_trang()).collect();
-                if co.is_empty() {
-                    return;
-                }
-                egui::Frame::new().fill(Color32::from_rgb(0xFF, 0xF4, 0xCC)).inner_margin(Margin::symmetric(8, 4)).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        let chu = if co.len() == 1 { format!("Trang {} nghi trắng — bỏ khi tách?", ten(co[0])) } else { format!("{} trang nghi trắng — bỏ khi tách?", co.len()) };
-                        ui.label(chu);
-                        if ui.add(nut_mau("Trắng (Enter · B)", XANH_LA)).clicked() {
-                            viec.push(Viec::DuyetNghiTrang(Nhan::Trang));
-                        }
-                        if ui.add(nut("Giữ nội dung (C)")).clicked() {
-                            viec.push(Viec::DuyetNghiTrang(Nhan::NoiDung));
-                        }
-                        if ui.add(nut("Index (I)")).clicked() {
-                            viec.push(Viec::DuyetNghiTrang(Nhan::Index));
-                        }
-                        ui.label(RichText::new(format!("còn {} trang Nghi trắng", so_nguyen(b.tong.nghi_trang as usize))).color(CHU_PHU));
-                    });
-                });
-            }
-            Loc::NghiXoay => {
-                let co: Vec<u32> = ds.iter().copied().filter(|&k| b.trang[k as usize].nghi_xoay().is_some()).collect();
-                if co.is_empty() {
-                    return;
-                }
-                let da_chinh = co.iter().all(|&k| b.trang[k as usize].da_chinh());
-                egui::Frame::new().fill(Color32::from_rgb(0xFD, 0xEB, 0xD8)).inner_margin(Margin::symmetric(8, 4)).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        let chu = if co.len() == 1 {
-                            format!("{} (đề xuất xoay {}°) →", ten(co[0]), b.trang[co[0] as usize].nghi_xoay().unwrap_or(0))
-                        } else {
-                            format!("{} trang Nghi xoay (đề xuất riêng từng trang) →", co.len())
-                        };
-                        ui.label(chu);
-                        let (n1, n2) = if da_chinh { (nut("1. Xoay đề xuất"), nut_mau("2. Xác nhận và tiếp (Enter)", XANH_LA)) } else { (nut_mau("1. Xoay đề xuất (Enter)", XANH_LA), nut("2. Xác nhận và tiếp")) };
-                        if ui.add(n1).clicked() {
-                            viec.push(Viec::XoayDeXuat);
-                        }
-                        ui.label("→");
-                        if ui.add(n2).clicked() {
-                            viec.push(Viec::XacNhanXoay);
-                        }
-                        ui.label(RichText::new(format!("R chỉnh · C về gốc · còn {}", so_nguyen(b.tong.nghi_xoay as usize))).color(CHU_PHU));
-                    });
-                });
-            }
-            _ => {}
+        let (co, nen): (Vec<u32>, Color32) = match loc {
+            Loc::NghiTrang => (ds.iter().copied().filter(|&k| b.trang[k as usize].nghi_trang()).collect(), Color32::from_rgb(0xFF, 0xF4, 0xCC)),
+            Loc::NghiXoay => (ds.iter().copied().filter(|&k| b.trang[k as usize].nghi_xoay().is_some()).collect(), Color32::from_rgb(0xFD, 0xEB, 0xD8)),
+            _ => return,
+        };
+        if co.is_empty() {
+            return;
         }
+        // Trong hộp phóng to: căn giữa theo bề rộng hàng đo ở khung hình trước (egui không biết trước bề rộng)
+        let id = ui.scope_id().with("thanh_hoi_rong");
+        let rong_truoc: Option<f32> = ui.data(|d| d.get_temp(id));
+        egui::Frame::new().fill(nen).inner_margin(Margin::symmetric(8, 4)).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                if let (true, Some(w)) = (trong_hop, rong_truoc) {
+                    ui.add_space(((ui.available_width() - w) / 2.0).max(0.0));
+                }
+                let x0 = ui.cursor().left();
+                match loc {
+                Loc::NghiTrang => {
+                    let chu = if trong_hop {
+                        "Máy đoán trang này trắng — thực tế là gì?".to_string()
+                    } else if co.len() == 1 {
+                        format!("Máy đoán trang {} trắng — thực tế là gì?", ten(co[0]))
+                    } else {
+                        format!("{} trang máy đoán trắng — thực tế là gì?", co.len())
+                    };
+                    ui.label(chu);
+                    for (n, chu) in [(Nhan::Trang, "Trắng (B)"), (Nhan::NoiDung, "Nội dung (C)"), (Nhan::Index, "Index (I)"), (Nhan::Split, "Split (S)")] {
+                        let r = if n == nhan_chon { ui.add(nut_mau(chu, XANH_LA)) } else { ui.add(nut(chu)) };
+                        if r.on_hover_text("Chọn nhãn thật của trang, rồi Xong / Enter").clicked() {
+                            viec.push(Viec::ChonNghi(n));
+                        }
+                    }
+                    if ui.add(nut("Xong (Enter)")).on_hover_text("Áp nhãn đang chọn, bỏ cờ nghi, sang trang nghi kế").clicked() {
+                        viec.push(Viec::DuyetNghiTrang(nhan_chon));
+                    }
+                    ui.label(RichText::new(format!("còn {} trang", so_nguyen(b.tong.nghi_trang as usize))).color(CHU_PHU));
+                }
+                Loc::NghiXoay => {
+                    let da_chinh = co.iter().all(|&k| b.trang[k as usize].da_chinh());
+                    let chu = if trong_hop {
+                        format!("Máy đoán trang này bị xoay {}°", b.trang[co[0] as usize].nghi_xoay().unwrap_or(0))
+                    } else if co.len() == 1 {
+                        format!("Máy đoán trang {} bị xoay {}°", ten(co[0]), b.trang[co[0] as usize].nghi_xoay().unwrap_or(0))
+                    } else {
+                        format!("{} trang máy đoán bị xoay (góc riêng từng trang)", co.len())
+                    };
+                    ui.label(chu);
+                    let (n1, n2) = if da_chinh { (nut("1. Xoay thử"), nut_mau("2. Đúng rồi, tiếp (Enter)", XANH_LA)) } else { (nut_mau("1. Xoay thử (Enter)", XANH_LA), nut("2. Đúng rồi, tiếp")) };
+                    if ui.add(n1).clicked() {
+                        viec.push(Viec::XoayDeXuat);
+                    }
+                    ui.label("→");
+                    if ui.add(n2).clicked() {
+                        viec.push(Viec::XacNhanXoay);
+                    }
+                    ui.label(RichText::new(format!("R xoay tay · C về như cũ · còn {} trang", so_nguyen(b.tong.nghi_xoay as usize))).color(CHU_PHU));
+                }
+                _ => {}
+                }
+                let rong = ui.min_rect().right() - x0;
+                if rong_truoc.is_none_or(|w| (w - rong).abs() > 0.5) {
+                    ui.data_mut(|d| d.insert_temp(id, rong));
+                    ui.ctx().request_repaint();
+                }
+            });
+        });
     }
 
     fn luoi(&mut self, ui: &mut egui::Ui, cfg: &CauHinh, viec: &mut Vec<Viec>) {
