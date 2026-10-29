@@ -36,6 +36,9 @@ pub struct TrangMeta {
     /// Số trang trong hồ sơ (1-based).
     pub so: u32,
     pub dung_luong: u32,
+    /// Kích thước trang (pt, đã tính /Rotate gốc) — để tính Quy A4 và tỷ lệ ảnh.
+    pub rong: f32,
+    pub cao: f32,
     /// `None` = chưa có kết quả phân tích.
     pub tu_dong: Option<NhanTuDong>,
     pub sua: Sua,
@@ -501,7 +504,7 @@ impl BangTrang {
                 let x = xf.and_then(|m| m.get(&so));
                 let co = (tc.trang_thai & BIT_CACHE) | if x.is_some_and(|x| x.xac_nhan) { CO_XAC_NHAN } else { 0 };
                 let sua = Sua { tay, co, goc: x.map_or(0, |x| x.goc) };
-                trang.push(TrangMeta { ho_so: h as u32, so: so as u32, dung_luong: tc.thong_tin.dung_luong, tu_dong, sua });
+                trang.push(TrangMeta { ho_so: h as u32, so: so as u32, dung_luong: tc.thong_tin.dung_luong, rong: tc.thong_tin.rong, cao: tc.thong_tin.cao, tu_dong, sua });
             }
         }
         Self::moi(phien.ho_so.iter().map(|h| h.tuong_doi.clone()).collect(), trang)
@@ -557,7 +560,7 @@ mod tests {
         let mut trang = Vec::new();
         for (h, n) in [(0u32, 6u32), (1, 4)] {
             for so in 1..=n {
-                trang.push(TrangMeta { ho_so: h, so, dung_luong: 1000 - so * 10 + h, tu_dong: td(Nhan::NoiDung, false, None), sua: Sua::default() });
+                trang.push(TrangMeta { ho_so: h, so, dung_luong: 1000 - so * 10 + h, rong: 595.0, cao: 842.0, tu_dong: td(Nhan::NoiDung, false, None), sua: Sua::default() });
             }
         }
         trang[1].tu_dong = td(Nhan::Index, false, None);

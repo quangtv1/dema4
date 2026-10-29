@@ -7,9 +7,11 @@ use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
 
-/// 2 bậc độ phân giải theo bề ngang ảnh (px thật).
-pub const BE_NGANG: [u32; 2] = [120, 240];
+/// Bậc độ phân giải theo bề ngang ảnh (px thật): 0–1 ảnh nhỏ lưới, 2–4 xem trang / phóng to.
+pub const BE_NGANG: [u32; 5] = [120, 240, 480, 960, 1600];
 pub const SO_TEXTURE_TOI_DA: usize = 600;
+/// Ảnh lớn (bậc ≥ 2) tốn RAM (A4 960 px ≈ 5 MB) → LRU riêng, giới hạn nhỏ.
+pub const SO_ANH_LON_TOI_DA: usize = 24;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KhoaAnh {
@@ -33,9 +35,9 @@ struct HangCho {
     dung: bool,
 }
 
-/// Bậc ảnh cần cho ô rộng `rong_px` px thật.
+/// Bậc nhỏ nhất đủ nét cho ô rộng `rong_px` px thật (cho phép phóng ~10 %).
 pub fn bac_cho(rong_px: f32) -> u8 {
-    if rong_px <= BE_NGANG[0] as f32 * 1.1 { 0 } else { 1 }
+    BE_NGANG.iter().position(|&b| rong_px <= b as f32 * 1.1).unwrap_or(BE_NGANG.len() - 1) as u8
 }
 
 /// Bộ nhớ texture LRU (thuần, để test): bỏ mục dùng lâu nhất khi vượt giới hạn.
@@ -84,7 +86,8 @@ impl<T> Lru<T> {
 pub struct AnhNho {
     hang: Arc<(Mutex<HangCho>, Condvar)>,
     nhan: Receiver<(KhoaAnh, ColorImage)>,
-    pub lru: Lru<TextureHandle>,
+    lru: Lru<TextureHandle>,
+    lru_lon: Lru<TextureHandle>,
     /// Đã yêu cầu ở khung trước (tránh gửi lại y nguyên).
     da_gui: Vec<KhoaAnh>,
 }
@@ -98,12 +101,28 @@ impl AnhNho {
             let (hang, gui, pdf, ctx) = (hang.clone(), gui.clone(), pdf.clone(), ctx.clone());
             std::thread::spawn(move || lam_viec(&hang, &pdf, &gui, &ctx));
         }
-        Self { hang, nhan, lru: Lru::moi(SO_TEXTURE_TOI_DA), da_gui: Vec::new() }
+        Self { hang, nhan, lru: Lru::moi(SO_TEXTURE_TOI_DA), lru_lon: Lru::moi(SO_ANH_LON_TOI_DA), da_gui: Vec::new() }
+    }
+
+    fn bo(&mut self, k: &KhoaAnh) -> &mut Lru<TextureHandle> {
+        if k.bac >= 2 { &mut self.lru_lon } else { &mut self.lru }
+    }
+
+    pub fn co(&self, k: &KhoaAnh) -> bool {
+        if k.bac >= 2 { self.lru_lon.co(k) } else { self.lru.co(k) }
+    }
+
+    /// Ảnh đúng bậc nếu có, không thì ảnh bậc thấp hơn gần nhất (hiện tạm trong lúc chờ render).
+    pub fn lay(&mut self, trang: u32, bac: u8) -> Option<TextureHandle> {
+        (0..=bac).rev().find_map(|b| {
+            let k = KhoaAnh { trang, bac: b };
+            self.bo(&k).lay(&k).cloned()
+        })
     }
 
     /// Thay danh sách cần render bằng các ô đang hiện còn thiếu ảnh (thứ tự hiện = thứ tự render).
     pub fn yeu_cau(&mut self, ds: Vec<YeuCau>) {
-        let ds: Vec<YeuCau> = ds.into_iter().filter(|y| !self.lru.co(&y.khoa)).collect();
+        let ds: Vec<YeuCau> = ds.into_iter().filter(|y| !self.co(&y.khoa)).collect();
         let khoa: Vec<KhoaAnh> = ds.iter().map(|y| y.khoa).collect();
         if khoa == self.da_gui {
             return;
@@ -120,13 +139,13 @@ impl AnhNho {
     pub fn nhan_anh(&mut self, ctx: &egui::Context) {
         while let Ok((k, anh)) = self.nhan.try_recv() {
             let tex = ctx.load_texture(format!("anh_nho_{}_{}", k.trang, k.bac), anh, TextureOptions::LINEAR);
-            self.lru.them(k, tex);
+            self.bo(&k).them(k, tex);
         }
     }
 
     /// Ảnh xám có sẵn từ phân tích (đỡ render lại khi đang hiện).
     pub fn them_anh_xam(&mut self, ctx: &egui::Context, k: KhoaAnh, rong: usize, cao: usize, xam: &[u8]) {
-        if self.lru.co(&k) || xam.len() != rong * cao {
+        if self.co(&k) || xam.len() != rong * cao {
             return;
         }
         let anh = ColorImage::from_gray([rong, cao], xam);
@@ -230,6 +249,8 @@ mod tests {
         assert_eq!(bac_cho(56.0), 0);
         assert_eq!(bac_cho(130.0), 0);
         assert_eq!(bac_cho(200.0), 1);
+        assert_eq!(bac_cho(900.0), 3);
+        assert_eq!(bac_cho(5000.0), 4);
     }
 
     #[test]

@@ -8,6 +8,8 @@ pub mod chon;
 pub mod hop_cau_hinh;
 pub mod thanh_nguong;
 pub mod thuoc_kho;
+pub mod van_ban;
+pub mod xem_trang;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -108,6 +110,8 @@ pub struct ManTach {
     vb_tong: Option<(u64, usize)>,
     hoi_phan_tich_lai: bool,
     anh: Option<AnhNho>,
+    /// Ảnh cần render trong khung này (gom từ lưới, xem trang, hộp phóng to rồi gửi 1 lần).
+    yeu_cau_anh: Vec<YeuCau>,
     /// Cấu hình đổi trong màn (độ rộng cột, cỡ ảnh…) → app ghi `sm-dema4.cfg`.
     pub cfg_doi: bool,
 }
@@ -137,6 +141,7 @@ impl Default for ManTach {
             vb_tong: None,
             hoi_phan_tich_lai: false,
             anh: None,
+            yeu_cau_anh: Vec::new(),
             cfg_doi: false,
         }
     }
@@ -673,6 +678,9 @@ impl ManTach {
                 self.luoi(ui, cfg, &mut viec);
             });
         }
+        if let Some(a) = &mut self.anh {
+            a.yeu_cau(std::mem::take(&mut self.yeu_cau_anh));
+        }
         for v in viec {
             self.lam(v, cfg);
         }
@@ -1012,8 +1020,9 @@ impl ManTach {
         let thu_tu = &self.thu_tu;
         let chon = &mut self.chon;
         let mut anh_nho = self.anh.as_mut();
-        let bac = bac_cho(co * ui.ctx().pixels_per_point());
-        let mut yeu_cau = Vec::new();
+        // Lưới hiện nhiều ô cùng lúc: tối đa bậc 240 px (ảnh lớn có LRU nhỏ, không đủ cho cả màn)
+        let bac = bac_cho(co * ui.ctx().pixels_per_point()).min(1);
+        let yeu_cau = &mut self.yeu_cau_anh;
         let ten_hien = &self.ten_hien;
         let mut keo_tu = self.keo_tu;
         let mut cuon_toi = self.cuon_toi.take();
@@ -1108,11 +1117,10 @@ impl ManTach {
                     let nghi_x = t.nghi_xoay();
                     let tex = anh_nho.as_mut().and_then(|a| {
                         let khoa = KhoaAnh { trang: k, bac };
-                        let co_tex = a.lru.lay(&khoa).cloned().or_else(|| a.lru.lay(&KhoaAnh { trang: k, bac: 0 }).cloned());
-                        if !a.lru.co(&khoa) {
+                        if !a.co(&khoa) {
                             yeu_cau.push(YeuCau { khoa, file: t.ho_so as usize, so: t.so as usize });
                         }
-                        co_tex
+                        a.lay(k, bac)
                     });
                     let anh = match &tex {
                         Some(tex) => {
@@ -1192,9 +1200,6 @@ impl ManTach {
             }
             phan_hoi.context_menu(|ui| menu_phai(ui, b, chon, thu_tu, self.loc, viec));
         });
-        if let Some(a) = anh_nho {
-            a.yeu_cau(yeu_cau);
-        }
         self.keo_tu = keo_tu;
         self.so_cot = so_cot;
         if dang_xem != self.dang_xem {
