@@ -80,19 +80,58 @@ struct UngDungChinh {
     cfg: crate::cau_hinh::CauHinh,
     hop_cau_hinh: Option<crate::gui_tach::hop_cau_hinh::HopCauHinh>,
     tro_giup: Option<crate::tro_giup::HopTroGiup>,
+    /// Đóng app khi nhãn chưa lưu (lưu bằng tay): đang hỏi Lưu / Bỏ / Huỷ; `cho_dong` = đã trả lời, cho đóng.
+    hoi_dong: bool,
+    cho_dong: bool,
 }
 
 impl Default for UngDungChinh {
     fn default() -> Self {
         let cfg = crate::cau_hinh::doc();
         let dem = UngDung { quy_tac: cfg.quy_tac(), ..Default::default() };
-        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach: Default::default(), cfg, hop_cau_hinh: None, tro_giup: None }
+        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach: Default::default(), cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, cho_dong: false }
     }
 }
 
 impl UngDungChinh {
     fn tab_huong_dan(&self) -> crate::tro_giup::TabHuongDan {
         if self.man == Man::Tach { crate::tro_giup::TabHuongDan::Tach } else { crate::tro_giup::TabHuongDan::Dem }
+    }
+
+    /// Hỏi Lưu / Bỏ / Huỷ khi đóng app còn nhãn chưa lưu.
+    fn hop_hoi_dong(&mut self, ctx: &egui::Context) {
+        if !self.hoi_dong {
+            return;
+        }
+        let mut chon = None;
+        egui::Modal::new(egui::Id::unique("hoi_dong")).show(ctx, |ui| {
+            ui.set_width(340.0);
+            ui.label(RichText::new("Nhãn chưa lưu").dam());
+            ui.add_space(4.0);
+            ui.label("Có thay đổi nhãn chưa ghi vào index_and_blank.txt. Lưu trước khi đóng?");
+            ui.add_space(8.0);
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if ui.add(nut_mau("Lưu", XANH_LA)).clicked() {
+                    chon = Some(1);
+                }
+                if ui.add(nut("Bỏ")).clicked() {
+                    chon = Some(2);
+                }
+                if ui.add(nut("Huỷ")).clicked() {
+                    chon = Some(0);
+                }
+            });
+        });
+        if let Some(c) = chon {
+            self.hoi_dong = false;
+            if c > 0 {
+                if c == 1 {
+                    self.tach.luu_nhan();
+                }
+                self.cho_dong = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
     }
 
     /// Áp Cấu hình mới cho cả 2 màn (`ghi` = ghi `sm-dema4.cfg`).
@@ -160,8 +199,14 @@ impl eframe::App for UngDungChinh {
             self.tieu_de_da_dat = self.man;
         }
         if ctx.input(|i| i.viewport().close_requested()) {
-            self.tach.ghi_cache();
+            if self.tach.chua_luu() && !self.cho_dong {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                self.hoi_dong = true;
+            } else {
+                self.tach.ghi_cache();
+            }
         }
+        self.hop_hoi_dong(&ctx);
         if self.tro_giup.is_none() && self.hop_cau_hinh.is_none() && ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(self.tab_huong_dan()));
         }

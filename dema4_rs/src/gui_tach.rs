@@ -277,12 +277,19 @@ impl ManTach {
         let xf = std::fs::read_to_string(self.file_xoay()).ok().and_then(|s| nhan::doc_file_xoay(&s, &so_trang_cua).ok());
         let bang = BangTrang::tu_phien(&phien, ch, nf.as_ref(), xf.as_ref());
         self.ten_hien = ten_hien_ho_so(&bang.ho_so);
+        self.bang = Some(bang);
+        self.phien = Some(phien);
+        self.chay = None;
+        self.chay_phan_con_thieu(ch);
+    }
+
+    /// Phân tích nền các trang còn thiếu kết quả theo Cấu hình `ch` (mở thư mục, hoặc vừa bật thêm loại quét /
+    /// tăng độ tin cậy hướng trang).
+    fn chay_phan_con_thieu(&mut self, ch: &CauHinhPhanTich) {
+        let Some(phien) = &self.phien else { return };
         let viec = phien.viec_con_thieu(ch);
         let tong = viec.len();
-        self.bang = Some(bang);
         if tong == 0 {
-            self.phien = Some(phien);
-            self.chay = None;
             self.trang_thai = "Đã phân tích".into();
             return;
         }
@@ -290,7 +297,6 @@ impl ManTach {
         let (gui, nhan) = mpsc::channel();
         let hang = HangDoi::moi(viec);
         hang_doi::chay(hang.clone(), Arc::new(phien.duong_dan_pdf()), ch.clone(), so_luong, gui);
-        self.phien = Some(phien);
         self.chay = Some(Chay::PhanTich { nhan, hang, tong, xong: 0, loi: 0, bat_dau: Instant::now() });
     }
 
@@ -380,6 +386,14 @@ impl ManTach {
         if let (Some(b), Some(p)) = (&mut self.bang, &self.phien) {
             b.gan_lai_tu_dong(p, &ch);
         }
+        if self.chay.is_none() {
+            self.chay_phan_con_thieu(&ch);
+        }
+    }
+
+    /// Còn nhãn chưa ghi ra file (chế độ lưu bằng tay).
+    pub fn chua_luu(&self) -> bool {
+        self.bang.as_ref().is_some_and(|b| b.chua_luu)
     }
 
     /// Ghi cache (cờ duyệt) — gọi khi đóng app / đổi thư mục.
@@ -1351,6 +1365,19 @@ mod tests {
             man2.nhan_su_kien(&ch, None);
         }
         assert_eq!(man2.bang.as_ref().unwrap().trang[1].nhan(), Nhan::Index);
+        // Bật thêm quét mã trong Cấu hình → tự chạy bổ sung phần còn thiếu, nhãn sửa tay giữ nguyên
+        let cfg_moi = CauHinh { quet_ma: true, ..cfg.clone() };
+        man2.ap_cau_hinh(&cfg, &cfg_moi);
+        assert!(man2.dang_chay(), "phải chạy bổ sung đọc mã");
+        let ch_moi = cfg_moi.cau_hinh_phan_tich();
+        while man2.dang_chay() {
+            std::thread::sleep(Duration::from_millis(20));
+            man2.nhan_su_kien(&ch_moi, None);
+        }
+        assert!(man2.phien.as_ref().unwrap().ho_so[0].trang.iter().all(|t| t.ket_qua.as_ref().is_some_and(|k| k.da_quet_ma)));
+        assert_eq!(man2.bang.as_ref().unwrap().trang[1].nhan(), Nhan::Index);
+        man2.ap_cau_hinh(&cfg_moi, &cfg_moi);
+        assert!(!man2.dang_chay(), "không đổi gì thì không chạy");
         let _ = std::fs::remove_dir_all(&goc);
     }
 }
