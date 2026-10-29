@@ -507,6 +507,59 @@ fn menu_phai_vb(ui: &mut egui::Ui, so_chon: usize, viec: &mut Vec<Viec>, tieu_di
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cau_hinh::CauHinh;
+
+    use crate::gui_tach::bang_trang::{BangTrang, Sua, TrangMeta};
+    use crate::tach_vb::nhan::Nhan;
+    use crate::tach_vb::phan_tich::NhanTuDong;
+
+    /// a: 5 trang — tr.2 Index, tr.4 Nghi trắng, tr.5 Nghi xoay 180 → văn bản [1] và [3,4,5].
+    fn man() -> ManTach {
+        let mut trang: Vec<TrangMeta> = (1..=5)
+            .map(|so| TrangMeta { ho_so: 0, so, dung_luong: 0, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: false, nghi_xoay: None }), sua: Sua::default() })
+            .collect();
+        trang[1].tu_dong = Some(NhanTuDong { nhan: Nhan::Index, nghi_trang: false, nghi_xoay: None });
+        trang[3].tu_dong = Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: true, nghi_xoay: None });
+        trang[4].tu_dong = Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: false, nghi_xoay: Some(180) });
+        let mut m = ManTach { tab: Tab::VanBan, ..Default::default() };
+        m.bang = Some(BangTrang::moi(vec!["a.pdf".into()], trang));
+        m.cap_nhat_ds_vb();
+        m
+    }
+
+    #[test]
+    fn xoay_chot_nghi_xoay_bo_khoi_van_ban_va_hoan_tac_rieng_nhom() {
+        let mut m = man();
+        let mut cfg = CauHinh::default();
+        assert_eq!(m.ds_vb.len(), 2);
+        m.lam(Viec::DoiVb(1), &mut cfg);
+        assert_eq!((m.vb, m.trang_vb_hien()), (1, vec![2, 3, 4]));
+        // Xoay trang Nghi xoay ở tab Văn bản = chốt luôn
+        m.chon_vb.chon_rieng(4);
+        m.lam(Viec::Xoay(180), &mut cfg);
+        let b = m.bang.as_ref().unwrap();
+        assert_eq!((b.trang[4].sua.goc, b.trang[4].nghi_xoay()), (180, None));
+        // Bỏ khỏi văn bản trang Nghi trắng → Trắng, hết cờ
+        m.chon_vb.chon_rieng(3);
+        m.lam(Viec::BoKhoiVb, &mut cfg);
+        let b = m.bang.as_ref().unwrap();
+        assert_eq!(b.trang[3].nhan(), Nhan::Trang);
+        assert!(!b.trang[3].nghi_trang());
+        m.cap_nhat_ds_vb();
+        assert_eq!(m.trang_vb_hien(), vec![2, 4], "văn bản còn tr.3 và tr.5");
+        // Bỏ hết trang của văn bản → văn bản biến mất, vị trí về văn bản kề
+        m.chon_vb.chon_tat(&[2, 4]);
+        m.lam(Viec::BoKhoiVb, &mut cfg);
+        m.cap_nhat_ds_vb();
+        assert_eq!((m.ds_vb.len(), m.vb), (1, 0));
+        // Ctrl+Z ở tab Văn bản chỉ đảo nhóm Văn bản; tab Hồ sơ (nhóm Tất cả) không có gì để hoàn tác
+        m.lam(Viec::HoanTac, &mut cfg);
+        m.cap_nhat_ds_vb();
+        assert_eq!(m.ds_vb.len(), 2);
+        m.tab = Tab::HoSo;
+        m.lam(Viec::HoanTac, &mut cfg);
+        assert!(m.bao.as_ref().is_some_and(|(c, _)| c.contains("không còn thao tác")));
+    }
 
     #[test]
     fn nac_ty_le_gan_nhat() {

@@ -54,7 +54,7 @@ Xem trước từng văn bản sẽ được tạo (trước khi tách), phóng 
   - **Thống kê lô** (hàm thuần `thong_ke_nguong(phien, ch) -> ThongKeNguong`, test bằng dữ liệu dựng tay):
     - histogram theo chỉ số v = dam + 0,3·mau, ô 0,1 % từ 0–10 % (ô cuối gom ≥ 10 %), mỗi ô 2 cột `trang`, `noi_dung`;
     - sửa của người dùng: Trắng tự động → giữ nội dung; Nghi → Trắng; Nghi → nội dung; nội dung → Trắng (trắng lọt);
-    - ngưỡng đề xuất lô: t1 = v lớn nhất mà dưới đó tỷ lệ nội dung ≤ 0,2 %; t2 = v nhỏ nhất mà trên đó trắng lọt ≤ 1 % (không đủ 50 trang trắng → để trống);
+    - ngưỡng đề xuất lô: t1 = v lớn nhất mà dưới đó tỷ lệ nội dung ≤ 0,2 %; t2 = v nhỏ nhất mà trên đó trắng lọt ≤ 1 % (không đủ 50 trang trắng → để trống); t2 < t1 (trắng và chữ tách bạch, không cần vùng nghi) → đề xuất t2 = t1;
     - xoay: số đề xuất được xác nhận / chỉnh góc khác / xác nhận 0°.
   - **B — Telegram**: tin tách thêm 2 dòng
     ```
@@ -62,7 +62,7 @@ Xem trước từng văn bản sẽ được tạo (trước khi tách), phóng 
     - Đề xuất lô: <b>t1 / t2</b>; Xoay: xác nhận <b>n</b> · chỉnh <b>n</b> · 0° <b>n</b>
     ```
     và gửi kèm file `nguong_<thư mục>_<yyyymmdd-hhmmss>.csv` (histogram) bằng `sendDocument` (thêm `telegram::gui_file`, multipart, cùng giới hạn thời gian; lỗi gửi file không chặn tin chữ). CSV: dòng đầu `# may=…;thu_muc=…;thoi_diem=…;t1=…;t2=…;phien_ban=…`, sau đó `v_tu;v_den;trang;noi_dung`.
-  - **C — Google Sheet**: POST JSON 1 dòng/lần tách tới web app Apps Script (`doPost` append vào sheet): thời điểm, máy, thư mục, phiên bản, ngưỡng đang dùng, các số sửa ở trên, đề xuất lô, histogram dạng chuỗi `trang|noi_dung` theo ô. URL webhook nhúng như token Telegram (`TACH_WEBHOOK_NHUNG`, ghi đè bằng dòng `webhook=` trong `telegram.txt`), không ghi log, không commit thêm bí mật ngoài lựa chọn đã có. Luồng nền, im lặng khi lỗi, không thử lại.
+  - **C — Google Sheet**: POST JSON 1 dòng/lần tách tới web app Apps Script (`doPost` append vào sheet): thời điểm, máy, thư mục, phiên bản, ngưỡng đang dùng, các số sửa ở trên, đề xuất lô, histogram dạng chuỗi `trang|noi_dung` theo ô. URL webhook nhúng như token Telegram (`TACH_WEBHOOK_NHUNG`, ghi đè bằng dòng `webhook=` trong `telegram.txt`) — **chưa có URL** (cần tạo Sheet + triển khai `scripts/apps-script-nguong.gs`; tới lúc đó phần C tự bỏ qua), không ghi log, không commit thêm bí mật ngoài lựa chọn đã có. Luồng nền, im lặng khi lỗi, không thử lại.
   - **Dữ liệu gửi**: chỉ số đếm + tên máy/thư mục như tin Đếm hiện có; không ảnh, không tên file PDF, không nội dung trang. Dòng công khai "Thông tin tách thư mục đã được ghi lại" giữ nguyên.
   - **Script tổng hợp** `dema4_rs/scripts/tong-hop-nguong.py` (chạy tay): đọc các CSV đã tải về (thư mục) hoặc CSV xuất từ Google Sheet → cộng dồn histogram → in t1/t2 đề xuất toàn bộ + theo máy, tỷ lệ trắng lọt / Trắng sai tại ngưỡng hiện tại. Đổi mặc định vẫn do người quyết (sửa hằng số + ghi bảng quyết định).
   - Popup "Đã tách xong" **không** gợi ý/áp dụng ngưỡng (chưa chốt — để sau khi có đủ dữ liệu).

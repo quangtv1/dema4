@@ -12,6 +12,7 @@ pub mod nhan;
 pub mod phan_tich;
 pub mod phien;
 pub mod tach;
+pub mod thong_ke_nguong;
 
 /// Thư mục mẫu 1 (`temp/function2/mau`) cho các test vàng chạy tay (`cargo test -- --ignored`).
 #[cfg(test)]

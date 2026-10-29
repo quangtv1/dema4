@@ -165,6 +165,70 @@ fn soan_tin_tach(ten_pc: &str, mac: &str, thu_muc: &str, sl: &SoLieuTach, thoi_d
     )
 }
 
+/// 2 dòng thống kê ngưỡng trắng nối vào tin tách (ngưỡng %, các sửa của người dùng, đề xuất lô, xoay).
+pub fn dong_nguong(tk: &crate::tach_vb::thong_ke_nguong::ThongKeNguong, nguong_trang: f32, nguong_nghi: f32) -> String {
+    use crate::gui::so_nguyen;
+    let n = |x: u32| dam(&so_nguyen(x as usize));
+    let pt = |x: f32| format!("{x:.2}").replace('.', ",");
+    let de_xuat = tk.de_xuat.map_or("chưa đủ dữ liệu".to_string(), |(a, b)| format!("{} / {}", pt(a), pt(b)));
+    format!(
+        "\n- Ngưỡng: {}; Trắng tự động: {} (sửa {}); Nghi trắng: {} → Trắng {} · giữ {}; Trắng lọt: {}\n- Đề xuất lô: {}; Xoay: xác nhận {} · chỉnh {} · 0° {}",
+        dam(&format!("{} % / {} %", pt(nguong_trang), pt(nguong_nghi))),
+        n(tk.trang_tu_dong),
+        n(tk.trang_tu_dong_sua),
+        n(tk.nghi),
+        n(tk.nghi_thanh_trang),
+        n(tk.nghi_giu),
+        n(tk.trang_lot),
+        dam(&de_xuat),
+        n(tk.xoay_xac_nhan),
+        n(tk.xoay_chinh),
+        n(tk.xoay_0),
+    )
+}
+
+/// Webhook Google Sheet (Apps Script) nhận 1 dòng thống kê mỗi lần tách. Nhúng như token Telegram; trống = không gửi.
+const TACH_WEBHOOK_NHUNG: &str = "";
+
+/// Dòng `webhook=` trong telegram.txt (nếu có), không thì URL nhúng.
+pub fn doc_webhook() -> Option<String> {
+    let tu_file = duong_dan_cau_hinh().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|s| {
+        s.lines().filter_map(|d| d.trim().strip_prefix("webhook")).filter_map(|d| d.trim_start().strip_prefix('=')).map(|v| v.trim().to_string()).find(|v| !v.is_empty())
+    });
+    tu_file.or_else(|| (!TACH_WEBHOOK_NHUNG.is_empty()).then(|| TACH_WEBHOOK_NHUNG.to_string()))
+}
+
+fn agent() -> ureq::Agent {
+    ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(15))).http_status_as_error(false).build().into()
+}
+
+/// Gửi file (CSV thống kê) vào nhóm bằng sendDocument (multipart dựng tay).
+pub fn gui_file(cau_hinh: &CauHinh, ten_file: &str, noi_dung: &[u8]) -> Result<(), String> {
+    gui_file_toi(API_TELEGRAM, cau_hinh, ten_file, noi_dung)
+}
+
+fn gui_file_toi(api: &str, cau_hinh: &CauHinh, ten_file: &str, noi_dung: &[u8]) -> Result<(), String> {
+    let ranh = format!("----sm-dema4-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
+    let ten_file = ten_file.replace(['"', '\r', '\n'], "_");
+    let mut than = format!("--{ranh}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{}\r\n", cau_hinh.chat_id).into_bytes();
+    than.extend(format!("--{ranh}\r\nContent-Disposition: form-data; name=\"document\"; filename=\"{ten_file}\"\r\nContent-Type: text/csv\r\n\r\n").as_bytes());
+    than.extend_from_slice(noi_dung);
+    than.extend(format!("\r\n--{ranh}--\r\n").as_bytes());
+    let mut ph = agent()
+        .post(format!("{api}/bot{}/sendDocument", cau_hinh.token))
+        .header("Content-Type", format!("multipart/form-data; boundary={ranh}"))
+        .send(&than[..])
+        .map_err(|e| format!("không kết nối được Telegram ({e})"))?;
+    let ma = ph.status().as_u16();
+    let tra = ph.body_mut().read_to_string().unwrap_or_default();
+    if ma == 200 && tra.contains("\"ok\":true") { Ok(()) } else { Err(format!("Telegram trả lỗi {ma}")) }
+}
+
+/// POST 1 dòng JSON tới webhook Apps Script (không thử lại; lỗi bỏ qua ở nơi gọi).
+pub fn gui_webhook(url: &str, json: &str) -> Result<(), String> {
+    agent().post(url).header("Content-Type", "application/json").send(json).map(|_| ()).map_err(|e| e.to_string())
+}
+
 pub fn gui_tin(cau_hinh: &CauHinh, noi_dung: &str) -> Result<(), String> {
     gui_tin_toi(API_TELEGRAM, cau_hinh, noi_dung)
 }
@@ -176,12 +240,7 @@ fn gui_tin_toi(api: &str, cau_hinh: &CauHinh, noi_dung: &str) -> Result<(), Stri
     } else {
         noi_dung.to_string()
     };
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(15)))
-        .http_status_as_error(false)
-        .build()
-        .into();
-    let mut phan_hoi = agent
+    let mut phan_hoi = agent()
         .post(format!("{api}/bot{}/sendMessage", cau_hinh.token))
         .send_form([("chat_id", cau_hinh.chat_id.as_str()), ("text", noi_dung.as_str()), ("parse_mode", "HTML")])
         .map_err(|e| format!("không kết nối được Telegram ({e})"))?;
@@ -233,6 +292,30 @@ mod tests {
              - Hồ sơ: <b>2</b>; Văn bản: <b>211</b>; Số trang: <b>476</b>; Bỏ index: <b>209</b>; Bỏ trắng: <b>1</b>; Split: <b>0</b>; Sao nguyên: <b>0</b>; Hồ sơ lỗi: <b>0</b>\n\
              - Thời điểm tách: <b>29.10.2026, 11:30:00</b>  (0 phút, 1,2 giây)"
         );
+    }
+
+    #[test]
+    fn dong_nguong_dung_mau() {
+        use crate::tach_vb::thong_ke_nguong::ThongKeNguong;
+        let tk = ThongKeNguong { trang_tu_dong: 120, trang_tu_dong_sua: 2, nghi: 30, nghi_thanh_trang: 25, nghi_giu: 5, trang_lot: 1, de_xuat: Some((0.9, 3.4)), xoay_xac_nhan: 7, xoay_chinh: 1, xoay_0: 2, ..Default::default() };
+        assert_eq!(
+            dong_nguong(&tk, 1.0, 3.2),
+            "\n- Ngưỡng: <b>1,00 % / 3,20 %</b>; Trắng tự động: <b>120</b> (sửa <b>2</b>); Nghi trắng: <b>30</b> → Trắng <b>25</b> · giữ <b>5</b>; Trắng lọt: <b>1</b>\n\
+             - Đề xuất lô: <b>0,90 / 3,40</b>; Xoay: xác nhận <b>7</b> · chỉnh <b>1</b> · 0° <b>2</b>"
+        );
+        assert!(dong_nguong(&ThongKeNguong::default(), 1.0, 3.2).contains("<b>chưa đủ dữ liệu</b>"));
+    }
+
+    #[test]
+    fn gui_file_multipart_dung_dinh_dang() {
+        let (api, luong) = may_chu_gia("200 OK|{\"ok\":true}");
+        let cau_hinh = CauHinh { token: "123:ABC".into(), chat_id: "-1001".into() };
+        assert_eq!(gui_file_toi(&api, &cau_hinh, "nguong_a.csv", b"v_tu;v_den\n0.0;0.1\n"), Ok(()));
+        let request = luong.join().unwrap();
+        assert!(request.starts_with("POST /bot123:ABC/sendDocument "));
+        assert!(request.contains("multipart/form-data; boundary=----sm-dema4-"));
+        assert!(request.contains("name=\"chat_id\"\r\n\r\n-1001\r\n"));
+        assert!(request.contains("filename=\"nguong_a.csv\"") && request.contains("v_tu;v_den\n0.0;0.1\n"));
     }
 
     #[test]

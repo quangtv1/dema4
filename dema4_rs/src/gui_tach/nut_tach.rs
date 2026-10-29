@@ -17,7 +17,9 @@ use crate::dem_pdf::QuyTac;
 use crate::gui::{mo_bang_he_dieu_hanh, nut, nut_mau, so_nguyen, so_thuc, thoi_gian_phut_giay, ChuDam, CHU, CHU_PHU, DO, XANH_LA};
 use crate::tach_vb::nhan::{Nhan, Xoay};
 use crate::tach_vb::phien::{thu_muc_an, PhienPhanTich};
+use crate::tach_vb::chi_so_trang::phan_loai;
 use crate::tach_vb::tach::{self, HoSoTach, KetQuaTach};
+use crate::tach_vb::thong_ke_nguong::{self, MauTrang, MauXoay, ThongKeNguong};
 use crate::telegram;
 
 pub(super) struct DangTach {
@@ -28,6 +30,9 @@ pub(super) struct DangTach {
     bat_dau: Instant,
     ra: PathBuf,
     so_lieu: telegram::SoLieuTach,
+    /// Thống kê ngưỡng trắng chụp lúc bấm Tách (None khi tắt quét trắng).
+    thong_ke: Option<ThongKeNguong>,
+    nguong: (f32, f32),
 }
 
 pub(super) struct XongTach {
@@ -56,6 +61,55 @@ pub fn ho_so_tach(phien: &PhienPhanTich, b: &BangTrang) -> Vec<HoSoTach> {
         }
     }
     ds
+}
+
+/// Thống kê ngưỡng của lô: nhãn cuối (sau duyệt) của mọi trang có chỉ số trắng + trang đã được đề xuất xoay.
+pub fn thong_ke_lo(phien: &PhienPhanTich, b: &BangTrang, cfg: &CauHinh) -> Option<ThongKeNguong> {
+    if !cfg.quet_trang {
+        return None;
+    }
+    let ch = cfg.cau_hinh_phan_tich();
+    let (mut trang, mut xoay) = (Vec::new(), Vec::new());
+    for t in &b.trang {
+        let Some(kq) = phien.ho_so[t.ho_so as usize].trang[t.so as usize - 1].ket_qua.as_ref() else { continue };
+        if let Some(cs) = kq.chi_so {
+            trang.push(MauTrang { v: cs.gia_tri(), tu_dong: phan_loai(cs, ch.nguong_trang, ch.nguong_nghi), nhan_cuoi: t.nhan() });
+        }
+        if let Some(g) = t.tu_dong.and_then(|td| td.nghi_xoay) {
+            xoay.push(MauXoay { de_xuat: g, goc: t.sua.goc, xac_nhan: t.sua.co & super::bang_trang::CO_XAC_NHAN != 0 });
+        }
+    }
+    Some(thong_ke_nguong::thong_ke(&trang, &xoay))
+}
+
+/// Gửi thống kê tách: tin chữ (+ 2 dòng ngưỡng), file CSV histogram, 1 dòng Google Sheet. Luồng nền, im lặng khi lỗi.
+fn gui_thong_ke(thu_muc: String, so_lieu: telegram::SoLieuTach, thoi_gian: Duration, thong_ke: Option<ThongKeNguong>, nguong: (f32, f32)) -> bool {
+    let Some(ch) = telegram::doc_cau_hinh().filter(|_| !cfg!(test)) else { return false };
+    let webhook = telegram::doc_webhook();
+    std::thread::spawn(move || {
+        let mut tin = telegram::noi_dung_tach(&thu_muc, &so_lieu, thoi_gian);
+        if let Some(tk) = &thong_ke {
+            tin += &telegram::dong_nguong(tk, nguong.0, nguong.1);
+        }
+        let _ = telegram::gui_tin(&ch, &tin);
+        let Some(tk) = thong_ke else { return };
+        let bay_gio = chrono::Local::now();
+        let ten = Path::new(thu_muc.trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let dau = [
+            ("may", telegram::ten_pc()),
+            ("thu_muc", ten.clone()),
+            ("thoi_diem", bay_gio.format("%Y-%m-%d %H:%M:%S").to_string()),
+            ("t1", format!("{:.2}", nguong.0)),
+            ("t2", format!("{:.2}", nguong.1)),
+            ("phien_ban", env!("CARGO_PKG_VERSION").to_string()),
+        ];
+        let csv = thong_ke_nguong::csv(&tk, &dau);
+        let _ = telegram::gui_file(&ch, &format!("nguong_{ten}_{}.csv", bay_gio.format("%Y%m%d-%H%M%S")), csv.as_bytes());
+        if let Some(url) = webhook {
+            let _ = telegram::gui_webhook(&url, &thong_ke_nguong::json(&tk, &dau));
+        }
+    });
+    true
 }
 
 impl ManTach {
@@ -145,6 +199,8 @@ impl ManTach {
         };
         let ho_so = ho_so_tach(phien, b);
         let so_lieu = telegram::SoLieuTach { ho_so: ho_so.len(), bo_index: b.tong.index as usize, bo_trang: b.tong.trang as usize, split: b.tong.split as usize, ..Default::default() };
+        let thong_ke = thong_ke_lo(phien, b, cfg);
+        let nguong = (cfg.nguong_trang, cfg.nguong_nghi);
         let (gui, nhan) = mpsc::channel();
         let (xong, dung) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicBool::new(false)));
         let (xong2, dung2, ra2, mau) = (xong.clone(), dung.clone(), ra.clone(), cfg.mau_ten.clone());
@@ -153,7 +209,7 @@ impl ManTach {
             let kq = tach::tach_thu_muc(&nguon, &ra2, &ho_so, &mau, &dung2, &|n, _| xong2.store(n, Ordering::Relaxed));
             let _ = gui.send(kq);
         });
-        self.tach = Some(DangTach { nhan, xong, tong, dung, bat_dau: Instant::now(), ra, so_lieu });
+        self.tach = Some(DangTach { nhan, xong, tong, dung, bat_dau: Instant::now(), ra, so_lieu, thong_ke, nguong });
     }
 
     /// Nhận kết quả tách: ghi log, gửi thống kê, mở popup.
@@ -185,16 +241,7 @@ impl ManTach {
         so_lieu.ho_so_loi = kq.loi.len();
         let thoi_gian = t.bat_dau.elapsed();
         // Test không gửi tin thật (cấu hình Telegram được nhúng sẵn trong file chạy)
-        let co_telegram = match telegram::doc_cau_hinh().filter(|_| !cfg!(test)) {
-            Some(ch) => {
-                let tin = telegram::noi_dung_tach(self.thu_muc.trim(), &so_lieu, thoi_gian);
-                std::thread::spawn(move || {
-                    let _ = telegram::gui_tin(&ch, &tin);
-                });
-                true
-            }
-            None => false,
-        };
+        let co_telegram = gui_thong_ke(self.thu_muc.trim().to_string(), so_lieu.clone(), thoi_gian, t.thong_ke, t.nguong);
         let ten_thu_muc = Path::new(self.thu_muc.trim().trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         self.xong_tach = Some(XongTach { ten_thu_muc, so_lieu, ra: t.ra, log, thoi_gian, da_dung: t.dung.load(Ordering::Relaxed), khong_xoa: kq.khong_xoa, loi, co_telegram });
     }
@@ -391,6 +438,10 @@ mod tests {
         assert_eq!((x.so_lieu.ho_so, x.so_lieu.van_ban, x.so_lieu.so_trang, x.so_lieu.bo_index), (1, 2, 4, 1));
         assert!(x.khong_xoa.is_empty() && x.loi.is_empty());
         assert!(ra.join("a").join("a_part1.pdf").exists() && ra.join("a").join("a_part2.pdf").exists());
+        // Thống kê ngưỡng của lô: 5 trang có chỉ số; máy cho Trắng 4 trang (trang 4 bị giả làm Nghi), người giữ nội dung / Index hết
+        let tk = thong_ke_lo(man.phien.as_ref().unwrap(), man.bang.as_ref().unwrap(), &cfg).unwrap();
+        assert_eq!(tk.o.iter().map(|x| x.0 + x.1).sum::<u32>(), 5);
+        assert_eq!((tk.trang_tu_dong, tk.trang_tu_dong_sua), (5, 5), "phân loại lại theo chỉ số đã lưu");
         let log = std::fs::read_to_string(nguon.join(".sm-dema4/ketqua_tach.txt")).unwrap();
         assert_eq!(log.lines().count(), 3, "{log}");
         let _ = std::fs::remove_dir_all(&goc);
