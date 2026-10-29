@@ -124,6 +124,48 @@ fn lam_viec(hang: &HangDoi, pdf: &[PathBuf], ch: &CauHinhPhanTich, gui: &Sender<
     }
 }
 
+/// Sắp lại kết quả về từ nhiều luồng theo đúng thứ tự hàng đợi (hồ sơ, trang): kết quả về sớm được giữ lại tới
+/// lượt mới đưa ra, để giao diện cập nhật lần lượt từ trên xuống. Trang bị bỏ (xoá khỏi lưới) không chặn hàng.
+pub struct XepThuTu<T> {
+    thu_tu: Vec<ViecTrang>,
+    ke: usize,
+    cho: HashMap<ViecTrang, T>,
+    bo: HashSet<ViecTrang>,
+}
+
+impl<T> XepThuTu<T> {
+    pub fn moi(thu_tu: Vec<ViecTrang>) -> Self {
+        Self { thu_tu, ke: 0, cho: HashMap::new(), bo: HashSet::new() }
+    }
+
+    /// Trang sẽ không có kết quả (bị bỏ khỏi hàng đợi).
+    pub fn bo(&mut self, v: ViecTrang) {
+        self.bo.insert(v);
+    }
+
+    /// Nhận 1 kết quả; trả các kết quả đã tới lượt, đúng thứ tự.
+    pub fn nhan(&mut self, v: ViecTrang, x: T) -> Vec<(ViecTrang, T)> {
+        self.cho.insert(v, x);
+        let mut ra = Vec::new();
+        while let Some(&v) = self.thu_tu.get(self.ke) {
+            if let Some(x) = self.cho.remove(&v) {
+                ra.push((v, x));
+            } else if !self.bo.contains(&v) {
+                break;
+            }
+            self.ke += 1;
+        }
+        ra
+    }
+
+    /// Kết thúc / dừng: trả mọi kết quả còn giữ, theo thứ tự.
+    pub fn het(&mut self) -> Vec<(ViecTrang, T)> {
+        let mut ra: Vec<_> = self.cho.drain().collect();
+        ra.sort_by_key(|x| x.0);
+        ra
+    }
+}
+
 /// Danh sách việc cho cả thư mục: mọi trang của mọi file (theo thứ tự file, trang).
 pub fn viec_ca_thu_muc(so_trang: &[usize]) -> Vec<ViecTrang> {
     so_trang.iter().enumerate().flat_map(|(file, &n)| (1..=n).map(move |trang| ViecTrang { file, trang })).collect()
@@ -137,6 +179,18 @@ mod tests {
 
     fn v(file: usize, trang: usize) -> ViecTrang {
         ViecTrang { file, trang }
+    }
+
+    #[test]
+    fn xep_thu_tu_dua_ra_lan_luot_trang_bo_khong_chan() {
+        let mut x = XepThuTu::moi(vec![v(0, 1), v(0, 2), v(0, 3), v(1, 1)]);
+        assert!(x.nhan(v(0, 2), 'b').is_empty(), "trang 2 về trước trang 1: giữ lại");
+        assert!(x.nhan(v(1, 1), 'd').is_empty());
+        assert_eq!(x.nhan(v(0, 1), 'a'), vec![(v(0, 1), 'a'), (v(0, 2), 'b')]);
+        x.bo(v(0, 3));
+        assert_eq!(x.nhan(v(1, 1), 'd'), vec![(v(1, 1), 'd')], "trang 3 bị bỏ không chặn hàng");
+        assert!(x.nhan(v(5, 5), 'z').is_empty());
+        assert_eq!(x.het(), vec![(v(5, 5), 'z')]);
     }
 
     #[test]

@@ -11,13 +11,15 @@ pub const RONG_GON: f32 = 36.0;
 pub const CAO_DAY: f32 = 30.0;
 const NEN_DAY: Color32 = Color32::from_rgb(0xFA, 0xFA, 0xFA);
 
-/// Tiến độ từng hồ sơ trong lúc Phân tích: số trang cần / đã xong, hồ sơ vừa có trang xong gần nhất, hồ sơ vừa xong hết.
+/// Tiến độ từng hồ sơ trong lúc Phân tích. Nhiều luồng chạy song song nên trang của 2 hồ sơ kề nhau có thể xong
+/// xen kẽ; "hồ sơ đang xử lý" vì vậy là hồ sơ đầu tiên (theo thứ tự cột trái) chưa xong — chỉ tiến, không nhảy lùi —
+/// và hồ sơ "vừa xong" được báo đúng thứ tự khi mốc này đi qua (để lưới nhảy lần lượt tới trang cuối từng hồ sơ).
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct TienDoHoSo {
     can: Vec<u32>,
     xong: Vec<u32>,
-    /// Hồ sơ đang xử lý (vừa có trang xong gần nhất).
-    pub dang: Option<u32>,
+    /// Hồ sơ đầu tiên chưa xong (mốc tiến độ).
+    moc: usize,
     vua_xong: Vec<u32>,
 }
 
@@ -30,17 +32,32 @@ impl TienDoHoSo {
                 *c += 1;
             }
         }
-        Self { xong: vec![0; so_ho_so], can, dang: None, vua_xong: Vec::new() }
+        let mut t = Self { xong: vec![0; so_ho_so], can, moc: 0, vua_xong: Vec::new() };
+        t.day_moc();
+        t.vua_xong.clear(); // hồ sơ không cần phân tích (đã có cache) không tính là "vừa xong"
+        t
+    }
+
+    fn day_moc(&mut self) {
+        while self.moc < self.can.len() && self.xong[self.moc] >= self.can[self.moc] {
+            if self.can[self.moc] > 0 {
+                self.vua_xong.push(self.moc as u32);
+            }
+            self.moc += 1;
+        }
     }
 
     /// 1 trang của hồ sơ `f` vừa xong (kết quả hoặc lỗi).
     pub fn nhan(&mut self, f: usize) {
-        let (Some(x), Some(&c)) = (self.xong.get_mut(f), self.can.get(f)) else { return };
-        *x += 1;
-        self.dang = Some(f as u32);
-        if *x == c {
-            self.vua_xong.push(f as u32);
+        if let Some(x) = self.xong.get_mut(f) {
+            *x += 1;
+            self.day_moc();
         }
+    }
+
+    /// Hồ sơ đang xử lý: hồ sơ đầu tiên chưa xong; None khi xong hết.
+    pub fn dang(&self) -> Option<u32> {
+        (self.moc < self.can.len()).then_some(self.moc as u32)
     }
 
     /// Phần đã xong (0..1) của hồ sơ đang dở; None = chưa bắt đầu / đã xong / không cần phân tích.
@@ -49,9 +66,14 @@ impl TienDoHoSo {
         (x > 0 && x < c).then(|| x as f32 / c as f32)
     }
 
-    /// Hồ sơ vừa xong hết từ lần gọi trước.
+    /// Hồ sơ vừa xong (đúng thứ tự cột trái) từ lần gọi trước.
     pub fn lay_vua_xong(&mut self) -> Vec<u32> {
         std::mem::take(&mut self.vua_xong)
+    }
+
+    /// Kết thúc / dừng: bỏ mốc (hết vạch, hết tự cuộn).
+    pub fn ket_thuc(&mut self) {
+        *self = Self::default();
     }
 }
 
@@ -62,6 +84,16 @@ pub fn vach_tien_do(ui: &egui::Ui, f: f32, x_trai: f32, rong: f32) {
     if cuoi > r.left() {
         ui.painter().rect_filled(Rect::from_min_max(egui::pos2(r.left(), r.bottom() - 2.0), egui::pos2(cuoi, r.bottom())), 0.0, VIEN_TAB_CHON);
     }
+}
+
+/// Vạch 2px chạy qua lại (không biết trước tổng) ở độ cao `y` — báo đang đọc danh sách.
+pub fn vach_dang_tai(ui: &egui::Ui, x_trai: f32, rong: f32, y: f32) {
+    let t = ui.input(|i| i.time) as f32;
+    let dai = rong * 0.3;
+    let dau = x_trai - dai + (t * 0.8).fract() * (rong + dai);
+    let r = Rect::from_min_max(egui::pos2(dau.max(x_trai), y - 2.0), egui::pos2((dau + dai).min(x_trai + rong), y));
+    ui.painter().rect_filled(r, 0.0, VIEN_TAB_CHON);
+    ui.ctx().request_repaint();
 }
 
 /// Người dùng vừa cuộn / bấm trong vùng `r` (để tạm dừng tự cuộn).
@@ -189,18 +221,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tien_do_ho_so_theo_trang_xong() {
-        let mut t = TienDoHoSo::moi(3, [0, 0, 1, 1, 1, 0]);
-        assert_eq!(t.phan(0), None, "chưa bắt đầu");
-        t.nhan(0);
-        assert_eq!((t.phan(0), t.dang), (Some(1.0 / 3.0), Some(0)));
+    fn tien_do_ho_so_moc_chi_tien_va_bao_xong_dung_thu_tu() {
+        // hồ sơ 0: 3 trang, 1: 2 trang, 2: đã có cache (0 trang cần), 3: 1 trang
+        let mut t = TienDoHoSo::moi(4, [0, 0, 0, 1, 1, 3]);
+        assert_eq!((t.dang(), t.phan(0)), (Some(0), None), "chưa bắt đầu");
         t.nhan(1);
+        t.nhan(1);
+        assert_eq!(t.dang(), Some(0), "hồ sơ 1 xong trước nhưng mốc vẫn ở hồ sơ 0");
+        assert!(t.lay_vua_xong().is_empty(), "chưa báo hồ sơ 1 khi hồ sơ 0 chưa xong");
+        t.nhan(0);
+        assert_eq!(t.phan(0), Some(1.0 / 3.0));
         t.nhan(0);
         t.nhan(0);
-        assert_eq!(t.phan(0), None, "xong hết thì bỏ vạch");
-        assert_eq!(t.lay_vua_xong(), [0]);
-        assert!(t.lay_vua_xong().is_empty());
-        assert_eq!((t.phan(1), t.phan(2), t.dang), (Some(1.0 / 3.0), None, Some(0)));
+        assert_eq!(t.lay_vua_xong(), [0, 1], "báo lần lượt, bỏ qua hồ sơ 2 đã có cache");
+        assert_eq!(t.dang(), Some(3));
+        t.nhan(3);
+        assert_eq!((t.dang(), t.lay_vua_xong()), (None, vec![3]));
     }
 
     #[test]

@@ -79,34 +79,43 @@ pub fn so_ten_tu_nhien(a: &str, b: &str) -> std::cmp::Ordering {
 }
 
 /// Duyệt cây thư mục theo thứ tự hiển thị: trong mỗi thư mục, các PDF (tên tự nhiên) trước, rồi lần lượt từng
-/// thư mục con (tên tự nhiên, đệ quy). Mỗi thư mục có PDF gọi `moi_thu_muc` 1 lần để giao diện hiện dần ngay.
-/// Bỏ thư mục ẩn / hệ thống (như màn Đếm), không đi theo symlink; thư mục gốc người dùng chọn luôn được duyệt.
+/// thư mục con (tên tự nhiên, đệ quy) — hết cây con của thư mục này mới sang thư mục kế. Đọc các thư mục song song
+/// (jwalk, nhanh trên ổ mạng / Google Drive) nhưng trả kết quả đúng thứ tự; mỗi thư mục có PDF gọi `moi_thu_muc`
+/// 1 lần ngay khi tới lượt để giao diện hiện dần. Bỏ thư mục ẩn / hệ thống (như màn Đếm), không theo symlink.
 pub fn duyet_pdf_theo_cay(goc: &Path, dung: &AtomicBool, mut moi_thu_muc: impl FnMut(Vec<PathBuf>)) {
-    let mut ngan_xep = vec![goc.to_path_buf()];
-    while let Some(tm) = ngan_xep.pop() {
+    let la_pdf = |ten: &std::ffi::OsStr| ten.to_string_lossy().to_lowercase().ends_with(".pdf");
+    let duyet = jwalk::WalkDir::new(goc).skip_hidden(false).follow_links(false).process_read_dir(move |depth, _cha, _tt, con| {
+        if depth.is_none() {
+            return; // mục ảo của thư mục gốc
+        }
+        con.retain(|r| match r {
+            Ok(e) if e.file_type.is_dir() => !crate::dem_pdf::bo_qua_thu_muc(&e.file_name),
+            Ok(e) => e.file_type.is_file() && la_pdf(&e.file_name),
+            Err(_) => false,
+        });
+        con.sort_by(|a, b| match (a, b) {
+            (Ok(a), Ok(b)) => a.file_type.is_dir().cmp(&b.file_type.is_dir()).then_with(|| so_ten_tu_nhien(&a.file_name.to_string_lossy(), &b.file_name.to_string_lossy())),
+            _ => std::cmp::Ordering::Equal,
+        });
+    });
+    let (mut lo, mut cha): (Vec<PathBuf>, Option<PathBuf>) = (Vec::new(), None);
+    for muc in duyet {
         if dung.load(std::sync::atomic::Ordering::Relaxed) {
             return;
         }
-        let Ok(doc) = std::fs::read_dir(&tm) else { continue };
-        let (mut pdf, mut con) = (Vec::new(), Vec::new());
-        for m in doc.flatten() {
-            let Ok(loai) = m.file_type() else { continue };
-            let ten = m.file_name();
-            if loai.is_dir() {
-                if !crate::dem_pdf::bo_qua_thu_muc(&ten) {
-                    con.push(m.path());
-                }
-            } else if loai.is_file() && ten.to_string_lossy().to_lowercase().ends_with(".pdf") {
-                pdf.push(m.path());
-            }
+        let Ok(muc) = muc else { continue };
+        if !muc.file_type().is_file() {
+            continue;
         }
-        let ten = |p: &PathBuf| p.file_name().map(|t| t.to_string_lossy().into_owned()).unwrap_or_default();
-        pdf.sort_by(|a, b| so_ten_tu_nhien(&ten(a), &ten(b)));
-        con.sort_by(|a, b| so_ten_tu_nhien(&ten(b), &ten(a))); // ngăn xếp: đảo để lấy ra theo thứ tự tên
-        ngan_xep.extend(con);
-        if !pdf.is_empty() {
-            moi_thu_muc(pdf);
+        let p = muc.path();
+        if cha.as_deref() != p.parent() && !lo.is_empty() {
+            moi_thu_muc(std::mem::take(&mut lo));
         }
+        cha = p.parent().map(Path::to_path_buf);
+        lo.push(p);
+    }
+    if !lo.is_empty() {
+        moi_thu_muc(lo);
     }
 }
 

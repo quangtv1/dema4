@@ -43,6 +43,11 @@ pub fn ke_ngang(ui: &mut egui::Ui, mau: Color32) {
 
 /// Hàng tab nền xám: tab chọn chữ đậm + gạch xanh 2 px ở đáy.
 pub fn hang_tab<T: PartialEq + Copy>(ui: &mut egui::Ui, ds: &[(T, &str)], chon: &mut T) {
+    hang_tab_phai(ui, ds, chon, |_| {});
+}
+
+/// Hàng tab + phần canh phải cùng hàng (vd nút Xoá cache của Cấu hình).
+pub fn hang_tab_phai<T: PartialEq + Copy>(ui: &mut egui::Ui, ds: &[(T, &str)], chon: &mut T, phai: impl FnOnce(&mut egui::Ui)) {
     dai(ui, NEN_DAU_HOP, Margin::symmetric(16, 0), CornerRadius::ZERO, |ui| {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
@@ -64,6 +69,7 @@ pub fn hang_tab<T: PartialEq + Copy>(ui: &mut egui::Ui, ds: &[(T, &str)], chon: 
                     pt.rect_filled(Rect::from_min_max(egui::pos2(r.left(), r.bottom() - 2.0), r.max), 0.0, VIEN_TAB_CHON);
                 }
             }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), phai);
         });
     });
     ke_ngang(ui, VIEN_NHAT);

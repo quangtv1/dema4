@@ -182,7 +182,9 @@ impl UngDungChinh {
                 let cau_hinh = ui.add_enabled(!khoa, egui::Button::new((atom_mau(BieuTuong::BanhRang, 14.0, xam), "Cấu hình")).frame(false)).on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để sửa Cấu hình");
                 if cau_hinh.clicked() {
                     use crate::gui_tach::hop_cau_hinh::{HopCauHinh, TabCauHinh};
-                    self.hop_cau_hinh = Some(HopCauHinh::moi(&self.cfg, if self.man == Man::Dem { TabCauHinh::Dem } else { TabCauHinh::Tach }));
+                    let mut hop = HopCauHinh::moi(&self.cfg, if self.man == Man::Dem { TabCauHinh::Dem } else { TabCauHinh::Tach });
+                    hop.co_cache = self.tach.co_cache();
+                    self.hop_cau_hinh = Some(hop);
                 }
                 egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::HoiDap, 14.0, xam), "Trợ giúp", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                     use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
@@ -245,7 +247,12 @@ impl eframe::App for UngDungChinh {
         }
         if let Some(hop) = &mut self.hop_cau_hinh {
             use crate::gui_tach::hop_cau_hinh::KetQuaHop;
-            match hop.ve(&ctx) {
+            let kq = hop.ve(&ctx);
+            if std::mem::take(&mut hop.xoa_cache) {
+                self.tach.xoa_cache();
+                hop.co_cache = self.tach.co_cache();
+            }
+            match kq {
                 KetQuaHop::Mo => {}
                 KetQuaHop::Huy => self.hop_cau_hinh = None,
                 KetQuaHop::Luu(moi) => {
@@ -1453,7 +1460,7 @@ mod tests {
         h.run();
         assert!(!h.get_by_label("Chức năng").accesskit_node().is_disabled());
         h.state_mut().tach.gia_dang_chay();
-        h.run();
+        h.run_steps(4); // vạch đang đọc chạy liên tục, không "lặng"
         assert!(h.get_by_label("Chức năng").accesskit_node().is_disabled());
         assert!(h.get_by_label("Cấu hình").accesskit_node().is_disabled());
         assert!(!h.get_by_label("Dừng").accesskit_node().is_disabled());

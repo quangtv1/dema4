@@ -65,6 +65,9 @@ pub struct HopCauHinh {
     /// Tay đang kéo / đang chọn trên thước khổ (0..7 ranh giới, 7 = ngưỡng A0).
     keo_tay: Option<usize>,
     tay_chon: Option<usize>,
+    /// Thư mục đang mở còn cache phân tích (bật nút Xoá cache); `xoa_cache` = vừa bấm, app xoá rồi cập nhật `co_cache`.
+    pub co_cache: bool,
+    pub xoa_cache: bool,
 }
 
 fn so_o(v: f32) -> String {
@@ -136,6 +139,8 @@ impl HopCauHinh {
             o_thu: String::new(),
             keo_tay: None,
             tay_chon: None,
+            co_cache: false,
+            xoa_cache: false,
         };
         h.dong_bo_o();
         h
@@ -179,7 +184,20 @@ impl HopCauHinh {
     pub fn ve(&mut self, ctx: &egui::Context) -> KetQuaHop {
         let mut kq = KetQuaHop::Mo;
         let phan_hoi = kh::hop(ctx, "hop_cau_hinh", RONG_HOP, "Cấu hình", |ui| {
-            kh::hang_tab(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF")], &mut self.tab);
+            let co_cache = self.co_cache;
+            let mut bam_xoa = false;
+            kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF")], &mut self.tab, |ui| {
+                // Canh phải, thẳng hàng 2 tab: chỉ bấm được khi thư mục đang mở còn cache
+                let nut = egui::Button::new(RichText::new("Xoá cache").size(12.0)).min_size(egui::vec2(0.0, 22.0));
+                bam_xoa = ui
+                    .add_enabled(co_cache, nut)
+                    .on_hover_text("Xoá kết quả phân tích đã lưu (.sm-dema4/cache) của thư mục đang mở. Nhãn đã gán không mất; lần Phân tích sau sẽ phân tích lại mọi trang.")
+                    .on_disabled_hover_text("Thư mục đang mở chưa có cache phân tích")
+                    .clicked();
+            });
+            if bam_xoa {
+                self.xoa_cache = true;
+            }
             kh::than(ui, "than_cau_hinh", CAO_THAN, Margin { left: 20, right: 20, top: 16, bottom: 8 }, |ui| match self.tab {
                 TabCauHinh::Tach => self.tab_tach(ui),
                 TabCauHinh::Dem => self.tab_dem(ui),

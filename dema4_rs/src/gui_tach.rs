@@ -78,7 +78,13 @@ pub enum Tab {
 enum Chay {
     /// Đang tìm PDF + đọc dung lượng / cache.
     Mo { nhan: Receiver<PhienPhanTich>, dung: Arc<AtomicBool> },
-    PhanTich { nhan: Receiver<SuKienPhanTich>, hang: Arc<HangDoi>, tong: usize, xong: usize, loi: usize, bat_dau: Instant },
+    PhanTich { nhan: Receiver<SuKienPhanTich>, hang: Arc<HangDoi>, tong: usize, xong: usize, loi: usize, bat_dau: Instant, xep: hang_doi::XepThuTu<KetQuaVe> },
+}
+
+/// Kết quả 1 trang chờ tới lượt hiển thị (nhiều luồng về lệch thứ tự).
+enum KetQuaVe {
+    Trang(crate::tach_vb::phan_tich::KetQuaTrang, Option<crate::tach_vb::anh::Anh>),
+    Loi,
 }
 
 /// Việc người dùng bấm trong lúc vẽ (thực hiện sau khi vẽ xong để khỏi vướng mượn).
@@ -163,6 +169,8 @@ pub struct ManTach {
     pub cfg_doi: bool,
     /// Lúc bấm Phân tích (tính tổng thời gian cả bước đọc thư mục).
     bat_dau_pt: Option<Instant>,
+    /// Vừa xoá cache: không ghi lại cache cũ trong bộ nhớ cho tới lần Phân tích sau.
+    khong_ghi_cache: bool,
     /// Cột trái: chuỗi tìm của từng tab, thu gọn (không lưu cfg: mở app luôn mở rộng), hồ sơ đã tự cuộn tới.
     pub(crate) tim_hs: String,
     tim_vb: String,
@@ -243,6 +251,7 @@ impl Default for ManTach {
             yeu_cau_anh: Vec::new(),
             cfg_doi: false,
             bat_dau_pt: None,
+            khong_ghi_cache: false,
             tim_hs: String::new(),
             tim_vb: String::new(),
             trai_gon: false,
@@ -413,6 +422,7 @@ impl ManTach {
         self.khoa_thu_tu = None;
         self.trang_thai = "Đang đọc thư mục…".into();
         self.bat_dau_pt = Some(Instant::now());
+        self.khong_ghi_cache = false;
         let (gui, nhan) = mpsc::channel();
         let dung = Arc::new(AtomicBool::new(false));
         let dung2 = dung.clone();
@@ -455,9 +465,10 @@ impl ManTach {
         let (gui, nhan) = mpsc::channel();
         self.tien_do_hs = cot_trai::TienDoHoSo::moi(phien.ho_so.len(), viec.iter().map(|v| v.file));
         self.hs_pt_cuon = None;
+        let xep = hang_doi::XepThuTu::moi(viec.clone());
         let hang = HangDoi::moi(viec);
         hang_doi::chay(hang.clone(), Arc::new(phien.duong_dan_pdf()), ch.clone(), so_luong, gui);
-        self.chay = Some(Chay::PhanTich { nhan, hang, tong, xong: 0, loi: 0, bat_dau });
+        self.chay = Some(Chay::PhanTich { nhan, hang, tong, xong: 0, loi: 0, bat_dau, xep });
     }
 
     fn nhan_su_kien(&mut self, ch: &CauHinhPhanTich, ctx: Option<&egui::Context>) {
@@ -471,12 +482,28 @@ impl ManTach {
                     self.trang_thai = "Không đọc được thư mục".into();
                 }
             },
-            Some(Chay::PhanTich { nhan, hang, tong, xong, loi, bat_dau }) => {
+            Some(Chay::PhanTich { nhan, hang, tong, xong, loi, bat_dau, xep }) => {
                 let (Some(phien), Some(bang)) = (self.phien.as_mut(), self.bang.as_mut()) else { return };
                 let mut ket_thuc = false;
+                let mut toi_luot: Vec<(ViecTrang, KetQuaVe)> = Vec::new();
                 for _ in 0..SU_KIEN_MOI_KHUNG {
                     match nhan.try_recv() {
-                        Ok(SuKienPhanTich::Trang { viec, kq, anh_nho, .. }) => {
+                        Ok(SuKienPhanTich::Trang { viec, kq, anh_nho, .. }) => toi_luot.extend(xep.nhan(viec, KetQuaVe::Trang(kq, anh_nho))),
+                        Ok(SuKienPhanTich::Loi { viec, .. }) => toi_luot.extend(xep.nhan(viec, KetQuaVe::Loi)),
+                        Ok(SuKienPhanTich::Xong) | Err(TryRecvError::Disconnected) => {
+                            ket_thuc = true;
+                            toi_luot.extend(xep.het());
+                            break;
+                        }
+                        Err(TryRecvError::Empty) => break,
+                    }
+                }
+                // Nhiều luồng phân tích song song, nhưng nhãn / tiến độ hiện lần lượt theo thứ tự hồ sơ, trang
+                for (viec, kq) in toi_luot {
+                    *xong += 1;
+                    self.tien_do_hs.nhan(viec.file);
+                    match kq {
+                        KetQuaVe::Trang(kq, anh_nho) => {
                             let k = bang.chi_so(viec.file, viec.trang);
                             // Ảnh xám của phân tích: dùng luôn cho ô đang hiện (đỡ render lại)
                             if let (Some(a), Some(anh), Some(ctx)) = (anh_nho, self.anh.as_mut(), ctx) {
@@ -485,20 +512,9 @@ impl ManTach {
                                 }
                             }
                             bang.dat_tu_dong(k, gan_nhan(&kq, ch));
-                            self.tien_do_hs.nhan(viec.file);
                             phien.nhan_ket_qua(viec, kq);
-                            *xong += 1;
                         }
-                        Ok(SuKienPhanTich::Loi { viec, .. }) => {
-                            self.tien_do_hs.nhan(viec.file);
-                            *xong += 1;
-                            *loi += 1;
-                        }
-                        Ok(SuKienPhanTich::Xong) | Err(TryRecvError::Disconnected) => {
-                            ket_thuc = true;
-                            break;
-                        }
-                        Err(TryRecvError::Empty) => break,
+                        KetQuaVe::Loi => *loi += 1,
                     }
                 }
                 if ket_thuc {
@@ -506,7 +522,7 @@ impl ManTach {
                     bang.chep_trang_thai(phien);
                     phien.ghi_cache();
                     self.chay = None;
-                    self.tien_do_hs.dang = None;
+                    self.tien_do_hs.ket_thuc();
                     self.trang_thai = if da_dung { format!("Đã dừng ở {phan_tram}% ({tg})") } else { format!("Phân tích xong ({tg})") };
                     if loi > 0 {
                         self.trang_thai += &format!(" · {loi} trang lỗi");
@@ -657,7 +673,31 @@ impl ManTach {
     }
 
     /// Ghi cache (cờ duyệt) — gọi khi đóng app / đổi thư mục.
+    fn thu_muc_cache(&self) -> PathBuf {
+        let goc = self.phien.as_ref().map(|p| p.goc.clone()).unwrap_or_else(|| PathBuf::from(self.thu_muc.trim()));
+        thu_muc_an(&goc).join("cache")
+    }
+
+    /// Thư mục đang mở còn cache phân tích (để bật nút Xoá cache).
+    pub fn co_cache(&self) -> bool {
+        !self.thu_muc.trim().is_empty() && std::fs::read_dir(self.thu_muc_cache()).is_ok_and(|mut d| d.next().is_some())
+    }
+
+    /// Xoá cache phân tích của thư mục đang mở; không ghi lại cache cũ trong bộ nhớ khi đóng / đổi thư mục.
+    pub fn xoa_cache(&mut self) {
+        match cache_trang::xoa_het(&self.thu_muc_cache()) {
+            Ok(()) => {
+                self.khong_ghi_cache = true;
+                self.bao = Some(("Đã xoá cache — lần Phân tích sau sẽ phân tích lại mọi trang".into(), Instant::now()));
+            }
+            Err(e) => self.trang_thai = format!("Không xoá được cache: {e}"),
+        }
+    }
+
     pub fn ghi_cache(&mut self) {
+        if self.khong_ghi_cache {
+            return;
+        }
         if let (Some(b), Some(p)) = (&self.bang, &mut self.phien) {
             b.chep_trang_thai(p);
             p.ghi_cache();
@@ -735,10 +775,12 @@ impl ManTach {
             Viec::BoKhoiVb => doi = b.gan(nhom, &ds, &ds, Nhan::Trang),
             Viec::Xoa => {
                 doi = b.xoa(nhom, &ds, &ds);
-                if let Some(Chay::PhanTich { hang, .. }) = &self.chay {
+                if let Some(Chay::PhanTich { hang, xep, .. }) = &mut self.chay {
                     for &k in &ds {
                         let t = &b.trang[k as usize];
-                        hang.bo(ViecTrang { file: t.ho_so as usize, trang: t.so as usize });
+                        let v = ViecTrang { file: t.ho_so as usize, trang: t.so as usize };
+                        hang.bo(v);
+                        xep.bo(v);
                     }
                 }
                 if doi > 0 {
@@ -1114,7 +1156,13 @@ impl ManTach {
             self.hs_dang_cuon = None;
         }
         let Some(b) = &self.bang else {
+            let khung = ui.max_rect();
             self.bang_xem_truoc(ui);
+            // Đang đọc danh sách: vạch chạy dưới tiêu đề bảng
+            let x = &self.xem_truoc;
+            if (x.nhan.is_some() && !x.da_duyet) || matches!(self.chay, Some(Chay::Mo { .. })) {
+                cot_trai::vach_dang_tai(ui, khung.left(), khung.width(), khung.top() + CAO_DAU_BANG);
+            }
             return;
         };
         let tong_vb = self.ds_vb.len();
@@ -1133,7 +1181,7 @@ impl ManTach {
             self.trai_cham = Some(Instant::now());
         }
         let tam_dung = self.trai_cham.is_some_and(|t| t.elapsed() < Duration::from_secs(5));
-        let cuon = match self.tien_do_hs.dang {
+        let cuon = match self.tien_do_hs.dang() {
             Some(h) if self.hs_pt_cuon != Some(h) && !tam_dung => {
                 self.hs_pt_cuon = Some(h);
                 hien.iter().position(|&x| x == h).map(|i| i + 1).or(cuon)
@@ -2014,6 +2062,38 @@ pub(super) fn ve_net_dut(painter: &egui::Painter, r: Rect, net: Stroke, dai: f32
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Phân tích lần đầu (chưa có cache) đi lần lượt từ hồ sơ số 1 theo đúng thứ tự cột trái (thứ tự cây thư mục).
+    #[test]
+    fn phan_tich_lan_dau_theo_thu_tu_cot_trai() {
+        let goc = std::env::temp_dir().join(format!("dema4_thu_tu_pt_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        for (f, n) in [("A/a1.pdf", 6), ("A/con/a2.pdf", 6), ("B/b1.pdf", 6), ("B/b2.pdf", 6), ("C/c1.pdf", 6), ("goc.pdf", 6)] {
+            let p = goc.join(f);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            crate::tach_vb::tach::tests::tao_pdf(&p, n);
+        }
+        let cfg = CauHinh::default();
+        let ch = cfg.cau_hinh_phan_tich();
+        let mut man = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };
+        man.bam_phan_tich(&ch);
+        let (bat_dau, mut thu_tu) = (Instant::now(), Vec::new());
+        while man.dang_chay() && bat_dau.elapsed() < Duration::from_secs(60) {
+            man.nhan_su_kien(&ch, None);
+            if let Some(h) = man.tien_do_hs.dang() {
+                if thu_tu.last() != Some(&h) {
+                    thu_tu.push(h);
+                }
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        let ten: Vec<&str> = man.bang.as_ref().unwrap().ho_so.iter().map(|s| s.as_str()).collect();
+        assert_eq!(ten, ["goc.pdf", "A/a1.pdf", "A/con/a2.pdf", "B/b1.pdf", "B/b2.pdf", "C/c1.pdf"]);
+        // Nhiều luồng chạy xen trang của 2 hồ sơ kề nhau, nhưng mốc "đang xử lý" chỉ tiến từ hồ sơ 1
+        assert_eq!(thu_tu.first(), Some(&0), "bắt đầu từ hồ sơ 1: {thu_tu:?}");
+        assert!(thu_tu.windows(2).all(|w| w[1] > w[0]), "chỉ tiến lần lượt, không nhảy lùi: {thu_tu:?}");
+        let _ = std::fs::remove_dir_all(&goc);
+    }
 
     /// Chọn thư mục (chưa Phân tích): danh sách PDF đọc nền, hiện tên ngay ở cột trái.
     #[test]
