@@ -847,7 +847,8 @@ impl UngDung {
         };
         // Gửi thống kê về Telegram ở luồng riêng (đọc lại cấu hình mỗi lần để sửa file không cần mở lại app).
         // Chạy ngầm, không hiện trạng thái gửi trên giao diện; popup có dòng báo app gửi thống kê.
-        if let Some(cau_hinh) = telegram::doc_cau_hinh() {
+        // Test (kể cả chụp ảnh màn hình) không gửi tin thật
+        if let Some(cau_hinh) = telegram::doc_cau_hinh().filter(|_| !cfg!(test)) {
             let tin = telegram::noi_dung_thong_ke(&xong.thu_muc, kq, xong.thoi_gian);
             std::thread::spawn(move || {
                 let _ = telegram::gui_tin(&cau_hinh, &tin);
@@ -1598,6 +1599,31 @@ mod tests {
         app.luu_va_thong_bao(&kq, xong);
         assert_eq!(app.ket_qua_chep.as_deref(), Some("KẾT QUẢ ĐẾM\n===\n"));
         let _ = std::fs::remove_dir_all(std::env::temp_dir().join("dema4_kiem_thu_copy"));
+    }
+
+    /// Chụp màn Đếm sau khi đếm xong thư mục mẫu 1 (cùng biến môi trường như `chup_man_tach`).
+    #[test]
+    #[ignore = "cần GPU và thư mục mẫu"]
+    fn chup_man_dem() {
+        let mau = crate::tach_vb::thu_muc_mau().expect("DEMA4_MAU_TACH");
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 760.0)).with_pixels_per_point(1.5).build_eframe(|cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut app = UngDungChinh { man: Man::Dem, ..Default::default() };
+            app.cfg = crate::cau_hinh::CauHinh::default();
+            app.dem.thu_muc = mau.join("pdf_goc").display().to_string();
+            app
+        });
+        harness.run_steps(2);
+        let ctx = harness.ctx.clone();
+        harness.state_mut().dem.bat_dau_dem(&ctx);
+        let bat_dau = Instant::now();
+        while harness.state().dem.dang_dem.is_some() && bat_dau.elapsed() < Duration::from_secs(120) {
+            harness.run_steps(1);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("dem_ket_qua.png")).unwrap();
     }
 
     /// Chụp màn Tách sau khi phân tích thư mục mẫu 1.
