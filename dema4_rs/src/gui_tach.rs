@@ -7,6 +7,7 @@ pub mod bieu_tuong;
 pub mod chon;
 pub mod hop_cau_hinh;
 pub mod thanh_nguong;
+pub mod thuoc_kho;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;

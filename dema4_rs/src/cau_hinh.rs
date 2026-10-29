@@ -270,6 +270,20 @@ impl CauHinh {
         s
     }
 
+    /// Quy tắc xếp khổ / quy A4 cho màn Đếm và CLI đếm. Giá trị mặc định → đúng công thức cũ (kết quả giống hệt).
+    pub fn quy_tac(&self) -> crate::dem_pdf::QuyTac {
+        use crate::dem_pdf::{A0Lon as A0, QuyTac, NGUONG_A0_THEO_DIEN_TICH, PT_MOI_MM};
+        QuyTac {
+            he_so: self.he_so,
+            ranh_gioi_mm: (self.ranh_gioi != RANH_GIOI_MAC_DINH).then_some(self.ranh_gioi),
+            a0_nguong_pt: if self.a0_nguong_mm == A0_NGUONG_MAC_DINH { NGUONG_A0_THEO_DIEN_TICH } else { self.a0_nguong_mm * PT_MOI_MM },
+            a0_lon: match self.a0_lon {
+                A0Lon::DienTich => A0::DienTich,
+                A0Lon::CoDinh => A0::CoDinh(self.a0_lon_he_so),
+            },
+        }
+    }
+
     /// Cấu hình phân tích trang (ngưỡng % → tỷ lệ). Loại mã chưa hỗ trợ → không đọc mã.
     pub fn cau_hinh_phan_tich(&self) -> crate::tach_vb::phan_tich::CauHinhPhanTich {
         crate::tach_vb::phan_tich::CauHinhPhanTich {
@@ -446,6 +460,38 @@ mod tests {
         assert_eq!(doc_tu(&cho2), CauHinh::default());
         assert!(!d.join("canh_exe.cfg.tmp").exists());
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn quy_tac_dem_theo_cau_hinh() {
+        use crate::dem_pdf::{A0Lon as A0, QuyTac, PT_MOI_MM};
+        assert_eq!(CauHinh::default().quy_tac(), QuyTac::default(), "mặc định → đúng công thức cũ");
+        // Dời ranh giới A3|A4 lên 380 mm → trang cạnh dài 370 mm thành A4
+        let mut c = CauHinh::default();
+        c.ranh_gioi[3] = 380.0;
+        let q = c.quy_tac();
+        assert_eq!(QuyTac::default().kho(250.0 * PT_MOI_MM, 370.0 * PT_MOI_MM), 3);
+        assert_eq!(q.kho(250.0 * PT_MOI_MM, 370.0 * PT_MOI_MM), 4);
+        assert_eq!(q.kho(250.0 * PT_MOI_MM, 381.0 * PT_MOI_MM), 3);
+        // Sát ngưỡng tính theo ranh giới mới: A4 297 → ranh 380, trang 363,4 mm = 80 %
+        let (ty_le, ke) = q.sat_nguong(200.0 * PT_MOI_MM, 363.4 * PT_MOI_MM, 4);
+        assert_eq!(ke, Some(3));
+        assert!((ty_le - 0.8).abs() < 1e-3, "{ty_le}");
+        // A0 lớn: 1500 × 900 mm → diện tích 21,64 (A4 tính theo pt như lõi đếm cũ) / cố định 20
+        let (w, h) = (900.0 * PT_MOI_MM, 1500.0 * PT_MOI_MM);
+        assert_eq!(CauHinh::default().quy_tac().quy_a4(0, w, h), 21.64);
+        let c = CauHinh { a0_lon: A0Lon::CoDinh, a0_lon_he_so: 20.0, ..Default::default() };
+        assert_eq!(c.quy_tac().a0_lon, A0::CoDinh(20.0));
+        assert_eq!(c.quy_tac().quy_a4(0, w, h), 20.0);
+        assert_eq!(c.quy_tac().quy_a4(0, 841.0 * PT_MOI_MM, 1189.0 * PT_MOI_MM), 16.0, "A0 chuẩn vẫn theo hệ số");
+        // Nâng ngưỡng A0 lớn lên 1600 mm → trang 1500 mm tính theo hệ số A0
+        let c = CauHinh { a0_nguong_mm: 1600.0, ..Default::default() };
+        assert_eq!(c.quy_tac().quy_a4(0, w, h), 16.0);
+        assert!(c.quy_tac().dong_tuy_chinh().contains("1600 mm"));
+        assert_eq!(CauHinh::default().quy_tac().dong_tuy_chinh(), "");
+        let mut c = CauHinh::default();
+        c.ranh_gioi[3] = 380.0;
+        assert_eq!(c.quy_tac().dong_tuy_chinh(), "Ranh giới khổ (mm): 1015 · 717,5 · 507 · 380 · 253,5 · 179 · 126,5\n");
     }
 
     #[test]

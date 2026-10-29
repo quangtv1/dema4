@@ -5,7 +5,9 @@ use eframe::egui::{self, Align, Color32, Margin, Rect, RichText, Sense, Stroke, 
 
 use super::bieu_tuong::thong_tin;
 use super::thanh_nguong::{self as tn, Mep};
-use crate::cau_hinh::{CauHinh, LoaiMa, LoiCauHinh, LuuNhan, TIN_CAY_KHOANG};
+use super::thuoc_kho as tk;
+use crate::cau_hinh::{A0Lon, CauHinh, LoaiMa, LoiCauHinh, LuuNhan, CANH_CHUAN_MM, RANH_GIOI_MAC_DINH, TIN_CAY_KHOANG};
+use crate::dem_pdf::{KHO, PT_MOI_MM};
 use crate::gui::{nut_mau, ChuDam, CHU, CHU_PHU, DO, VIEN, VIEN_NHAT, XANH_COBALT, XANH_LA};
 
 /// Dòng `nhãn | ô`: cột nhãn cố định, ô kéo tới mép phải (macro để 2 khối cùng mượn `self`).
@@ -23,6 +25,7 @@ const CAO_THAN: f32 = 470.0;
 const RONG_NHAN: f32 = 118.0;
 const VANG_CHU: Color32 = Color32::from_rgb(0xA0, 0x70, 0x00);
 const XAM_DAM: Color32 = Color32::from_rgb(0x70, 0x70, 0x70);
+const NAU: Color32 = Color32::from_rgb(0x8B, 0x5A, 0x2B);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TabCauHinh {
@@ -51,10 +54,21 @@ pub struct HopCauHinh {
     o_tin_cay: String,
     keo: Option<Keo>,
     mep_chon: Option<Mep>,
+    o_he_so: [String; 8],
+    o_a0_he_so: String,
+    o_thu: String,
+    /// Tay đang kéo / đang chọn trên thước khổ (0..7 ranh giới, 7 = ngưỡng A0).
+    keo_tay: Option<usize>,
+    tay_chon: Option<usize>,
 }
 
 fn so_o(v: f32) -> String {
     format!("{v:.2}").replace('.', ",")
+}
+
+/// Hệ số giữ đủ f64 (0,1 không thành 0,10000000149).
+fn doc_so64(s: &str) -> Option<f64> {
+    s.trim().replace(',', ".").parse::<f64>().ok().filter(|v| v.is_finite())
 }
 
 fn doc_so(s: &str) -> Option<f32> {
@@ -80,6 +94,12 @@ pub fn mac_dinh_tach(c: &CauHinh) -> CauHinh {
     }
 }
 
+/// Đưa các mục Đếm trang A4 về mặc định.
+pub fn mac_dinh_dem(c: &CauHinh) -> CauHinh {
+    let md = CauHinh::default();
+    CauHinh { he_so: md.he_so, ranh_gioi: md.ranh_gioi, a0_lon: md.a0_lon, a0_lon_he_so: md.a0_lon_he_so, a0_nguong_mm: md.a0_nguong_mm, ..c.clone() }
+}
+
 /// Dòng ước tốc độ theo tổ hợp loại quét đang bật.
 pub fn uoc_toc_do(c: &CauHinh) -> (String, bool) {
     let ma = c.quet_ma && c.loai_ma == LoaiMa::Code128;
@@ -101,13 +121,35 @@ pub fn uoc_toc_do(c: &CauHinh) -> (String, bool) {
 
 impl HopCauHinh {
     pub fn moi(cfg: &CauHinh, tab: TabCauHinh) -> Self {
-        Self { tab, nhap: cfg.clone(), o_trang: so_o(cfg.nguong_trang), o_nghi: so_o(cfg.nguong_nghi), o_tin_cay: so_o(cfg.tin_cay_xoay), keo: None, mep_chon: None }
+        let mut h = Self {
+            tab,
+            nhap: cfg.clone(),
+            o_trang: String::new(),
+            o_nghi: String::new(),
+            o_tin_cay: String::new(),
+            keo: None,
+            mep_chon: None,
+            o_he_so: Default::default(),
+            o_a0_he_so: String::new(),
+            o_thu: String::new(),
+            keo_tay: None,
+            tay_chon: None,
+        };
+        h.dong_bo_o();
+        h
+    }
+
+    #[cfg(test)]
+    pub fn dat_o_thu(&mut self, s: &str) {
+        self.o_thu = s.into();
     }
 
     fn dong_bo_o(&mut self) {
         self.o_trang = so_o(self.nhap.nguong_trang);
         self.o_nghi = so_o(self.nhap.nguong_nghi);
         self.o_tin_cay = so_o(self.nhap.tin_cay_xoay);
+        self.o_he_so = self.nhap.he_so.map(|h| h.to_string().replace('.', ","));
+        self.o_a0_he_so = self.nhap.a0_lon_he_so.to_string().replace('.', ",");
     }
 
     /// Lỗi hiện tại (gồm ô gõ không ra số) → khoá Lưu.
@@ -118,6 +160,16 @@ impl HopCauHinh {
         }
         if doc_so(&self.o_tin_cay).is_none() && !l.contains(&LoiCauHinh::TinCay) {
             l.push(LoiCauHinh::TinCay);
+        }
+        for (i, o) in self.o_he_so.iter().enumerate() {
+            if doc_so64(o).is_none_or(|v| v <= 0.0) && !l.contains(&LoiCauHinh::HeSo(i)) {
+                l.push(LoiCauHinh::HeSo(i));
+            }
+        }
+        // Hệ số cố định chỉ chặn Lưu khi đang chọn
+        l.retain(|e| *e != LoiCauHinh::A0LonHeSo || self.nhap.a0_lon == A0Lon::CoDinh);
+        if self.nhap.a0_lon == A0Lon::CoDinh && doc_so64(&self.o_a0_he_so).is_none() && !l.contains(&LoiCauHinh::A0LonHeSo) {
+            l.push(LoiCauHinh::A0LonHeSo);
         }
         l
     }
@@ -141,17 +193,17 @@ impl HopCauHinh {
                 ui.set_min_height(CAO_THAN);
                 match self.tab {
                     TabCauHinh::Tach => self.tab_tach(ui),
-                    TabCauHinh::Dem => {
-                        ui.add_space(20.0);
-                        ui.label(RichText::new("Hệ số quy A4 và ranh giới khổ — đang chuyển từ màn Đếm vào đây.").color(CHU_PHU));
-                    }
+                    TabCauHinh::Dem => self.tab_dem(ui),
                 }
             });
             ui.separator();
             let loi = self.loi();
             ui.horizontal(|ui| {
-                if ui.add(egui::Button::new("Mặc định").min_size(egui::vec2(70.0, 24.0))).on_hover_text("Đưa các mục của tab đang mở về mặc định").clicked() && self.tab == TabCauHinh::Tach {
-                    self.nhap = mac_dinh_tach(&self.nhap);
+                if ui.add(egui::Button::new("Mặc định").min_size(egui::vec2(70.0, 24.0))).on_hover_text("Đưa các mục của tab đang mở về mặc định").clicked() {
+                    self.nhap = match self.tab {
+                        TabCauHinh::Tach => mac_dinh_tach(&self.nhap),
+                        TabCauHinh::Dem => mac_dinh_dem(&self.nhap),
+                    };
                     self.dong_bo_o();
                 }
                 ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
@@ -322,6 +374,170 @@ impl HopCauHinh {
         });
     }
 
+    fn tab_dem(&mut self, ui: &mut egui::Ui) {
+        let loi = self.loi();
+        nhom(ui, "1. Hệ số quy A4", |ui| {
+            egui::Grid::new("he_so").num_columns(8).spacing([6.0, 6.0]).show(ui, |ui| {
+                for k in 0..8 {
+                    let nhan = ui.label(KHO[k]);
+                    let sai = loi.contains(&LoiCauHinh::HeSo(k));
+                    let khac = (self.nhap.he_so[k] - crate::dem_pdf::HE_SO_MAC_DINH[k]).abs() > 1e-9;
+                    let o = egui::TextEdit::singleline(&mut self.o_he_so[k]).desired_width(76.0).align(egui::Align2::RIGHT_CENTER).text_color(if sai { DO } else if khac { XANH_COBALT } else { CHU });
+                    if ui.add(o).labelled_by(nhan.id).changed() {
+                        if let Some(v) = doc_so64(&self.o_he_so[k]).filter(|v| *v > 0.0) {
+                            self.nhap.he_so[k] = v;
+                        }
+                    }
+                    if k == 3 {
+                        ui.end_row();
+                    }
+                }
+            });
+            ui.add_space(8.0);
+            dong!(
+                ui,
+                |ui| {
+                    ui.label("Lớn hơn A0");
+                    thong_tin(ui, "Trang A0 có cạnh dài vượt ngưỡng ở thước mục 2 (mặc định 1399 mm). Quy theo diện tích ÷ A4 (không thấp hơn hệ số A0) hoặc dùng hệ số cố định (≥ hệ số A0).");
+                },
+                |ui| {
+                    ui.radio_value(&mut self.nhap.a0_lon, A0Lon::DienTich, "Theo diện tích ÷ A4");
+                    ui.radio_value(&mut self.nhap.a0_lon, A0Lon::CoDinh, "Hệ số cố định");
+                    ui.add_enabled_ui(self.nhap.a0_lon == A0Lon::CoDinh, |ui| {
+                        let sai = loi.contains(&LoiCauHinh::A0LonHeSo);
+                        let o = egui::TextEdit::singleline(&mut self.o_a0_he_so).desired_width(56.0).align(egui::Align2::RIGHT_CENTER).text_color(if sai { DO } else { CHU });
+                        if ui.add(o).on_hover_text("Hệ số cố định cho trang A0 lớn").changed() {
+                            if let Some(v) = doc_so64(&self.o_a0_he_so) {
+                                self.nhap.a0_lon_he_so = v;
+                            }
+                        }
+                    });
+                },
+            );
+            let goi_y = if loi.contains(&LoiCauHinh::A0LonHeSo) {
+                (format!("Hệ số phải ≥ hệ số A0 ({})", self.o_he_so[0]), DO)
+            } else if self.nhap.a0_lon == A0Lon::CoDinh {
+                (format!("Mọi trang A0 lớn tính {} trang A4", self.o_a0_he_so), CHU_PHU)
+            } else {
+                let q = self.nhap.quy_tac().quy_a4(0, 900.0 * PT_MOI_MM, 1500.0 * PT_MOI_MM);
+                (format!("Vd trang 1500 × 900 mm = {} trang A4", tn::so_vn(q as f32)), CHU_PHU)
+            };
+            goi_y_duoi(ui, Some(goi_y));
+        });
+        ui.add_space(10.0);
+        nhom(ui, "2. Ranh giới khổ theo cạnh dài (mm)", |ui| {
+            self.thuoc_kho(ui);
+            ui.label(RichText::new("Vạch chấm = cạnh chuẩn · vạch đen = ranh giới (kéo; ←/→ 0,5 mm) · gạch chéo = A0 theo diện tích").small().color(CHU_PHU));
+            ui.add_space(6.0);
+            dong!(
+                ui,
+                |ui| {
+                    ui.label("Thử cạnh dài");
+                },
+                |ui| {
+                    ui.add(egui::TextEdit::singleline(&mut self.o_thu).desired_width(64.0).align(egui::Align2::RIGHT_CENTER).hint_text("mm")).on_hover_text("Cạnh dài trang (mm)");
+                    ui.label("mm");
+                    if let Some(mm) = doc_so(&self.o_thu).filter(|v| *v > 0.0) {
+                        ui.label(RichText::new(tk::thu(mm as f64, &self.nhap.ranh_gioi, self.nhap.a0_nguong_mm)).dam());
+                    }
+                },
+            );
+        });
+    }
+
+    /// Thước ranh giới khổ: 7 tay ranh giới + tay nâu ngưỡng A0 lớn; ô Thử → vạch đỏ đứt.
+    fn thuoc_kho(&mut self, ui: &mut egui::Ui) {
+        let rong = ui.available_width();
+        let (vung, _) = ui.allocate_exact_size(egui::vec2(rong, 62.0), Sense::hover());
+        let dai = Rect::from_min_size(vung.min + egui::vec2(0.0, 18.0), egui::vec2(rong, 14.0));
+        let x_cua = |mm: f32| dai.left() + tk::vi_tri(mm) * dai.width();
+        let id = ui.make_persistent_id("thuoc_kho");
+        let gia_tri = |h: &Self, i: usize| if i == 7 { h.nhap.a0_nguong_mm as f32 } else { h.nhap.ranh_gioi[i] as f32 };
+        let vi_tri = ui.input(|i| i.pointer.interact_pos());
+        let mut hover = None;
+        for i in 0..8 {
+            let r = Rect::from_center_size(egui::pos2(x_cua(gia_tri(self, i)), dai.center().y + 4.0), egui::vec2(10.0, 30.0));
+            let p = ui.interact(r, id.with(i), Sense::click_and_drag());
+            if p.hovered() {
+                hover = Some(i);
+            }
+            if p.drag_started() {
+                self.keo_tay = Some(i);
+            }
+            if p.drag_started() || p.clicked() {
+                self.tay_chon = Some(i);
+            }
+            p.on_hover_text(if i == 7 { "Ngưỡng A0 quy A4 theo diện tích (mặc định 1399 mm)".to_string() } else { format!("Ranh giới {}|{} · mặc định {} mm", KHO[i], KHO[i + 1], tn::so_vn(RANH_GIOI_MAC_DINH[i] as f32)) });
+        }
+        let dat = |h: &mut Self, i: usize, mm: f32| {
+            let mm = tk::dat(i, mm) as f64;
+            if i == 7 {
+                h.nhap.a0_nguong_mm = mm;
+            } else {
+                h.nhap.ranh_gioi[i] = mm;
+            }
+        };
+        if let (Some(i), Some(p)) = (self.keo_tay, vi_tri) {
+            if ui.input(|i| i.pointer.primary_down()) {
+                dat(self, i, tk::mm_tai((p.x - dai.left()) / dai.width()));
+            } else {
+                self.keo_tay = None;
+            }
+        }
+        if let Some(i) = self.tay_chon {
+            if !ui.ctx().egui_wants_keyboard_input() {
+                let (trai, phai, lon) = ui.input(|k| (k.key_pressed(egui::Key::ArrowLeft), k.key_pressed(egui::Key::ArrowRight), k.modifiers.shift));
+                if trai || phai {
+                    let v = tk::phim(i, gia_tri(self, i), phai, lon);
+                    dat(self, i, v);
+                }
+            }
+        }
+        // Vẽ: dải trắng viền xám, vùng gạch chéo A0 theo diện tích, cạnh chuẩn chấm, tay kéo
+        let p = ui.painter();
+        p.rect(dai, 0.0, Color32::WHITE, Stroke::new(1.0, VIEN), StrokeKind::Inside);
+        let xa0 = x_cua(self.nhap.a0_nguong_mm as f32);
+        let mut x = xa0;
+        while x < dai.right() + dai.height() {
+            let (a, b) = (egui::pos2(x - dai.height(), dai.bottom()), egui::pos2(x, dai.top()));
+            let cat = |q: egui::Pos2| egui::pos2(q.x.clamp(xa0, dai.right()), q.y);
+            if b.x > xa0 && a.x < dai.right() {
+                // Đoạn chéo cắt trong vùng [xa0, mép phải]
+                let t0 = ((xa0 - a.x) / (b.x - a.x)).clamp(0.0, 1.0);
+                let t1 = ((dai.right() - a.x) / (b.x - a.x)).clamp(0.0, 1.0);
+                let d = |t: f32| a + (b - a) * t;
+                p.line_segment([cat(d(t0)), cat(d(t1))], Stroke::new(1.0, Color32::from_gray(185)));
+            }
+            x += 6.0;
+        }
+        p.text(egui::pos2((xa0 + dai.right()) / 2.0, dai.bottom() + 3.0), egui::Align2::CENTER_TOP, "A0 · diện tích", egui::FontId::proportional(10.0), NAU);
+        let font = egui::FontId::proportional(10.5);
+        for (k, &c) in CANH_CHUAN_MM.iter().enumerate() {
+            let xc = x_cua(c as f32);
+            p.extend(egui::Shape::dashed_line(&[egui::pos2(xc, dai.top() - 2.0), egui::pos2(xc, dai.bottom() + 2.0)], Stroke::new(1.0, CHU_PHU), 2.0, 2.0));
+            p.text(egui::pos2(xc, vung.top()), egui::Align2::CENTER_TOP, format!("{} {}", KHO[k], c as u32), font.clone(), CHU_PHU);
+        }
+        for i in 0..8 {
+            let v = gia_tri(self, i);
+            let xt = x_cua(v);
+            let sang = hover == Some(i) || self.keo_tay == Some(i) || self.tay_chon == Some(i);
+            let mau = if i == 7 { NAU } else if sang { XANH_COBALT } else { CHU };
+            p.vline(xt, (dai.top() - 3.0)..=(dai.bottom() + 3.0), Stroke::new(if sang { 2.5 } else { 2.0 }, mau));
+            let day = dai.bottom() + 4.0;
+            p.add(egui::Shape::convex_polygon(vec![egui::pos2(xt, day), egui::pos2(xt - 4.0, day + 5.0), egui::pos2(xt + 4.0, day + 5.0)], mau, Stroke::NONE));
+            let md = if i == 7 { crate::cau_hinh::A0_NGUONG_MAC_DINH as f32 } else { RANH_GIOI_MAC_DINH[i] as f32 };
+            let mau_so = if (v - md).abs() > 1e-3 { XANH_COBALT } else { CHU };
+            p.text(egui::pos2(xt, day + 6.0), egui::Align2::CENTER_TOP, tn::so_vn(v), font.clone(), if i == 7 { NAU } else { mau_so });
+        }
+        if let Some(mm) = doc_so(&self.o_thu).filter(|v| *v > 0.0) {
+            let xt = x_cua(mm);
+            p.extend(egui::Shape::dashed_line(&[egui::pos2(xt, dai.top() - 6.0), egui::pos2(xt, dai.bottom() + 6.0)], Stroke::new(1.5, DO), 3.0, 2.0));
+        }
+        if hover.is_some() || self.keo_tay.is_some() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+        }
+    }
+
     /// Thanh khoảng 2 ngưỡng: kéo mép, kéo cả khung, bấm thước, ←/→ (Shift = 0,1).
     fn thanh_khoang(&mut self, ui: &mut egui::Ui, sai: bool) {
         let rong = ui.available_width();
@@ -488,6 +704,23 @@ mod tests {
         let m = mac_dinh_tach(&c);
         assert_eq!((m.he_so, m.rong_cot_trai), ([1.0; 8], 300.0));
         assert_eq!((m.nguong_trang, m.mau_ten.as_str()), (1.0, "{hoso}_part{n}"));
+    }
+
+    #[test]
+    fn mac_dinh_dem_va_o_he_so_sai() {
+        let c = CauHinh { he_so: [2.0; 8], nguong_trang: 2.0, ..Default::default() };
+        let m = mac_dinh_dem(&c);
+        assert_eq!((m.he_so, m.nguong_trang), (crate::dem_pdf::HE_SO_MAC_DINH, 2.0));
+        let mut h = HopCauHinh::moi(&CauHinh::default(), TabCauHinh::Dem);
+        assert_eq!(h.o_he_so[5], "0,5");
+        h.o_he_so[5] = "x".into();
+        assert_eq!(h.loi(), [LoiCauHinh::HeSo(5)]);
+        h.o_he_so[5] = "0,5".into();
+        // Hệ số cố định < A0 chỉ lỗi khi đang chọn "Hệ số cố định"
+        h.nhap.a0_lon_he_so = 10.0;
+        assert!(h.loi().is_empty());
+        h.nhap.a0_lon = A0Lon::CoDinh;
+        assert_eq!(h.loi(), [LoiCauHinh::A0LonHeSo]);
     }
 
     #[test]

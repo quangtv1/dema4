@@ -59,18 +59,93 @@ pub const DIEN_TICH_A4: f64 = A_SIZES[4] * A_SIZES[5];
 /// dài A0 + cạnh ngắn A4 = 1189 + 210 = 1399 mm
 pub const NGUONG_A0_THEO_DIEN_TICH: f64 = A_SIZES[0] + A_SIZES[5];
 
-/// Số trang A4 quy đổi của một trang.
-/// Trang khổ A0 có cạnh dài > 1399 mm (dài A0 + cạnh ngắn A4) quy đổi = diện tích thật / diện tích A4,
-/// không thấp hơn hệ số A0. Trang A0 ngắn hơn và các khổ khác dùng hệ số.
-pub fn quy_a4_trang(kho: usize, chieu_rong: f64, chieu_cao: f64, he_so: &[f64; 8]) -> f64 {
-    if kho == 0 && chieu_rong.max(chieu_cao) > NGUONG_A0_THEO_DIEN_TICH {
-        he_so[0].max(lam_tron_2(chieu_rong * chieu_cao / DIEN_TICH_A4))
-    } else {
-        he_so[kho]
+pub const HE_SO_MAC_DINH: [f64; 8] = [16.0, 8.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.125];
+/// 1 mm = 72 / 25,4 pt
+pub const PT_MOI_MM: f64 = 72.0 / 25.4;
+
+/// Cách quy A4 trang khổ A0 có cạnh dài vượt ngưỡng.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum A0Lon {
+    /// Diện tích thật ÷ A4, không thấp hơn hệ số A0.
+    DienTich,
+    /// Hệ số cố định (≥ hệ số A0).
+    CoDinh(f64),
+}
+
+/// Quy tắc xếp khổ + quy A4 (Cấu hình › Đếm trang A4). Mặc định = cách đếm từ trước tới nay.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct QuyTac {
+    pub he_so: [f64; 8],
+    /// Ranh giới khổ theo cạnh dài (mm) A0|A1 … A6|A7; None = điểm giữa 2 cạnh chuẩn (mặc định).
+    pub ranh_gioi_mm: Option<[f64; 7]>,
+    /// Trang A0 dài hơn mức này (pt) quy theo `a0_lon`.
+    pub a0_nguong_pt: f64,
+    pub a0_lon: A0Lon,
+}
+
+impl Default for QuyTac {
+    fn default() -> Self {
+        Self { he_so: HE_SO_MAC_DINH, ranh_gioi_mm: None, a0_nguong_pt: NGUONG_A0_THEO_DIEN_TICH, a0_lon: A0Lon::DienTich }
     }
 }
 
-pub const HE_SO_MAC_DINH: [f64; 8] = [16.0, 8.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.125];
+impl QuyTac {
+    /// Khổ theo cạnh dài: ≥ ranh giới i → khổ i, nhỏ hơn ranh giới cuối → A7.
+    pub fn kho(&self, chieu_rong: f64, chieu_cao: f64) -> usize {
+        let Some(rg) = self.ranh_gioi_mm else { return xac_dinh_kho_a(chieu_rong, chieu_cao) };
+        let canh_dai = chieu_rong.max(chieu_cao);
+        if canh_dai.is_nan() {
+            return 4;
+        }
+        rg.iter().position(|&r| canh_dai >= r * PT_MOI_MM).unwrap_or(7)
+    }
+
+    /// Tỷ lệ đã dùng của khoảng từ cạnh chuẩn tới ranh giới với khổ kề bên (cảnh báo "Sát ngưỡng").
+    pub fn sat_nguong(&self, chieu_rong: f64, chieu_cao: f64, kho: usize) -> (f64, Option<usize>) {
+        let Some(rg) = self.ranh_gioi_mm else { return muc_sat_nguong(chieu_rong, chieu_cao, kho) };
+        let canh_dai = chieu_rong.max(chieu_cao);
+        let chuan = A_SIZES[kho];
+        let (ke_ben, ranh) = if canh_dai > chuan {
+            if kho == 0 {
+                return (0.0, None);
+            }
+            (kho - 1, rg[kho - 1])
+        } else {
+            if kho == 7 {
+                return (0.0, None);
+            }
+            (kho + 1, rg[kho])
+        };
+        ((canh_dai - chuan).abs() / (ranh * PT_MOI_MM - chuan).abs(), Some(ke_ben))
+    }
+
+    /// Số trang A4 quy đổi của 1 trang.
+    pub fn quy_a4(&self, kho: usize, chieu_rong: f64, chieu_cao: f64) -> f64 {
+        if kho == 0 && chieu_rong.max(chieu_cao) > self.a0_nguong_pt {
+            match self.a0_lon {
+                A0Lon::DienTich => self.he_so[0].max(lam_tron_2(chieu_rong * chieu_cao / DIEN_TICH_A4)),
+                A0Lon::CoDinh(h) => h,
+            }
+        } else {
+            self.he_so[kho]
+        }
+    }
+
+    /// Dòng ghi thêm vào khối KẾT QUẢ ĐẾM khi khác mặc định (để biết số liệu đếm theo tuỳ chỉnh).
+    pub fn dong_tuy_chinh(&self) -> String {
+        let mut s = String::new();
+        if let Some(rg) = self.ranh_gioi_mm {
+            s += &format!("Ranh giới khổ (mm): {}\n", rg.iter().map(|r| r.to_string().replace('.', ",")).collect::<Vec<_>>().join(" · "));
+        }
+        let nguong_mm = (self.a0_nguong_pt / PT_MOI_MM).round();
+        match self.a0_lon {
+            A0Lon::CoDinh(h) => s += &format!("Trang A0 dài hơn {nguong_mm} mm: hệ số cố định {}\n", h.to_string().replace('.', ",")),
+            A0Lon::DienTich if self.a0_nguong_pt != NGUONG_A0_THEO_DIEN_TICH => s += &format!("Trang A0 dài hơn {nguong_mm} mm: quy A4 theo diện tích\n"),
+            A0Lon::DienTich => {}
+        }
+        s
+    }
+}
 /// Cảnh báo khi cạnh dài đã lệch >= 80% nửa khoảng tới khổ kề bên
 pub const NGUONG_CANH_BAO: f64 = 0.8;
 pub const DPI_CHUAN: f64 = 300.0;
@@ -227,7 +302,7 @@ impl TaiLieu {
     }
 }
 
-fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], kiem_tra_dpi: bool, kiem_tra_ky: bool, dung: &AtomicBool) -> Result<KetQuaFile, String> {
+fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, quy_tac: &QuyTac, kiem_tra_dpi: bool, kiem_tra_ky: bool, dung: &AtomicBool) -> Result<KetQuaFile, String> {
     let ten = duong_dan.to_string_lossy();
     // Khi cần kiểm tra chữ ký thì mở dạng PdfDocument (vẫn đọc trang được); nếu không thì mở Document như cũ
     let (tai_lieu, ky_so) = if kiem_tra_ky {
@@ -262,14 +337,14 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
         let chieu_rong = lam_tron_3(r.x1 as f64 - r.x0 as f64);
         let chieu_cao = lam_tron_3(r.y1 as f64 - r.y0 as f64);
         let huong_trang = if chieu_rong > chieu_cao { "Ngang" } else { "Dọc" };
-        let kho = xac_dinh_kho_a(chieu_rong, chieu_cao);
+        let kho = quy_tac.kho(chieu_rong, chieu_cao);
         kq.dem[kho] += 1;
         if kho == 0 {
-            quy_a0 += quy_a4_trang(0, chieu_rong, chieu_cao, he_so);
+            quy_a0 += quy_tac.quy_a4(0, chieu_rong, chieu_cao);
         }
 
         let mut canh_bao = Vec::new();
-        let (ty_le, kho_ke_ben) = muc_sat_nguong(chieu_rong, chieu_cao, kho);
+        let (ty_le, kho_ke_ben) = quy_tac.sat_nguong(chieu_rong, chieu_cao, kho);
         if ty_le >= NGUONG_CANH_BAO {
             // Làm tròn xuống để trang chưa vượt ngưỡng không bị hiển thị 100%
             canh_bao.push(format!("Sát ngưỡng {} ({}%)", KHO[kho_ke_ben.unwrap()], (ty_le * 100.0) as i64));
@@ -313,7 +388,7 @@ fn phan_tich_file(duong_dan: &Path, stt: usize, tong: usize, he_so: &[f64; 8], k
     }
 
     // Cộng theo đúng thứ tự A0..A7 như Python để số thực ra giống hệt
-    kq.quy_a4 = lam_tron_2((1..8).fold(quy_a0, |tong, i| tong + kq.dem[i] as f64 * he_so[i]));
+    kq.quy_a4 = lam_tron_2((1..8).fold(quy_a0, |tong, i| tong + kq.dem[i] as f64 * quy_tac.he_so[i]));
     let dem: Vec<String> = kq.dem.iter().map(|d| d.to_string()).collect();
     let chuoi: Vec<String> = chuoi_kho.iter().map(|(n, k)| format!("{n}{}", KHO[*k])).collect();
     kq.dong_tong_hop = format!("{stt}/{tong}\t{duong_dan_tuyet_doi}\t{so_trang}\t{}\t'=>\t{}\t{}", dem.join("\t"), so_kieu_python(kq.quy_a4), chuoi.join(", "));
@@ -416,7 +491,7 @@ pub(crate) fn tim_file_pdf(thu_muc: &str, dung: &AtomicBool, gui: &Sender<SuKien
 }
 
 /// Đếm cả thư mục. Các file được đọc song song nhưng kết quả gửi về đúng thứ tự file.
-pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, kiem_tra_ky: bool, dung: &AtomicBool, gui: &Sender<SuKien>) {
+pub fn dem_thu_muc(thu_muc: &str, quy_tac: QuyTac, kiem_tra_dpi: bool, kiem_tra_ky: bool, dung: &AtomicBool, gui: &Sender<SuKien>) {
     let bat_dau = Instant::now();
     let cac_file = tim_file_pdf(thu_muc, dung, gui);
     let tong = cac_file.len();
@@ -438,7 +513,7 @@ pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, kiem_tra_
                 if dung.load(Ordering::Relaxed) {
                     return;
                 }
-                let _ = tx.send((i, phan_tich_file(p, i + 1, tong, &he_so, kiem_tra_dpi, kiem_tra_ky, dung)));
+                let _ = tx.send((i, phan_tich_file(p, i + 1, tong, &quy_tac, kiem_tra_dpi, kiem_tra_ky, dung)));
             });
         });
 
@@ -491,10 +566,11 @@ pub fn dem_thu_muc(thu_muc: &str, he_so: [f64; 8], kiem_tra_dpi: bool, kiem_tra_
         "\nKẾT QUẢ ĐẾM\n===========================\n\
          Tổng số file pdf trong thư mục {}: {tong} \n\
          Tổng số trang {tong_so_trang} các loại => quy ra A4: {quy_str} (+{tang_them_str})\n\
-         Thời gian đếm: {}:{}:{giay:.3}\n{GACH}\nTrong đó, bao gồm:\n",
+         Thời gian đếm: {}:{}:{giay:.3}\n{}{GACH}\nTrong đó, bao gồm:\n",
         ten_thu_muc(thu_muc),
         gio as i64,
-        phut as i64
+        phut as i64,
+        quy_tac.dong_tuy_chinh()
     );
     for k in 0..8 {
         tong_hop += &format!(" - Tổng số trang {}: {}\n", KHO[k], dem_tong[k]);
@@ -608,19 +684,19 @@ mod tests {
     fn a0_quy_a4_theo_dien_tich_khong_thap_hon_he_so_a0() {
         let hs = HE_SO_MAC_DINH;
         // Đúng A0 hoặc nhỏ hơn: theo hệ số A0 (16)
-        assert_eq!(quy_a4_trang(0, A_SIZES[1], A_SIZES[0], &hs), 16.0);
-        assert_eq!(quy_a4_trang(0, 2000.0, 3000.0, &hs), 16.0);
+        assert_eq!(QuyTac { he_so: hs, ..Default::default() }.quy_a4(0, A_SIZES[1], A_SIZES[0]), 16.0);
+        assert_eq!(QuyTac { he_so: hs, ..Default::default() }.quy_a4(0, 2000.0, 3000.0), 16.0);
         // Cạnh dài 1398 mm (chưa vượt 1189 + 210): vẫn 16 dù diện tích lớn hơn A0
-        assert_eq!(quy_a4_trang(0, 841.0 * PT, 1398.0 * PT, &hs), 16.0);
+        assert_eq!(QuyTac { he_so: hs, ..Default::default() }.quy_a4(0, 841.0 * PT, 1398.0 * PT), 16.0);
         // Cạnh dài 1400 mm: theo diện tích 841 x 1400 / (210 x 297) = 18,88
-        assert_eq!(quy_a4_trang(0, 841.0 * PT, 1400.0 * PT, &hs), 18.88);
+        assert_eq!(QuyTac { he_so: hs, ..Default::default() }.quy_a4(0, 841.0 * PT, 1400.0 * PT), 18.88);
         // Dải dài nhưng hẹp: vượt ngưỡng chiều dài nhưng diện tích nhỏ → không thấp hơn 16
-        assert_eq!(quy_a4_trang(0, 1.0, 14400.0, &hs), 16.0);
+        assert_eq!(QuyTac { he_so: hs, ..Default::default() }.quy_a4(0, 1.0, 14400.0), 16.0);
         // Khổ 1189 x 1682 mm (2 x A0): theo diện tích thật ~ 32 A4
-        let q = quy_a4_trang(0, 1189.0 * PT, 1682.0 * PT, &hs);
+        let q = QuyTac { he_so: hs, ..Default::default() }.quy_a4(0, 1189.0 * PT, 1682.0 * PT);
         assert!((q - 32.0).abs() < 0.1, "{q}");
         // Khổ khác vẫn theo hệ số
-        assert_eq!(quy_a4_trang(4, 9999.0, 9999.0, &hs), 1.0);
+        assert_eq!(QuyTac { he_so: hs, ..Default::default() }.quy_a4(4, 9999.0, 9999.0), 1.0);
     }
 
     #[test]
@@ -681,7 +757,7 @@ mod tests {
         );
         let p = d.join("ky.pdf");
         std::fs::write(&p, &pdf).unwrap();
-        let kq = phan_tich_file(&p, 1, 1, &HE_SO_MAC_DINH, true, true, &AtomicBool::new(false)).expect("phải mở được PDF có widget chữ ký");
+        let kq = phan_tich_file(&p, 1, 1, &QuyTac::default(), true, true, &AtomicBool::new(false)).expect("phải mở được PDF có widget chữ ký");
         assert_eq!(kq.ky_so, Some(true));
         assert_eq!(kq.dong_chi_tiet.len(), 1);
         let _ = std::fs::remove_dir_all(&d);
@@ -701,7 +777,7 @@ mod tests {
 
         // Đếm trọn: 2 file hỏng được báo lỗi, các file còn lại vẫn đếm đủ
         let (gui, nhan) = mpsc::channel();
-        dem_thu_muc(thu_muc, HE_SO_MAC_DINH, false, true, &AtomicBool::new(false), &gui);
+        dem_thu_muc(thu_muc, QuyTac::default(), false, true, &AtomicBool::new(false), &gui);
         drop(gui);
         let xong = nhan.into_iter().find_map(|s| if let SuKien::Xong(kq) = s { Some(kq) } else { None }).expect("phải có Xong");
         assert_eq!(xong.so_file_loi, 2);
@@ -712,7 +788,7 @@ mod tests {
         let dung = AtomicBool::new(false);
         let (gui, nhan) = mpsc::channel();
         let xong = std::thread::scope(|s| {
-            s.spawn(|| dem_thu_muc(thu_muc, HE_SO_MAC_DINH, false, false, &dung, &gui));
+            s.spawn(|| dem_thu_muc(thu_muc, QuyTac::default(), false, false, &dung, &gui));
             let mut xong = None;
             for su_kien in &nhan {
                 match su_kien {
@@ -737,7 +813,7 @@ mod tests {
     #[ignore = "chẩn đoán tay, cần DEMA4_FILE"]
     fn in_ly_do_loi_mo_file() {
         let p = PathBuf::from(std::env::var("DEMA4_FILE").expect("DEMA4_FILE"));
-        match phan_tich_file(&p, 1, 1, &HE_SO_MAC_DINH, true, true, &AtomicBool::new(false)) {
+        match phan_tich_file(&p, 1, 1, &QuyTac::default(), true, true, &AtomicBool::new(false)) {
             Ok(kq) => println!("Mở OK: {} trang, ký số {:?}", kq.dong_chi_tiet.len(), kq.ky_so),
             Err(e) => println!("LỖI: {e}"),
         }

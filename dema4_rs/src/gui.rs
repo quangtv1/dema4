@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use eframe::egui::{self, Align, Color32, CornerRadius, Layout, Margin, RichText, Stroke, TextStyle};
 use egui_extras::{Column, TableBuilder};
 
-use crate::dem_pdf::{self, KetQuaDem, SuKien, HE_SO_MAC_DINH, KHO};
+use crate::dem_pdf::{self, KetQuaDem, SuKien, KHO};
 use crate::telegram;
 
 const TIEU_DE: &str = "Đếm trang A4 (Giải pháp số Sao Mai)";
@@ -83,11 +83,23 @@ struct UngDungChinh {
 
 impl Default for UngDungChinh {
     fn default() -> Self {
-        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem: UngDung::default(), tach: Default::default(), cfg: crate::cau_hinh::doc(), hop_cau_hinh: None }
+        let cfg = crate::cau_hinh::doc();
+        let dem = UngDung { quy_tac: cfg.quy_tac(), ..Default::default() };
+        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach: Default::default(), cfg, hop_cau_hinh: None }
     }
 }
 
 impl UngDungChinh {
+    /// Áp Cấu hình mới cho cả 2 màn (`ghi` = ghi `sm-dema4.cfg`).
+    fn ap_cau_hinh(&mut self, moi: crate::cau_hinh::CauHinh, ghi: bool) {
+        self.tach.ap_cau_hinh(&self.cfg, &moi);
+        self.dem.quy_tac = moi.quy_tac();
+        self.cfg = moi;
+        if ghi {
+            let _ = crate::cau_hinh::ghi(&self.cfg);
+        }
+    }
+
     fn dang_chay(&self) -> bool {
         self.dem.dang_dem.is_some() || self.tach.dang_chay()
     }
@@ -149,9 +161,7 @@ impl eframe::App for UngDungChinh {
                 KetQuaHop::Mo => {}
                 KetQuaHop::Huy => self.hop_cau_hinh = None,
                 KetQuaHop::Luu(moi) => {
-                    self.tach.ap_cau_hinh(&self.cfg, &moi);
-                    self.cfg = moi;
-                    let _ = crate::cau_hinh::ghi(&self.cfg);
+                    self.ap_cau_hinh(moi, true);
                     self.hop_cau_hinh = None;
                 }
             }
@@ -333,11 +343,10 @@ struct UngDung {
     tien_do: Option<(usize, usize)>,
     dang_dem: Option<DangDem>,
     trang_thai: String,
-    /// Hàng hệ số: đang sổ ra hay ẩn, và nội dung 8 ô A0..A7
-    hien_he_so: bool,
-    he_so: [String; 8],
-    /// Hệ số đã dùng cho lần đếm gần nhất (để nhắc khi người dùng đổi hệ số sau đó)
-    he_so_da_dung: Option<[f64; 8]>,
+    /// Quy tắc xếp khổ / quy A4 từ Cấu hình › Đếm trang A4
+    quy_tac: dem_pdf::QuyTac,
+    /// Quy tắc đã dùng cho lần đếm gần nhất (để nhắc khi người dùng đổi Cấu hình sau đó)
+    quy_tac_da_dung: Option<dem_pdf::QuyTac>,
     thong_bao: Option<ThongBaoXong>,
     /// Thời gian của lần đếm xong gần nhất (hiện ở dòng chân khi bảng có kết quả)
     thoi_gian_dem: Option<Duration>,
@@ -369,9 +378,8 @@ impl Default for UngDung {
             tien_do: None,
             dang_dem: None,
             trang_thai: String::new(),
-            hien_he_so: false,
-            he_so: HE_SO_MAC_DINH.map(dem_pdf::so_kieu_python),
-            he_so_da_dung: None,
+            quy_tac: dem_pdf::QuyTac::default(),
+            quy_tac_da_dung: None,
             thong_bao: None,
             thoi_gian_dem: None,
             file_cuoi: None,
@@ -537,7 +545,7 @@ impl UngDung {
         self.thoi_gian_dem = None;
         self.file_cuoi = None;
         self.so_dong_da_cuon = 0;
-        self.he_so_da_dung = None;
+        self.quy_tac_da_dung = None;
         self.trang_thai = String::new();
     }
 
@@ -551,14 +559,7 @@ impl UngDung {
             self.trang_thai = format!("Lỗi: không tìm thấy thư mục {thu_muc}");
             return;
         }
-        let he_so = match self.he_so_hien_tai() {
-            Ok(h) => h,
-            Err(k) => {
-                self.trang_thai = format!("Lỗi: hệ số {} không phải là số (dùng dấu chấm, ví dụ 0.5)", KHO[k]);
-                self.hien_he_so = true;
-                return;
-            }
-        };
+        let quy_tac = self.quy_tac;
 
         self.xoa_ket_qua();
         self.trang_thai = "Đang tìm file PDF…".into();
@@ -567,10 +568,10 @@ impl UngDung {
         let dung = Arc::new(AtomicBool::new(false));
         let (tm, dung_luong, ctx, kiem_tra_dpi, kiem_tra_ky) = (thu_muc.clone(), Arc::clone(&dung), ctx.clone(), self.kiem_tra_dpi, self.kiem_tra_ky);
         std::thread::spawn(move || {
-            dem_pdf::dem_thu_muc(&tm, he_so, kiem_tra_dpi, kiem_tra_ky, &dung_luong, &gui);
+            dem_pdf::dem_thu_muc(&tm, quy_tac, kiem_tra_dpi, kiem_tra_ky, &dung_luong, &gui);
             ctx.request_repaint();
         });
-        self.he_so_da_dung = Some(he_so);
+        self.quy_tac_da_dung = Some(quy_tac);
         self.dang_dem = Some(DangDem { nhan, dung, thu_muc, bat_dau: Instant::now() });
     }
 
@@ -617,21 +618,12 @@ impl UngDung {
         self.dong.push(DongBang::Trang { o, canh_bao, file, kho });
     }
 
-    /// Hệ số đang nhập trong 8 ô A0..A7; Err(k) nếu ô KHO[k] không phải là số
-    fn he_so_hien_tai(&self) -> Result<[f64; 8], usize> {
-        let mut he_so = [0.0; 8];
-        for (k, s) in self.he_so.iter().enumerate() {
-            he_so[k] = s.trim().parse::<f64>().map_err(|_| k)?;
-        }
-        Ok(he_so)
-    }
-
-    /// Quy ra A4 = Σ (số trang khổ Ax × hệ số Ax) theo hệ số đang nhập; None nếu có ô nhập sai
+    /// Quy ra A4 = Σ (số trang khổ Ax × hệ số Ax) theo Cấu hình hiện tại
     fn quy_a4_hien_tai(&self) -> Option<f64> {
-        let he_so = self.he_so_hien_tai().ok()?;
-        // A0 quy theo diện tích thật từng trang (cùng công thức với lõi đếm), các khổ khác theo hệ số
-        let quy_a0: f64 = self.thong_ke.kich_thuoc_a0.iter().map(|&(r, c)| dem_pdf::quy_a4_trang(0, r, c, &he_so)).sum();
-        Some(dem_pdf::lam_tron_2((1..8).fold(quy_a0, |tong, k| tong + self.thong_ke.theo_kho[k] as f64 * he_so[k])))
+        let q = &self.quy_tac;
+        // A0 lớn quy theo Cấu hình từng trang (cùng công thức với lõi đếm), các khổ khác theo hệ số
+        let quy_a0: f64 = self.thong_ke.kich_thuoc_a0.iter().map(|&(r, c)| q.quy_a4(0, r, c)).sum();
+        Some(dem_pdf::lam_tron_2((1..8).fold(quy_a0, |tong, k| tong + self.thong_ke.theo_kho[k] as f64 * q.he_so[k])))
     }
 
     /// Chỉ số các dòng hiện theo bộ lọc; tính lại khi đổi bộ lọc hoặc có thêm dòng
@@ -779,24 +771,6 @@ impl UngDung {
     }
 
     /// Hàng hệ số A0..A7, chỉ hiện khi bấm nút "Hệ số"; giá trị màu xám, căn giữa ô
-    fn hang_he_so(&mut self, ui: &mut egui::Ui) {
-        if !self.hien_he_so {
-            return;
-        }
-        ui.horizontal(|ui| {
-            let cho_sua = self.dang_dem.is_none();
-            let khe = ui.spacing().item_spacing.x;
-            let rong_o = ((ui.available_width() - 8.0 * 26.0 - 15.0 * khe) / 8.0).clamp(44.0, 90.0);
-            for k in 0..8 {
-                let nhan = ui.label(format!("{}:", KHO[k]));
-                let hop_le = self.he_so[k].trim().parse::<f64>().is_ok();
-                let mau = if hop_le { CHU } else { DO };
-                let o = egui::TextEdit::singleline(&mut self.he_so[k]).desired_width(rong_o).align(egui::Align2::CENTER_CENTER).text_color(mau).margin(Margin::symmetric(4, 3));
-                ui.add_enabled(cho_sua, o).labelled_by(nhan.id);
-            }
-        });
-    }
-
     /// Bấm vào một liên kết lọc: chọn bộ lọc đó, bấm lại bộ lọc đang chọn thì bỏ lọc
     fn bam_loc(&mut self, loc: BoLoc) {
         self.bo_loc = if self.bo_loc == loc { BoLoc::TatCa } else { loc };
@@ -859,10 +833,10 @@ impl UngDung {
                 }
             }
 
-            let he_so_doi = matches!((self.he_so_da_dung, self.he_so_hien_tai()), (Some(cu), Ok(moi)) if cu != moi);
-            if he_so_doi && self.dang_dem.is_none() {
+            let quy_tac_doi = self.quy_tac_da_dung.is_some_and(|cu| cu != self.quy_tac);
+            if quy_tac_doi && self.dang_dem.is_none() {
                 ui.add_space(14.0);
-                ui.label(RichText::new("Hệ số đã đổi – bấm Đếm để ghi lại file kết quả").italics().color(CHU_PHU));
+                ui.label(RichText::new("Cấu hình quy A4 đã đổi – bấm Đếm để đếm và ghi lại file kết quả").italics().color(CHU_PHU));
             }
 
             // Bên phải: Check ký số, Check DPI, liên kết Hệ số
@@ -874,13 +848,6 @@ impl UngDung {
                 ui.add_enabled(self.dang_dem.is_none(), egui::Checkbox::new(&mut self.kiem_tra_ky, "Check ký số")).on_hover_text(
                     "Kiểm tra từng file PDF đã ký số hay chưa (đọc AcroForm, một lần mỗi file).\nNhẹ hơn Check DPI nhiều.",
                 );
-                // Liên kết "Hệ số" bên trái ô Check DPI: bấm để mở / thu hàng hệ số ngay bên dưới
-                ui.add_space(10.0);
-                let ui_lien_ket = ui.scope(|ui| lien_ket(ui, RichText::new("Hệ số"), self.hien_he_so, true));
-                if ui_lien_ket.inner {
-                    self.hien_he_so = !self.hien_he_so;
-                }
-                ui_lien_ket.response.on_hover_text("Hệ số nhân với số trang mỗi khổ để ra số trang quy A4");
             });
         });
     }
@@ -1253,7 +1220,6 @@ impl UngDung {
             self.hang_thu_muc(ui);
             ui.add_space(2.0);
             self.dong_tom_tat(ui);
-            self.hang_he_so(ui);
             ui.add_space(4.0);
             self.bang_ket_qua(ui);
         });
@@ -1320,11 +1286,8 @@ mod tests {
     fn quy_a4_tinh_lai_khi_doi_he_so() {
         let mut app = app_mau("1/1\t/a/x.pdf => trang: 1\t595.0\t842.0\tDoc\tA4\t300\t\t-\n1/1\t/a/x.pdf => trang: 2\t842.0\t1191.0\tDoc\tA3\t300\t\t-");
         assert_eq!(app.quy_a4_hien_tai(), Some(3.0)); // mặc định: 1 trang A4 × 1 + 1 trang A3 × 2
-        app.he_so[3] = "2.5".into();
+        app.quy_tac.he_so[3] = 2.5;
         assert_eq!(app.quy_a4_hien_tai(), Some(3.5));
-        app.he_so[4] = "abc".into();
-        assert_eq!(app.quy_a4_hien_tai(), None);
-        assert_eq!(app.he_so_hien_tai(), Err(4));
     }
 
     #[test]
@@ -1337,29 +1300,20 @@ mod tests {
         let q = app.quy_a4_hien_tai().unwrap();
         assert_eq!(q, 48.06); // 16 + 32,06 (2 x 16,03), làm tròn 2 chữ số
         // Hệ số A0 là mức sàn: nâng lên 40 thì trang chuẩn tính 40, trang lớn (~32) cũng lên 40
-        app.he_so[0] = "40".into();
+        app.quy_tac.he_so[0] = 40.0;
         assert_eq!(app.quy_a4_hien_tai(), Some(80.0));
     }
 
-    /// Gõ vào ô hệ số qua giao diện thật (không mở cửa sổ): ô sửa được và Quy ra A4 đổi theo
+    /// Lưu Cấu hình › Đếm → màn Đếm tính lại Quy A4 theo hệ số mới
     #[test]
-    fn go_he_so_qua_giao_dien() {
-        use egui_kittest::kittest::Queryable;
-        let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(980.0, 600.0)).build_eframe(|cc| {
-            cai_giao_dien(&cc.egui_ctx);
-            let mut app = app_mau("1/1\t/a/x.pdf => trang: 1\t842.0\t1191.0\tDoc\tA3\t300\t\t-");
-            app.hien_he_so = true;
-            app
-        });
-        harness.run();
-        harness.get_by_label("A3:").focus();
-        harness.run();
-        harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A); // chọn hết "2.0" để gõ đè
-        harness.run();
-        harness.get_by_label("A3:").type_text("5");
-        harness.run();
-        assert_eq!(harness.state().he_so[3], "5");
-        assert_eq!(harness.state().quy_a4_hien_tai(), Some(5.0));
+    fn luu_cau_hinh_cap_nhat_quy_a4_man_dem() {
+        let mut app = UngDungChinh { dem: app_mau("1/1\t/a/x.pdf => trang: 1\t842.0\t1191.0\tDoc\tA3\t300\t\t-"), ..Default::default() };
+        let mut cfg = crate::cau_hinh::CauHinh::default();
+        app.ap_cau_hinh(cfg.clone(), false);
+        assert_eq!(app.dem.quy_a4_hien_tai(), Some(2.0));
+        cfg.he_so[3] = 5.0;
+        app.ap_cau_hinh(cfg, false);
+        assert_eq!(app.dem.quy_a4_hien_tai(), Some(5.0));
     }
 
     #[test]
@@ -1457,6 +1411,13 @@ mod tests {
         harness.state_mut().hop_cau_hinh = Some(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::Tach));
         harness.run_steps(3);
         harness.render().unwrap().save(thu_muc_anh.join("tach_3_cau_hinh.png")).unwrap();
+        let mut cfg_dem = cfg.clone();
+        cfg_dem.ranh_gioi[3] = 380.0;
+        let mut hop = crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg_dem, crate::gui_tach::hop_cau_hinh::TabCauHinh::Dem);
+        hop.dat_o_thu("370");
+        harness.state_mut().hop_cau_hinh = Some(hop);
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("tach_4_cau_hinh_dem.png")).unwrap();
     }
 
     /// Vẽ giao diện ra ảnh PNG (không mở cửa sổ) từ một file chi tiết thật để xem bố cục.
@@ -1480,7 +1441,6 @@ mod tests {
                 app.tien_do = Some((48, 121));
             } else {
                 app.tien_do = Some((121, 121));
-                app.hien_he_so = bo_loc == BoLoc::TatCa && !popup;
                 app.ket_qua_chep = Some("KẾT QUẢ ĐẾM".into());
             }
             if popup {

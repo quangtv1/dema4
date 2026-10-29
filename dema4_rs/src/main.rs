@@ -51,7 +51,7 @@ fn main() {
 fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_ghi: bool) -> i32 {
     let bat_dau = std::time::Instant::now();
     let (gui, nhan) = mpsc::channel();
-    dem_pdf::dem_thu_muc(thu_muc, dem_pdf::HE_SO_MAC_DINH, kiem_tra_dpi, kiem_tra_ky, &AtomicBool::new(false), &gui);
+    dem_pdf::dem_thu_muc(thu_muc, cau_hinh::doc().quy_tac(), kiem_tra_dpi, kiem_tra_ky, &AtomicBool::new(false), &gui);
     drop(gui);
 
     let mut ket_qua = None;
