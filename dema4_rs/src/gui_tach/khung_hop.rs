@@ -214,8 +214,12 @@ pub fn bang_gon(ui: &mut egui::Ui, dong: &[(&str, &str, bool, f32)]) {
                     ui.set_min_width(96.0);
                     ui.label(RichText::new(nhan).size(12.0).color(crate::gui::CHU_PHU));
                 });
-                let chu = RichText::new(gia_tri).size(co);
-                ui.add(egui::Label::new(if dam { chu.dam() } else { chu }).wrap());
+                if let Some(hien) = gia_tri.strip_prefix("https://") {
+                    ui.hyperlink_to(RichText::new(hien).size(co).color(VIEN_TAB_CHON), gia_tri);
+                } else {
+                    let chu = RichText::new(gia_tri).size(co);
+                    ui.add(egui::Label::new(if dam { chu.dam() } else { chu }).wrap());
+                }
             });
         }
     });

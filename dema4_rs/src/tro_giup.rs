@@ -12,6 +12,19 @@ use crate::gui_tach::khung_hop as kh;
 const API_PHAT_HANH: &str = "https://api.github.com/repos/quangtv1/dema4/releases/latest";
 pub const TRANG_TAI: &str = "https://github.com/quangtv1/dema4/releases/latest";
 pub const PHIEN_BAN: &str = env!("CARGO_PKG_VERSION");
+pub const WEBSITE: &str = "https://saomaiso.com";
+
+/// Logo Sao Mai (PNG nhúng trong exe), nạp texture 1 lần rồi giữ trong bộ nhớ egui.
+fn logo(ctx: &egui::Context) -> egui::TextureHandle {
+    let id = egui::Id::unique("logo_sao_mai");
+    if let Some(t) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
+        return t;
+    }
+    let anh = eframe::icon_data::from_png_bytes(include_bytes!("../assets/logo-sao-mai.png")).expect("logo PNG hợp lệ");
+    let t = ctx.load_texture("logo_sao_mai", egui::ColorImage::from_rgba_unmultiplied([anh.width as usize, anh.height as usize], &anh.rgba), egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, t.clone()));
+    t
+}
 const RONG: f32 = 560.0;
 /// Popup gọn (Cập nhật, Thông tin).
 const RONG_GON: f32 = 340.0;
@@ -112,6 +125,14 @@ impl HopTroGiup {
                 });
             }),
             HopTroGiup::ThongTin => kh::hop(ctx, "hop_tro_giup", RONG_GON, "Thông tin", |ui| {
+                // Logo đơn vị (bỏ slogan) ở đầu hộp
+                egui::Frame::new().inner_margin(Margin { left: 16, right: 16, top: 16, bottom: 0 }).show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.vertical_centered(|ui| {
+                        let tex = logo(ctx);
+                        ui.add(egui::Image::new(&tex).fit_to_exact_size(egui::vec2(150.0, 150.0 * tex.size()[1] as f32 / tex.size()[0] as f32)));
+                    });
+                });
                 kh::bang_gon(
                     ui,
                     &[
@@ -119,6 +140,7 @@ impl HopTroGiup {
                         ("Phiên bản", PHIEN_BAN, true, 12.0),
                         ("Chức năng", "Đếm trang A4 · Tách văn bản PDF", false, 12.0),
                         ("Đơn vị", "Giải pháp số Sao Mai", false, 12.0),
+                        ("Website", WEBSITE, false, 12.0),
                         ("Thư viện", "MuPDF (AGPL) · zxing-cpp (Apache 2.0) · ONNX Runtime (MIT) · mô hình PP-LCNet_x1_0_doc_ori (Apache 2.0) · egui", false, 11.5),
                     ],
                 );
@@ -176,7 +198,7 @@ const HD_TACH: &[Khoi] = &[
         "Tab *Hồ sơ*: kiểm tra nhãn, sửa bằng [S] [I] [B]. Chọn trang như Explorer; sắp ~Dung lượng~ để dồn trang index/trắng.",
         "Duyệt hết *Nghi trắng* và *Nghi xoay* (menu lọc) — bắt buộc trước khi tách.",
         "Tab *Văn bản*: xem trước từng văn bản (Lưới · 1 trang · 2 trang); xoay hoặc *Bỏ khỏi văn bản* nếu cần.",
-        "*Tách* → `<gốc>_vanban`, giữ nguyên cấu trúc thư mục; mỗi hồ sơ một thư mục chứa `<hồ sơ>_part1.pdf`…",
+        "*Tách* → `<gốc>_vanban`, giữ nguyên cấu trúc thư mục; mỗi hồ sơ một thư mục chứa `<hồ sơ>.1.pdf`…",
     ]),
     Khoi::Muc("Nhãn trang"),
     Khoi::Bang(&[

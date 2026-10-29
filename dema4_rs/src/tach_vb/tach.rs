@@ -1,7 +1,7 @@
 //! Lệnh tách: từ hồ sơ + nhãn + góc xoay → ghi các văn bản PDF và dòng log `ketqua_tach.txt`.
 //!
 //! Thư mục ra `<cha>/<tên nguồn>_vanban` giữ nguyên cấu trúc thư mục nguồn và thêm 1 tầng thư mục hồ sơ:
-//! `mau2/HOP 462/4766/4766.pdf` → `mau2_vanban/HOP 462/4766/4766/4766_part1.pdf`.
+//! `mau2/HOP 462/4766/4766.pdf` → `mau2_vanban/HOP 462/4766/4766/4766.1.pdf`.
 
 use super::cat_pdf::cat_bang_ghep;
 use super::nhan::{tinh_dai, Nhan, Xoay};
@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-pub const MAU_TEN_MAC_DINH: &str = "{hoso}_part{n}";
+pub const MAU_TEN_MAC_DINH: &str = "{hoso}.{n}";
 pub const TIEU_DE_LOG: &str = "STT\tFile đầu vào\tDải trang\tFile đầu ra\tTrang trắng đã bỏ\tSố trang";
 
 /// Thư mục ra: `<cha>/<tên nguồn>_vanban`; `cha` trống = cha của thư mục nguồn. Không được nằm trong nguồn.
@@ -251,7 +251,7 @@ pub(crate) mod tests {
 
     #[test]
     fn ten_va_thu_muc_ra() {
-        assert_eq!(ten_van_ban(MAU_TEN_MAC_DINH, "L1_05_13", 3), "L1_05_13_part3.pdf");
+        assert_eq!(ten_van_ban(MAU_TEN_MAC_DINH, "L1_05_13", 3), "L1_05_13.3.pdf");
         assert_eq!(ten_van_ban("{hoso}_{n3}", "L1_05_13", 1), "L1_05_13_001.pdf");
         assert_eq!(ten_van_ban("{hoso}:{n}", "Hồ sơ số 5", 2), "Hồ sơ số 5_2.pdf");
         assert!(kiem_mau_ten("{hoso}_part").is_err());
@@ -259,8 +259,8 @@ pub(crate) mod tests {
         assert_eq!(thu_muc_ra(nguon, None).unwrap(), PathBuf::from("/du_lieu/mau2_vanban"));
         assert_eq!(thu_muc_ra(nguon, Some(Path::new("/ra"))).unwrap(), PathBuf::from("/ra/mau2_vanban"));
         assert!(thu_muc_ra(nguon, Some(Path::new("/du_lieu/mau2/con"))).is_err());
-        assert!(khop_mau(MAU_TEN_MAC_DINH, "a_b", "a_b_part12.pdf"));
-        assert!(!khop_mau(MAU_TEN_MAC_DINH, "a_b", "a_b_partx.pdf"));
+        assert!(khop_mau(MAU_TEN_MAC_DINH, "a_b", "a_b.12.pdf"));
+        assert!(!khop_mau(MAU_TEN_MAC_DINH, "a_b", "a_b.x.pdf"));
         assert!(!khop_mau(MAU_TEN_MAC_DINH, "a_b", "ghi_chu.pdf"));
         assert!(khop_mau("{hoso}_{n3}", "a", "a_004.pdf"));
     }
@@ -285,15 +285,15 @@ pub(crate) mod tests {
         let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
         assert!(kq.loi.is_empty(), "{:?}", kq.loi);
         let thu_muc_hs = ra.join("HOP 462").join("4766").join("4766");
-        assert_eq!(chu_cac_trang(&thu_muc_hs.join("4766_part1.pdf")), vec!["Trang 1", "Trang 2"]);
-        assert_eq!(chu_cac_trang(&thu_muc_hs.join("4766_part2.pdf")), vec!["Trang 4", "Trang 6"]);
-        assert_eq!(chu_cac_trang(&thu_muc_hs.join("4766_part3.pdf")), vec!["Trang 7", "Trang 8", "Trang 9", "Trang 10"]);
+        assert_eq!(chu_cac_trang(&thu_muc_hs.join("4766.1.pdf")), vec!["Trang 1", "Trang 2"]);
+        assert_eq!(chu_cac_trang(&thu_muc_hs.join("4766.2.pdf")), vec!["Trang 4", "Trang 6"]);
+        assert_eq!(chu_cac_trang(&thu_muc_hs.join("4766.3.pdf")), vec!["Trang 7", "Trang 8", "Trang 9", "Trang 10"]);
         // Trang 9 xoay 90 → trang thứ 3 của part3 mang /Rotate 90; file gốc không đổi
-        let doc = PdfDocument::open(thu_muc_hs.join("4766_part3.pdf").to_str().unwrap()).unwrap();
+        let doc = PdfDocument::open(thu_muc_hs.join("4766.3.pdf").to_str().unwrap()).unwrap();
         assert_eq!(doc.find_page(2).unwrap().get_dict("Rotate").unwrap().unwrap().as_int().unwrap(), 90);
         drop(doc); // Windows không xoá được file đang mở (lần chạy lại bên dưới phải xoá part3)
         // Hồ sơ không nhãn → chép nguyên từng byte; thư mục chỉ có ảnh không được tạo
-        assert_eq!(std::fs::read(ra.join("goc").join("goc_part1.pdf")).unwrap(), std::fs::read(nguon.join("goc.pdf")).unwrap());
+        assert_eq!(std::fs::read(ra.join("goc").join("goc.1.pdf")).unwrap(), std::fs::read(nguon.join("goc.pdf")).unwrap());
         assert_eq!(kq.sao_nguyen, 1);
         assert!(!ra.join("chi_co_anh").exists());
         // Log 1-based, STT liên tục
@@ -307,15 +307,15 @@ pub(crate) mod tests {
         let ho_so_2 = vec![HoSoTach { pdf: con.join("4766.pdf"), nhan: [(3, Nhan::Index)].into_iter().collect(), xoay: BTreeMap::new() }];
         let kq2 = tach_thu_muc(&nguon, &ra, &ho_so_2, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
         assert_eq!(kq2.dong.len(), 2);
-        assert!(!thu_muc_hs.join("4766_part3.pdf").exists());
+        assert!(!thu_muc_hs.join("4766.3.pdf").exists());
         assert!(thu_muc_hs.join("ghi_chu.txt").exists());
         assert!(kq2.khong_xoa.is_empty());
         // Part cũ không xoá được (Windows: file đang mở; giả lập bằng thư mục trùng tên part) → báo lại, không im lặng
-        std::fs::create_dir(thu_muc_hs.join("4766_part3.pdf")).unwrap();
-        std::fs::write(thu_muc_hs.join("4766_part3.pdf").join("x"), b"").unwrap();
+        std::fs::create_dir(thu_muc_hs.join("4766.3.pdf")).unwrap();
+        std::fs::write(thu_muc_hs.join("4766.3.pdf").join("x"), b"").unwrap();
         let kq3 = tach_thu_muc(&nguon, &ra, &ho_so_2, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
         assert!(kq3.loi.is_empty(), "{:?}", kq3.loi);
-        assert_eq!(kq3.khong_xoa, vec![thu_muc_hs.join("4766_part3.pdf")]);
+        assert_eq!(kq3.khong_xoa, vec![thu_muc_hs.join("4766.3.pdf")]);
         assert!(dong_log_khong_xoa(&kq3.khong_xoa).starts_with("# Không xoá được file cũ"));
         let _ = std::fs::remove_dir_all(&goc);
     }
@@ -332,8 +332,8 @@ pub(crate) mod tests {
         let ho_so: Vec<HoSoTach> = ["a", "b"].iter().map(|d| HoSoTach { pdf: nguon.join(d).join("x.pdf"), nhan: [(1, Nhan::Trang)].into_iter().collect(), xoay: BTreeMap::new() }).collect();
         let ra = thu_muc_ra(&nguon, None).unwrap();
         tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
-        assert_eq!(chu_cac_trang(&ra.join("a/x/x_part1.pdf")), vec!["Trang 2"]);
-        assert_eq!(chu_cac_trang(&ra.join("b/x/x_part1.pdf")), vec!["Trang 2", "Trang 3"]);
+        assert_eq!(chu_cac_trang(&ra.join("a/x/x.1.pdf")), vec!["Trang 2"]);
+        assert_eq!(chu_cac_trang(&ra.join("b/x/x.1.pdf")), vec!["Trang 2", "Trang 3"]);
         let _ = std::fs::remove_dir_all(&goc);
     }
 

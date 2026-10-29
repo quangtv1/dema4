@@ -149,14 +149,16 @@ impl UngDungChinh {
 
     fn thanh_menu(&mut self, ui: &mut egui::Ui) {
         let khoa = self.dang_chay();
-        use crate::gui_tach::bieu_tuong::{atom, BieuTuong};
+        use crate::gui_tach::bieu_tuong::{atom, atom_mau, BieuTuong};
+        // Icon xám nét đơn ở đầu mỗi mục (lưới · bánh răng · dấu hỏi)
+        let xam = Color32::from_gray(0x55);
         // Thanh menu như prototype: nền #F7F7F7, viền dưới, nút có mũi ▾ khi mở menu con
         let r = egui::Panel::top("menu").frame(egui::Frame::new().fill(NEN_TAB).inner_margin(Margin::symmetric(6, 1))).show(ui, |ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
             ui.spacing_mut().icon_spacing = 5.0;
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.add_enabled_ui(!khoa, |ui| {
-                    egui::containers::menu::MenuButton::from_button(egui::Button::new(("Chức năng", atom(BieuTuong::MuiTenXuong, 10.0)))).ui(ui, |ui| {
+                    egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::Luoi, 13.0, xam), "Chức năng", atom(BieuTuong::MuiTenXuong, 10.0)))).ui(ui, |ui| {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
                         for (man, ten, icon) in [(Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
                             if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
@@ -168,12 +170,12 @@ impl UngDungChinh {
                 })
                 .response
                 .on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để đổi chức năng");
-                let cau_hinh = ui.add_enabled(!khoa, egui::Button::new("Cấu hình").frame(false)).on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để sửa Cấu hình");
+                let cau_hinh = ui.add_enabled(!khoa, egui::Button::new((atom_mau(BieuTuong::BanhRang, 14.0, xam), "Cấu hình")).frame(false)).on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để sửa Cấu hình");
                 if cau_hinh.clicked() {
                     use crate::gui_tach::hop_cau_hinh::{HopCauHinh, TabCauHinh};
                     self.hop_cau_hinh = Some(HopCauHinh::moi(&self.cfg, if self.man == Man::Dem { TabCauHinh::Dem } else { TabCauHinh::Tach }));
                 }
-                egui::containers::menu::MenuButton::from_button(egui::Button::new(("Trợ giúp", atom(BieuTuong::MuiTenXuong, 10.0)))).ui(ui, |ui| {
+                egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::HoiDap, 14.0, xam), "Trợ giúp", atom(BieuTuong::MuiTenXuong, 10.0)))).ui(ui, |ui| {
                     use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
                     use crate::tro_giup::HopTroGiup;
                     if muc_menu_day(ui, BieuTuong::XoayPhai, "Kiểm tra cập nhật…", false, None, 210.0).clicked() {
@@ -1465,7 +1467,7 @@ mod tests {
         h.get_by_label("Huỷ").click();
         h.run();
         assert!(h.state().hop_cau_hinh.is_none());
-        assert_eq!(h.state().cfg.mau_ten, "{hoso}_part{n}");
+        assert_eq!(h.state().cfg.mau_ten, "{hoso}.{n}");
     }
 
     /// Cửa sổ thấp (980×600) hay mặc định: nút Lưu/Huỷ của hộp Cấu hình vẫn nằm trong cửa sổ, cả 2 tab.
@@ -1556,10 +1558,16 @@ mod tests {
             let mut app = UngDungChinh { man: Man::Tach, ..Default::default() };
             app.cfg = crate::cau_hinh::CauHinh::default();
             app.tach.thu_muc = mau.join("pdf_goc").display().to_string();
-            let ch = app.cfg.cau_hinh_phan_tich();
-            app.tach.bam_phan_tich(&ch);
             app
         });
+        // Vừa chọn thư mục, chưa Phân tích: cột trái hiện ngay tên các PDF
+        for _ in 0..30 {
+            harness.run_steps(1);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        harness.render().unwrap().save(thu_muc_anh.join("tach_0_xem_truoc.png")).unwrap();
+        let ch = harness.state().cfg.cau_hinh_phan_tich();
+        harness.state_mut().tach.bam_phan_tich(&ch);
         let bat_dau = Instant::now();
         while harness.state().tach.dang_chay() && bat_dau.elapsed() < Duration::from_secs(120) {
             harness.run_steps(1);
@@ -1571,6 +1579,22 @@ mod tests {
             std::thread::sleep(Duration::from_millis(50));
         }
         harness.render().unwrap().save(thu_muc_anh.join("tach_1_tat_ca.png")).unwrap();
+        // Chọn 1 trang ở cuối danh sách → cột trái đánh dấu + tự cuộn tới hồ sơ; rồi thu gọn cột, rồi tìm
+        let cuoi = harness.state().tach.thu_tu_hien().last().copied();
+        if let Some(k) = cuoi {
+            harness.state_mut().tach.chon.chon_rieng(k);
+        }
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("tach_1b_dang_xem.png")).unwrap();
+        harness.state_mut().tach.trai_gon = true;
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("tach_1c_gon.png")).unwrap();
+        harness.state_mut().tach.trai_gon = false;
+        harness.state_mut().tach.tim_hs = "2".into();
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("tach_1d_tim.png")).unwrap();
+        harness.state_mut().tach.tim_hs.clear();
+        harness.state_mut().tach.chon.bo_het();
         harness.state_mut().tach.loc = crate::gui_tach::bang_trang::Loc::NghiTrang;
         harness.run_steps(2);
         let dau = harness.state().tach.thu_tu_hien().first().copied();

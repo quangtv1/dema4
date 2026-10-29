@@ -17,7 +17,10 @@ pub const CANH_CHUAN_MM: [f64; 8] = [1189.0, 841.0, 594.0, 420.0, 297.0, 210.0, 
 pub const A0_NGUONG_MAC_DINH: f64 = 1399.0;
 pub const A0_NGUONG_KHOANG: (f64, f64) = (1189.0, 2500.0);
 pub const TIN_CAY_KHOANG: (f32, f32) = (0.50, 0.95);
-pub const SO_NAC_ANH: u8 = 7;
+/// Số nấc cỡ ảnh lưới (xem `gui_tach::NAC_ANH`).
+pub const SO_NAC_ANH: u8 = 12;
+/// Nấc mặc định: 110 px = 26 %.
+pub const NAC_ANH_MAC_DINH: u8 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum A0Lon {
@@ -99,8 +102,8 @@ impl Default for CauHinh {
             mau_ten: MAU_TEN_MAC_DINH.into(),
             luu_nhan: LuuNhan::TuDong,
             rong_cot_trai: 290.0,
-            co_anh_hs: 2,
-            co_anh_vb: 2,
+            co_anh_hs: NAC_ANH_MAC_DINH,
+            co_anh_vb: NAC_ANH_MAC_DINH,
             ty_le_vb: 100,
             che_do_vb: CheDoVb::Luoi,
             an_dong_thu_muc: false,
@@ -204,8 +207,8 @@ impl CauHinh {
                     _ => {}
                 },
                 "rong_cot_trai" => c.rong_cot_trai = so().map_or(c.rong_cot_trai, |x| (x as f32).clamp(160.0, 520.0)),
-                "co_anh_hs" => c.co_anh_hs = so().map_or(c.co_anh_hs, |x| (x as u8).min(SO_NAC_ANH - 1)),
-                "co_anh_vb" => c.co_anh_vb = so().map_or(c.co_anh_vb, |x| (x as u8).min(SO_NAC_ANH - 1)),
+                "nac_anh_hs" => c.co_anh_hs = so().map_or(c.co_anh_hs, |x| (x as u8).min(SO_NAC_ANH - 1)),
+                "nac_anh_vb" => c.co_anh_vb = so().map_or(c.co_anh_vb, |x| (x as u8).min(SO_NAC_ANH - 1)),
                 "ty_le_vb" => c.ty_le_vb = so().filter(|x| (10.0..=400.0).contains(x)).map_or(c.ty_le_vb, |x| x as u16),
                 "che_do_vb" => match v {
                     "luoi" => c.che_do_vb = CheDoVb::Luoi,
@@ -257,7 +260,7 @@ impl CauHinh {
         s += &format!("ma_index={}\ntin_cay_xoay={:.2}\n", self.ma_index, self.tin_cay_xoay);
         s += &format!("thu_muc_ra={}\nmau_ten={}\n", self.thu_muc_ra, self.mau_ten);
         s += &format!("luu_nhan={}\n", if self.luu_nhan == LuuNhan::TuDong { "tu_dong" } else { "bang_tay" });
-        s += &format!("rong_cot_trai={}\nco_anh_hs={}\nco_anh_vb={}\nty_le_vb={}\n", self.rong_cot_trai, self.co_anh_hs, self.co_anh_vb, self.ty_le_vb);
+        s += &format!("rong_cot_trai={}\nnac_anh_hs={}\nnac_anh_vb={}\nty_le_vb={}\n", self.rong_cot_trai, self.co_anh_hs, self.co_anh_vb, self.ty_le_vb);
         s += &format!(
             "che_do_vb={}\n",
             match self.che_do_vb {

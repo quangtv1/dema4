@@ -194,7 +194,7 @@ mod tests {
         assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned(), "--nhan".into(), "/khong/co.txt".into()]), 2);
         assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned()]), 0);
         let ra = goc.join("ho so_vanban").join("a");
-        let doc = mupdf::pdf::PdfDocument::open(ra.join("a_part2.pdf").to_str().unwrap()).unwrap();
+        let doc = mupdf::pdf::PdfDocument::open(ra.join("a.2.pdf").to_str().unwrap()).unwrap();
         assert_eq!(doc.page_count().unwrap(), 2);
         assert_eq!(doc.find_page(1).unwrap().get_dict("Rotate").unwrap().unwrap().as_int().unwrap(), 180);
         let log = std::fs::read_to_string(nguon.join(".sm-dema4/ketqua_tach.txt")).unwrap();

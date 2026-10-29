@@ -54,6 +54,21 @@ impl PhienPhanTich {
         Self { goc: goc.to_path_buf(), ho_so }
     }
 
+    /// Xem trước khi Phân tích: tên (đường dẫn tương đối) các PDF trong thư mục + số trang nếu đã có cache
+    /// (không mở PDF nào nên chạy nhanh cả trên thư mục lớn).
+    pub fn xem_truoc(goc: &Path, dung: &AtomicBool) -> Vec<(String, Option<usize>)> {
+        let (gui, _bo) = std::sync::mpsc::channel();
+        let pdf = crate::dem_pdf::tim_file_pdf(&goc.to_string_lossy(), dung, &gui);
+        let cache = thu_muc_an(goc).join("cache");
+        pdf.into_par_iter()
+            .map(|pdf| {
+                let tuong_doi = duong_dan_ghi(goc, &pdf);
+                let so_trang = KhoaFile::cua(&pdf, &tuong_doi).and_then(|k| cache_trang::doc(&cache, &k)).map(|t| t.len());
+                (tuong_doi, so_trang)
+            })
+            .collect()
+    }
+
     pub fn duong_dan_pdf(&self) -> Vec<PathBuf> {
         self.ho_so.iter().map(|h| h.pdf.clone()).collect()
     }

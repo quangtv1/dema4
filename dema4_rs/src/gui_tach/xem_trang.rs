@@ -2,9 +2,7 @@
 //! luôn cân giữa khung; tỷ lệ > 100 % thì rộng hơn khung → cuộn ngang, vị trí cuộn đặt ở giữa.
 
 /// Tỷ lệ so với "vừa chiều ngang" (%).
-pub const TY_LE: [u16; 7] = [50, 75, 100, 125, 150, 175, 200];
-/// 6 nấc cỡ ảnh chế độ Lưới (px).
-pub const NAC_LUOI: [f32; 6] = [90.0, 120.0, 160.0, 200.0, 250.0, 300.0];
+pub const TY_LE: [u16; 9] = [50, 75, 100, 125, 150, 175, 200, 225, 250];
 pub const LE: f32 = 12.0;
 pub const KHE: f32 = 16.0;
 

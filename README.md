@@ -30,7 +30,7 @@ Menu **Chức năng › Tách văn bản**. Các bước (cũng có trong **Tr�
 2. Tab **Hồ sơ**: kiểm tra nhãn, sửa bằng phím **S** (Split — văn bản mới bắt đầu từ trang này), **I** (Index), **B** (Trắng), **C** (bỏ nhãn). Chọn trang như Windows Explorer (Ctrl / Shift / kéo khung); Ctrl+Z / Ctrl+Y riêng từng nhóm lọc.
 3. Duyệt hết **Nghi trắng** và **Nghi xoay** (menu lọc) — bắt buộc trước khi tách.
 4. Tab **Văn bản**: xem trước từng văn bản (Lưới · 1 trang · 2 trang); xoay hoặc **Bỏ khỏi văn bản** nếu cần.
-5. **Tách** → `<thư mục gốc>_vanban/…/<hồ sơ>/<hồ sơ>_part1.pdf …`, giữ nguyên cấu trúc thư mục. Hồ sơ không có nhãn và không xoay được chép nguyên từng byte (giữ chữ ký số).
+5. **Tách** → `<thư mục gốc>_vanban/…/<hồ sơ>/<hồ sơ>.1.pdf …`, giữ nguyên cấu trúc thư mục. Hồ sơ không có nhãn và không xoay được chép nguyên từng byte (giữ chữ ký số).
 
 Nhãn, góc xoay, cache phân tích và log lưu trong thư mục ẩn `<thư mục gốc>/.sm-dema4/`; file PDF gốc không bị sửa. Mở lại thư mục giữ nguyên trạng thái lần trước.
 
@@ -70,8 +70,8 @@ Menu **Cấu hình** (2 tab Đếm trang A4 / Tách PDF) ghi file `sm-dema4.cfg`
 | `nguong_trang` · `nguong_nghi` | 1.00 · 3.20 | ngưỡng Trắng / Nghi trắng (% diện tích có nét mực đậm) |
 | `loai_ma` · `ma_index` | `code128` · `NAMSAO-TACH` | mã tờ index (lệch ≤ 3 ký tự; trống = mọi mã) |
 | `tin_cay_xoay` | 0.80 | độ tin cậy gợi ý Nghi xoay (0,50–0,95) |
-| `thu_muc_ra` · `mau_ten` · `luu_nhan` | trống · `{hoso}_part{n}` · `tu_dong` | thư mục cha kết quả; mẫu tên (`{hoso}` `{n}` `{n3}`); lưu nhãn tự động / `bang_tay` |
-| `rong_cot_trai` · `co_anh_hs` · `co_anh_vb` · `ty_le_vb` · `che_do_vb` · `an_dong_thu_muc` | 290 · 2 · 2 · 100 · `luoi` · 0 | trạng thái giao diện |
+| `thu_muc_ra` · `mau_ten` · `luu_nhan` | trống · `{hoso}.{n}` · `tu_dong` | thư mục cha kết quả; mẫu tên (`{hoso}` `{n}` `{n3}`); lưu nhãn tự động / `bang_tay` |
+| `rong_cot_trai` · `nac_anh_hs` · `nac_anh_vb` · `ty_le_vb` · `che_do_vb` · `an_dong_thu_muc` | 290 · 3 · 3 · 100 · `luoi` · 0 | trạng thái giao diện (nấc ảnh lưới 0–11: 3 = 26 %, 11 = 250 %) |
 
 ## Chế độ dòng lệnh (Đếm)
 

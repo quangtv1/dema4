@@ -806,7 +806,7 @@ mod tests {
         let c = CauHinh { he_so: [1.0; 8], rong_cot_trai: 300.0, nguong_trang: 2.0, mau_ten: "{n}".into(), ..Default::default() };
         let m = mac_dinh_tach(&c);
         assert_eq!((m.he_so, m.rong_cot_trai), ([1.0; 8], 300.0));
-        assert_eq!((m.nguong_trang, m.mau_ten.as_str()), (1.0, "{hoso}_part{n}"));
+        assert_eq!((m.nguong_trang, m.mau_ten.as_str()), (1.0, "{hoso}.{n}"));
     }
 
     #[test]

@@ -439,7 +439,7 @@ mod tests {
         let x = man.xong_tach.as_ref().expect("có popup Đã tách xong");
         assert_eq!((x.so_lieu.ho_so, x.so_lieu.van_ban, x.so_lieu.so_trang, x.so_lieu.bo_index), (1, 2, 4, 1));
         assert!(x.khong_xoa.is_empty() && x.loi.is_empty());
-        assert!(ra.join("a").join("a_part1.pdf").exists() && ra.join("a").join("a_part2.pdf").exists());
+        assert!(ra.join("a").join("a.1.pdf").exists() && ra.join("a").join("a.2.pdf").exists());
         // Thống kê ngưỡng của lô: 5 trang có chỉ số; máy cho Trắng 4 trang (trang 4 bị giả làm Nghi), người giữ nội dung / Index hết
         let tk = thong_ke_lo(man.phien.as_ref().unwrap(), man.bang.as_ref().unwrap(), &cfg).unwrap();
         assert_eq!(tk.o.iter().map(|x| x.0 + x.1).sum::<u32>(), 5);

@@ -10,7 +10,7 @@ use super::anh_nho::{self, bac_cho, KhoaAnh, YeuCau};
 use super::bieu_tuong::{self, atom, nut_phang, BieuTuong};
 use super::chon::{BoCucLuoi, PhimDiChuyen, PhimPhu};
 use super::van_ban::{self, MucVanBan};
-use super::xem_trang::{self, NAC_LUOI, TY_LE};
+use super::xem_trang::{self, TY_LE};
 use super::{bat_dau_bang, chuot_luoi, ke_duoi, ngan, o_so, ChuotLuoi, ManTach, Tab, Viec, CAM, NEN_ANH_CHO, NEN_CHON, NEN_HOVER, VACH_DONG, VIEN_CHON};
 use crate::cau_hinh::{CauHinh, CheDoVb};
 use crate::gui::{so_nguyen, ChuDam, CHU, CHU_PHU, VIEN_NHAT};
@@ -146,12 +146,7 @@ impl ManTach {
     }
 
     pub(super) fn tab_van_ban(&mut self, ui: &mut egui::Ui, cfg: &mut CauHinh, viec: &mut Vec<Viec>) {
-        egui::Panel::left("tach_van_ban_trai")
-            .resizable(true)
-            .default_size(cfg.rong_cot_trai)
-            .size_range(160.0..=520.0)
-            .frame(egui::Frame::new().fill(Color32::WHITE))
-            .show(ui, |ui| self.bang_van_ban(ui, cfg, viec));
+        super::cot_trai_panel("tach_van_ban_trai", self.trai_gon, cfg.rong_cot_trai).show(ui, |ui| self.bang_van_ban(ui, cfg, viec));
         egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| {
             if self.ds_vb.is_empty() {
                 ui.centered_and_justified(|ui| ui.label(RichText::new("Chưa có văn bản nào").color(CHU_PHU)));
@@ -159,14 +154,24 @@ impl ManTach {
             }
             self.thanh_dieu_huong(ui, cfg, viec);
             let vb = self.ds_vb[self.vb].clone();
-            // Đáy vùng xem: hoàn tác / làm lại nhóm Văn bản + trang trắng bị bỏ trong dải
+            // Đáy vùng xem: trang trắng bị bỏ trong dải · số trang đang chọn (như dòng trạng thái tab Hồ sơ)
+            let so_chon = self.chon_vb.so_luong();
             egui::Panel::bottom("vb_bo_trang").frame(egui::Frame::new().fill(Color32::WHITE).inner_margin(Margin::symmetric(12, 3))).show(ui, |ui| {
                 ui.painter().hline(ui.max_rect().expand2(egui::vec2(12.0, 0.0)).x_range(), ui.max_rect().top() - 3.5, Stroke::new(1.0, VIEN_NHAT));
                 ui.horizontal(|ui| {
-                    self.nut_hoan_tac(ui, viec);
+                    ui.set_min_height(22.0);
+                    let mut job = egui::text::LayoutJob::default();
+                    let thuong = super::chu_dong(CHU_PHU, false);
                     if !vb.bo.is_empty() {
-                        ui.label(RichText::new(format!("Bỏ trắng: tr.{}", vb.bo.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", "))).size(12.0).color(CHU_PHU));
+                        job.append(&format!("Bỏ trắng: tr.{}", vb.bo.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", ")), 0.0, thuong.clone());
                     }
+                    if so_chon > 0 {
+                        job.append(if vb.bo.is_empty() { "Đã chọn: " } else { " · Đã chọn: " }, 0.0, thuong.clone());
+                        job.append(&so_nguyen(so_chon), 0.0, super::chu_dong(crate::gui::VIEN_TAB_CHON, true));
+                        job.append(" trang", 0.0, thuong);
+                    }
+                    ui.label(job);
+                    self.bao_tam(ui);
                 });
             });
             match cfg.che_do_vb {
@@ -177,9 +182,25 @@ impl ManTach {
     }
 
     fn bang_van_ban(&mut self, ui: &mut egui::Ui, cfg: &CauHinh, viec: &mut Vec<Viec>) {
-        let n = self.ds_vb.len();
+        let gon_truoc = self.trai_gon;
+        super::cot_trai::day(ui, "day_trai_vb", &mut self.tim_vb, "Tìm văn bản", &mut self.trai_gon);
+        if self.trai_gon != gon_truoc {
+            self.cuon_ds_vb = true;
+        }
         let (vb, cuon) = (self.vb, std::mem::take(&mut self.cuon_ds_vb));
         let Some(b) = &self.bang else { return };
+        let ten_vb = |m: &MucVanBan| van_ban::ten(&cfg.mau_ten, &b.ho_so[m.ho_so as usize], m.so);
+        // Văn bản hiện trong cột: khớp ô tìm theo tên
+        let hien: Vec<usize> = (0..self.ds_vb.len()).filter(|&i| super::cot_trai::khop_tim(&ten_vb(&self.ds_vb[i]), &self.tim_vb)).collect();
+        let khong_thay = hien.is_empty() && !self.tim_vb.trim().is_empty();
+        let vi_tri = if cuon { hien.iter().position(|&i| i == vb) } else { None };
+        if self.trai_gon {
+            let ds = &self.ds_vb;
+            if let Some(j) = super::cot_trai::cot_so_gon(ui, "cot_so_vb", hien.len(), 26.0, super::CAO_DAU_BANG, |j| (hien[j] + 1).to_string(), |j| ten_vb(&ds[hien[j]]), |j| hien[j] == vb, |_| false, vi_tri) {
+                viec.push(Viec::DenVb(hien[j]));
+            }
+            return;
+        }
         bat_dau_bang(ui);
         let mut bang = TableBuilder::new(ui)
             .sense(Sense::click())
@@ -187,8 +208,8 @@ impl ManTach {
             .column(Column::exact(36.0))
             .column(Column::remainder().at_least(80.0).clip(true))
             .column(Column::exact(52.0));
-        if cuon {
-            bang = bang.scroll_to_row(vb, Some(Align::Center));
+        if let Some(j) = vi_tri {
+            bang = bang.scroll_to_row(j, Some(Align::Center));
         }
         bang.header(super::CAO_DAU_BANG, |mut h| {
             for (i, t) in ["#", "Tên văn bản", "Trang"].into_iter().enumerate() {
@@ -196,8 +217,12 @@ impl ManTach {
             }
         })
         .body(|body| {
-            body.rows(26.0, n, |mut row| {
-                let i = row.index();
+            body.rows(26.0, hien.len().max(khong_thay as usize), |mut row| {
+                if khong_thay {
+                    row.col(|ui| super::cot_trai::bao_khong_thay(ui, &format!("Không có văn bản nào chứa “{}”", self.tim_vb.trim())));
+                    return;
+                }
+                let i = hien[row.index()];
                 let m = &self.ds_vb[i];
                 let chon = i == vb;
                 row.set_selected(chon);
@@ -216,7 +241,7 @@ impl ManTach {
                         bieu_tuong::ve(ui.painter(), r, BieuTuong::Keo, CAM);
                         ui.add_space(3.0);
                     }
-                    ui.label(dam(van_ban::ten(&cfg.mau_ten, &b.ho_so[m.ho_so as usize], m.so))).on_hover_text(&b.ho_so[m.ho_so as usize]);
+                    ui.label(dam(ten_vb(m))).on_hover_text(&b.ho_so[m.ho_so as usize]);
                 });
                 row.col(|ui| {
                     ke_duoi(ui, vach);
@@ -275,22 +300,19 @@ impl ManTach {
                         }
                     }
                     ngan(ui);
-                    if ui.add(nut_phang(atom(BieuTuong::KinhCong, 15.0), false)).on_hover_text("Phóng to (Ctrl + cuộn lên)").clicked() {
-                        viec.push(Viec::NacVb(1));
-                    }
-                    if cfg.che_do_vb != CheDoVb::Luoi {
-                        ui.label(RichText::new(format!("{}%", TY_LE[nac_ty_le(cfg.ty_le_vb)])).size(12.0).color(CHU_PHU));
-                    }
-                    if ui.add(nut_phang(atom(BieuTuong::KinhTru, 15.0), false)).on_hover_text("Thu nhỏ (Ctrl + cuộn xuống)").clicked() {
-                        viec.push(Viec::NacVb(-1));
-                    }
+                    let (pt, nho, lon) = if cfg.che_do_vb == CheDoVb::Luoi {
+                        (super::phan_tram_nac(cfg.co_anh_vb), cfg.co_anh_vb > 0, (cfg.co_anh_vb as usize) < super::NAC_ANH.len() - 1)
+                    } else {
+                        let i = nac_ty_le(cfg.ty_le_vb);
+                        (TY_LE[i] as u32, i > 0, i < TY_LE.len() - 1)
+                    };
+                    super::nut_thu_phong(ui, pt, nho, lon, "", viec, Viec::NacVb(-1), Viec::NacVb(1));
                     ngan(ui);
                     let co = so_chon > 0;
                     super::nut_xoay(ui, co, viec);
-                    if ui.add_enabled(co, nut_phang(atom(BieuTuong::BoKhoi, 15.0), false)).on_hover_text("Bỏ khỏi văn bản — trang đang chọn thành Trắng, không có trong file tách (Del) · Ctrl+Z hoàn tác").on_disabled_hover_text("Chọn trang trước (Del)").clicked() {
+                    if ui.add_enabled(co, nut_phang(atom(BieuTuong::TrangGach, 16.0), false)).on_hover_text("Bỏ khỏi văn bản — trang đang chọn thành Trắng, không có trong file tách (Del) · Ctrl+Z hoàn tác").on_disabled_hover_text("Chọn trang trước (Del)").clicked() {
                         viec.push(Viec::BoKhoiVb);
                     }
-                    super::so_chon(ui, so_chon);
                 });
             });
         });
@@ -305,7 +327,7 @@ impl ManTach {
 
     fn luoi_van_ban(&mut self, ui: &mut egui::Ui, cfg: &CauHinh, vb: &MucVanBan, viec: &mut Vec<Viec>) {
         let Some(b) = &self.bang else { return };
-        let co = NAC_LUOI[(cfg.co_anh_vb as usize).min(NAC_LUOI.len() - 1)];
+        let co = super::co_vua_khung(cfg.co_anh_vb, ui.available_width());
         let (cao_anh, cao_o) = (co * 1.414, co * 1.414 + CAO_CHU_VB);
         if ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
             let z = ui.input(|i| i.zoom_delta());
@@ -320,7 +342,7 @@ impl ManTach {
         let yeu_cau = &mut self.yeu_cau_anh;
         let mut keo_tu = self.keo_tu_vb;
         let mut so_cot = 1;
-        let bac = bac_cho(co * ui.ctx().pixels_per_point()).min(1);
+        let bac = bac_cho(co * ui.ctx().pixels_per_point()).min(if co > 230.0 { 3 } else { 1 });
         let cuon_dau = std::mem::take(&mut self.cuon_dau_vb);
         let mut vung_cuon = egui::ScrollArea::vertical().id_salt(("luoi_vb", vb.ho_so, vb.tu)).auto_shrink(false);
         if cuon_dau {
@@ -571,7 +593,7 @@ mod tests {
     fn nac_ty_le_gan_nhat() {
         assert_eq!(TY_LE[nac_ty_le(100)], 100);
         assert_eq!(TY_LE[nac_ty_le(110)], 100);
-        assert_eq!(TY_LE[nac_ty_le(400)], 200);
+        assert_eq!(TY_LE[nac_ty_le(400)], 250);
         assert_eq!(TY_LE[nac_ty_le(10)], 50);
     }
 }

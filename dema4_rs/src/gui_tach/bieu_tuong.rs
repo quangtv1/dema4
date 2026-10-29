@@ -33,6 +33,36 @@ pub enum BieuTuong {
     KinhTru,
     KinhCong,
     SapXep,
+    /// Icon nét mảnh theo prototype (toạ độ lưới 16 × 16 của SVG)
+    BanhRang,
+    ChongTrang,
+    MaVach,
+    TrangTrong,
+    TrangHoi,
+    DanhSachSo,
+    TangDan,
+    GiamDan,
+    ThungRac,
+    TrangGach,
+    ThuGon,
+    MoRong,
+    KinhLup,
+}
+
+/// Điểm trong lưới 16 × 16 (như `viewBox="0 0 16 16"` của prototype) → toạ độ màn hình trong `r`.
+fn p16(r: Rect, x: f32, y: f32) -> Pos2 {
+    r.min + Vec2::new(x / 16.0 * r.width(), y / 16.0 * r.height())
+}
+
+/// Cung tròn trong lưới 16: tâm (cx, cy), bán kính rr, từ góc `tu` tới `den` (radian).
+fn cung16(r: Rect, cx: f32, cy: f32, rr: f32, tu: f32, den: f32) -> Vec<Pos2> {
+    (0..=12).map(|i| tu + (den - tu) * i as f32 / 12.0).map(|a| p16(r, cx + rr * a.cos(), cy + rr * a.sin())).collect()
+}
+
+/// Trang giấy góc gấp phải trên (khung chung của các icon trang).
+fn trang_giay(painter: &egui::Painter, r: Rect, s: Stroke) {
+    painter.add(Shape::line(vec![p16(r, 9.5, 1.5), p16(r, 3.5, 1.5), p16(r, 3.5, 14.5), p16(r, 12.5, 14.5), p16(r, 12.5, 4.5), p16(r, 9.5, 1.5)], s));
+    painter.add(Shape::line(vec![p16(r, 9.5, 1.5), p16(r, 9.5, 4.5), p16(r, 12.5, 4.5)], s));
 }
 
 const NET: f32 = 1.75;
@@ -60,16 +90,14 @@ pub fn ve(painter: &egui::Painter, r: Rect, bt: BieuTuong, mau: Color32) {
             painter.add(Shape::convex_polygon(vec![c + Vec2::new(-0.45, -0.2) * k, c + Vec2::new(0.45, -0.2) * k, c + Vec2::new(0.0, 0.3) * k], mau, Stroke::NONE));
         }
         BieuTuong::HoanTac | BieuTuong::LamLai => {
-            // Mũi tên quay đầu: vạch ngang trên + nửa vòng bên phải (hoàn tác) / trái (làm lại)
-            let lat = if bt == BieuTuong::HoanTac { 1.0 } else { -1.0 };
-            let tam = c + Vec2::new(0.15 * lat, 0.1) * k;
-            let r_cung = 0.45 * k;
-            let (tu, den) = if lat > 0.0 { (-PI / 2.0, PI / 2.0) } else { (-PI / 2.0, -3.0 * PI / 2.0) };
-            let mut diem = vec![tam + Vec2::new(-0.75 * lat * k, -r_cung)];
-            diem.extend(cung(tam, r_cung, tu, den));
-            diem.push(tam + Vec2::new(-0.3 * lat * k, r_cung));
+            let s = Stroke::new(1.2, mau);
+            let lat = |x: f32| if bt == BieuTuong::HoanTac { x } else { 16.0 - x };
+            painter.add(Shape::line(vec![p16(r, lat(6.0), 9.5), p16(r, lat(2.5), 6.0), p16(r, lat(6.0), 2.5)], s));
+            let mut diem = vec![p16(r, lat(2.5), 6.0), p16(r, lat(10.0), 6.0)];
+            let (tu, den) = if bt == BieuTuong::HoanTac { (-PI / 2.0, PI / 2.0) } else { (-PI / 2.0, -3.0 * PI / 2.0) };
+            diem.extend(cung16(r, lat(10.0), 9.5, 3.5, tu, den));
+            diem.push(p16(r, lat(8.0), 13.0));
             painter.add(Shape::line(diem, s));
-            painter.add(Shape::line(dau_mui_ten(tam + Vec2::new(-0.75 * lat * k, -r_cung), Vec2::new(-lat, 0.0), 0.3 * k), s));
         }
         BieuTuong::ThongTin => {
             painter.circle_stroke(c, 0.85 * k, Stroke::new(1.2, mau));
@@ -148,6 +176,74 @@ pub fn ve(painter: &egui::Painter, r: Rect, bt: BieuTuong, mau: Color32) {
             painter.line_segment([c + Vec2::new(0.4, 0.75) * k, c + Vec2::new(0.4, -0.75) * k], s);
             painter.add(Shape::line(dau_mui_ten(c + Vec2::new(0.4, -0.75) * k, Vec2::new(0.0, -1.0), 0.32 * k), s));
         }
+        BieuTuong::BanhRang => {
+            // Bánh răng: vòng ngoài + 8 răng + lỗ giữa
+            let s = Stroke::new(1.3, mau);
+            painter.circle_stroke(c, 0.55 * k, s);
+            painter.circle_stroke(c, 0.22 * k, s);
+            for i in 0..8 {
+                let a = i as f32 * PI / 4.0;
+                painter.line_segment([c + 0.55 * k * Vec2::angled(a), c + 0.85 * k * Vec2::angled(a)], Stroke::new(2.2, mau));
+            }
+        }
+        BieuTuong::ChongTrang => {
+            let s = Stroke::new(1.25, mau);
+            painter.add(Shape::line(vec![p16(r, 10.0, 1.5), p16(r, 6.0, 1.5), p16(r, 6.0, 11.5), p16(r, 13.0, 11.5), p16(r, 13.0, 4.5), p16(r, 10.0, 1.5)], s));
+            painter.add(Shape::line(vec![p16(r, 3.5, 4.5), p16(r, 3.5, 14.5), p16(r, 10.0, 14.5)], s));
+        }
+        BieuTuong::MaVach => {
+            for (x, w) in [(2.5, 1.2), (4.8, 0.8), (6.5, 1.6), (9.0, 0.8), (10.8, 1.2), (13.0, 0.8)] {
+                painter.line_segment([p16(r, x, 3.0), p16(r, x, 13.0)], Stroke::new(w * r.width() / 16.0, mau));
+            }
+        }
+        BieuTuong::TrangTrong => trang_giay(painter, r, Stroke::new(1.25, mau)),
+        BieuTuong::TrangHoi => {
+            trang_giay(painter, r, Stroke::new(1.25, mau));
+            painter.text(p16(r, 8.0, 9.5), egui::Align2::CENTER_CENTER, "?", egui::FontId::new(0.5 * r.height(), egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), mau);
+        }
+        BieuTuong::TrangGach => {
+            let s = Stroke::new(1.25, mau);
+            trang_giay(painter, r, s);
+            painter.line_segment([p16(r, 2.0, 14.0), p16(r, 14.0, 2.0)], s);
+        }
+        BieuTuong::DanhSachSo => {
+            let s = Stroke::new(1.25, mau);
+            for (i, y) in [4.0, 8.0, 12.0].into_iter().enumerate() {
+                painter.line_segment([p16(r, 7.0, y), p16(r, 14.0, y)], s);
+                painter.text(p16(r, 3.5, y), egui::Align2::CENTER_CENTER, (i + 1).to_string(), egui::FontId::proportional(0.32 * r.height()), mau);
+            }
+        }
+        BieuTuong::TangDan | BieuTuong::GiamDan => {
+            let s = Stroke::new(1.25, mau);
+            let tang = bt == BieuTuong::TangDan;
+            painter.line_segment([p16(r, 4.0, 2.5), p16(r, 4.0, 13.5)], s);
+            let dinh = if tang { p16(r, 4.0, 2.5) } else { p16(r, 4.0, 13.5) };
+            painter.add(Shape::line(dau_mui_ten(dinh, Vec2::new(0.0, if tang { -1.0 } else { 1.0 }), 0.3 * k), s));
+            let dai = if tang { [3.0, 5.0, 7.0] } else { [7.0, 5.0, 3.0] };
+            for (y, d) in [4.0, 8.0, 12.0].into_iter().zip(dai) {
+                painter.line_segment([p16(r, 7.5, y), p16(r, 7.5 + d, y)], s);
+            }
+        }
+        BieuTuong::ThungRac => {
+            let s = Stroke::new(1.25, mau);
+            painter.line_segment([p16(r, 2.5, 4.0), p16(r, 13.5, 4.0)], s);
+            painter.add(Shape::line(vec![p16(r, 6.0, 4.0), p16(r, 6.0, 2.5), p16(r, 10.0, 2.5), p16(r, 10.0, 4.0)], s));
+            painter.add(Shape::line(vec![p16(r, 3.8, 4.0), p16(r, 4.5, 13.5), p16(r, 11.5, 13.5), p16(r, 12.2, 4.0)], s));
+            for x in [6.5, 9.5] {
+                painter.line_segment([p16(r, x, 6.5), p16(r, x, 11.0)], s);
+            }
+        }
+        BieuTuong::ThuGon | BieuTuong::MoRong => {
+            let s = Stroke::new(1.4, mau);
+            painter.line_segment([p16(r, 3.0, 2.5), p16(r, 3.0, 13.5)], s);
+            let diem = if bt == BieuTuong::ThuGon { [(11.0, 5.0), (8.0, 8.0), (11.0, 11.0)] } else { [(7.0, 5.0), (10.0, 8.0), (7.0, 11.0)] };
+            painter.add(Shape::line(diem.iter().map(|&(x, y)| p16(r, x, y)).collect(), s));
+        }
+        BieuTuong::KinhLup => {
+            let s = Stroke::new(1.4, mau);
+            painter.circle_stroke(p16(r, 7.0, 7.0), 4.5 / 16.0 * r.width(), s);
+            painter.line_segment([p16(r, 10.5, 10.5), p16(r, 14.0, 14.0)], s);
+        }
         BieuTuong::XoayPhai | BieuTuong::Xoay180 => {
             // Vòng 3/4 theo chiều kim đồng hồ, mũi tên ở cuối
             let r_cung = 0.62 * k;
@@ -179,6 +275,21 @@ pub fn atom(bt: BieuTuong, co: f32) -> egui::Atom<'static> {
     egui::Atom::paint(Vec2::splat(co), move |ui, a| ve(ui.painter(), a.rect, bt, a.fallback_text_color))
 }
 
+/// Icon màu cố định làm phần tử của `Button` (vd icon xám đầu mục thanh menu).
+pub fn atom_mau(bt: BieuTuong, co: f32, mau: Color32) -> egui::Atom<'static> {
+    egui::Atom::paint(Vec2::splat(co), move |ui, a| ve(ui.painter(), a.rect, bt, if ui.is_enabled() { mau } else { mau.gamma_multiply(0.45) }))
+}
+
+/// Mục menu chọn 1 (menu lọc / sắp xếp): icon nét mảnh đầu dòng, chữ, ✓ xanh ở cuối dòng khi đang chọn.
+pub fn muc_menu_icon(ui: &mut egui::Ui, icon: BieuTuong, chu: impl Into<String>, dang_chon: bool, rong: f32) -> Response {
+    let r = ui.add(egui::Button::new(format!("      {}", chu.into())).min_size(egui::vec2(rong, 0.0)));
+    ve(ui.painter(), Rect::from_center_size(egui::pos2(r.rect.left() + 14.0, r.rect.center().y), egui::vec2(14.0, 14.0)), icon, Color32::from_gray(0x55));
+    if dang_chon {
+        ve(ui.painter(), Rect::from_center_size(egui::pos2(r.rect.right() - 12.0, r.rect.center().y), egui::vec2(12.0, 12.0)), BieuTuong::Dau, crate::gui::VIEN_TAB_CHON);
+    }
+    r
+}
+
 /// Nút phẳng thanh công cụ (`.nutma` của prototype): chỉ có nền khi rê chuột; `sang` = đang chọn (nền + viền xanh).
 pub fn nut_phang<'a>(atoms: impl egui::IntoAtoms<'a>, sang: bool) -> egui::Button<'a> {
     let nut = egui::Button::new(atoms).stroke(Stroke::NONE).min_size(egui::vec2(24.0, 24.0));
@@ -195,7 +306,7 @@ pub fn muc_menu_day(ui: &mut egui::Ui, icon: BieuTuong, chu: &str, dang_chon: bo
     let mau = ui.visuals().text_color();
     ve(ui.painter(), Rect::from_center_size(egui::pos2(r.rect.left() + 13.0, r.rect.center().y), egui::vec2(14.0, 14.0)), icon, mau);
     if dang_chon {
-        ve(ui.painter(), Rect::from_center_size(egui::pos2(r.rect.right() - 12.0, r.rect.center().y), egui::vec2(12.0, 12.0)), BieuTuong::Dau, crate::gui::XANH_LA);
+        ve(ui.painter(), Rect::from_center_size(egui::pos2(r.rect.right() - 12.0, r.rect.center().y), egui::vec2(12.0, 12.0)), BieuTuong::Dau, crate::gui::VIEN_TAB_CHON);
     } else if let Some(p) = phim {
         ui.painter().text(egui::pos2(r.rect.right() - 8.0, r.rect.center().y), egui::Align2::RIGHT_CENTER, p, egui::TextStyle::Small.resolve(ui.style()), ui.visuals().weak_text_color());
     }
@@ -207,7 +318,7 @@ pub fn muc_menu(ui: &mut egui::Ui, chu: impl Into<egui::WidgetText>, dang_chon: 
     let r = ui.add(egui::Button::new(chu).min_size(egui::vec2(rong, 0.0)));
     if dang_chon {
         let o = Rect::from_center_size(egui::pos2(r.rect.right() - 12.0, r.rect.center().y), egui::vec2(12.0, 12.0));
-        ve(ui.painter(), o, BieuTuong::Dau, crate::gui::XANH_LA);
+        ve(ui.painter(), o, BieuTuong::Dau, crate::gui::VIEN_TAB_CHON);
     }
     r
 }
