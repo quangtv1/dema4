@@ -1,6 +1,7 @@
 //! Màn "Tách văn bản": hàng thư mục + Phân tích nền, tab Hồ sơ (bảng hồ sơ, lưới gộp mọi trang để duyệt và
 //! gán nhãn kiểu Explorer), dòng đáy. Đặc tả = `plans/261027-1736-tach-van-ban-tu-dong/prototype-tach-van-ban.html`.
 
+pub mod anh_nho;
 pub mod bang_trang;
 pub mod bieu_tuong;
 pub mod chon;
@@ -22,6 +23,7 @@ use crate::tach_vb::phan_tich::{gan_nhan, CauHinhPhanTich};
 use crate::tach_vb::phien::{thu_muc_an, PhienPhanTich};
 use crate::tach_vb::cache_trang;
 use bang_trang::{ke_tiep, ten_nhan, BangTrang, EnterXoay, Loc, Nhom, Sap};
+use anh_nho::{bac_cho, AnhNho, KhoaAnh, YeuCau};
 use bieu_tuong::{muc_menu, BieuTuong};
 use chon::{BoChon, BoCucLuoi, PhimDiChuyen, PhimPhu};
 
@@ -102,6 +104,7 @@ pub struct ManTach {
     dang_xem: Vec<u32>,
     vb_tong: Option<(u64, usize)>,
     hoi_phan_tich_lai: bool,
+    anh: Option<AnhNho>,
     /// Cấu hình đổi trong màn (độ rộng cột, cỡ ảnh…) → app ghi `sm-dema4.cfg`.
     pub cfg_doi: bool,
 }
@@ -130,6 +133,7 @@ impl Default for ManTach {
             dang_xem: Vec::new(),
             vb_tong: None,
             hoi_phan_tich_lai: false,
+            anh: None,
             cfg_doi: false,
         }
     }
@@ -246,6 +250,7 @@ impl ManTach {
         }
         self.bang = None;
         self.phien = None;
+        self.anh = None;
         self.chon = BoChon::default();
         self.loc = Loc::TatCa;
         self.loc_menu = Loc::TatCa;
@@ -286,7 +291,7 @@ impl ManTach {
         self.chay = Some(Chay::PhanTich { nhan, hang, tong, xong: 0, loi: 0, bat_dau: Instant::now() });
     }
 
-    fn nhan_su_kien(&mut self, ch: &CauHinhPhanTich) {
+    fn nhan_su_kien(&mut self, ch: &CauHinhPhanTich, ctx: Option<&egui::Context>) {
         match &mut self.chay {
             None => {}
             Some(Chay::Mo { nhan, .. }) => match nhan.try_recv() {
@@ -302,8 +307,14 @@ impl ManTach {
                 let mut ket_thuc = false;
                 for _ in 0..SU_KIEN_MOI_KHUNG {
                     match nhan.try_recv() {
-                        Ok(SuKienPhanTich::Trang { viec, kq, .. }) => {
+                        Ok(SuKienPhanTich::Trang { viec, kq, anh_nho, .. }) => {
                             let k = bang.chi_so(viec.file, viec.trang);
+                            // Ảnh xám của phân tích: dùng luôn cho ô đang hiện (đỡ render lại)
+                            if let (Some(a), Some(anh), Some(ctx)) = (anh_nho, self.anh.as_mut(), ctx) {
+                                if a.kenh == 1 && self.dang_xem.contains(&k) {
+                                    anh.them_anh_xam(ctx, KhoaAnh { trang: k, bac: 0 }, a.rong, a.cao, &a.du_lieu);
+                                }
+                            }
                             bang.dat_tu_dong(k, gan_nhan(&kq, ch));
                             phien.nhan_ket_qua(viec, kq);
                             *xong += 1;
@@ -583,7 +594,13 @@ impl ManTach {
     pub fn ve(&mut self, ui: &mut egui::Ui, cfg: &mut CauHinh) {
         let ctx = ui.ctx().clone();
         let ch = cfg.cau_hinh_phan_tich();
-        self.nhan_su_kien(&ch);
+        self.nhan_su_kien(&ch, Some(&ctx));
+        if let (None, Some(p)) = (&self.anh, &self.phien) {
+            self.anh = Some(AnhNho::moi(p.duong_dan_pdf(), 2, ctx.clone()));
+        }
+        if let Some(a) = &mut self.anh {
+            a.nhan_anh(&ctx);
+        }
         if self.chay.is_some() {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
@@ -957,6 +974,9 @@ impl ManTach {
         }
         let thu_tu = &self.thu_tu;
         let chon = &mut self.chon;
+        let mut anh_nho = self.anh.as_mut();
+        let bac = bac_cho(co * ui.ctx().pixels_per_point());
+        let mut yeu_cau = Vec::new();
         let ten_hien = &self.ten_hien;
         let mut keo_tu = self.keo_tu;
         let mut cuon_toi = self.cuon_toi.take();
@@ -1045,12 +1065,33 @@ impl ManTach {
                         ve_net_dut(&painter, nen_o.shrink(1.0), Stroke::new(1.0, CHU_PHU), 2.0);
                     }
                     // Ảnh (chờ texture: khung xám); xoay 90/270 thì đổi chiều cho vừa ô
-                    let (rw, rh) = if t.sua.goc % 180 == 90 { (co, co / 1.414) } else { (co, cao_anh) };
-                    let anh = Rect::from_center_size(egui::pos2(o.center().x, o.top() + cao_anh / 2.0), egui::vec2(rw, rh));
+                    let hop = Rect::from_min_size(o.min, egui::vec2(co, cao_anh));
                     let nhan_t = t.nhan();
                     let nghi_t = t.nghi_trang();
                     let nghi_x = t.nghi_xoay();
-                    painter.rect_filled(anh, 0.0, if nhan_t == Nhan::Trang { NEN_TRANG_NHAN } else { NEN_ANH_CHO });
+                    let tex = anh_nho.as_mut().and_then(|a| {
+                        let khoa = KhoaAnh { trang: k, bac };
+                        let co_tex = a.lru.lay(&khoa).cloned().or_else(|| a.lru.lay(&KhoaAnh { trang: k, bac: 0 }).cloned());
+                        if !a.lru.co(&khoa) {
+                            yeu_cau.push(YeuCau { khoa, file: t.ho_so as usize, so: t.so as usize });
+                        }
+                        co_tex
+                    });
+                    let anh = match &tex {
+                        Some(tex) => {
+                            let r = anh_nho::ve_xoay(&painter, hop, tex, t.sua.goc);
+                            if nhan_t == Nhan::Trang {
+                                painter.rect_filled(r, 0.0, NEN_TRANG_NHAN.gamma_multiply(0.45));
+                            }
+                            r
+                        }
+                        None => {
+                            let (rw, rh) = if t.sua.goc % 180 == 90 { (co, co / 1.414) } else { (co, cao_anh) };
+                            let r = Rect::from_center_size(hop.center(), egui::vec2(rw, rh));
+                            painter.rect_filled(r, 0.0, if nhan_t == Nhan::Trang { NEN_TRANG_NHAN } else { NEN_ANH_CHO });
+                            r
+                        }
+                    };
                     match nhan_t {
                         Nhan::Index => {
                             painter.rect_stroke(anh, 0.0, Stroke::new(2.0, XANH_COBALT), StrokeKind::Outside);
@@ -1114,6 +1155,9 @@ impl ManTach {
             }
             phan_hoi.context_menu(|ui| menu_phai(ui, b, chon, thu_tu, self.loc, viec));
         });
+        if let Some(a) = anh_nho {
+            a.yeu_cau(yeu_cau);
+        }
         self.keo_tu = keo_tu;
         self.so_cot = so_cot;
         if dang_xem != self.dang_xem {
@@ -1274,7 +1318,7 @@ mod tests {
         while man.dang_chay() {
             assert!(bat_dau.elapsed() < Duration::from_secs(30));
             std::thread::sleep(Duration::from_millis(20));
-            man.nhan_su_kien(&ch);
+            man.nhan_su_kien(&ch, None);
         }
         let b = man.bang.as_ref().unwrap();
         assert_eq!(b.trang.len(), 3);
@@ -1289,7 +1333,7 @@ mod tests {
         man2.bam_phan_tich(&ch);
         while man2.dang_chay() {
             std::thread::sleep(Duration::from_millis(20));
-            man2.nhan_su_kien(&ch);
+            man2.nhan_su_kien(&ch, None);
         }
         assert_eq!(man2.bang.as_ref().unwrap().trang[1].nhan(), Nhan::Index);
         let _ = std::fs::remove_dir_all(&goc);

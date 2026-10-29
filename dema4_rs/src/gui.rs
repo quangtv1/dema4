@@ -1417,7 +1417,11 @@ mod tests {
             harness.run_steps(1);
             std::thread::sleep(Duration::from_millis(50));
         }
-        harness.run_steps(3);
+        // Chờ luồng ảnh nhỏ render các ô đang hiện
+        for _ in 0..40 {
+            harness.run_steps(1);
+            std::thread::sleep(Duration::from_millis(50));
+        }
         harness.render().unwrap().save(thu_muc_anh.join("tach_1_tat_ca.png")).unwrap();
         harness.state_mut().tach.loc = crate::gui_tach::bang_trang::Loc::NghiTrang;
         harness.run_steps(2);
@@ -1425,7 +1429,10 @@ mod tests {
         if let Some(k) = dau {
             harness.state_mut().tach.chon.chon_rieng(k);
         }
-        harness.run_steps(3);
+        for _ in 0..20 {
+            harness.run_steps(1);
+            std::thread::sleep(Duration::from_millis(50));
+        }
         harness.render().unwrap().save(thu_muc_anh.join("tach_2_nghi_trang.png")).unwrap();
     }
 
