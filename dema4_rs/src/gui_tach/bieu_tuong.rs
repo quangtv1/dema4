@@ -13,6 +13,8 @@ pub enum BieuTuong {
     LamLai,
     XoayPhai,
     Xoay180,
+    /// ⓘ (tooltip giải thích).
+    ThongTin,
 }
 
 const NET: f32 = 1.75;
@@ -51,6 +53,11 @@ pub fn ve(painter: &egui::Painter, r: Rect, bt: BieuTuong, mau: Color32) {
             painter.add(Shape::line(diem, s));
             painter.add(Shape::line(dau_mui_ten(tam + Vec2::new(-0.75 * lat * k, -r_cung), Vec2::new(-lat, 0.0), 0.3 * k), s));
         }
+        BieuTuong::ThongTin => {
+            painter.circle_stroke(c, 0.85 * k, Stroke::new(1.2, mau));
+            painter.circle_filled(c + Vec2::new(0.0, -0.4) * k, 0.12 * k, mau);
+            painter.line_segment([c + Vec2::new(0.0, -0.12) * k, c + Vec2::new(0.0, 0.5) * k], Stroke::new(1.4, mau));
+        }
         BieuTuong::XoayPhai | BieuTuong::Xoay180 => {
             // Vòng 3/4 theo chiều kim đồng hồ, mũi tên ở cuối
             let r_cung = 0.62 * k;
@@ -85,4 +92,12 @@ pub fn muc_menu(ui: &mut egui::Ui, chu: impl Into<egui::WidgetText>, dang_chon: 
         ve(ui.painter(), o, BieuTuong::Dau, crate::gui::XANH_LA);
     }
     r
+}
+
+/// ⓘ 14 px, rê chuột hiện giải thích.
+pub fn thong_tin(ui: &mut egui::Ui, giai_thich: &str) -> Response {
+    let (r, phan_hoi) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), Sense::hover());
+    let mau = if phan_hoi.hovered() { crate::gui::XANH_COBALT } else { ui.visuals().weak_text_color() };
+    ve(ui.painter(), r, BieuTuong::ThongTin, mau);
+    phan_hoi.on_hover_text(giai_thich)
 }

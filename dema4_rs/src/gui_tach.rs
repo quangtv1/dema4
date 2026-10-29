@@ -5,6 +5,8 @@ pub mod anh_nho;
 pub mod bang_trang;
 pub mod bieu_tuong;
 pub mod chon;
+pub mod hop_cau_hinh;
+pub mod thanh_nguong;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -364,6 +366,18 @@ impl ManTach {
         match kq {
             Ok(()) => b.chua_luu = false,
             Err(e) => self.trang_thai = format!("Không ghi được nhãn: {e}"),
+        }
+    }
+
+    /// Cấu hình vừa lưu: đổi ngưỡng / mã index / độ tin cậy → gán lại nhãn tự động ngay (không render lại,
+    /// nhãn người đã sửa giữ nguyên).
+    pub fn ap_cau_hinh(&mut self, cu: &CauHinh, moi: &CauHinh) {
+        let ch = moi.cau_hinh_phan_tich();
+        if cu.cau_hinh_phan_tich() == ch {
+            return;
+        }
+        if let (Some(b), Some(p)) = (&mut self.bang, &self.phien) {
+            b.gan_lai_tu_dong(p, &ch);
         }
     }
 

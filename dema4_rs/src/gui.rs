@@ -78,11 +78,12 @@ struct UngDungChinh {
     dem: UngDung,
     tach: crate::gui_tach::ManTach,
     cfg: crate::cau_hinh::CauHinh,
+    hop_cau_hinh: Option<crate::gui_tach::hop_cau_hinh::HopCauHinh>,
 }
 
 impl Default for UngDungChinh {
     fn default() -> Self {
-        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem: UngDung::default(), tach: Default::default(), cfg: crate::cau_hinh::doc() }
+        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem: UngDung::default(), tach: Default::default(), cfg: crate::cau_hinh::doc(), hop_cau_hinh: None }
     }
 }
 
@@ -107,6 +108,11 @@ impl UngDungChinh {
                 })
                 .response
                 .on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để đổi chức năng");
+                let cau_hinh = ui.add_enabled(!khoa, egui::Button::new("Cấu hình").frame(false)).on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để sửa Cấu hình");
+                if cau_hinh.clicked() {
+                    use crate::gui_tach::hop_cau_hinh::{HopCauHinh, TabCauHinh};
+                    self.hop_cau_hinh = Some(HopCauHinh::moi(&self.cfg, if self.man == Man::Dem { TabCauHinh::Dem } else { TabCauHinh::Tach }));
+                }
             });
         });
     }
@@ -135,6 +141,19 @@ impl eframe::App for UngDungChinh {
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN)).show(ui, |ui| {
                     ui.centered_and_justified(|ui| ui.label(RichText::new("Ký văn bản — Chức năng đang phát triển").color(CHU_PHU)));
                 });
+            }
+        }
+        if let Some(hop) = &mut self.hop_cau_hinh {
+            use crate::gui_tach::hop_cau_hinh::KetQuaHop;
+            match hop.ve(&ctx) {
+                KetQuaHop::Mo => {}
+                KetQuaHop::Huy => self.hop_cau_hinh = None,
+                KetQuaHop::Luu(moi) => {
+                    self.tach.ap_cau_hinh(&self.cfg, &moi);
+                    self.cfg = moi;
+                    let _ = crate::cau_hinh::ghi(&self.cfg);
+                    self.hop_cau_hinh = None;
+                }
             }
         }
     }
@@ -1434,6 +1453,10 @@ mod tests {
             std::thread::sleep(Duration::from_millis(50));
         }
         harness.render().unwrap().save(thu_muc_anh.join("tach_2_nghi_trang.png")).unwrap();
+        let cfg = harness.state().cfg.clone();
+        harness.state_mut().hop_cau_hinh = Some(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::Tach));
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("tach_3_cau_hinh.png")).unwrap();
     }
 
     /// Vẽ giao diện ra ảnh PNG (không mở cửa sổ) từ một file chi tiết thật để xem bố cục.
