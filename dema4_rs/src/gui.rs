@@ -1389,6 +1389,81 @@ mod tests {
         assert_eq!(app.dem.quy_a4_hien_tai(), Some(5.0));
     }
 
+    fn harness_chinh(man: Man) -> egui_kittest::Harness<'static, UngDungChinh> {
+        egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 700.0)).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            UngDungChinh { man, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() }
+        })
+    }
+
+    /// Menu Chức năng 3 mục đổi màn; F1 mở Hướng dẫn đúng tab của màn đang dùng; Đóng tắt hộp.
+    #[test]
+    fn menu_chuc_nang_doi_man_va_f1_mo_huong_dan() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness_chinh(Man::Dem);
+        h.run();
+        h.get_by_label("Chức năng").click();
+        h.run();
+        for ten in ["Đếm trang A4", "Tách văn bản", "Ký văn bản"] {
+            h.get_by_label_contains(ten);
+        }
+        h.get_by_label_contains("Tách văn bản").click();
+        h.run();
+        assert_eq!(h.state().man, Man::Tach);
+        h.get_by_label("Thư mục hồ sơ PDF:");
+        h.key_press(egui::Key::F1);
+        h.run();
+        assert!(matches!(h.state().tro_giup, Some(crate::tro_giup::HopTroGiup::HuongDan(crate::tro_giup::TabHuongDan::Tach))));
+        h.get_by_label("Đóng").click();
+        h.run();
+        assert!(h.state().tro_giup.is_none());
+        h.get_by_label("Chức năng").click();
+        h.run();
+        h.get_by_label_contains("Ký văn bản").click();
+        h.run();
+        assert_eq!(h.state().man, Man::Ky);
+        h.get_by_label("Ký văn bản — Chức năng đang phát triển");
+        h.key_press(egui::Key::F1);
+        h.run();
+        assert!(matches!(h.state().tro_giup, Some(crate::tro_giup::HopTroGiup::HuongDan(crate::tro_giup::TabHuongDan::Dem))));
+    }
+
+    /// Đang phân tích: khoá menu Chức năng + Cấu hình; nút Dừng vẫn bấm được.
+    #[test]
+    fn menu_khoa_khi_dang_phan_tich_nut_dung_van_bam_duoc() {
+        use egui_kittest::kittest::{NodeT, Queryable};
+        let mut h = harness_chinh(Man::Tach);
+        h.state_mut().tach.thu_muc = "/x".into();
+        h.run();
+        assert!(!h.get_by_label("Chức năng").accesskit_node().is_disabled());
+        h.state_mut().tach.gia_dang_chay();
+        h.run();
+        assert!(h.get_by_label("Chức năng").accesskit_node().is_disabled());
+        assert!(h.get_by_label("Cấu hình").accesskit_node().is_disabled());
+        assert!(!h.get_by_label("Dừng").accesskit_node().is_disabled());
+        assert!(h.query_by_label("Phân tích").is_none());
+    }
+
+    /// Hộp Cấu hình: Huỷ đóng không đổi gì; ô sai khoá Lưu.
+    #[test]
+    fn cau_hinh_huy_va_o_sai_khoa_luu() {
+        use egui_kittest::kittest::{NodeT, Queryable};
+        let mut h = harness_chinh(Man::Tach);
+        h.run();
+        h.get_by_label("Cấu hình").click();
+        h.run();
+        assert!(h.state().hop_cau_hinh.is_some());
+        assert!(!h.get_by_label("Lưu").accesskit_node().is_disabled());
+        h.state_mut().hop_cau_hinh.as_mut().unwrap().nhap.mau_ten = "{hoso}".into();
+        h.run();
+        assert!(h.get_by_label("Lưu").accesskit_node().is_disabled(), "mẫu tên thiếu {{n}} → khoá Lưu");
+        h.get_by_label_contains("Mẫu phải có");
+        h.get_by_label("Huỷ").click();
+        h.run();
+        assert!(h.state().hop_cau_hinh.is_none());
+        assert_eq!(h.state().cfg.mau_ten, "{hoso}_part{n}");
+    }
+
     #[test]
     fn luong_dem_chet_khong_lam_sap_giao_dien() {
         let mut app = UngDung::default();

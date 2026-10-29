@@ -281,7 +281,9 @@ impl HopCauHinh {
                                 ui.selectable_value(&mut self.nhap.loai_ma, LoaiMa::Code128, "Code 128");
                                 ui.selectable_value(&mut self.nhap.loai_ma, LoaiMa::Qr, "QR code");
                                 ui.selectable_value(&mut self.nhap.loai_ma, LoaiMa::Chu, "Cụm ký tự");
-                            });
+                            })
+                            .response
+                            .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, "Loại mã index"));
                         ui.add(egui::TextEdit::singleline(&mut self.nhap.ma_index).desired_width(ui.available_width()).hint_text("mọi mã")).on_hover_text("Giá trị mã index");
                     });
                 },

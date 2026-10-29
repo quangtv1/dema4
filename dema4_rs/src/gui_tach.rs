@@ -189,6 +189,14 @@ fn ghi_an_toan(p: &Path, noi_dung: &str) -> std::io::Result<()> {
 }
 
 impl ManTach {
+    /// Giả lập đang đọc thư mục (kênh không bao giờ trả) — cho test khoá menu.
+    #[cfg(test)]
+    pub fn gia_dang_chay(&mut self) {
+        let (gui, nhan) = mpsc::channel();
+        std::mem::forget(gui);
+        self.chay = Some(Chay::Mo { nhan, dung: Arc::new(AtomicBool::new(false)) });
+    }
+
     pub fn thu_tu_hien(&self) -> &[u32] {
         &self.thu_tu
     }
