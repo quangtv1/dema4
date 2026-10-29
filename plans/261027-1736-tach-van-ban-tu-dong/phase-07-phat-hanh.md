@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Phát hành"
-status: pending
+status: in-progress
 priority: P2
 dependencies: [5, 6]
 effort: "0,5 ngày"
@@ -30,8 +30,8 @@ Kiểm thử tổng trên Windows, cập nhật tài liệu, release v0.3.0.
 3. Thử exe Windows trên máy thật.
 
 ## Success Criteria
-- [ ] Test đơn vị + vàng xanh; CI xanh; Release v0.3.0 có exe.
-- [ ] Người dùng tách xong mẫu trên Windows không cần công cụ nào khác.
+- [x] Test đơn vị + vàng xanh; CI xanh; Release v0.3.0 có exe (Windows 52 MB, macOS 39 MB; DirectML/D3D12/DXCore nạp trễ — exe không đòi các DLL này lúc mở) (2026-10-29).
+- [ ] Người dùng tách xong mẫu trên Windows không cần công cụ nào khác — **chờ thử tay** (Thông tin 0.3.0, Đếm, Phân tích → duyệt → Tách, Telegram 2 loại tin, tab `nguong` trong Sheet).
 
 ## Risk Assessment
 - Windows build lâu hơn vì zxing-cpp (C++, CMake) → cache thư mục build trên CI; không đổi feature mupdf trong plan này.
