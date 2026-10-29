@@ -62,7 +62,7 @@ Xem trước từng văn bản sẽ được tạo (trước khi tách), phóng 
     - Đề xuất lô: <b>t1 / t2</b>; Xoay: xác nhận <b>n</b> · chỉnh <b>n</b> · 0° <b>n</b>
     ```
     và gửi kèm file `nguong_<thư mục>_<yyyymmdd-hhmmss>.csv` (histogram) bằng `sendDocument` (thêm `telegram::gui_file`, multipart, cùng giới hạn thời gian; lỗi gửi file không chặn tin chữ). CSV: dòng đầu `# may=…;thu_muc=…;thoi_diem=…;t1=…;t2=…;phien_ban=…`, sau đó `v_tu;v_den;trang;noi_dung`.
-  - **C — Google Sheet**: POST JSON 1 dòng/lần tách tới web app Apps Script (`doPost` append vào sheet): thời điểm, máy, thư mục, phiên bản, ngưỡng đang dùng, các số sửa ở trên, đề xuất lô, histogram dạng chuỗi `trang|noi_dung` theo ô. URL webhook nhúng như token Telegram (`TACH_WEBHOOK_NHUNG`, ghi đè bằng dòng `webhook=` trong `telegram.txt`) — **chưa có URL** (cần tạo Sheet + triển khai `scripts/apps-script-nguong.gs`; tới lúc đó phần C tự bỏ qua), không ghi log, không commit thêm bí mật ngoài lựa chọn đã có. Luồng nền, im lặng khi lỗi, không thử lại.
+  - **C — Google Sheet** (đổi 2026-10-29: người dùng chọn dùng service account sẵn có thay Apps Script, chấp nhận rủi ro khoá nằm trong exe): module chung `google_sheet::ghi_dong(tab, tiêu đề, hàng)` (JWT RS256 → token → Sheets API append; tab chưa có thì tạo + ghi tiêu đề) ghi 1 hàng/lần tách vào tab `nguong` của Sheet Monitor_dema4. Khoá nhúng lúc build: CI từ secret `SHEET_KEY_JSON`, máy từ `dema4_rs/bi_mat/sheet_key.json` (gitignore) — không có trong repo. Sheet phải chia sẻ quyền Chỉnh sửa cho email service account. Luồng nền, im lặng khi lỗi. Sau này ghi thêm loại thống kê khác = gọi `ghi_dong` với tab mới.
   - **Dữ liệu gửi**: chỉ số đếm + tên máy/thư mục như tin Đếm hiện có; không ảnh, không tên file PDF, không nội dung trang. Dòng công khai "Thông tin tách thư mục đã được ghi lại" giữ nguyên.
   - **Script tổng hợp** `dema4_rs/scripts/tong-hop-nguong.py` (chạy tay): đọc các CSV đã tải về (thư mục) hoặc CSV xuất từ Google Sheet → cộng dồn histogram → in t1/t2 đề xuất toàn bộ + theo máy, tỷ lệ trắng lọt / Trắng sai tại ngưỡng hiện tại. Đổi mặc định vẫn do người quyết (sửa hằng số + ghi bảng quyết định).
   - Popup "Đã tách xong" **không** gợi ý/áp dụng ngưỡng (chưa chốt — để sau khi có đủ dữ liệu).
@@ -79,7 +79,7 @@ Xem trước từng văn bản sẽ được tạo (trước khi tách), phóng 
 - Modify: `dema4_rs/src/gui_tach.rs` (tab Văn bản, hộp phóng to, nút Tách, popup)
 - Modify: `dema4_rs/src/telegram.rs` (soạn tin thống kê tách, `gui_file` sendDocument, POST webhook Sheet)
 - Create: `dema4_rs/src/tach_vb/thong_ke_nguong.rs` (histogram, sửa của người dùng, ngưỡng đề xuất lô, CSV, JSON dòng Sheet)
-- Create: `dema4_rs/scripts/tong-hop-nguong.py`, `dema4_rs/scripts/apps-script-nguong.gs` (mã `doPost` để dán vào Apps Script)
+- Create: `dema4_rs/scripts/tong-hop-nguong.py`, `dema4_rs/src/google_sheet.rs`
 - Dùng: `dema4_rs/src/tach_vb.rs` (dải cắt phase 2, cắt PDF phase 4)
 
 ## Implementation Steps (tests first)

@@ -18,6 +18,9 @@ target/
 # Cấu hình Telegram (chứa token – KHÔNG đưa lên repo)
 telegram.txt
 
+# Khoá service account Google Sheet (nhúng vào exe lúc build – KHÔNG đưa lên repo)
+dema4_rs/bi_mat/
+
 # Python
 __pycache__/
 *.pyc
@@ -27,3 +30,7 @@ temp/
 
 # macOS / editor
 .DS_Store
+
+# Lối tắt Google Drive (Sheet/Doc) — không phải mã nguồn
+*.gsheet
+*.gdoc

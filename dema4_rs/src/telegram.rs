@@ -187,17 +187,6 @@ pub fn dong_nguong(tk: &crate::tach_vb::thong_ke_nguong::ThongKeNguong, nguong_t
     )
 }
 
-/// Webhook Google Sheet (Apps Script) nhận 1 dòng thống kê mỗi lần tách. Nhúng như token Telegram; trống = không gửi.
-const TACH_WEBHOOK_NHUNG: &str = "";
-
-/// Dòng `webhook=` trong telegram.txt (nếu có), không thì URL nhúng.
-pub fn doc_webhook() -> Option<String> {
-    let tu_file = duong_dan_cau_hinh().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|s| {
-        s.lines().filter_map(|d| d.trim().strip_prefix("webhook")).filter_map(|d| d.trim_start().strip_prefix('=')).map(|v| v.trim().to_string()).find(|v| !v.is_empty())
-    });
-    tu_file.or_else(|| (!TACH_WEBHOOK_NHUNG.is_empty()).then(|| TACH_WEBHOOK_NHUNG.to_string()))
-}
-
 fn agent() -> ureq::Agent {
     ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(15))).http_status_as_error(false).build().into()
 }
@@ -222,11 +211,6 @@ fn gui_file_toi(api: &str, cau_hinh: &CauHinh, ten_file: &str, noi_dung: &[u8]) 
     let ma = ph.status().as_u16();
     let tra = ph.body_mut().read_to_string().unwrap_or_default();
     if ma == 200 && tra.contains("\"ok\":true") { Ok(()) } else { Err(format!("Telegram trả lỗi {ma}")) }
-}
-
-/// POST 1 dòng JSON tới webhook Apps Script (không thử lại; lỗi bỏ qua ở nơi gọi).
-pub fn gui_webhook(url: &str, json: &str) -> Result<(), String> {
-    agent().post(url).header("Content-Type", "application/json").send(json).map(|_| ()).map_err(|e| e.to_string())
 }
 
 pub fn gui_tin(cau_hinh: &CauHinh, noi_dung: &str) -> Result<(), String> {

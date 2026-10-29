@@ -82,31 +82,31 @@ pub fn thong_ke_lo(phien: &PhienPhanTich, b: &BangTrang, cfg: &CauHinh) -> Optio
     Some(thong_ke_nguong::thong_ke(&trang, &xoay))
 }
 
-/// Gửi thống kê tách: tin chữ (+ 2 dòng ngưỡng), file CSV histogram, 1 dòng Google Sheet. Luồng nền, im lặng khi lỗi.
+/// Gửi thống kê tách: tin chữ (+ 2 dòng ngưỡng), file CSV histogram, 1 hàng tab "nguong" Google Sheet. Luồng nền, im lặng khi lỗi.
 fn gui_thong_ke(thu_muc: String, so_lieu: telegram::SoLieuTach, thoi_gian: Duration, thong_ke: Option<ThongKeNguong>, nguong: (f32, f32)) -> bool {
-    let Some(ch) = telegram::doc_cau_hinh().filter(|_| !cfg!(test)) else { return false };
-    let webhook = telegram::doc_webhook();
+    let ch = telegram::doc_cau_hinh().filter(|_| !cfg!(test));
+    let sheet = crate::google_sheet::co_khoa() && !cfg!(test);
+    if ch.is_none() && !sheet {
+        return false;
+    }
     std::thread::spawn(move || {
-        let mut tin = telegram::noi_dung_tach(&thu_muc, &so_lieu, thoi_gian);
-        if let Some(tk) = &thong_ke {
-            tin += &telegram::dong_nguong(tk, nguong.0, nguong.1);
-        }
-        let _ = telegram::gui_tin(&ch, &tin);
-        let Some(tk) = thong_ke else { return };
         let bay_gio = chrono::Local::now();
         let ten = Path::new(thu_muc.trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-        let dau = [
-            ("may", telegram::ten_pc()),
-            ("thu_muc", ten.clone()),
-            ("thoi_diem", bay_gio.format("%Y-%m-%d %H:%M:%S").to_string()),
-            ("t1", format!("{:.2}", nguong.0)),
-            ("t2", format!("{:.2}", nguong.1)),
-            ("phien_ban", env!("CARGO_PKG_VERSION").to_string()),
-        ];
-        let csv = thong_ke_nguong::csv(&tk, &dau);
-        let _ = telegram::gui_file(&ch, &format!("nguong_{ten}_{}.csv", bay_gio.format("%Y%m%d-%H%M%S")), csv.as_bytes());
-        if let Some(url) = webhook {
-            let _ = telegram::gui_webhook(&url, &thong_ke_nguong::json(&tk, &dau));
+        if let Some(ch) = &ch {
+            let mut tin = telegram::noi_dung_tach(&thu_muc, &so_lieu, thoi_gian);
+            if let Some(tk) = &thong_ke {
+                tin += &telegram::dong_nguong(tk, nguong.0, nguong.1);
+            }
+            let _ = telegram::gui_tin(ch, &tin);
+        }
+        let Some(tk) = thong_ke else { return };
+        let dau = [bay_gio.format("%Y-%m-%d %H:%M:%S").to_string(), telegram::ten_pc(), ten.clone(), env!("CARGO_PKG_VERSION").to_string(), format!("{:.2}", nguong.0), format!("{:.2}", nguong.1)];
+        if let Some(ch) = &ch {
+            let csv = thong_ke_nguong::csv(&tk, &thong_ke_nguong::COT_SHEET[..6].iter().copied().zip(dau.iter().cloned()).collect::<Vec<_>>());
+            let _ = telegram::gui_file(ch, &format!("nguong_{ten}_{}.csv", bay_gio.format("%Y%m%d-%H%M%S")), csv.as_bytes());
+        }
+        if sheet {
+            let _ = crate::google_sheet::ghi_dong("nguong", &thong_ke_nguong::COT_SHEET, thong_ke_nguong::dong_sheet(&tk, dau));
         }
     });
     true

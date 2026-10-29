@@ -3,7 +3,7 @@
 
 Đầu vào (1 hoặc nhiều đường dẫn):
   - thư mục / file `nguong_*.csv` tải từ nhóm Telegram (dòng đầu `# may=…;…`, sau đó `v_tu;v_den;trang;noi_dung`);
-  - file CSV xuất từ Google Sheet "nguong" (cột `histogram` = `trắng|nội dung` theo ô, cách nhau dấu phẩy).
+  - file CSV tải từ tab "nguong" của Google Sheet Monitor_dema4 (cột `histogram` = `trắng|nội dung` theo ô).
 
 Ví dụ:  python3 tong-hop-nguong.py ~/Downloads/nguong/  nguong-sheet.csv  --t1 1.0 --t2 3.2
 

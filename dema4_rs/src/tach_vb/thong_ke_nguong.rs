@@ -124,40 +124,21 @@ pub fn csv(tk: &ThongKeNguong, dau: &[(&str, String)]) -> String {
     s
 }
 
-fn chuoi_json(s: &str) -> String {
-    let mut kq = String::from('"');
-    for c in s.chars() {
-        match c {
-            '"' => kq += "\\\"",
-            '\\' => kq += "\\\\",
-            c if (c as u32) < 0x20 => kq += &format!("\\u{:04x}", c as u32),
-            c => kq.push(c),
-        }
-    }
-    kq + "\""
-}
+/// Cột tab "nguong" trên Google Sheet.
+pub const COT_SHEET: [&str; 18] = [
+    "thoi_diem", "may", "thu_muc", "phien_ban", "t1", "t2", "trang_tu_dong", "trang_tu_dong_sua", "nghi", "nghi_thanh_trang", "nghi_giu", "trang_lot", "de_xuat_t1", "de_xuat_t2", "xoay_xac_nhan", "xoay_chinh", "xoay_0", "histogram",
+];
 
-/// 1 dòng JSON gửi Google Sheet (Apps Script `doPost`): các trường đầu + số liệu + histogram `trắng|nội dung` theo ô.
-pub fn json(tk: &ThongKeNguong, dau: &[(&str, String)]) -> String {
-    let mut truong: Vec<String> = dau.iter().map(|(k, v)| format!("{}:{}", chuoi_json(k), chuoi_json(v))).collect();
-    let so = [
-        ("trang_tu_dong", tk.trang_tu_dong),
-        ("trang_tu_dong_sua", tk.trang_tu_dong_sua),
-        ("nghi", tk.nghi),
-        ("nghi_thanh_trang", tk.nghi_thanh_trang),
-        ("nghi_giu", tk.nghi_giu),
-        ("trang_lot", tk.trang_lot),
-        ("xoay_xac_nhan", tk.xoay_xac_nhan),
-        ("xoay_chinh", tk.xoay_chinh),
-        ("xoay_0", tk.xoay_0),
-    ];
-    truong.extend(so.iter().map(|(k, v)| format!("\"{k}\":{v}")));
-    let (t1, t2) = tk.de_xuat.map_or((String::new(), String::new()), |(a, b)| (format!("{a:.1}"), format!("{b:.1}")));
-    truong.push(format!("\"de_xuat_t1\":{}", chuoi_json(&t1)));
-    truong.push(format!("\"de_xuat_t2\":{}", chuoi_json(&t2)));
-    let hist = tk.o.iter().map(|(a, b)| format!("{a}|{b}")).collect::<Vec<_>>().join(",");
-    truong.push(format!("\"histogram\":{}", chuoi_json(&hist)));
-    format!("{{{}}}", truong.join(","))
+/// 1 hàng tab "nguong": 6 ô đầu (thời điểm, máy, thư mục, phiên bản, t1, t2) + số liệu + histogram `trắng|nội dung` theo ô.
+pub fn dong_sheet(tk: &ThongKeNguong, dau: [String; 6]) -> Vec<serde_json::Value> {
+    use serde_json::Value;
+    let mut d: Vec<Value> = dau.into_iter().map(Value::from).collect();
+    d.extend([tk.trang_tu_dong, tk.trang_tu_dong_sua, tk.nghi, tk.nghi_thanh_trang, tk.nghi_giu, tk.trang_lot].map(Value::from));
+    let (t1, t2) = tk.de_xuat.map_or((Value::from(""), Value::from("")), |(a, b)| (Value::from(a as f64), Value::from(b as f64)));
+    d.extend([t1, t2]);
+    d.extend([tk.xoay_xac_nhan, tk.xoay_chinh, tk.xoay_0].map(Value::from));
+    d.push(tk.o.iter().map(|(a, b)| format!("{a}|{b}")).collect::<Vec<_>>().join(",").into());
+    d
 }
 
 #[cfg(test)]
@@ -226,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn csv_va_json() {
+    fn csv_va_dong_sheet() {
         let t = thong_ke(&[m(0.012, LoaiTrang::NghiTrang, Nhan::Trang)], &[]);
         let c = csv(&t, &[("may", "PC;1".into()), ("t1", "1.00".into())]);
         let dong: Vec<&str> = c.lines().collect();
@@ -235,8 +216,9 @@ mod tests {
         assert_eq!(dong[2 + 12], "1.2;1.3;1;0");
         assert_eq!(dong.last().unwrap(), &"10.0;100;0;0");
         assert_eq!(dong.len(), 2 + SO_O);
-        let j = json(&t, &[("thu_muc", "C:\\a \"b\"".into())]);
-        assert!(j.starts_with("{\"thu_muc\":\"C:\\\\a \\\"b\\\"\",\"trang_tu_dong\":0,"), "{j}");
-        assert!(j.contains("\"nghi_thanh_trang\":1") && j.contains("\"de_xuat_t1\":\"\"") && j.ends_with("0|0\"}"));
+        let d = dong_sheet(&t, ["2026-10-29 12:00:00", "PC", "x", "0.3.0", "1.00", "3.20"].map(String::from));
+        assert_eq!(d.len(), COT_SHEET.len());
+        assert_eq!((d[8].as_u64(), d[9].as_u64(), d[12].as_str()), (Some(1), Some(1), Some("")), "nghi, nghi→trắng, chưa đủ dữ liệu đề xuất");
+        assert!(d[17].as_str().unwrap().starts_with("0|0,"));
     }
 }
