@@ -200,7 +200,7 @@ impl CauHinh {
                 "ma_index" => c.ma_index = v.to_string(),
                 "tin_cay_xoay" => c.tin_cay_xoay = so().map_or(c.tin_cay_xoay, |x| x as f32),
                 "thu_muc_ra" => c.thu_muc_ra = v.to_string(),
-                "mau_ten" => c.mau_ten = v.to_string(),
+                "mau_ten" => c.mau_ten = if v == "{hoso}_part{n}" { MAU_TEN_MAC_DINH.to_string() } else { v.to_string() },
                 "luu_nhan" => match v {
                     "tu_dong" => c.luu_nhan = LuuNhan::TuDong,
                     "bang_tay" => c.luu_nhan = LuuNhan::BangTay,
@@ -376,6 +376,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    #[test]
+    fn mau_ten_mac_dinh_cu_doi_sang_moi() {
+        assert_eq!(CauHinh::phan_tich("mau_ten={hoso}_part{n}\n").mau_ten, MAU_TEN_MAC_DINH);
+        assert_eq!(CauHinh::phan_tich("mau_ten={hoso}-{n3}\n").mau_ten, "{hoso}-{n3}", "mẫu người dùng tự đặt giữ nguyên");
     }
 
     #[test]

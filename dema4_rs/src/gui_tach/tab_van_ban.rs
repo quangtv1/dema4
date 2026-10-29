@@ -350,8 +350,8 @@ impl ManTach {
         }
         vung_cuon.show_viewport(ui, |ui, vp| {
             let rong = ui.available_width();
-            let mut bc = BoCucLuoi::moi(rong - 2.0 * super::LE, co, cao_o, super::KHE_X, super::KHE_Y);
-            bc.le_trai = super::LE;
+            let mut bc = BoCucLuoi::deu(rong - 2.0 * super::LE, co, cao_o, super::DEM_O, super::KHE_X, super::KHE_Y);
+            bc.le_trai += super::LE;
             so_cot = bc.so_cot;
             ui.set_min_size(egui::vec2(rong, bc.so_hang(n) as f32 * bc.cao_hang() + super::LE));
             let goc = ui.max_rect().min + egui::vec2(0.0, super::LE);
@@ -373,7 +373,7 @@ impl ManTach {
                     }
                     let k = trang[i];
                     let t = &b.trang[k as usize];
-                    let o = Rect::from_min_size(goc + egui::vec2(super::LE + cot as f32 * (co + super::KHE_X), hang as f32 * bc.cao_hang()), egui::vec2(co, cao_o));
+                    let o = Rect::from_min_size(goc + egui::Vec2::from(bc.goc_o(i)), egui::vec2(co, cao_o));
                     ve_nen_o(&painter, o, chon.co(k), hover == Some(k), chon.tieu_diem == Some(k));
                     let hop = Rect::from_min_size(o.min, egui::vec2(co, cao_anh));
                     let r = ve_anh(&painter, anh, yeu_cau, hop, k, t.ho_so, t.so, t.sua.goc, bac);

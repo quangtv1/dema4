@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: completed
 created: 2026-10-29
 ---
 # Cập nhật app theo prototype chiều 29/10 → v0.4.0

@@ -149,16 +149,25 @@ impl UngDungChinh {
 
     fn thanh_menu(&mut self, ui: &mut egui::Ui) {
         let khoa = self.dang_chay();
-        use crate::gui_tach::bieu_tuong::{atom, atom_mau, BieuTuong};
+        use crate::gui_tach::bieu_tuong::{atom_mau, BieuTuong};
         // Icon xám nét đơn ở đầu mỗi mục (lưới · bánh răng · dấu hỏi)
         let xam = Color32::from_gray(0x55);
         // Thanh menu như prototype: nền #F7F7F7, viền dưới, nút có mũi ▾ khi mở menu con
         let r = egui::Panel::top("menu").frame(egui::Frame::new().fill(NEN_TAB).inner_margin(Margin::symmetric(6, 1))).show(ui, |ui| {
-            ui.spacing_mut().item_spacing.x = 8.0;
-            ui.spacing_mut().icon_spacing = 5.0;
+            // Như prototype: chữ 13 px, mỗi mục đệm 12 px hai bên, icon cách chữ 6 px, cao 28 px
+            ui.spacing_mut().item_spacing.x = 0.0;
+            ui.spacing_mut().icon_spacing = 6.0;
+            ui.spacing_mut().button_padding = egui::vec2(12.0, 5.0);
+            ui.spacing_mut().interact_size.y = 26.0;
+            for kieu in [TextStyle::Body, TextStyle::Button] {
+                ui.style_mut().text_styles.insert(kieu, egui::FontId::proportional(13.0));
+            }
             egui::MenuBar::new().ui(ui, |ui| {
+                // MenuBar đặt lại khoảng cách: đệm 12 px mỗi bên mục = 24 px giữa 2 mục, lề trái 12 px
+                ui.spacing_mut().item_spacing.x = 24.0;
+                ui.add_space(12.0);
                 ui.add_enabled_ui(!khoa, |ui| {
-                    egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::Luoi, 13.0, xam), "Chức năng", atom(BieuTuong::MuiTenXuong, 10.0)))).ui(ui, |ui| {
+                    egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::MenuLuoi, 14.0, xam), "Chức năng", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
                         for (man, ten, icon) in [(Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
                             if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
@@ -175,10 +184,10 @@ impl UngDungChinh {
                     use crate::gui_tach::hop_cau_hinh::{HopCauHinh, TabCauHinh};
                     self.hop_cau_hinh = Some(HopCauHinh::moi(&self.cfg, if self.man == Man::Dem { TabCauHinh::Dem } else { TabCauHinh::Tach }));
                 }
-                egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::HoiDap, 14.0, xam), "Trợ giúp", atom(BieuTuong::MuiTenXuong, 10.0)))).ui(ui, |ui| {
+                egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::HoiDap, 14.0, xam), "Trợ giúp", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                     use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
                     use crate::tro_giup::HopTroGiup;
-                    if muc_menu_day(ui, BieuTuong::XoayPhai, "Kiểm tra cập nhật…", false, None, 210.0).clicked() {
+                    if muc_menu_day(ui, BieuTuong::CapNhat, "Kiểm tra cập nhật…", false, None, 210.0).clicked() {
                         self.tro_giup = Some(HopTroGiup::cap_nhat());
                         ui.close();
                     }
@@ -296,6 +305,7 @@ fn cai_giao_dien(ctx: &egui::Context) {
     fonts.families.insert(egui::FontFamily::Name(HO_FONT_DAM.into()), dam);
     ctx.set_fonts(fonts);
 
+    crate::gui_tach::bieu_tuong::dang_ky_svg(ctx);
     ctx.set_theme(egui::ThemePreference::Light);
     ctx.all_styles_mut(|style| {
         use egui::{FontFamily::Proportional, FontId};

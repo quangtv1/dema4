@@ -49,10 +49,12 @@ pub fn phan_tram_nac(nac: u8) -> u32 {
 
 /// Cỡ ô thật: nấc đã chọn nhưng không rộng hơn bề ngang khung (chừa lề 2 bên + khe).
 pub(super) fn co_vua_khung(nac: u8, rong_khung: f32) -> f32 {
-    NAC_ANH[(nac as usize).min(NAC_ANH.len() - 1)].min((rong_khung - 2.0 * LE - KHE_X).max(NAC_ANH[0]))
+    NAC_ANH[(nac as usize).min(NAC_ANH.len() - 1)].min((rong_khung - 2.0 * LE - DEM_O).max(NAC_ANH[0]))
 }
-pub(super) const KHE_X: f32 = 28.0;
-pub(super) const KHE_Y: f32 = 22.0;
+/// Lưới như prototype: cột tối thiểu = ảnh + 22 px, khe 12 px, hàng cách nhau đủ cho 2 dòng chữ + khe.
+pub(super) const DEM_O: f32 = 22.0;
+pub(super) const KHE_X: f32 = 12.0;
+pub(super) const KHE_Y: f32 = 36.0;
 /// 2 dòng chữ dưới ảnh.
 const CAO_CHU: f32 = 30.0;
 pub(super) const LE: f32 = 12.0;
@@ -166,6 +168,9 @@ pub struct ManTach {
     hs_dang_cuon: Option<u32>,
     /// Chọn thư mục (chưa Phân tích): danh sách PDF đọc nền để hiện ngay tên ở cột trái.
     xem_truoc: XemTruoc,
+    /// Đang gõ ô thư mục (chưa quét cho tới khi gõ xong) / hộp chọn thư mục chạy luồng riêng (Windows).
+    dang_go_tm: bool,
+    chon_tm: Option<Receiver<Option<PathBuf>>>,
 }
 
 /// Danh sách hồ sơ xem trước: thư mục đã quét, kết quả đang chờ, tên hiển thị + số trang (nếu có cache).
@@ -226,8 +231,30 @@ impl Default for ManTach {
             trai_gon: false,
             hs_dang_cuon: None,
             xem_truoc: XemTruoc::default(),
+            dang_go_tm: false,
+            chon_tm: None,
         }
     }
+}
+
+/// Hộp chọn thư mục: Windows chạy ở luồng riêng để cửa sổ app không đứng hình lúc hộp thoại mở / duyệt ổ mạng;
+/// macOS bắt buộc mở trên luồng chính (rfd) nên mở trực tiếp.
+fn chon_thu_muc_nen(hien_tai: &str) -> Receiver<Option<PathBuf>> {
+    let (gui, nhan) = mpsc::channel();
+    let dau = PathBuf::from(hien_tai.trim());
+    let mo = move || {
+        let mut hop = rfd::FileDialog::new();
+        if dau.is_dir() {
+            hop = hop.set_directory(&dau);
+        }
+        let _ = gui.send(hop.pick_folder());
+    };
+    if cfg!(target_os = "windows") {
+        std::thread::spawn(mo);
+    } else {
+        mo();
+    }
+    nhan
 }
 
 /// Thời lượng dạng hh:mm:ss (10 s → 00:00:10, 10 phút 10 s → 00:10:10).
@@ -459,6 +486,45 @@ impl ManTach {
 
     /// Chọn / gõ thư mục khi chưa Phân tích: quét nền tên các PDF (+ số trang nếu đã có cache) để hiện ngay ở cột trái.
     fn cap_nhat_xem_truoc(&mut self) {
+        if let Some(nhan) = &self.chon_tm {
+            match nhan.try_recv() {
+                Ok(p) => {
+                    self.chon_tm = None;
+                    if let Some(p) = p {
+                        self.thu_muc = p.display().to_string();
+                    }
+                }
+                Err(TryRecvError::Disconnected) => self.chon_tm = None,
+                Err(TryRecvError::Empty) => {}
+            }
+        }
+        // Đổi sang thư mục khác (gõ xong / chọn xong) khi đang mở thư mục cũ: lưu nhãn + cache rồi bỏ phiên cũ
+        if !self.dang_go_tm && self.chay.is_none() && self.tach.is_none() {
+            if let Some(goc) = self.phien.as_ref().map(|p| p.goc.clone()) {
+                if Path::new(self.thu_muc.trim()) != goc {
+                    if self.chua_luu() {
+                        self.luu_nhan();
+                    }
+                    self.ghi_cache();
+                    self.bang = None;
+                    self.phien = None;
+                    self.anh = None;
+                    self.chon = BoChon::default();
+                    self.chon_vb = BoChon::default();
+                    self.loc = Loc::TatCa;
+                    self.loc_menu = Loc::TatCa;
+                    self.ho_so_loc = None;
+                    self.khoa_thu_tu = None;
+                    self.khoa_ds_vb = None;
+                    self.ds_vb.clear();
+                    self.trang_thai.clear();
+                    self.xem_truoc.thu_muc.clear();
+                }
+            }
+        }
+        if self.dang_go_tm {
+            return;
+        }
         let x = &mut self.xem_truoc;
         if let Some(nhan) = &x.nhan {
             if let Ok(ds) = nhan.try_recv() {
@@ -500,9 +566,10 @@ impl ManTach {
 
     pub fn luu_nhan(&mut self) {
         let Some(b) = &mut self.bang else { return };
+        let goc = self.phien.as_ref().map(|p| p.goc.clone()).unwrap_or_else(|| PathBuf::from(self.thu_muc.trim()));
         let (n, x) = (nhan::ghi_file_nhan(&b.bang_nhan()), nhan::ghi_file_xoay(&b.bang_xoay()));
-        let fx = thu_muc_an(Path::new(&self.thu_muc)).join("xoay_trang.txt");
-        let kq = ghi_an_toan(&thu_muc_an(Path::new(&self.thu_muc)).join("index_and_blank.txt"), &n).and_then(|_| if x.is_empty() && !fx.exists() { Ok(()) } else { ghi_an_toan(&fx, &x) });
+        let fx = thu_muc_an(&goc).join("xoay_trang.txt");
+        let kq = ghi_an_toan(&thu_muc_an(&goc).join("index_and_blank.txt"), &n).and_then(|_| if x.is_empty() && !fx.exists() { Ok(()) } else { ghi_an_toan(&fx, &x) });
         match kq {
             Ok(()) => b.chua_luu = false,
             Err(e) => self.trang_thai = format!("Không ghi được nhãn: {e}"),
@@ -867,11 +934,11 @@ impl ManTach {
             let nhan = ui.label("Thư mục hồ sơ PDF:");
             let khoa = dang_chay || self.tach.is_some();
             let o = egui::TextEdit::singleline(&mut self.thu_muc).desired_width(ui.available_width() - 2.0 * 86.0 - 12.0);
-            ui.add_enabled(!khoa, o).labelled_by(nhan.id);
-            if ui.add_enabled(!khoa, nut("Chọn")).clicked() {
-                if let Some(p) = rfd::FileDialog::new().pick_folder() {
-                    self.thu_muc = p.display().to_string();
-                }
+            let r = ui.add_enabled(!khoa, o).labelled_by(nhan.id);
+            // Gõ xong (rời ô / Enter) mới quét, tránh quét cả ổ khi đang gõ dở "G:\"
+            self.dang_go_tm = r.has_focus();
+            if ui.add_enabled(!khoa && self.chon_tm.is_none(), nut("Chọn")).clicked() {
+                self.chon_tm = Some(chon_thu_muc_nen(&self.thu_muc));
             }
             let (chu, mau) = if dang_chay {
                 ("Dừng", DO)
@@ -923,12 +990,11 @@ impl ManTach {
         let nut_r = Rect::from_min_size(egui::pos2(rect.right() - 30.0, rect.top() + 4.0), egui::vec2(24.0, 24.0));
         let nut_an = ui.interact(nut_r, ui.scope_id().with("an_dong"), Sense::click());
         let an = cfg.an_dong_thu_muc;
-        let mau_nut = if nut_an.hovered() { XANH_NUT } else { CHU_PHU };
-        let c = nut_r.center();
-        ui.painter().hline((c.x - 7.0)..=(c.x + 7.0), c.y - 5.0, Stroke::new(1.5, mau_nut));
-        let (y0, y1) = if an { (c.y - 1.0, c.y + 5.0) } else { (c.y + 5.0, c.y - 1.0) };
-        ui.painter().line_segment([egui::pos2(c.x - 4.0, y0), egui::pos2(c.x, y1)], Stroke::new(1.5, mau_nut));
-        ui.painter().line_segment([egui::pos2(c.x + 4.0, y0), egui::pos2(c.x, y1)], Stroke::new(1.5, mau_nut));
+        // Nút icon nét (như .nutgon prototype): nền xanh nhạt khi rê chuột
+        if nut_an.hovered() {
+            ui.painter().rect(nut_r, 3.0, Color32::from_rgb(0xE5, 0xF3, 0xFF), Stroke::new(1.0, Color32::from_rgb(0xCC, 0xE8, 0xFF)), StrokeKind::Inside);
+        }
+        bieu_tuong::ve(ui.painter(), Rect::from_center_size(nut_r.center(), egui::vec2(15.0, 15.0)), if an { BieuTuong::HienDong } else { BieuTuong::AnDong }, Color32::from_gray(0x44));
         if nut_an.on_hover_text(if an { "Hiện dòng thư mục (Chọn · Phân tích)" } else { "Ẩn dòng thư mục — mở rộng vùng duyệt" }).clicked() {
             cfg.an_dong_thu_muc = !an;
             self.cfg_doi = true;
@@ -977,7 +1043,7 @@ impl ManTach {
         let hien: Vec<u32> = (0..b.ho_so.len() as u32).filter(|&h| cot_trai::khop_tim(&self.ten_hien[h as usize], &self.tim_hs)).collect();
         let khong_thay = hien.is_empty() && !self.tim_hs.trim().is_empty();
         // Hồ sơ chứa trang đang xem (khi xem Tất cả): đánh dấu + tự cuộn tới 1 lần mỗi khi đổi hồ sơ
-        let dang = if ho_so_loc.is_none() { self.chon.tieu_diem.map(|k| b.trang[k as usize].ho_so) } else { None };
+        let dang = if ho_so_loc.is_none() && self.chon.so_luong() > 0 { self.chon.tieu_diem.map(|k| b.trang[k as usize].ho_so) } else { None };
         let cuon = match dang {
             Some(h) if self.hs_dang_cuon != Some(h) => hien.iter().position(|&x| x == h).map(|i| i + 1),
             _ => None,
@@ -1043,11 +1109,7 @@ impl ManTach {
                     row.col(|ui| {
                         nen_dang(ui);
                         ke_duoi(ui, vach);
-                        if la_dang {
-                            ui.painter().rect_filled(Rect::from_min_size(ui.max_rect().min, egui::vec2(3.0, ui.max_rect().height())), 0.0, VIEN_TAB_CHON);
-                        }
-                        let so = RichText::new(h.map(|h| (h + 1).to_string()).unwrap_or_default());
-                        o_so(ui, if la_dang { so.dam().color(CHU) } else { so.color(CHU_PHU) }, true);
+                        o_so(ui, RichText::new(h.map(|h| (h + 1).to_string()).unwrap_or_default()).color(CHU_PHU), true);
                     });
                     row.col(|ui| {
                         nen_dang(ui);
@@ -1178,7 +1240,7 @@ impl ManTach {
                     viec.push(Viec::DatLoc(muc));
                 }
                 egui::Popup::menu(&r).show(|ui| {
-                    for (i, (l, icon)) in [(Loc::TatCa, BieuTuong::ChongTrang), (Loc::Index, BieuTuong::MaVach), (Loc::Trang, BieuTuong::TrangTrong), (Loc::NghiTrang, BieuTuong::TrangHoi), (Loc::NghiXoay, BieuTuong::XoayPhai)].into_iter().enumerate() {
+                    for (i, (l, icon)) in [(Loc::TatCa, BieuTuong::ChongTrang), (Loc::Index, BieuTuong::MaVach), (Loc::Trang, BieuTuong::TrangTrong), (Loc::NghiTrang, BieuTuong::TrangHoi), (Loc::NghiXoay, BieuTuong::XoayMenu)].into_iter().enumerate() {
                         if i == 3 {
                             ui.separator();
                         }
@@ -1352,8 +1414,8 @@ impl ManTach {
         let mut so_cot = 1;
         egui::ScrollArea::vertical().id_salt("luoi_ho_so").auto_shrink(false).show_viewport(ui, |ui, vp| {
             let rong = ui.available_width();
-            let mut bc = BoCucLuoi::moi(rong - 2.0 * LE, co, cao_o, KHE_X, KHE_Y);
-            bc.le_trai = LE;
+            let mut bc = BoCucLuoi::deu(rong - 2.0 * LE, co, cao_o, DEM_O, KHE_X, KHE_Y);
+            bc.le_trai += LE;
             so_cot = bc.so_cot;
             let cao_noi_dung = bc.so_hang(n) as f32 * bc.cao_hang() + LE;
             ui.set_min_size(egui::vec2(rong, cao_noi_dung));
@@ -1367,7 +1429,7 @@ impl ManTach {
             // Cuộn tới ô tiêu điểm
             if let Some(k) = cuon_toi.take() {
                 if let Some(i) = thu_tu.iter().position(|&x| x == k) {
-                    let r = Rect::from_min_size(goc + egui::vec2(LE + (i % bc.so_cot) as f32 * (co + KHE_X), (i / bc.so_cot) as f32 * bc.cao_hang()), egui::vec2(co, cao_o));
+                    let r = Rect::from_min_size(goc + egui::Vec2::from(bc.goc_o(i)), egui::vec2(co, cao_o));
                     ui.scroll_to_rect(r, None);
                 }
             }
@@ -1385,7 +1447,7 @@ impl ManTach {
                     let k = thu_tu[i];
                     dang_xem.push(k);
                     let t = &b.trang[k as usize];
-                    let o = Rect::from_min_size(goc + egui::vec2(LE + cot as f32 * (co + KHE_X), hang as f32 * bc.cao_hang()), egui::vec2(co, cao_o));
+                    let o = Rect::from_min_size(goc + egui::Vec2::from(bc.goc_o(i)), egui::vec2(co, cao_o));
                     let nen_o = o.expand(4.0);
                     if chon.co(k) {
                         painter.rect(nen_o, 2.0, NEN_CHON, Stroke::new(1.0, VIEN_CHON), StrokeKind::Inside);
@@ -1687,6 +1749,8 @@ pub(super) fn bat_dau_bang(ui: &mut egui::Ui) {
     ui.visuals_mut().selection.bg_fill = NEN_TAB_CHON;
     // Cột sát nhau (lề chữ nằm trong ô) để vạch dòng và nền dòng chọn liền một dải
     ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+    // Chữ trong ô không bắt chuột (mặc định egui cho bôi chọn chữ) → bấm chỗ nào trên dòng cũng chọn dòng
+    ui.style_mut().interaction.selectable_labels = false;
 }
 
 /// Panel cột trái: mở rộng = kéo đổi độ rộng 160–520 px; thu gọn = cố định 36 px (id riêng để không đè độ rộng đã nhớ).
@@ -1877,7 +1941,7 @@ mod tests {
         assert_eq!(gio_phut_giay(Duration::from_millis(3_725_400)), "01:02:05");
         assert_eq!(phan_tram_nac(3), 26);
         assert_eq!(phan_tram_nac(11), 250);
-        assert_eq!(co_vua_khung(11, 600.0), 600.0 - 2.0 * LE - KHE_X);
+        assert_eq!(co_vua_khung(11, 600.0), 600.0 - 2.0 * LE - DEM_O);
         assert_eq!(co_vua_khung(3, 1600.0), 110.0);
     }
 

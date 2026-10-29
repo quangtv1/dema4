@@ -1,7 +1,7 @@
-//! Icon nét 1 màu (kiểu Lucide) vẽ bằng `painter`: font Arial / font sẵn của egui không có ✓ ▾ ↻ ↶ ↷.
+//! Icon nét 1 màu: dùng đúng SVG của prototype (`plans/261027-1736-tach-van-ban-tu-dong/prototype-tach-van-ban.html`,
+//! cùng toạ độ path và độ dày nét), vẽ bằng bộ đọc SVG của egui_extras; nét trắng rồi tô màu bằng `tint`.
 
-use eframe::egui::{self, Color32, Pos2, Rect, Response, Sense, Shape, Stroke, Vec2};
-use std::f32::consts::PI;
+use eframe::egui::{self, Color32, Rect, Response, Sense, Shape, Stroke, Vec2};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BieuTuong {
@@ -13,13 +13,14 @@ pub enum BieuTuong {
     LamLai,
     XoayPhai,
     Xoay180,
-    /// ⓘ (tooltip giải thích).
+    /// Menu Trợ giúp: Thông tin (info), Kiểm tra cập nhật (refresh), Hướng dẫn (circle-help)
     ThongTin,
-    /// Menu Chức năng / Trợ giúp
+    CapNhat,
+    HoiDap,
+    /// Menu Chức năng: Đếm (file-text), Tách (scissors), Ký (pen)
     TaiLieu,
     Keo,
     But,
-    HoiDap,
     /// Tab Văn bản / hộp phóng to
     TraiChevron,
     PhaiChevron,
@@ -33,226 +34,117 @@ pub enum BieuTuong {
     KinhTru,
     KinhCong,
     SapXep,
-    /// Icon nét mảnh theo prototype (toạ độ lưới 16 × 16 của SVG)
+    /// Thanh menu: lưới 4 ô (Chức năng), bánh răng (Cấu hình)
+    MenuLuoi,
     BanhRang,
+    /// Menu lọc / sắp xếp
     ChongTrang,
     MaVach,
     TrangTrong,
     TrangHoi,
+    XoayMenu,
     DanhSachSo,
     TangDan,
     GiamDan,
+    /// Nhóm sửa / tab Văn bản
     ThungRac,
     TrangGach,
+    /// Cột trái: thu gọn / mở rộng, kính lúp ô tìm; hàng tab: ẩn / hiện dòng thư mục
     ThuGon,
     MoRong,
     KinhLup,
+    AnDong,
+    HienDong,
 }
 
-/// Điểm trong lưới 16 × 16 (như `viewBox="0 0 16 16"` của prototype) → toạ độ màn hình trong `r`.
-fn p16(r: Rect, x: f32, y: f32) -> Pos2 {
-    r.min + Vec2::new(x / 16.0 * r.width(), y / 16.0 * r.height())
+/// (path SVG, cạnh viewBox, độ dày nét) — chép nguyên từ prototype.
+fn svg_cua(bt: BieuTuong) -> Option<(&'static str, u8, f32)> {
+    use BieuTuong::*;
+    Some(match bt {
+        Dau => (r#"<path d="M3.5 8.5 6.5 11.5 12.5 4.5"/>"#, 16, 1.8),
+        MuiTenXuong | BoKhoi => return None,
+        HoanTac => (r#"<path d="M6 9.5 2.5 6 6 2.5"/><path d="M2.5 6H10a3.5 3.5 0 0 1 0 7H8"/>"#, 16, 1.15),
+        LamLai => (r#"<path d="M10 9.5 13.5 6 10 2.5"/><path d="M13.5 6H6a3.5 3.5 0 0 0 0 7h2"/>"#, 16, 1.15),
+        XoayPhai => (r#"<path d="M12.5 7.5A4.5 4.5 0 1 1 8 3h3.5"/><path d="M9.5 1 11.5 3 9.5 5"/>"#, 16, 1.3),
+        Xoay180 => (r#"<path d="M3.5 8a4.5 4.5 0 0 1 9 0v3"/><path d="M10.5 9 12.5 11 14.5 9"/>"#, 16, 1.3),
+        ThongTin => (r#"<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>"#, 24, 1.75),
+        CapNhat => (r#"<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>"#, 24, 1.75),
+        HoiDap => (r#"<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>"#, 24, 1.8),
+        TaiLieu => (r#"<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>"#, 24, 1.75),
+        Keo => (r#"<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>"#, 24, 1.75),
+        But => (r#"<path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.9.9-2.9a2 2 0 0 1 .5-.9z"/>"#, 24, 1.75),
+        TraiChevron => (r#"<path d="M10 3.5 5.5 8l4.5 4.5"/>"#, 16, 1.3),
+        PhaiChevron => (r#"<path d="M6 3.5 10.5 8 6 12.5"/>"#, 16, 1.3),
+        Luoi => (r#"<rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/>"#, 16, 1.3),
+        MotTrang => (r#"<rect x="4" y="1.5" width="8" height="13"/><path d="M1.5 8h1.5M13 8h1.5"/>"#, 16, 1.3),
+        HaiTrang => (r#"<rect x="1.5" y="2.5" width="6" height="11"/><rect x="8.5" y="2.5" width="6" height="11"/>"#, 16, 1.3),
+        Dong => (r#"<path d="M4 4l8 8M12 4l-8 8"/>"#, 16, 1.3),
+        ChevronXuong => (r#"<path d="M4.5 6.5 8 10l3.5-3.5"/>"#, 16, 1.3),
+        KinhTru => (r#"<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M5 7h4"/>"#, 16, 1.3),
+        KinhCong => (r#"<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M5 7h4M7 5v4"/>"#, 16, 1.3),
+        SapXep => (r#"<path d="M5 3v10M2.5 10.5 5 13l2.5-2.5M11 13V3M8.5 5.5 11 3l2.5 2.5"/>"#, 16, 1.3),
+        MenuLuoi => (r#"<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>"#, 24, 1.8),
+        BanhRang => (r#"<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>"#, 24, 1.8),
+        ChongTrang => (r#"<path d="M15 2H9a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7z"/><path d="M4 7v13a2 2 0 0 0 2 2h9"/>"#, 24, 1.8),
+        MaVach => (r#"<path d="M3 5v14M6.5 5v14M9 5v14M13 5v14M15.5 5v14M18 5v14M21 5v14"/>"#, 24, 1.8),
+        TrangTrong => (r#"<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>"#, 24, 1.8),
+        TrangHoi => (r#"<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M10 13a2 2 0 1 1 3 1.7c-.6.3-1 .8-1 1.3"/><path d="M12 19h.01"/>"#, 24, 1.8),
+        XoayMenu => (r#"<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>"#, 24, 1.8),
+        DanhSachSo => (r#"<path d="M10 6h11M10 12h11M10 18h11"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>"#, 24, 1.8),
+        TangDan => (r#"<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h4"/><path d="M11 16h7"/><path d="M11 20h10"/>"#, 24, 1.8),
+        GiamDan => (r#"<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/>"#, 24, 1.8),
+        ThungRac => (r#"<path d="M2.5 4h11"/><path d="M6 4V2.5h4V4"/><path d="M3.8 4l.7 9.5h7l.7-9.5"/><path d="M6.5 6.5v4.5M9.5 6.5v4.5"/>"#, 16, 1.15),
+        TrangGach => (r#"<path d="M9.5 1.5H4.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M2 14 14 2"/>"#, 16, 1.3),
+        ThuGon => (r#"<path d="M3 2.5v11"/><path d="M11 5 8 8l3 3"/>"#, 16, 1.4),
+        MoRong => (r#"<path d="M3 2.5v11"/><path d="M5 5l3 3-3 3"/>"#, 16, 1.4),
+        KinhLup => (r#"<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>"#, 16, 1.4),
+        AnDong => (r#"<path d="M3 3.5h10"/><path d="M5 10l3-3 3 3"/>"#, 16, 1.4),
+        HienDong => (r#"<path d="M3 3.5h10"/><path d="M5 7l3 3 3-3"/>"#, 16, 1.4),
+    })
 }
 
-/// Cung tròn trong lưới 16: tâm (cx, cy), bán kính rr, từ góc `tu` tới `den` (radian).
-fn cung16(r: Rect, cx: f32, cy: f32, rr: f32, tu: f32, den: f32) -> Vec<Pos2> {
-    (0..=12).map(|i| tu + (den - tu) * i as f32 / 12.0).map(|a| p16(r, cx + rr * a.cos(), cy + rr * a.sin())).collect()
+const TAT_CA: [BieuTuong; 40] = {
+    use BieuTuong::*;
+    [
+        Dau, MuiTenXuong, HoanTac, LamLai, XoayPhai, Xoay180, ThongTin, CapNhat, HoiDap, TaiLieu, Keo, But, TraiChevron, PhaiChevron, Luoi, MotTrang, HaiTrang, BoKhoi, Dong, ChevronXuong, KinhTru, KinhCong, SapXep, MenuLuoi,
+        BanhRang, ChongTrang, MaVach, TrangTrong, TrangHoi, XoayMenu, DanhSachSo, TangDan, GiamDan, ThungRac, TrangGach, ThuGon, MoRong, KinhLup, AnDong, HienDong,
+    ]
+};
+
+fn uri(bt: BieuTuong) -> String {
+    format!("bytes://bieu_tuong/{bt:?}.svg")
 }
 
-/// Trang giấy góc gấp phải trên (khung chung của các icon trang).
-fn trang_giay(painter: &egui::Painter, r: Rect, s: Stroke) {
-    painter.add(Shape::line(vec![p16(r, 9.5, 1.5), p16(r, 3.5, 1.5), p16(r, 3.5, 14.5), p16(r, 12.5, 14.5), p16(r, 12.5, 4.5), p16(r, 9.5, 1.5)], s));
-    painter.add(Shape::line(vec![p16(r, 9.5, 1.5), p16(r, 9.5, 4.5), p16(r, 12.5, 4.5)], s));
+/// Nạp bộ đọc ảnh (SVG) và đăng ký SVG của mọi icon — gọi 1 lần khi dựng giao diện.
+pub fn dang_ky_svg(ctx: &egui::Context) {
+    egui_extras::install_image_loaders(ctx);
+    for bt in TAT_CA {
+        if let Some((than, canh, net)) = svg_cua(bt) {
+            let svg = format!(r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {canh} {canh}" fill="none" stroke="#fff" stroke-width="{net}" stroke-linecap="round" stroke-linejoin="round">{than}</svg>"##);
+            ctx.include_bytes(uri(bt), svg.into_bytes());
+        }
+    }
 }
 
-const NET: f32 = 1.75;
-
-fn cung(c: Pos2, r: f32, tu: f32, den: f32) -> Vec<Pos2> {
-    (0..=16).map(|i| tu + (den - tu) * i as f32 / 16.0).map(|a| c + r * Vec2::angled(a)).collect()
-}
-
-/// Đầu mũi tên tại `p` hướng theo `huong` (đã chuẩn hoá).
-fn dau_mui_ten(p: Pos2, huong: Vec2, co: f32) -> Vec<Pos2> {
-    let n = huong.rot90();
-    vec![p - huong * co + n * co * 0.8, p, p - huong * co - n * co * 0.8]
-}
-
-/// Vẽ icon vừa khít `r` (vùng vuông, ~15 px).
+/// Vẽ icon vừa khít `r` (vùng vuông) màu `mau`.
 pub fn ve(painter: &egui::Painter, r: Rect, bt: BieuTuong, mau: Color32) {
-    let s = Stroke::new(NET, mau);
     let c = r.center();
     let k = r.width().min(r.height()) / 2.0;
     match bt {
-        BieuTuong::Dau => {
-            painter.add(Shape::line(vec![c + Vec2::new(-0.6, 0.0) * k, c + Vec2::new(-0.2, 0.45) * k, c + Vec2::new(0.65, -0.5) * k], s));
-        }
         BieuTuong::MuiTenXuong => {
             painter.add(Shape::convex_polygon(vec![c + Vec2::new(-0.45, -0.2) * k, c + Vec2::new(0.45, -0.2) * k, c + Vec2::new(0.0, 0.3) * k], mau, Stroke::NONE));
         }
-        BieuTuong::HoanTac | BieuTuong::LamLai => {
-            let s = Stroke::new(1.2, mau);
-            let lat = |x: f32| if bt == BieuTuong::HoanTac { x } else { 16.0 - x };
-            painter.add(Shape::line(vec![p16(r, lat(6.0), 9.5), p16(r, lat(2.5), 6.0), p16(r, lat(6.0), 2.5)], s));
-            let mut diem = vec![p16(r, lat(2.5), 6.0), p16(r, lat(10.0), 6.0)];
-            let (tu, den) = if bt == BieuTuong::HoanTac { (-PI / 2.0, PI / 2.0) } else { (-PI / 2.0, -3.0 * PI / 2.0) };
-            diem.extend(cung16(r, lat(10.0), 9.5, 3.5, tu, den));
-            diem.push(p16(r, lat(8.0), 13.0));
-            painter.add(Shape::line(diem, s));
-        }
-        BieuTuong::ThongTin => {
-            painter.circle_stroke(c, 0.85 * k, Stroke::new(1.2, mau));
-            painter.circle_filled(c + Vec2::new(0.0, -0.4) * k, 0.12 * k, mau);
-            painter.line_segment([c + Vec2::new(0.0, -0.12) * k, c + Vec2::new(0.0, 0.5) * k], Stroke::new(1.4, mau));
-        }
-        BieuTuong::TaiLieu => {
-            let (w, h) = (0.62 * k, 0.8 * k);
-            let goc = 0.3 * k;
-            let diem = vec![c + Vec2::new(-w, -h), c + Vec2::new(w - goc, -h), c + Vec2::new(w, -h + goc), c + Vec2::new(w, h), c + Vec2::new(-w, h), c + Vec2::new(-w, -h)];
-            painter.add(Shape::line(diem, s));
-            for y in [-0.05, 0.3] {
-                painter.line_segment([c + Vec2::new(-0.35, y) * k, c + Vec2::new(0.35, y) * k], s);
-            }
-        }
-        BieuTuong::Keo => {
-            for y in [-0.45, 0.45] {
-                painter.circle_stroke(c + Vec2::new(-0.5, y) * k, 0.25 * k, s);
-            }
-            painter.line_segment([c + Vec2::new(-0.3, -0.3) * k, c + Vec2::new(0.8, 0.45) * k], s);
-            painter.line_segment([c + Vec2::new(-0.3, 0.3) * k, c + Vec2::new(0.8, -0.45) * k], s);
-        }
-        BieuTuong::But => {
-            painter.line_segment([c + Vec2::new(-0.6, 0.55) * k, c + Vec2::new(0.45, -0.5) * k], Stroke::new(NET * 1.3, mau));
-            painter.line_segment([c + Vec2::new(-0.75, 0.8) * k, c + Vec2::new(-0.6, 0.55) * k], s);
-            painter.line_segment([c + Vec2::new(0.0, 0.85) * k, c + Vec2::new(0.85, 0.85) * k], s);
-        }
-        BieuTuong::HoiDap => {
-            painter.circle_stroke(c, 0.85 * k, Stroke::new(1.2, mau));
-            painter.text(c + Vec2::new(0.0, 0.05 * k), egui::Align2::CENTER_CENTER, "?", egui::FontId::proportional(1.2 * k), mau);
-        }
-        BieuTuong::TraiChevron | BieuTuong::PhaiChevron => {
-            let l = if bt == BieuTuong::TraiChevron { 1.0 } else { -1.0 };
-            painter.add(Shape::line(vec![c + Vec2::new(0.25 * l, -0.6) * k, c + Vec2::new(-0.25 * l, 0.0) * k, c + Vec2::new(0.25 * l, 0.6) * k], s));
-        }
-        BieuTuong::Luoi => {
-            for (x, y) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
-                painter.rect_stroke(Rect::from_center_size(c + Vec2::new(x, y) * 0.42 * k, Vec2::splat(0.62 * k)), 1.0, s, egui::StrokeKind::Middle);
-            }
-        }
-        BieuTuong::MotTrang => {
-            painter.rect_stroke(Rect::from_center_size(c, Vec2::new(1.1, 1.6) * k), 1.0, s, egui::StrokeKind::Middle);
-        }
-        BieuTuong::HaiTrang => {
-            for x in [-0.45, 0.45] {
-                painter.rect_stroke(Rect::from_center_size(c + Vec2::new(x, 0.0) * k, Vec2::new(0.75, 1.5) * k), 1.0, s, egui::StrokeKind::Middle);
-            }
-        }
-        BieuTuong::BoKhoi => {
-            // Trang có dấu trừ: bỏ trang khỏi văn bản
-            painter.rect_stroke(Rect::from_center_size(c + Vec2::new(-0.15, 0.0) * k, Vec2::new(1.0, 1.5) * k), 1.0, s, egui::StrokeKind::Middle);
-            painter.circle_filled(c + Vec2::new(0.45, 0.45) * k, 0.42 * k, painter.ctx().global_style().visuals.window_fill);
-            painter.line_segment([c + Vec2::new(0.22, 0.45) * k, c + Vec2::new(0.68, 0.45) * k], Stroke::new(NET * 1.2, mau));
-        }
-        BieuTuong::Dong => {
-            painter.line_segment([c + Vec2::new(-0.55, -0.55) * k, c + Vec2::new(0.55, 0.55) * k], s);
-            painter.line_segment([c + Vec2::new(0.55, -0.55) * k, c + Vec2::new(-0.55, 0.55) * k], s);
-        }
-        BieuTuong::ChevronXuong => {
-            painter.add(Shape::line(vec![c + Vec2::new(-0.45, -0.22) * k, c + Vec2::new(0.0, 0.22) * k, c + Vec2::new(0.45, -0.22) * k], Stroke::new(1.3, mau)));
-        }
-        BieuTuong::KinhTru | BieuTuong::KinhCong => {
-            let s = Stroke::new(1.3, mau);
-            let tam = c + Vec2::new(-0.15, -0.15) * k;
-            painter.circle_stroke(tam, 0.58 * k, s);
-            painter.line_segment([c + Vec2::new(0.3, 0.3) * k, c + Vec2::new(0.85, 0.85) * k], s);
-            painter.line_segment([tam - Vec2::new(0.3 * k, 0.0), tam + Vec2::new(0.3 * k, 0.0)], s);
-            if bt == BieuTuong::KinhCong {
-                painter.line_segment([tam - Vec2::new(0.0, 0.3 * k), tam + Vec2::new(0.0, 0.3 * k)], s);
-            }
-        }
-        BieuTuong::SapXep => {
-            let s = Stroke::new(1.3, mau);
-            painter.line_segment([c + Vec2::new(-0.4, -0.75) * k, c + Vec2::new(-0.4, 0.75) * k], s);
-            painter.add(Shape::line(dau_mui_ten(c + Vec2::new(-0.4, 0.75) * k, Vec2::new(0.0, 1.0), 0.32 * k), s));
-            painter.line_segment([c + Vec2::new(0.4, 0.75) * k, c + Vec2::new(0.4, -0.75) * k], s);
-            painter.add(Shape::line(dau_mui_ten(c + Vec2::new(0.4, -0.75) * k, Vec2::new(0.0, -1.0), 0.32 * k), s));
-        }
-        BieuTuong::BanhRang => {
-            // Bánh răng: vòng ngoài + 8 răng + lỗ giữa
-            let s = Stroke::new(1.3, mau);
-            painter.circle_stroke(c, 0.55 * k, s);
-            painter.circle_stroke(c, 0.22 * k, s);
-            for i in 0..8 {
-                let a = i as f32 * PI / 4.0;
-                painter.line_segment([c + 0.55 * k * Vec2::angled(a), c + 0.85 * k * Vec2::angled(a)], Stroke::new(2.2, mau));
-            }
-        }
-        BieuTuong::ChongTrang => {
-            let s = Stroke::new(1.25, mau);
-            painter.add(Shape::line(vec![p16(r, 10.0, 1.5), p16(r, 6.0, 1.5), p16(r, 6.0, 11.5), p16(r, 13.0, 11.5), p16(r, 13.0, 4.5), p16(r, 10.0, 1.5)], s));
-            painter.add(Shape::line(vec![p16(r, 3.5, 4.5), p16(r, 3.5, 14.5), p16(r, 10.0, 14.5)], s));
-        }
-        BieuTuong::MaVach => {
-            for (x, w) in [(2.5, 1.2), (4.8, 0.8), (6.5, 1.6), (9.0, 0.8), (10.8, 1.2), (13.0, 0.8)] {
-                painter.line_segment([p16(r, x, 3.0), p16(r, x, 13.0)], Stroke::new(w * r.width() / 16.0, mau));
-            }
-        }
-        BieuTuong::TrangTrong => trang_giay(painter, r, Stroke::new(1.25, mau)),
-        BieuTuong::TrangHoi => {
-            trang_giay(painter, r, Stroke::new(1.25, mau));
-            painter.text(p16(r, 8.0, 9.5), egui::Align2::CENTER_CENTER, "?", egui::FontId::new(0.5 * r.height(), egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), mau);
-        }
-        BieuTuong::TrangGach => {
-            let s = Stroke::new(1.25, mau);
-            trang_giay(painter, r, s);
-            painter.line_segment([p16(r, 2.0, 14.0), p16(r, 14.0, 2.0)], s);
-        }
-        BieuTuong::DanhSachSo => {
-            let s = Stroke::new(1.25, mau);
-            for (i, y) in [4.0, 8.0, 12.0].into_iter().enumerate() {
-                painter.line_segment([p16(r, 7.0, y), p16(r, 14.0, y)], s);
-                painter.text(p16(r, 3.5, y), egui::Align2::CENTER_CENTER, (i + 1).to_string(), egui::FontId::proportional(0.32 * r.height()), mau);
-            }
-        }
-        BieuTuong::TangDan | BieuTuong::GiamDan => {
-            let s = Stroke::new(1.25, mau);
-            let tang = bt == BieuTuong::TangDan;
-            painter.line_segment([p16(r, 4.0, 2.5), p16(r, 4.0, 13.5)], s);
-            let dinh = if tang { p16(r, 4.0, 2.5) } else { p16(r, 4.0, 13.5) };
-            painter.add(Shape::line(dau_mui_ten(dinh, Vec2::new(0.0, if tang { -1.0 } else { 1.0 }), 0.3 * k), s));
-            let dai = if tang { [3.0, 5.0, 7.0] } else { [7.0, 5.0, 3.0] };
-            for (y, d) in [4.0, 8.0, 12.0].into_iter().zip(dai) {
-                painter.line_segment([p16(r, 7.5, y), p16(r, 7.5 + d, y)], s);
-            }
-        }
-        BieuTuong::ThungRac => {
-            let s = Stroke::new(1.25, mau);
-            painter.line_segment([p16(r, 2.5, 4.0), p16(r, 13.5, 4.0)], s);
-            painter.add(Shape::line(vec![p16(r, 6.0, 4.0), p16(r, 6.0, 2.5), p16(r, 10.0, 2.5), p16(r, 10.0, 4.0)], s));
-            painter.add(Shape::line(vec![p16(r, 3.8, 4.0), p16(r, 4.5, 13.5), p16(r, 11.5, 13.5), p16(r, 12.2, 4.0)], s));
-            for x in [6.5, 9.5] {
-                painter.line_segment([p16(r, x, 6.5), p16(r, x, 11.0)], s);
-            }
-        }
-        BieuTuong::ThuGon | BieuTuong::MoRong => {
-            let s = Stroke::new(1.4, mau);
-            painter.line_segment([p16(r, 3.0, 2.5), p16(r, 3.0, 13.5)], s);
-            let diem = if bt == BieuTuong::ThuGon { [(11.0, 5.0), (8.0, 8.0), (11.0, 11.0)] } else { [(7.0, 5.0), (10.0, 8.0), (7.0, 11.0)] };
-            painter.add(Shape::line(diem.iter().map(|&(x, y)| p16(r, x, y)).collect(), s));
-        }
-        BieuTuong::KinhLup => {
-            let s = Stroke::new(1.4, mau);
-            painter.circle_stroke(p16(r, 7.0, 7.0), 4.5 / 16.0 * r.width(), s);
-            painter.line_segment([p16(r, 10.5, 10.5), p16(r, 14.0, 14.0)], s);
-        }
-        BieuTuong::XoayPhai | BieuTuong::Xoay180 => {
-            // Vòng 3/4 theo chiều kim đồng hồ, mũi tên ở cuối
-            let r_cung = 0.62 * k;
-            let (tu, den) = (0.75 * PI, 2.2 * PI);
-            painter.add(Shape::line(cung(c, r_cung, tu, den), s));
-            let cuoi = c + r_cung * Vec2::angled(den);
-            painter.add(Shape::line(dau_mui_ten(cuoi, Vec2::angled(den + PI / 2.0), 0.3 * k), s));
-            if bt == BieuTuong::Xoay180 {
-                painter.circle_filled(c, 0.16 * k, mau);
+        BieuTuong::BoKhoi => {}
+        _ => {
+            let ctx = painter.ctx();
+            let px = (r.width().max(r.height()) * ctx.pixels_per_point()).round().max(1.0) as u32;
+            let goi_y = egui::SizeHint::Size { width: px, height: px, maintain_aspect_ratio: true };
+            match ctx.try_load_texture(&uri(bt), egui::TextureOptions::LINEAR, goi_y) {
+                Ok(egui::load::TexturePoll::Ready { texture }) => {
+                    painter.image(texture.id, r, Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), mau);
+                }
+                Ok(egui::load::TexturePoll::Pending { .. }) => ctx.request_repaint(),
+                Err(_) => {}
             }
         }
     }
@@ -272,7 +164,7 @@ pub fn nut(ui: &mut egui::Ui, bt: BieuTuong, goi_y: &str, bat: bool) -> Response
 
 /// Icon làm 1 phần tử của `Button` (`Button::new((atom(..), "chữ"))`): nhãn truy cập vẫn chỉ là chữ.
 pub fn atom(bt: BieuTuong, co: f32) -> egui::Atom<'static> {
-    egui::Atom::paint(Vec2::splat(co), move |ui, a| ve(ui.painter(), a.rect, bt, a.fallback_text_color))
+    atom_mau(bt, co, Color32::from_gray(0x55))
 }
 
 /// Icon màu cố định làm phần tử của `Button` (vd icon xám đầu mục thanh menu).

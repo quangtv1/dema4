@@ -78,6 +78,7 @@ fn o_tim(ui: &mut egui::Ui, id: &str, tim: &mut String, goi_y: &str, rong: f32) 
 /// `chu(i)` = số hiển thị, `chon(i)` = hàng đang chọn (nền xanh), `dang(i)` = hồ sơ chứa trang đang xem (vạch xanh trái).
 pub fn cot_so_gon(ui: &mut egui::Ui, id: &str, so_dong: usize, cao: f32, cao_dau: f32, chu: impl Fn(usize) -> String, goi_y: impl Fn(usize) -> String, chon: impl Fn(usize) -> bool, dang: impl Fn(usize) -> bool, cuon_toi: Option<usize>) -> Option<usize> {
     let mut bam = None;
+    ui.style_mut().interaction.selectable_labels = false;
     // Tiêu đề "#"
     let (dau, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), cao_dau), Sense::hover());
     ui.painter().rect_filled(dau, 0.0, crate::gui::NEN_TIEU_DE);
@@ -108,11 +109,8 @@ pub fn cot_so_gon(ui: &mut egui::Ui, id: &str, so_dong: usize, cao: f32, cao_dau
                 } else if ph.hovered() {
                     p.rect_filled(r, 0.0, Color32::from_rgb(0xF2, 0xF7, 0xFC));
                 }
-                if dang(i) {
-                    p.rect_filled(Rect::from_min_size(r.min, egui::vec2(3.0, r.height())), 0.0, VIEN_TAB_CHON);
-                }
                 p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, super::VACH_DONG));
-                let dam = chon(i) || dang(i);
+                let dam = chon(i);
                 let font = if dam { egui::FontId::new(12.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())) } else { egui::FontId::proportional(12.0) };
                 p.text(r.center(), egui::Align2::CENTER_CENTER, chu(i), font, if dam { CHU } else { CHU_PHU });
                 if ph.clicked() {

@@ -243,6 +243,19 @@ impl BoCucLuoi {
         Self { so_cot, rong_o, cao_o, khe_x, khe_y, le_trai: 0.0 }
     }
 
+    /// Lưới chia đều bề ngang như CSS `repeat(auto-fill, minmax(rong_o + dem, 1fr))` + `gap: khe` của prototype:
+    /// mỗi cột rộng bằng nhau, ảnh nằm giữa cột (khoảng thừa chia đều 2 bên).
+    pub fn deu(rong: f32, rong_o: f32, cao_o: f32, dem: f32, khe: f32, khe_y: f32) -> Self {
+        let so_cot = (((rong + khe) / (rong_o + dem + khe)).floor() as usize).max(1);
+        let cot = ((rong - khe * (so_cot - 1) as f32) / so_cot as f32).max(rong_o);
+        Self { so_cot, rong_o, cao_o, khe_x: cot + khe - rong_o, khe_y, le_trai: (cot - rong_o) / 2.0 }
+    }
+
+    /// Góc trái trên của ô thứ `i` (toạ độ nội dung, chưa cộng gốc).
+    pub fn goc_o(&self, i: usize) -> (f32, f32) {
+        (self.le_trai + (i % self.so_cot) as f32 * (self.rong_o + self.khe_x), (i / self.so_cot) as f32 * self.cao_hang())
+    }
+
     pub fn so_hang(&self, n: usize) -> usize {
         n.div_ceil(self.so_cot)
     }
