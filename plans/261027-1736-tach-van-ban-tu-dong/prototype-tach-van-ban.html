@@ -990,7 +990,7 @@
       $('dsTrai').innerHTML = '<div class="bangvb" role="grid"><span class="tieude-cot so">#</span><span class="tieude-cot">Tên văn bản</span>' +
         '<span class="tieude-cot so">Trang</span>' +
         tatCaVanBan().map(function (x, g) {
-          var ten = tenVanBan(x.hs, x.so).replace(/\.pdf$/i, '');
+          var ten = tenVanBan(x.hs, x.so);
           return '<div class="vbdong' + (g === s.vb ? ' chon' : '') + (x.so === 1 && g ? ' dauhs' : '') + '" data-vbg="' + g + '" role="row">' +
             '<span class="so" title="' + ten + '">' + (g + 1) + '</span><span title="' + ten + (x.v.ao ? ' — mở đầu bằng Split' : '') + '">' + (x.v.ao ? '<span class="ao">✂ </span>' : '') + ten + '</span>' +
             '<span class="so">' + demGiu(x) + '</span></div>';
@@ -1005,7 +1005,7 @@
       var m = nhan[i], vb = s.daPT ? tinhDai(m).length : '';
       tTr += N; tI += dem(m, 'index'); tT += dem(m, 'trang'); tV += vb || 0;
       return '<div class="vbdong' + (i === s.locHS ? ' chon' : '') + '" data-hs="' + i + '" role="row"><span class="so" title="' + tenHS(i) + '">' + (i + 1) + '</span>' +
-        '<span title="' + t + '">' + tenHS(i) + '</span><span class="so">' + N + '</span>' +
+        '<span title="' + t + '">' + TEN[i] + '</span><span class="so">' + N + '</span>' +
         '<span class="so">' + (s.daPT ? dem(m, 'index') + (dem(m, 'cat') ? '<span class="ao" title="Split"> +' + dem(m, 'cat') + '</span>' : '') : '') + '</span><span class="so">' + (s.daPT ? dem(m, 'trang') : '') + '</span><span class="so">' + vb + '</span></div>';
     }).join('');
     $('dsTrai').innerHTML = '<div class="banghs" role="grid">' +
@@ -1057,7 +1057,7 @@
     if (n !== undefined) soTrongView = n;
     var xoa = 0; daXoa.forEach(function (d, hs) { if (s.locHS < 0 || s.locHS === hs) xoa += Object.keys(d).length; });
     var sc = soChon();
-    $('conView').innerHTML = 'Còn trong view: <b>' + soTrongView + '</b> trang · đã xoá ' + xoa + (sc ? ' · Đã chọn: <b style="color:var(--chon-vien)">' + sc + '</b> trang' : '');
+    $('conView').textContent = 'Trong lưới: ' + soTrongView + ' · Đã xoá: ' + xoa + ' · Đã chọn: ' + sc;
     veHoanTac();
   }
   function veLuoi() {
@@ -1180,7 +1180,7 @@
         for (var p = x.v.a; p <= x.v.b; p++) if (nhan[x.hs][p] !== 'trang') { soTrang++; quyA4 += HE_SO[khoTrang(x.hs, p)]; }
       });
       var so = function (n) { return String(n).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
-      $('chanTrang').innerHTML = 'Thông tin: Hồ sơ: <b>' + TEN.length + '</b>; Văn bản: <b>' + tongVB + '</b>; Số trang: <b>' + so(soTrang) + '</b>; Quy A4: <b>' + so(quyA4) + '</b>';
+      $('chanTrang').innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>Số hồ sơ: <b>' + TEN.length + '</b>; Số văn bản: <b>' + tongVB + '</b>; Tổng số trang: <b>' + so(soTrang) + '</b>; Số trang (Quy A4): <b>' + so(quyA4) + '</b>';
     } else {
       $('chanTrang').textContent = '';
     }

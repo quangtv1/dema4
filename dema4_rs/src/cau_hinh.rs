@@ -313,7 +313,7 @@ pub fn cho_dat_file() -> Vec<PathBuf> {
     ds
 }
 
-fn thu_muc_nguoi_dung() -> Option<PathBuf> {
+pub(crate) fn thu_muc_nguoi_dung() -> Option<PathBuf> {
     let goc = if cfg!(windows) {
         PathBuf::from(std::env::var_os("APPDATA")?)
     } else if cfg!(target_os = "macos") {

@@ -5,6 +5,7 @@ pub mod cache_trang;
 pub mod cat_pdf;
 pub mod chi_so_trang;
 pub mod doc_ma;
+pub mod du_lieu_an;
 pub mod dung_luong;
 pub mod hang_doi;
 pub mod huong_trang;

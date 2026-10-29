@@ -11,10 +11,8 @@ use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
-/// Thư mục ẩn cạnh dữ liệu: nhãn, góc xoay, log tách, cache.
-pub fn thu_muc_an(goc: &Path) -> PathBuf {
-    goc.join(".sm-dema4")
-}
+pub use super::du_lieu_an::thu_muc_an;
+use super::du_lieu_an::chuyen_du_lieu_cu;
 
 pub struct HoSoPhanTich {
     pub pdf: PathBuf,
@@ -122,6 +120,7 @@ pub fn duyet_pdf_theo_cay(goc: &Path, dung: &AtomicBool, mut moi_thu_muc: impl F
 impl PhienPhanTich {
     /// Mở thư mục: file có cache khớp → dùng ngay; chưa có → đọc dung lượng + kích thước (không render).
     pub fn mo(goc: &Path, dung: &AtomicBool) -> Self {
+        chuyen_du_lieu_cu(goc);
         let mut pdf = Vec::new();
         duyet_pdf_theo_cay(goc, dung, |ds| pdf.extend(ds));
         Self::mo_tu_ds(goc, pdf)
@@ -129,6 +128,7 @@ impl PhienPhanTich {
 
     /// Như `mo` nhưng dùng danh sách PDF đã duyệt sẵn (bước xem trước) — khỏi duyệt lại cây thư mục.
     pub fn mo_tu_ds(goc: &Path, pdf: Vec<PathBuf>) -> Self {
+        chuyen_du_lieu_cu(goc);
         let cache = thu_muc_an(goc).join("cache");
         let ho_so = pdf
             .into_par_iter()
@@ -156,6 +156,7 @@ impl PhienPhanTich {
             let _ = gui.send(XemTruocSuKien::Them(ds));
         });
         let _ = gui.send(XemTruocSuKien::DaDuyet);
+        chuyen_du_lieu_cu(goc);
         let cache = thu_muc_an(goc).join("cache");
         let so: Vec<Option<usize>> = tat_ca
             .par_iter()

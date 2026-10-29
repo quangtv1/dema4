@@ -86,13 +86,46 @@ type KetQuaHoSo = (Vec<DongLog>, bool, Vec<String>, Vec<PathBuf>);
 
 fn so_trang_pdf(pdf: &Path) -> Result<usize, String> {
     let doc = mupdf::Document::open(pdf.to_str().ok_or("đường dẫn không hợp lệ")?).map_err(|e| format!("không mở được: {e}"))?;
+    // Có mật khẩu người dùng: MuPDF vẫn mở và đếm trang được nhưng luồng dữ liệu đọc ra là rác → file tách hỏng
+    if doc.needs_password().map_err(|e| e.to_string())? {
+        return Err(LOI_MAT_KHAU.into());
+    }
     Ok(doc.page_count().map_err(|e| e.to_string())? as usize)
 }
+
+pub const LOI_MAT_KHAU: &str = "PDF có mật khẩu — mở bằng mật khẩu, lưu lại bản không mật khẩu rồi làm lại";
+
+/// Diễn giải vài lỗi hay gặp của MuPDF / hệ điều hành cho người dùng; lỗi khác giữ nguyên.
+pub fn ro_loi(e: String) -> String {
+    let t = e.to_lowercase();
+    if t.contains("no objects found") || t.contains("cannot recognize") || t.contains("not a pdf") {
+        "file hỏng hoặc không phải PDF".into()
+    } else if t.contains("os error 206)") || t.contains("name too long") {
+        format!("đường dẫn quá dài (Windows giới hạn 260 ký tự) — đặt thư mục lưu kết quả ngắn hơn · {e}")
+    } else if t.contains("permission denied") || t.contains("access is denied") || t.contains("os error 5)") {
+        format!("không có quyền ghi · {e}")
+    } else if t.contains("no space left") || t.contains("os error 112)") || t.contains("os error 28)") {
+        format!("ổ đĩa đầy · {e}")
+    } else {
+        e
+    }
+}
+
+/// Chữ trong panic (để báo thành lỗi thường thay vì sập app).
+pub fn chu_panic(p: &(dyn std::any::Any + Send)) -> String {
+    p.downcast_ref::<&str>().map(|s| s.to_string()).or_else(|| p.downcast_ref::<String>().cloned()).unwrap_or_else(|| "không rõ".into())
+}
+
+/// Đuôi file tạm khi đang ghi 1 văn bản: ghi xong mới đổi tên thành `.pdf`, nên tắt app giữa chừng không để lại PDF cụt.
+const DUOI_TAM: &str = ".tmp";
 
 /// Tách 1 hồ sơ vào `thu_muc_ho_so` (= `<ra>/<thư mục con>/<hồ sơ>/`). Trả các dòng log + có chép nguyên không.
 fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<KetQuaHoSo, String> {
     let ten_ho_so = ho_so.pdf.file_stem().ok_or("tên file không hợp lệ")?.to_string_lossy().into_owned();
     let so_trang = so_trang_pdf(&ho_so.pdf)?;
+    if so_trang == 0 {
+        return Ok((Vec::new(), false, vec![format!("{}: 0 trang, không có gì để tách", ho_so.pdf.display())], Vec::new()));
+    }
     if let Some(&t) = ho_so.nhan.keys().chain(ho_so.xoay.keys()).filter(|&&t| t > so_trang).max() {
         return Err(format!("nhãn / góc xoay ở trang {t} nhưng hồ sơ chỉ có {so_trang} trang"));
     }
@@ -103,21 +136,28 @@ fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<KetQu
     for vb in &dai.van_ban {
         let ten = ten_van_ban(mau, &ten_ho_so, vb.so);
         let ra = thu_muc_ho_so.join(&ten);
-        if dai.nguyen_ven {
+        let tam = thu_muc_ho_so.join(format!("{ten}{DUOI_TAM}"));
+        let ghi = if dai.nguyen_ven {
             // Không nhãn, không xoay: chép từng byte (giữ cả chữ ký số), không ghi lại bằng MuPDF
-            std::fs::copy(&ho_so.pdf, &ra).map_err(|e| format!("không chép được {}: {e}", ra.display()))?;
+            std::fs::copy(&ho_so.pdf, &tam).map(|_| ()).map_err(|e| format!("không chép được {}: {e}", ra.display()))
         } else {
-            cat_bang_ghep(&ho_so.pdf, &vb.trang_giu, &ra).map_err(|e| format!("không ghi được {}: {e}", ra.display()))?;
+            cat_bang_ghep(&ho_so.pdf, &vb.trang_giu, &tam).map_err(|e| format!("không ghi được {}: {e}", ra.display()))
+        };
+        if let Err(e) = ghi.and_then(|_| std::fs::rename(&tam, &ra).map_err(|e| format!("không đổi tên file tạm thành {}: {e}", ra.display()))) {
+            let _ = std::fs::remove_file(&tam);
+            return Err(e);
         }
         da_ghi.insert(ten);
         dong.push(DongLog { file_vao: ho_so.pdf.clone(), tu: vb.tu, den: vb.den, file_ra: ra, trang_bo: vb.bo.clone(), so_trang: vb.trang_giu.len() });
     }
-    // Dọn văn bản cũ của lần tách trước không còn sinh ra (chỉ file khớp mẫu tên đang áp)
+    // Dọn văn bản cũ của lần tách trước không còn sinh ra (chỉ file khớp mẫu tên đang áp) và file tạm bỏ dở
     let mut khong_xoa = Vec::new();
     if let Ok(ds) = std::fs::read_dir(thu_muc_ho_so) {
         for muc in ds.flatten() {
             let ten = muc.file_name().to_string_lossy().into_owned();
-            if !da_ghi.contains(&ten) && khop_mau(mau, &ten_ho_so, &ten) && std::fs::remove_file(muc.path()).is_err() {
+            let tam_cu = ten.strip_suffix(DUOI_TAM).is_some_and(|goc| khop_mau(mau, &ten_ho_so, goc));
+            let thua = !da_ghi.contains(&ten) && khop_mau(mau, &ten_ho_so, &ten);
+            if (tam_cu || thua) && std::fs::remove_file(muc.path()).is_err() {
                 khong_xoa.push(muc.path());
             }
         }
@@ -138,7 +178,11 @@ pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung
         .map(|(i, hs)| {
             let con = hs.pdf.parent().and_then(|p| p.strip_prefix(nguon).ok()).unwrap_or(Path::new(""));
             let ten = hs.pdf.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-            let kq = tach_ho_so(hs, &ra.join(con).join(ten), mau);
+            // Một hồ sơ gây panic (lỗi trong thư viện PDF) chỉ thành lỗi của hồ sơ đó, không làm hỏng cả lô
+            let thu_muc_hs = ra.join(con).join(ten);
+            let kq = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tach_ho_so(hs, &thu_muc_hs, mau)))
+                .unwrap_or_else(|p| Err(format!("lỗi bất ngờ khi tách: {}", chu_panic(&*p))))
+                .map_err(ro_loi);
             tien_do(xong.fetch_add(1, Ordering::Relaxed) + 1, ho_so.len());
             (i, kq)
         })
@@ -200,6 +244,13 @@ pub fn dong_log_khong_xoa(khong_xoa: &[PathBuf]) -> String {
     khong_xoa.iter().map(|p| format!("# Không xoá được file cũ (có thể đang mở): {}\n", p.display())).collect()
 }
 
+/// Dòng `#` cuối log: hồ sơ lỗi (không tách được) và cảnh báo (dải toàn trắng, hồ sơ 0 trang) — để xem lại đủ sau popup.
+pub fn dong_log_loi(loi: &[(PathBuf, String)], canh_bao: &[String]) -> String {
+    let mut s: String = loi.iter().map(|(p, e)| format!("# Lỗi {}: {e}\n", p.display())).collect();
+    s.extend(canh_bao.iter().map(|c| format!("# Cảnh báo {c}\n")));
+    s
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -234,6 +285,67 @@ pub(crate) mod tests {
         }
         ra.extend(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", obj.len() + 1).bytes());
         std::fs::write(duong_dan, ra).unwrap();
+    }
+
+    /// PDF mật khẩu người dùng: báo lỗi, không ghi file (ghi ra sẽ là PDF hỏng); chỉ mật khẩu chủ sở hữu: tách bình thường.
+    #[test]
+    fn pdf_mat_khau_bao_loi_khong_ghi_file_hong() {
+        use mupdf::pdf::{Encryption, PdfWriteOptions};
+        let goc = std::env::temp_dir().join(format!("dema4_mat_khau_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let nguon = goc.join("nguon");
+        std::fs::create_dir_all(&nguon).unwrap();
+        tao_pdf(&goc.join("goc.pdf"), 4);
+        let doc = PdfDocument::open(goc.join("goc.pdf").to_str().unwrap()).unwrap();
+        for (ten, nguoi_dung) in [("mk_user.pdf", "matkhau"), ("mk_owner.pdf", "")] {
+            let mut tc = PdfWriteOptions::default();
+            tc.set_encryption(Encryption::Aes128).set_user_password(nguoi_dung).set_owner_password("chu");
+            doc.save_with_options(nguon.join(ten).to_str().unwrap(), tc).unwrap();
+        }
+        let nhan: BTreeMap<usize, Nhan> = [(2, Nhan::Index)].into();
+        let ho_so = vec![
+            HoSoTach { pdf: nguon.join("mk_user.pdf"), nhan: nhan.clone(), xoay: BTreeMap::new() },
+            HoSoTach { pdf: nguon.join("mk_owner.pdf"), nhan, xoay: BTreeMap::new() },
+        ];
+        let ra = thu_muc_ra(&nguon, None).unwrap();
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        assert_eq!(kq.loi.len(), 1, "{:?}", kq.loi);
+        assert!(kq.loi[0].0.ends_with("mk_user.pdf") && kq.loi[0].1.contains("mật khẩu"), "{:?}", kq.loi);
+        assert!(!ra.join("mk_user").exists(), "không được ghi file nào từ PDF có mật khẩu");
+        assert_eq!(chu_cac_trang(&ra.join("mk_owner").join("mk_owner.1.pdf")), ["Trang 1"]);
+        assert_eq!(chu_cac_trang(&ra.join("mk_owner").join("mk_owner.2.pdf")), ["Trang 3", "Trang 4"]);
+        // Lúc phân tích cũng chặn: hồ sơ báo lỗi, không hiện trang để gán nhãn
+        assert!(super::super::dung_luong::doc_thong_tin_file(&nguon.join("mk_user.pdf")).unwrap_err().contains("mật khẩu"));
+        assert_eq!(super::super::dung_luong::doc_thong_tin_file(&nguon.join("mk_owner.pdf")).unwrap().len(), 4);
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Hồ sơ hỏng chỉ lỗi riêng nó; hồ sơ 0 trang thành cảnh báo; văn bản ghi qua file tạm, không để sót `.tmp`
+    /// (kể cả file tạm bỏ dở của lần trước); lỗi + cảnh báo có dòng `#` trong log.
+    #[test]
+    fn ho_so_loi_khong_chan_ho_so_khac_khong_sot_file_tam_va_ghi_log() {
+        let goc = std::env::temp_dir().join(format!("dema4_hs_loi_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let nguon = goc.join("nguon");
+        std::fs::create_dir_all(&nguon).unwrap();
+        tao_pdf(&nguon.join("ok.pdf"), 3);
+        tao_pdf(&nguon.join("trong.pdf"), 0);
+        std::fs::write(nguon.join("hong.pdf"), b"%PDF-1.4\nrac rac rac").unwrap();
+        let ra = thu_muc_ra(&nguon, None).unwrap();
+        std::fs::create_dir_all(ra.join("ok")).unwrap();
+        std::fs::write(ra.join("ok").join("ok.9.pdf.tmp"), b"do dang").unwrap();
+        let nhan: BTreeMap<usize, Nhan> = [(2, Nhan::Index)].into();
+        let ho_so: Vec<HoSoTach> = ["ok.pdf", "trong.pdf", "hong.pdf"].iter().map(|t| HoSoTach { pdf: nguon.join(t), nhan: nhan.clone(), xoay: BTreeMap::new() }).collect();
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        assert_eq!(kq.loi.len(), 1, "{:?}", kq.loi);
+        assert!(kq.loi[0].0.ends_with("hong.pdf") && kq.loi[0].1.contains("file hỏng hoặc không phải PDF"), "{:?}", kq.loi);
+        assert!(kq.canh_bao.iter().any(|c| c.contains("trong.pdf") && c.contains("0 trang")), "{:?}", kq.canh_bao);
+        let mut ten: Vec<String> = std::fs::read_dir(ra.join("ok")).unwrap().map(|m| m.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        ten.sort();
+        assert_eq!(ten, ["ok.1.pdf", "ok.2.pdf"], "không còn file tạm");
+        let log = dong_log_loi(&kq.loi, &kq.canh_bao);
+        assert!(log.contains("# Lỗi ") && log.contains("hong.pdf") && log.contains("# Cảnh báo ") && log.contains("0 trang"), "{log}");
+        let _ = std::fs::remove_dir_all(&goc);
     }
 
     /// Chữ trên từng trang của PDF (để biết trang nào nằm trong văn bản).

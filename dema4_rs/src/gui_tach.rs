@@ -133,6 +133,8 @@ pub struct ManTach {
     thu_tu: Vec<u32>,
     khoa_thu_tu: Option<(Loc, Option<u32>, Sap, u64)>,
     ten_hien: Vec<String>,
+    /// Tên hồ sơ ở cột trái: `ten_hien` + đuôi gốc (`.pdf` / `.PDF`).
+    ten_cot: Vec<String>,
     bao: Option<(String, Instant)>,
     trang_thai: String,
     so_cot: usize,
@@ -184,6 +186,8 @@ pub struct ManTach {
     hs_pt_cuon: Option<u32>,
     trai_cham: Option<Instant>,
     luoi_cham: Option<Instant>,
+    /// Phân tích vừa xong hết: chọn trang cuối của lưới Tất cả.
+    nhay_het: bool,
     /// Cuộn tới `cuon_toi` đặt giữa vùng nhìn (nhảy tới trang cuối hồ sơ vừa xong).
     cuon_giua: bool,
     /// Đang gõ ô thư mục (chưa quét cho tới khi gõ xong) / hộp chọn thư mục chạy luồng riêng (Windows).
@@ -222,6 +226,7 @@ impl Default for ManTach {
             thu_tu: Vec::new(),
             khoa_thu_tu: None,
             ten_hien: Vec::new(),
+            ten_cot: Vec::new(),
             bao: None,
             trang_thai: String::new(),
             so_cot: 1,
@@ -261,6 +266,7 @@ impl Default for ManTach {
             hs_pt_cuon: None,
             trai_cham: None,
             luoi_cham: None,
+            nhay_het: false,
             cuon_giua: false,
             dang_go_tm: false,
             chon_tm: None,
@@ -328,6 +334,11 @@ pub fn ten_hien_ho_so(duong_dan: &[String]) -> Vec<String> {
             }
         })
         .collect()
+}
+
+/// Gắn lại đuôi gốc của file (`.pdf` / `.PDF` …) vào tên hiển thị — dùng cho cột tên hồ sơ.
+pub fn kem_duoi(ten: &[String], duong_dan: &[String]) -> Vec<String> {
+    ten.iter().zip(duong_dan).map(|(t, p)| format!("{t}{}", p.rfind('.').filter(|&i| !p[i..].contains('/')).map_or("", |i| &p[i..]))).collect()
 }
 
 /// Ghi qua file tạm rồi đổi tên: tắt app giữa chừng không làm hỏng file nhãn.
@@ -420,6 +431,8 @@ impl ManTach {
         self.loc_menu = Loc::TatCa;
         self.ho_so_loc = None;
         self.khoa_thu_tu = None;
+        self.tab = Tab::HoSo;
+        self.nhay_het = false;
         self.trang_thai = "Đang đọc thư mục…".into();
         self.bat_dau_pt = Some(Instant::now());
         self.khong_ghi_cache = false;
@@ -444,6 +457,7 @@ impl ManTach {
         let xf = std::fs::read_to_string(self.file_xoay()).ok().and_then(|s| nhan::doc_file_xoay(&s, &so_trang_cua).ok());
         let bang = BangTrang::tu_phien(&phien, ch, nf.as_ref(), xf.as_ref());
         self.ten_hien = ten_hien_ho_so(&bang.ho_so);
+        self.ten_cot = kem_duoi(&self.ten_hien, &bang.ho_so);
         self.bang = Some(bang);
         self.phien = Some(phien);
         self.chay = None;
@@ -458,7 +472,7 @@ impl ManTach {
         let tong = viec.len();
         let bat_dau = self.bat_dau_pt.take().unwrap_or_else(Instant::now);
         if tong == 0 {
-            self.trang_thai = format!("Phân tích xong ({})", gio_phut_giay(bat_dau.elapsed()));
+            self.trang_thai = format!("Phân tích xong ({}){}", gio_phut_giay(bat_dau.elapsed()), self.chu_ho_so_loi());
             return;
         }
         let so_luong = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).saturating_sub(1).max(1);
@@ -523,10 +537,12 @@ impl ManTach {
                     phien.ghi_cache();
                     self.chay = None;
                     self.tien_do_hs.ket_thuc();
+                    self.nhay_het = !da_dung;
                     self.trang_thai = if da_dung { format!("Đã dừng ở {phan_tram}% ({tg})") } else { format!("Phân tích xong ({tg})") };
                     if loi > 0 {
                         self.trang_thai += &format!(" · {loi} trang lỗi");
                     }
+                    self.trang_thai += &self.chu_ho_so_loi();
                 }
             }
         }
@@ -606,7 +622,7 @@ impl ManTach {
                 }
             }
             if moi && (x.da_duyet || x.luc_tinh_ten.is_none_or(|t| t.elapsed() > Duration::from_millis(200))) {
-                x.ten = ten_hien_ho_so(&x.tuong_doi);
+                x.ten = kem_duoi(&ten_hien_ho_so(&x.tuong_doi), &x.tuong_doi);
                 x.luc_tinh_ten = Some(Instant::now());
             }
         }
@@ -626,13 +642,31 @@ impl ManTach {
 
     /// Hồ sơ vừa phân tích xong → lưới cuộn tới ảnh cuối của hồ sơ đó (giữa vùng nhìn), trừ khi người dùng vừa
     /// chạm lưới trong 5 s hoặc đang lọc hồ sơ khác. Mỗi hồ sơ 1 lần nên nhẹ (lưới chỉ vẽ ô đang hiện).
+    /// Đuôi dòng trạng thái: số hồ sơ không mở được (lý do hiện khi di chuột vào tên ở cột trái).
+    fn chu_ho_so_loi(&self) -> String {
+        let n = self.phien.as_ref().map_or(0, |p| p.ho_so.iter().filter(|h| h.loi.is_some()).count());
+        if n > 0 { format!(" · {n} hồ sơ không mở được (di chuột vào tên đỏ)") } else { String::new() }
+    }
+
     fn nhay_trang_cuoi(&mut self) {
         let xong = self.tien_do_hs.lay_vua_xong();
-        let (Some(&h), Some(b)) = (xong.last(), &self.bang) else { return };
-        if self.tab != Tab::HoSo || self.luoi_cham.is_some_and(|t| t.elapsed() < Duration::from_secs(5)) || self.ho_so_loc.is_some_and(|x| x != h) {
+        let het = std::mem::take(&mut self.nhay_het);
+        let Some(b) = &self.bang else { return };
+        if self.tab != Tab::HoSo || self.luoi_cham.is_some_and(|t| t.elapsed() < Duration::from_secs(5)) {
             return;
         }
-        if let Some(&k) = self.thu_tu.iter().rev().find(|&&k| b.trang[k as usize].ho_so == h) {
+        // Xong hết: trang cuối của lưới; không thì trang cuối của hồ sơ vừa xong (nếu đang hiện trong lưới)
+        let k = if het {
+            self.thu_tu.last().copied()
+        } else {
+            let Some(&h) = xong.last() else { return };
+            if self.ho_so_loc.is_some_and(|x| x != h) {
+                return;
+            }
+            self.thu_tu.iter().rev().find(|&&k| b.trang[k as usize].ho_so == h).copied()
+        };
+        if let Some(k) = k {
+            self.chon.chon_rieng(k);
             self.cuon_toi = Some(k);
             self.cuon_giua = true;
         }
@@ -1168,7 +1202,7 @@ impl ManTach {
         let tong_vb = self.ds_vb.len();
         let ho_so_loc = self.ho_so_loc;
         // Hồ sơ hiện trong cột: khớp ô tìm (dòng "Tất cả" luôn ở đầu)
-        let hien: Vec<u32> = (0..b.ho_so.len() as u32).filter(|&h| cot_trai::khop_tim(&self.ten_hien[h as usize], &self.tim_hs)).collect();
+        let hien: Vec<u32> = (0..b.ho_so.len() as u32).filter(|&h| cot_trai::khop_tim(&self.ten_cot[h as usize], &self.tim_hs)).collect();
         let khong_thay = hien.is_empty() && !self.tim_hs.trim().is_empty();
         // Hồ sơ chứa trang đang xem (khi xem Tất cả): tự cuộn tới 1 lần mỗi khi đổi hồ sơ (không tô nền)
         let dang = if ho_so_loc.is_none() && self.chon.so_luong() > 0 { self.chon.tieu_diem.map(|k| b.trang[k as usize].ho_so) } else { None };
@@ -1191,7 +1225,7 @@ impl ManTach {
         let td = &self.tien_do_hs;
         let mut chon_hs: Option<Option<u32>> = None;
         if self.trai_gon {
-            let ten_hien = &self.ten_hien;
+            let ten_hien = &self.ten_cot;
             let bam = cot_trai::cot_so_gon(
                 ui,
                 "cot_so_hs",
@@ -1243,7 +1277,7 @@ impl ManTach {
                     };
                     let (dem, so_trang, vb, ten) = match h {
                         None => (b.tong, b.trang.len(), tong_vb, "Tất cả".to_string()),
-                        Some(h) => (b.dem_ho_so(h), b.so_trang(h as usize), b.van_ban(h as usize).van_ban.len(), self.ten_hien[h as usize].clone()),
+                        Some(h) => (b.dem_ho_so(h), b.so_trang(h as usize), b.van_ban(h as usize).van_ban.len(), self.ten_cot[h as usize].clone()),
                     };
                     let dam = |s: String| if h.is_none() { RichText::new(s).dam() } else { RichText::new(s) };
                     // Dòng "Tất cả" ngăn với các hồ sơ bằng vạch đậm hơn
@@ -1255,9 +1289,15 @@ impl ManTach {
                     row.col(|ui| {
                         ke_duoi(ui, vach);
                         ui.add_space(LE_O_BANG);
-                        let r = ui.add(egui::Label::new(dam(ten)).truncate());
+                        // Hồ sơ không mở được lúc phân tích: tên đỏ, lý do khi di chuột
+                        let loi_hs = h.and_then(|h| self.phien.as_ref()?.ho_so.get(h as usize)?.loi.as_deref());
+                        let ten = if loi_hs.is_some() { dam(ten).color(DO) } else { dam(ten) };
+                        let r = ui.add(egui::Label::new(ten).truncate());
                         if let Some(h) = h {
-                            r.on_hover_text(&b.ho_so[h as usize]);
+                            r.on_hover_text(match loi_hs {
+                                Some(e) => format!("{}\n⚠ Không mở được: {e}", b.ho_so[h as usize]),
+                                None => b.ho_so[h as usize].clone(),
+                            });
                         }
                     });
                     row.col(|ui| {
@@ -1696,21 +1736,17 @@ impl ManTach {
         self.dang_xem = dang_xem;
     }
 
-    /// Dòng trạng thái dưới lưới (trong vùng duyệt): còn trong view, hoàn tác / làm lại, trạng thái lưu nhãn.
+    /// Dòng trạng thái dưới lưới (trong vùng duyệt): số trang trong lưới / đã xoá / đã chọn, hoàn tác / làm lại, trạng thái lưu nhãn.
     fn dong_trang_thai(&mut self, ui: &mut egui::Ui, cfg: &CauHinh, viec: &mut Vec<Viec>) {
         let Some(b) = &self.bang else { return };
         ui.horizontal(|ui| {
             let mut job = egui::text::LayoutJob::default();
             let thuong = chu_dong(CHU_PHU, false);
-            job.append("Còn trong view: ", 0.0, thuong.clone());
-            job.append(&so_nguyen(self.thu_tu.len()), 0.0, chu_dong(CHU, true));
-            job.append(&format!(" trang · đã xoá {}", so_nguyen(b.tong.da_xoa as usize)), 0.0, thuong.clone());
-            let sc = self.chon.so_luong();
-            if sc > 0 {
-                job.append(" · Đã chọn: ", 0.0, thuong.clone());
-                job.append(&so_nguyen(sc), 0.0, chu_dong(VIEN_TAB_CHON, true));
-                job.append(" trang", 0.0, thuong);
-            }
+            job.append(
+                &format!("Trong lưới: {} · Đã xoá: {} · Đã chọn: {}", so_nguyen(self.thu_tu.len()), so_nguyen(b.tong.da_xoa as usize), so_nguyen(self.chon.so_luong())),
+                0.0,
+                thuong,
+            );
             ui.label(job);
             self.bao_tam(ui);
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
@@ -2076,17 +2112,34 @@ mod tests {
         let cfg = CauHinh::default();
         let ch = cfg.cau_hinh_phan_tich();
         let mut man = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };
+        man.tab = Tab::VanBan;
         man.bam_phan_tich(&ch);
-        let (bat_dau, mut thu_tu) = (Instant::now(), Vec::new());
+        assert_eq!(man.tab, Tab::HoSo, "Phân tích: về tab Hồ sơ, lưới Tất cả");
+        let (bat_dau, mut thu_tu, mut da_chon) = (Instant::now(), Vec::new(), Vec::new());
         while man.dang_chay() && bat_dau.elapsed() < Duration::from_secs(60) {
             man.nhan_su_kien(&ch, None);
+            man.cap_nhat_thu_tu();
+            man.nhay_trang_cuoi();
             if let Some(h) = man.tien_do_hs.dang() {
                 if thu_tu.last() != Some(&h) {
                     thu_tu.push(h);
                 }
             }
+            if let (Some(k), Some(b)) = (man.chon.tieu_diem, &man.bang) {
+                let t = &b.trang[k as usize];
+                if da_chon.last() != Some(&(t.ho_so, t.so)) {
+                    da_chon.push((t.ho_so, t.so));
+                }
+            }
             std::thread::sleep(Duration::from_millis(2));
         }
+        man.cap_nhat_thu_tu();
+        man.nhay_trang_cuoi();
+        assert_eq!(man.chon.tieu_diem, man.thu_tu.last().copied(), "xong hết: chọn trang cuối của Tất cả");
+        // Mỗi hồ sơ xong: chọn trang cuối của nó, lần lượt (khung nào xong nhiều hồ sơ thì nhảy tới hồ sơ sau cùng)
+        assert!(da_chon.len() >= 2 && da_chon.last().unwrap().0 == 5, "nhảy qua nhiều hồ sơ, cuối cùng là hồ sơ 6: {da_chon:?}");
+        assert!(da_chon.iter().all(|&(_, so)| so == 6), "chỉ chọn trang cuối: {da_chon:?}");
+        assert!(da_chon.windows(2).all(|w| w[1].0 > w[0].0), "lần lượt từng hồ sơ: {da_chon:?}");
         let ten: Vec<&str> = man.bang.as_ref().unwrap().ho_so.iter().map(|s| s.as_str()).collect();
         assert_eq!(ten, ["goc.pdf", "A/a1.pdf", "A/con/a2.pdf", "B/b1.pdf", "B/b2.pdf", "C/c1.pdf"]);
         // Nhiều luồng chạy xen trang của 2 hồ sơ kề nhau, nhưng mốc "đang xử lý" chỉ tiến từ hồ sơ 1
@@ -2111,7 +2164,7 @@ mod tests {
         }
         let mut ten = man.xem_truoc.ten.clone();
         ten.sort();
-        assert_eq!(ten, ["a", "b"]);
+        assert_eq!(ten, ["a.pdf", "b.pdf"], "cột tên hồ sơ kèm đuôi gốc");
         assert!(man.xem_truoc.so_trang.iter().all(|s| s.is_none()), "chưa có cache → chưa có số trang");
         let _ = std::fs::remove_dir_all(&goc);
     }
@@ -2131,6 +2184,7 @@ mod tests {
     fn ten_hien_kem_thu_muc_cha_khi_trung() {
         let ds: Vec<String> = ["HOP 462/4766/4766.pdf", "HOP 463/4766.pdf", "x/L1_05_13.pdf", "a.PDF"].map(String::from).into();
         assert_eq!(ten_hien_ho_so(&ds), ["4766/4766", "HOP 463/4766", "L1_05_13", "a"]);
+        assert_eq!(kem_duoi(&ten_hien_ho_so(&ds), &ds), ["4766/4766.pdf", "HOP 463/4766.pdf", "L1_05_13.pdf", "a.PDF"]);
     }
 
     /// Phân tích thư mục nhỏ qua màn Tách (không mở cửa sổ): lưới đủ trang, gán nhãn tự lưu file.
@@ -2156,7 +2210,7 @@ mod tests {
         man.cap_nhat_thu_tu();
         man.chon.chon_rieng(man.thu_tu[1]);
         man.lam(Viec::Gan(Nhan::Index), &mut cfg);
-        let file = std::fs::read_to_string(goc.join(".sm-dema4/index_and_blank.txt")).unwrap();
+        let file = std::fs::read_to_string(thu_muc_an(&goc).join("index_and_blank.txt")).unwrap();
         assert!(file.contains("a.pdf;2;index"), "{file}");
         // Mở lại: nhãn sửa tay còn nguyên
         let mut man2 = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };

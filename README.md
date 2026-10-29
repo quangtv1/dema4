@@ -17,7 +17,7 @@ cd dema4_rs
 cargo build --release
 ```
 
-File chạy: `dema4_rs/target/release/sm-dema4` (Windows: `sm-dema4.exe`) — một file duy nhất, ONNX Runtime liên kết tĩnh, mô hình hướng trang nhúng sẵn.
+File chạy: `dema4_rs/target/release/dema4_saomai` (Windows: `dema4_saomai.exe`) — một file duy nhất, ONNX Runtime liên kết tĩnh, mô hình hướng trang nhúng sẵn.
 
 GitHub Actions tự build cho macOS (arm64) và Windows (x64) mỗi khi push lên `main`.
 Tạo tag `vX.Y.Z` để sinh Release kèm file chạy.

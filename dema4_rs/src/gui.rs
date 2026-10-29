@@ -82,6 +82,8 @@ struct UngDungChinh {
     tro_giup: Option<crate::tro_giup::HopTroGiup>,
     /// Đóng app khi nhãn chưa lưu (lưu bằng tay): đang hỏi Lưu / Bỏ / Huỷ; `cho_dong` = đã trả lời, cho đóng.
     hoi_dong: bool,
+    /// Đóng app khi đang phân tích / tách: hỏi Thoát luôn / Huỷ (thoát giữa chừng mất kết quả đang ghi dở).
+    hoi_dong_chay: bool,
     cho_dong: bool,
 }
 
@@ -89,7 +91,7 @@ impl Default for UngDungChinh {
     fn default() -> Self {
         let cfg = crate::cau_hinh::doc();
         let dem = UngDung { quy_tac: cfg.quy_tac(), ..Default::default() };
-        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach: Default::default(), cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, cho_dong: false }
+        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach: Default::default(), cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
     }
 }
 
@@ -99,6 +101,35 @@ impl UngDungChinh {
     }
 
     /// Hỏi Lưu / Bỏ / Huỷ khi đóng app còn nhãn chưa lưu.
+    fn hop_hoi_dong_chay(&mut self, ctx: &egui::Context) {
+        if !self.hoi_dong_chay {
+            return;
+        }
+        let mut chon = None;
+        use crate::gui_tach::khung_hop as kh;
+        let viec = if self.tach.dang_tach() { "tách văn bản" } else { "phân tích" };
+        kh::hop(ctx, "hoi_dong_chay", 360.0, "Đang xử lý", |ui| {
+            kh::than_chu(ui, &format!("Đang {viec}. Thoát ngay thì phần đang làm dở sẽ mất; nên bấm *Dừng*, đợi xong rồi mới thoát."));
+            kh::chan(ui, |ui| {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(kh::nut_chan_mau("Thoát luôn", DO)).clicked() {
+                        chon = Some(true);
+                    }
+                    if ui.add(kh::nut_chan("Huỷ")).clicked() {
+                        chon = Some(false);
+                    }
+                });
+            });
+        });
+        if let Some(thoat) = chon {
+            self.hoi_dong_chay = false;
+            if thoat {
+                self.cho_dong = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
+    }
+
     fn hop_hoi_dong(&mut self, ctx: &egui::Context) {
         if !self.hoi_dong {
             return;
@@ -216,7 +247,12 @@ impl eframe::App for UngDungChinh {
             self.tieu_de_da_dat = self.man;
         }
         if ctx.input(|i| i.viewport().close_requested()) {
-            if self.tach.chua_luu() && !self.cho_dong {
+            if self.cho_dong {
+                self.tach.ghi_cache();
+            } else if self.tach.dang_chay() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                self.hoi_dong_chay = true;
+            } else if self.tach.chua_luu() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                 self.hoi_dong = true;
             } else {
@@ -224,6 +260,7 @@ impl eframe::App for UngDungChinh {
             }
         }
         self.hop_hoi_dong(&ctx);
+        self.hop_hoi_dong_chay(&ctx);
         if self.tro_giup.is_none() && self.hop_cau_hinh.is_none() && ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(self.tab_huong_dan()));
         }

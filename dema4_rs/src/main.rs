@@ -7,7 +7,7 @@
 //! - Thêm `--dpi` để kiểm tra DPI ảnh scan, `--kyso` để kiểm tra chữ ký số (mặc định tắt).
 //! - `dema4_rs <thư mục> --khong-ghi`: chỉ đếm và in kết quả (không ghi file, không gửi thống kê), dùng để đo tốc độ.
 //! - `dema4_rs --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]`: tách văn bản theo nhãn,
-//!   ghi `<cha>/<tên>_vanban/…` và `<thư mục pdf>/.sm-dema4/ketqua_tach.txt`; chưa có nhãn thì phân tích tự động trước.
+//!   ghi `<cha>/<tên>_vanban/…` và `ketqua_tach.txt` trong thư mục dữ liệu ẩn của thư mục pdf (cạnh file chạy); chưa có nhãn thì phân tích tự động trước.
 
 #[allow(dead_code)] // nối dần vào màn Đếm / Tách
 mod cau_hinh;
@@ -93,7 +93,7 @@ fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_gh
 }
 
 /// `--tach <thư mục pdf> [--nhan <file>] [--ra <thư mục cha>]`: cắt theo nhãn có sẵn (không phân tích).
-/// Nhãn mặc định `<thư mục>/.sm-dema4/index_and_blank.txt`; góc xoay `<thư mục>/.sm-dema4/xoay_trang.txt` nếu có.
+/// Nhãn mặc định `index_and_blank.txt`, góc xoay `xoay_trang.txt` (nếu có) trong thư mục dữ liệu ẩn của `<thư mục>`.
 fn chay_tach(tham_so: &[String]) -> i32 {
     use std::path::{Path, PathBuf};
     use tach_vb::{nhan, tach};
@@ -113,7 +113,8 @@ fn chay_tach(tham_so: &[String]) -> i32 {
         return 2;
     };
     let thu_muc = std::fs::canonicalize(&thu_muc).unwrap_or(thu_muc);
-    let an = thu_muc.join(".sm-dema4");
+    tach_vb::du_lieu_an::chuyen_du_lieu_cu(&thu_muc);
+    let an = tach_vb::phien::thu_muc_an(&thu_muc);
     let co_nhan_rieng = file_nhan.is_some();
     let file_nhan = file_nhan.unwrap_or_else(|| an.join("index_and_blank.txt"));
     if !co_nhan_rieng && !file_nhan.exists() {
@@ -197,7 +198,11 @@ mod tests {
         let doc = mupdf::pdf::PdfDocument::open(ra.join("a.2.pdf").to_str().unwrap()).unwrap();
         assert_eq!(doc.page_count().unwrap(), 2);
         assert_eq!(doc.find_page(1).unwrap().get_dict("Rotate").unwrap().unwrap().as_int().unwrap(), 180);
-        let log = std::fs::read_to_string(nguon.join(".sm-dema4/ketqua_tach.txt")).unwrap();
+        // Nhãn cũ trong thư mục đầu vào đã được chuyển sang thư mục dữ liệu cạnh app
+        assert!(!nguon.join(".sm-dema4").exists());
+        let an = crate::tach_vb::phien::thu_muc_an(&nguon);
+        let log = std::fs::read_to_string(an.join("ketqua_tach.txt")).unwrap();
+        let _ = std::fs::remove_dir_all(&an);
         assert_eq!(log.lines().count(), 3);
         let _ = std::fs::remove_dir_all(&goc);
     }
@@ -210,9 +215,11 @@ mod tests {
         std::fs::create_dir_all(&nguon).unwrap();
         crate::tach_vb::tach::tests::tao_pdf(&nguon.join("b.pdf"), 3);
         assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned()]), 0);
-        let nhan = std::fs::read_to_string(nguon.join(".sm-dema4/index_and_blank.txt")).unwrap();
+        let an = crate::tach_vb::phien::thu_muc_an(&nguon);
+        let nhan = std::fs::read_to_string(an.join("index_and_blank.txt")).unwrap();
         assert_eq!(nhan.lines().count(), 3, "3 trang chữ nhỏ → blank: {nhan}");
-        assert!(nguon.join(".sm-dema4/cache").is_dir());
+        assert!(an.join("cache").is_dir());
+        assert!(!nguon.join(".sm-dema4").exists(), "không ghi gì vào thư mục đầu vào");
         let _ = std::fs::remove_dir_all(&goc);
     }
 }

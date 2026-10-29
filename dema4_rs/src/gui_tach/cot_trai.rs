@@ -73,7 +73,8 @@ impl TienDoHoSo {
 
     /// Kết thúc / dừng: bỏ mốc (hết vạch, hết tự cuộn).
     pub fn ket_thuc(&mut self) {
-        *self = Self::default();
+        // Giữ danh sách vừa xong: hồ sơ cuối xong cùng khung với sự kiện kết thúc vẫn được nhảy tới
+        *self = Self { vua_xong: std::mem::take(&mut self.vua_xong), ..Self::default() };
     }
 }
 

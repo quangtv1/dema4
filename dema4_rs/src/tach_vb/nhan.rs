@@ -59,7 +59,7 @@ pub fn chuan_duong_dan(p: &str) -> String {
 }
 
 /// Đường dẫn thật của hồ sơ ghi trong file nhãn: tuyệt đối giữ nguyên; tương đối tính từ `goc`
-/// (app: thư mục đầu vào = cha của `.sm-dema4/`; file kiểu cũ như mẫu 1: thư mục chứa file nhãn).
+/// (app: thư mục đầu vào; file kiểu cũ như mẫu 1: thư mục chứa file nhãn).
 pub fn duong_dan_that(goc: &std::path::Path, p: &str) -> std::path::PathBuf {
     let p = chuan_duong_dan(p);
     let tuyet_doi = p.starts_with('/') || p.as_bytes().get(1) == Some(&b':');

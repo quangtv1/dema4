@@ -45,6 +45,8 @@ pub(super) struct XongTach {
     da_dung: bool,
     khong_xoa: Vec<PathBuf>,
     loi: Vec<String>,
+    /// Số cảnh báo (dải chỉ có trang trắng, hồ sơ 0 trang) — chi tiết trong log.
+    so_canh_bao: usize,
     co_telegram: bool,
 }
 
@@ -54,7 +56,7 @@ impl XongTach {
     pub(super) fn mau() -> Self {
         let so_lieu = telegram::SoLieuTach { ho_so: 2, van_ban: 7, so_trang: 41, bo_index: 5, bo_trang: 3, split: 1, sao_nguyen: 0, ho_so_loi: 0 };
         let ra = PathBuf::from("/Users/a/pdf_goc_vanban");
-        XongTach { ten_thu_muc: "pdf_goc".into(), so_lieu, log: ra.join("log.txt"), ra, thoi_gian: Duration::from_secs(21), da_dung: false, khong_xoa: Vec::new(), loi: Vec::new(), co_telegram: true }
+        XongTach { ten_thu_muc: "pdf_goc".into(), so_lieu, log: ra.join("log.txt"), ra, thoi_gian: Duration::from_secs(21), da_dung: false, khong_xoa: Vec::new(), loi: Vec::new(), so_canh_bao: 0, co_telegram: true }
     }
 }
 
@@ -137,11 +139,11 @@ impl ManTach {
         }
     }
 
-    pub(super) fn dang_tach(&self) -> bool {
+    pub fn dang_tach(&self) -> bool {
         self.tach.is_some()
     }
 
-    /// `Thông tin: Hồ sơ · Văn bản · Số trang · Quy A4` + nút Tách (đang tách → Dừng).
+    /// (i) `Số hồ sơ; Số văn bản; Tổng số trang; Số trang (Quy A4)` + nút Tách (đang tách → Dừng).
     pub(super) fn dong_thong_tin_tach(&mut self, ui: &mut egui::Ui, cfg: &CauHinh) {
         let tong = self.tong_thong_tin(&cfg.quy_tac());
         let so_hs = self.bang.as_ref().map_or(0, |b| b.ho_so.len());
@@ -149,10 +151,13 @@ impl ManTach {
         let ra = tach::thu_muc_ra(Path::new(self.thu_muc.trim()), (!cfg.thu_muc_ra.trim().is_empty()).then(|| Path::new(cfg.thu_muc_ra.trim())));
         ui.horizontal(|ui| {
             if let Some(t) = tong {
+                let (r, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+                super::bieu_tuong::ve(ui.painter(), r, super::bieu_tuong::BieuTuong::ThongTin, CHU_PHU);
                 let mut job = egui::text::LayoutJob::default();
                 let (thuong, dam) = (super::chu_dong(CHU_PHU, false), super::chu_dong(CHU, true));
-                for (i, (ten, gia_tri)) in [("Hồ sơ", so_nguyen(so_hs)), ("Văn bản", so_nguyen(t.so_van_ban)), ("Số trang", so_nguyen(t.so_trang)), ("Quy A4", so_thuc(t.quy_a4))].into_iter().enumerate() {
-                    job.append(&format!("{}{ten}: ", if i == 0 { "Thông tin: " } else { "; " }), 0.0, thuong.clone());
+                let muc = [("Số hồ sơ", so_nguyen(so_hs)), ("Số văn bản", so_nguyen(t.so_van_ban)), ("Tổng số trang", so_nguyen(t.so_trang)), ("Số trang (Quy A4)", so_thuc(t.quy_a4))];
+                for (i, (ten, gia_tri)) in muc.into_iter().enumerate() {
+                    job.append(&format!("{}{ten}: ", if i == 0 { "" } else { "; " }), 0.0, thuong.clone());
                     job.append(&gia_tri, 0.0, dam.clone());
                 }
                 ui.label(job);
@@ -217,7 +222,9 @@ impl ManTach {
         let (xong2, dung2, ra2, mau) = (xong.clone(), dung.clone(), ra.clone(), cfg.mau_ten.clone());
         let tong = ho_so.len();
         std::thread::spawn(move || {
-            let kq = tach::tach_thu_muc(&nguon, &ra2, &ho_so, &mau, &dung2, &|n, _| xong2.store(n, Ordering::Relaxed));
+            // Panic ngoài dự kiến → báo lỗi thường cho người dùng, không sập app
+            let kq = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tach::tach_thu_muc(&nguon, &ra2, &ho_so, &mau, &dung2, &|n, _| xong2.store(n, Ordering::Relaxed))))
+                .unwrap_or_else(|p| Err(format!("lỗi bất ngờ: {}", tach::chu_panic(&*p))));
             let _ = gui.send(kq);
         });
         self.tach = Some(DangTach { nhan, xong, tong, dung, bat_dau: Instant::now(), ra, so_lieu, thong_ke, nguong });
@@ -241,7 +248,7 @@ impl ManTach {
         };
         let log = thu_muc_an(Path::new(self.thu_muc.trim())).join("ketqua_tach.txt");
         let mut loi: Vec<String> = kq.loi.iter().map(|(p, e)| format!("{}: {e}", p.display())).collect();
-        let noi_dung = tach::noi_dung_log(&kq.dong) + &tach::dong_log_khong_xoa(&kq.khong_xoa);
+        let noi_dung = tach::noi_dung_log(&kq.dong) + &tach::dong_log_khong_xoa(&kq.khong_xoa) + &tach::dong_log_loi(&kq.loi, &kq.canh_bao);
         if let Err(e) = std::fs::create_dir_all(log.parent().unwrap()).and_then(|_| std::fs::write(&log, noi_dung)) {
             loi.push(format!("Không ghi được log {}: {e}", log.display()));
         }
@@ -254,7 +261,7 @@ impl ManTach {
         // Test không gửi tin thật (cấu hình Telegram được nhúng sẵn trong file chạy)
         let co_telegram = gui_thong_ke(self.thu_muc.trim().to_string(), so_lieu.clone(), thoi_gian, t.thong_ke, t.nguong);
         let ten_thu_muc = Path::new(self.thu_muc.trim().trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-        self.xong_tach = Some(XongTach { ten_thu_muc, so_lieu, ra: t.ra, log, thoi_gian, da_dung: t.dung.load(Ordering::Relaxed), khong_xoa: kq.khong_xoa, loi, co_telegram });
+        self.xong_tach = Some(XongTach { ten_thu_muc, so_lieu, ra: t.ra, log, thoi_gian, da_dung: t.dung.load(Ordering::Relaxed), khong_xoa: kq.khong_xoa, loi, so_canh_bao: kq.canh_bao.len(), co_telegram });
     }
 
     /// Hộp "Chưa tách được" (còn trang Nghi) + hỏi lưu trước khi tách + popup "Đã tách xong".
@@ -362,6 +369,12 @@ impl ManTach {
             for l in x.loi.iter().take(5) {
                 khung_hop::ghi_gon(ui, l, DO);
             }
+            if x.loi.len() > 5 {
+                khung_hop::ghi_gon(ui, &format!("… và {} lỗi khác — bấm Mở log để xem đủ.", x.loi.len() - 5), DO);
+            }
+            if x.so_canh_bao > 0 {
+                khung_hop::ghi_gon(ui, &format!("{} cảnh báo (dải chỉ có trang trắng / hồ sơ 0 trang không sinh văn bản) — xem trong log.", x.so_canh_bao), CHU_PHU);
+            }
             if x.co_telegram {
                 khung_hop::ghi_gon(ui, "Thông tin tách thư mục đã được ghi lại", CHU_PHU);
             }
@@ -398,6 +411,33 @@ mod tests {
             man.nhan_su_kien(ch, None);
             man.nhan_ket_qua_tach();
         }
+    }
+
+    /// Hồ sơ không mở được: dòng trạng thái đếm, tách xong popup có lỗi và log có dòng `# Lỗi`.
+    #[test]
+    fn ho_so_hong_bao_o_trang_thai_popup_va_log() {
+        let goc = std::env::temp_dir().join(format!("dema4_tach_hong_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let nguon = goc.join("nguon");
+        std::fs::create_dir_all(&nguon).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&nguon.join("a.pdf"), 3);
+        std::fs::write(nguon.join("hong.pdf"), b"%PDF-1.4\nrac").unwrap();
+        let cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
+        let ch = cfg.cau_hinh_phan_tich();
+        let mut man = ManTach { thu_muc: nguon.display().to_string(), ..Default::default() };
+        man.bam_phan_tich(&ch);
+        cho_xong(&mut man, &ch);
+        assert!(man.trang_thai.contains("1 hồ sơ không mở được"), "{}", man.trang_thai);
+        assert!(man.phien.as_ref().unwrap().ho_so.iter().any(|h| h.loi.as_deref().is_some_and(|e| !e.is_empty())));
+        man.bat_dau_tach(&cfg);
+        cho_xong(&mut man, &ch);
+        let x = man.xong_tach.as_ref().expect("popup tách xong");
+        assert_eq!(x.loi.len(), 1, "{:?}", x.loi);
+        assert!(x.loi[0].contains("hong.pdf"), "{:?}", x.loi);
+        let log = std::fs::read_to_string(&x.log).unwrap();
+        assert!(log.contains("# Lỗi ") && log.contains("hong.pdf"), "{log}");
+        let _ = std::fs::remove_dir_all(thu_muc_an(&nguon));
+        let _ = std::fs::remove_dir_all(&goc);
     }
 
     /// Còn trang Nghi → không ghi file nào, hộp đúng số; Duyệt → đúng bộ lọc, chọn sẵn trang đầu;
@@ -444,7 +484,8 @@ mod tests {
         let tk = thong_ke_lo(man.phien.as_ref().unwrap(), man.bang.as_ref().unwrap(), &cfg).unwrap();
         assert_eq!(tk.o.iter().map(|x| x.0 + x.1).sum::<u32>(), 5);
         assert_eq!((tk.trang_tu_dong, tk.trang_tu_dong_sua), (5, 5), "phân loại lại theo chỉ số đã lưu");
-        let log = std::fs::read_to_string(nguon.join(".sm-dema4/ketqua_tach.txt")).unwrap();
+        let log = std::fs::read_to_string(thu_muc_an(&nguon).join("ketqua_tach.txt")).unwrap();
+        let _ = std::fs::remove_dir_all(thu_muc_an(&nguon));
         assert_eq!(log.lines().count(), 3, "{log}");
         let _ = std::fs::remove_dir_all(&goc);
     }

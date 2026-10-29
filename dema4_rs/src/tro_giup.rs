@@ -225,7 +225,7 @@ const HD_TACH: &[Khoi] = &[
         ("Hoàn tác", "[Ctrl+Z] hoàn tác · [Ctrl+Y] làm lại — riêng từng nhóm lọc"),
         ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc nút − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước/sau · [F1] hướng dẫn"),
     ]),
-    Khoi::Ghi("Nhãn, góc xoay và log lưu trong thư mục ẩn `.sm-dema4` của thư mục gốc; file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
+    Khoi::Ghi("Nhãn, góc xoay, log và cache lưu trong thư mục ẩn `.sm-dema4` cạnh file ứng dụng (mỗi thư mục đầu vào 1 thư mục con riêng); thư mục đầu vào và file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

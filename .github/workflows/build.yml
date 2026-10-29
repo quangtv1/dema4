@@ -32,12 +32,12 @@ jobs:
         include:
           - os: macos-latest
             ten: macOS-arm64
-            file_chay: sm-dema4
-            artifact: sm-dema4-macos-arm64
+            file_chay: dema4_saomai
+            artifact: dema4_saomai
           - os: windows-latest
             ten: Windows-x64
-            file_chay: sm-dema4.exe
-            artifact: sm-dema4-windows-x64.exe
+            file_chay: dema4_saomai.exe
+            artifact: dema4_saomai.exe
     steps:
       - uses: actions/checkout@v4
 

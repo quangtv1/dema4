@@ -1,4 +1,4 @@
-//! Cache kết quả phân tích trong `<thư mục đầu vào>/.sm-dema4/cache/`: mỗi PDF 1 file nhị phân nhỏ.
+//! Cache kết quả phân tích trong `<thư mục dữ liệu ẩn>/cache/` (xem `du_lieu_an`): mỗi PDF 1 file nhị phân nhỏ.
 //!
 //! Khoá = đường dẫn tương đối + kích thước + thời điểm sửa của PDF; PDF đổi → cache file đó bị bỏ.
 //! Lưu kết quả thô (dung lượng, kích thước, chỉ số trắng, mã đọc được, phân bố hướng) và trạng thái duyệt

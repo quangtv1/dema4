@@ -56,6 +56,9 @@ fn kich_thuoc(trang: &PdfObject) -> (f32, f32) {
 /// Đọc thông tin mọi trang của 1 file PDF.
 pub fn doc_thong_tin_file(pdf: &Path) -> Result<Vec<ThongTinTrang>, String> {
     let doc = PdfDocument::open(pdf.to_str().ok_or("đường dẫn không hợp lệ")?).map_err(loi)?;
+    if doc.needs_password().map_err(loi)? {
+        return Err(super::tach::LOI_MAT_KHAU.into());
+    }
     let n = doc.page_count().map_err(loi)?;
     (0..n)
         .map(|i| {

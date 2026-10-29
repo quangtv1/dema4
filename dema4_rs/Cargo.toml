@@ -1,12 +1,12 @@
 [package]
 name = "dema4_rs"
-version = "0.4.4"
+version = "0.4.5"
 edition = "2021"
 description = "Đếm trang A4 và tách văn bản PDF scan (Giải pháp số Sao Mai)"
 
-# Tên file chạy: sm-dema4 (sm-dema4.exe trên Windows)
+# Tên file chạy / tên tiến trình: dema4_saomai (dema4_saomai.exe trên Windows); tiêu đề cửa sổ không đổi
 [[bin]]
-name = "sm-dema4"
+name = "dema4_saomai"
 path = "src/main.rs"
 
 [dependencies]
@@ -31,7 +31,7 @@ zxing-cpp = { version = "0.5.3", features = ["bundled"] }
 ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "download-binaries"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_System_Console"] }
+windows-sys = { version = "0.61", features = ["Win32_System_Console", "Win32_Storage_FileSystem"] }
 
 [build-dependencies]
 winresource = "0.1"

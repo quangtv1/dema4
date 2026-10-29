@@ -189,7 +189,8 @@ impl ManTach {
         }
         let (vb, cuon) = (self.vb, std::mem::take(&mut self.cuon_ds_vb));
         let Some(b) = &self.bang else { return };
-        let ten_vb = |m: &MucVanBan| van_ban::ten(&cfg.mau_ten, &b.ho_so[m.ho_so as usize], m.so);
+        // Cột trái: tên file văn bản sẽ ghi ra (luôn đuôi `.pdf` thường)
+        let ten_vb = |m: &MucVanBan| van_ban::ten(&cfg.mau_ten, &b.ho_so[m.ho_so as usize], m.so) + ".pdf";
         // Văn bản hiện trong cột: khớp ô tìm theo tên
         let hien: Vec<usize> = (0..self.ds_vb.len()).filter(|&i| super::cot_trai::khop_tim(&ten_vb(&self.ds_vb[i]), &self.tim_vb)).collect();
         let khong_thay = hien.is_empty() && !self.tim_vb.trim().is_empty();
