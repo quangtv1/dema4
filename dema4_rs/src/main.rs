@@ -13,6 +13,8 @@
 mod cau_hinh;
 mod dem_pdf;
 mod gui;
+#[allow(dead_code)] // nối dần vào giao diện
+mod gui_tach;
 #[allow(dead_code)] // dùng dần từ các phần phân tích / giao diện tách văn bản
 mod tach_vb;
 mod telegram;
