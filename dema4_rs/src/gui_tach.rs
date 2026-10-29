@@ -1502,12 +1502,18 @@ impl ManTach {
 
     /// Thanh hỏi duyệt trong bộ lọc Nghi trắng / Nghi xoay.
     fn thanh_hoi(&self, ui: &mut egui::Ui, ds: &[u32], viec: &mut Vec<Viec>) {
-        let Some(b) = &self.bang else { return };
+        if let Some(b) = &self.bang {
+            Self::thanh_hoi_cua(ui, b, &self.ten_hien, self.loc, ds, viec);
+        }
+    }
+
+    /// Thanh hỏi duyệt dùng chung cho lưới và hộp phóng to (cùng nút, cùng phím).
+    fn thanh_hoi_cua(ui: &mut egui::Ui, b: &BangTrang, ten_hien: &[String], loc: Loc, ds: &[u32], viec: &mut Vec<Viec>) {
         let ten = |k: u32| {
             let t = &b.trang[k as usize];
-            format!("{}.{}", self.ten_hien[t.ho_so as usize], t.so)
+            format!("{}.{}", ten_hien[t.ho_so as usize], t.so)
         };
-        match self.loc {
+        match loc {
             Loc::NghiTrang => {
                 let co: Vec<u32> = ds.iter().copied().filter(|&k| b.trang[k as usize].nghi_trang()).collect();
                 if co.is_empty() {
