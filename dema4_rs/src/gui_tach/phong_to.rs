@@ -4,7 +4,6 @@
 use eframe::egui::{self, Align, Color32, Margin, Rect, RichText, Stroke, StrokeKind};
 
 use super::anh_nho::{self, bac_cho, KhoaAnh, YeuCau};
-use super::bang_trang::ten_nhan;
 use super::bieu_tuong::{self, BieuTuong};
 use super::{nhom_nut, ngan_nho, nut_nhom, ve_net_dut, Loc, ManTach, NoiDungNut, Tab, Viec, CAM, MAU_S};
 use crate::cau_hinh::CauHinh;
@@ -77,13 +76,15 @@ impl ManTach {
                 pt.nac = pt.nac.saturating_sub(1);
             }
             // Gán nhãn / xoay / xoá ngay trong hộp, cùng phím với lưới
-            if !i.modifiers.command {
+            if !i.modifiers.command && !la_vb {
                 let gan = |n: Nhan| if duyet_nghi && n != Nhan::Split { Viec::DuyetNghiTrang(n) } else { Viec::Gan(n) };
                 for (phim, v) in [(egui::Key::S, Viec::Gan(Nhan::Split)), (egui::Key::I, gan(Nhan::Index)), (egui::Key::B, gan(Nhan::Trang)), (egui::Key::C, gan(Nhan::NoiDung))] {
                     if i.key_pressed(phim) {
                         viec.push(v);
                     }
                 }
+            }
+            if !i.modifiers.command {
                 if i.key_pressed(egui::Key::R) {
                     viec.push(Viec::Xoay(if i.modifiers.shift { 180 } else { 90 }));
                 }
@@ -103,34 +104,46 @@ impl ManTach {
                 if bieu_tuong::nut(ui, BieuTuong::TraiChevron, "Trang trước (←)", pt.co_truoc()).clicked() {
                     pt.di(false);
                 }
-                let nhan = match t.nhan() {
-                    Nhan::NoiDung if t.nghi_trang() => "Nghi trắng".to_string(),
-                    Nhan::NoiDung => "Nội dung".to_string(),
-                    n => ten_nhan(n).to_string(),
-                };
+                let hang = ui.max_rect();
                 ui.label(RichText::new(format!("{}.{}", self.ten_hien[t.ho_so as usize], t.so)).dam());
-                ui.label(RichText::new(format!("· {nhan} ({}/{})", pt.i + 1, pt.ds.len())).color(CHU_PHU));
                 if bieu_tuong::nut(ui, BieuTuong::PhaiChevron, "Trang sau (→)", pt.co_sau()).clicked() {
                     pt.di(true);
                 }
+                // Giữa hàng: trạng thái trang (đậm) + vị trí, vd "Nội dung (12/215)"
+                let nhan = match t.nhan() {
+                    Nhan::NoiDung if t.nghi_trang() => "Nghi trắng",
+                    Nhan::NoiDung if t.nghi_xoay().is_some() => "Nghi xoay",
+                    Nhan::NoiDung => "Nội dung",
+                    Nhan::Index => "Index (barcode)",
+                    Nhan::Trang => "Trang trắng",
+                    Nhan::Split => "Điểm tách",
+                };
+                let mut job = egui::text::LayoutJob::default();
+                job.append(nhan, 0.0, super::chu_dong(crate::gui::CHU, true));
+                job.append(&format!(" ({}/{})", pt.i + 1, pt.ds.len()), 0.0, super::chu_dong(CHU_PHU, false));
+                let g = ui.painter().layout_job(job);
+                ui.painter().galley(egui::pos2(hang.center().x - g.size().x / 2.0, ui.min_rect().center().y - g.size().y / 2.0), g, crate::gui::CHU);
                 // Nhóm gắn nhãn + nhóm xoay / xoá như thanh công cụ lưới, áp cho trang đang xem
                 ui.add_space(10.0);
                 let nhan_t = t.nhan();
                 let gan = |n: Nhan| if duyet_nghi && n != Nhan::Split { Viec::DuyetNghiTrang(n) } else { Viec::Gan(n) };
-                nhom_nut(ui, |ui| {
-                    if nut_nhom(ui, NoiDungNut::Chu("S", Some(MAU_S)), (nhan_t == Nhan::Split, false), matches!(nhan_t, Nhan::NoiDung | Nhan::Split), "Split — văn bản mới bắt đầu từ trang này (S, bấm lại để huỷ)").clicked() {
-                        viec.push(Viec::Gan(Nhan::Split));
-                    }
-                    ngan_nho(ui);
-                    if nut_nhom(ui, NoiDungNut::Chu("I", None), (nhan_t == Nhan::Index, false), true, "Index — tờ mã vạch, bỏ khi tách (I, bấm lại để huỷ)").clicked() {
-                        viec.push(gan(Nhan::Index));
-                    }
-                    ngan_nho(ui);
-                    if nut_nhom(ui, NoiDungNut::Chu("B", None), (nhan_t == Nhan::Trang, false), true, "Trắng — bỏ khi tách (B, bấm lại để huỷ)").clicked() {
-                        viec.push(gan(Nhan::Trang));
-                    }
-                });
-                ui.add_space(8.0);
+                // S I B chỉ ở tab Hồ sơ (tab Văn bản chỉ xoay / bỏ khỏi văn bản)
+                if !la_vb {
+                    nhom_nut(ui, |ui| {
+                        if nut_nhom(ui, NoiDungNut::Chu("S", Some(MAU_S)), (nhan_t == Nhan::Split, false), matches!(nhan_t, Nhan::NoiDung | Nhan::Split), "Split — văn bản mới bắt đầu từ trang này (S, bấm lại để huỷ)").clicked() {
+                            viec.push(Viec::Gan(Nhan::Split));
+                        }
+                        ngan_nho(ui);
+                        if nut_nhom(ui, NoiDungNut::Chu("I", None), (nhan_t == Nhan::Index, false), true, "Index — tờ mã vạch, bỏ khi tách (I, bấm lại để huỷ)").clicked() {
+                            viec.push(gan(Nhan::Index));
+                        }
+                        ngan_nho(ui);
+                        if nut_nhom(ui, NoiDungNut::Chu("B", None), (nhan_t == Nhan::Trang, false), true, "Trắng — bỏ khi tách (B, bấm lại để huỷ)").clicked() {
+                            viec.push(gan(Nhan::Trang));
+                        }
+                    });
+                    ui.add_space(8.0);
+                }
                 nhom_nut(ui, |ui| {
                     if nut_nhom(ui, NoiDungNut::Icon(BieuTuong::XoayPhai), (false, false), true, "Xoay phải 90° (R)").clicked() {
                         viec.push(Viec::Xoay(90));

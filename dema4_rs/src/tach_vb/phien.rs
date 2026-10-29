@@ -31,11 +31,95 @@ pub struct PhienPhanTich {
     pub ho_so: Vec<HoSoPhanTich>,
 }
 
+/// Sự kiện danh sách xem trước (đọc nền khi chọn thư mục).
+pub enum XemTruocSuKien {
+    /// PDF của 1 thư mục vừa đọc xong (đường dẫn đầy đủ, theo thứ tự hiển thị).
+    Them(Vec<PathBuf>),
+    /// Đã duyệt hết cây thư mục.
+    DaDuyet,
+    /// Số trang (theo cache) của mọi file, cùng thứ tự.
+    SoTrang(Vec<Option<usize>>),
+}
+
+/// So tên kiểu tự nhiên, không phân biệt hoa thường: cụm số so theo giá trị ("HS 2" trước "HS 10").
+pub fn so_ten_tu_nhien(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (mut x, mut y) = (a.chars().peekable(), b.chars().peekable());
+    loop {
+        match (x.peek().copied(), y.peek().copied()) {
+            (None, None) => return a.cmp(b),
+            (None, _) => return Ordering::Less,
+            (_, None) => return Ordering::Greater,
+            (Some(c), Some(d)) if c.is_ascii_digit() && d.is_ascii_digit() => {
+                let lay = |it: &mut std::iter::Peekable<std::str::Chars>| {
+                    let mut s = String::new();
+                    while let Some(c) = it.peek().filter(|c| c.is_ascii_digit()).copied() {
+                        s.push(c);
+                        it.next();
+                    }
+                    s
+                };
+                let (m, n) = (lay(&mut x), lay(&mut y));
+                let (m2, n2) = (m.trim_start_matches('0'), n.trim_start_matches('0'));
+                let o = m2.len().cmp(&n2.len()).then(m2.cmp(n2)).then(m.len().cmp(&n.len()));
+                if o != Ordering::Equal {
+                    return o;
+                }
+            }
+            (Some(c), Some(d)) => {
+                let o = c.to_lowercase().cmp(d.to_lowercase());
+                if o != Ordering::Equal {
+                    return o;
+                }
+                x.next();
+                y.next();
+            }
+        }
+    }
+}
+
+/// Duyệt cây thư mục theo thứ tự hiển thị: trong mỗi thư mục, các PDF (tên tự nhiên) trước, rồi lần lượt từng
+/// thư mục con (tên tự nhiên, đệ quy). Mỗi thư mục có PDF gọi `moi_thu_muc` 1 lần để giao diện hiện dần ngay.
+/// Bỏ thư mục ẩn / hệ thống (như màn Đếm), không đi theo symlink; thư mục gốc người dùng chọn luôn được duyệt.
+pub fn duyet_pdf_theo_cay(goc: &Path, dung: &AtomicBool, mut moi_thu_muc: impl FnMut(Vec<PathBuf>)) {
+    let mut ngan_xep = vec![goc.to_path_buf()];
+    while let Some(tm) = ngan_xep.pop() {
+        if dung.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
+        let Ok(doc) = std::fs::read_dir(&tm) else { continue };
+        let (mut pdf, mut con) = (Vec::new(), Vec::new());
+        for m in doc.flatten() {
+            let Ok(loai) = m.file_type() else { continue };
+            let ten = m.file_name();
+            if loai.is_dir() {
+                if !crate::dem_pdf::bo_qua_thu_muc(&ten) {
+                    con.push(m.path());
+                }
+            } else if loai.is_file() && ten.to_string_lossy().to_lowercase().ends_with(".pdf") {
+                pdf.push(m.path());
+            }
+        }
+        let ten = |p: &PathBuf| p.file_name().map(|t| t.to_string_lossy().into_owned()).unwrap_or_default();
+        pdf.sort_by(|a, b| so_ten_tu_nhien(&ten(a), &ten(b)));
+        con.sort_by(|a, b| so_ten_tu_nhien(&ten(b), &ten(a))); // ngăn xếp: đảo để lấy ra theo thứ tự tên
+        ngan_xep.extend(con);
+        if !pdf.is_empty() {
+            moi_thu_muc(pdf);
+        }
+    }
+}
+
 impl PhienPhanTich {
     /// Mở thư mục: file có cache khớp → dùng ngay; chưa có → đọc dung lượng + kích thước (không render).
     pub fn mo(goc: &Path, dung: &AtomicBool) -> Self {
-        let (gui, _bo) = std::sync::mpsc::channel();
-        let pdf = crate::dem_pdf::tim_file_pdf(&goc.to_string_lossy(), dung, &gui);
+        let mut pdf = Vec::new();
+        duyet_pdf_theo_cay(goc, dung, |ds| pdf.extend(ds));
+        Self::mo_tu_ds(goc, pdf)
+    }
+
+    /// Như `mo` nhưng dùng danh sách PDF đã duyệt sẵn (bước xem trước) — khỏi duyệt lại cây thư mục.
+    pub fn mo_tu_ds(goc: &Path, pdf: Vec<PathBuf>) -> Self {
         let cache = thu_muc_an(goc).join("cache");
         let ho_so = pdf
             .into_par_iter()
@@ -54,19 +138,21 @@ impl PhienPhanTich {
         Self { goc: goc.to_path_buf(), ho_so }
     }
 
-    /// Xem trước khi Phân tích: tên (đường dẫn tương đối) các PDF trong thư mục + số trang nếu đã có cache
-    /// (không mở PDF nào nên chạy nhanh cả trên thư mục lớn).
-    pub fn xem_truoc(goc: &Path, dung: &AtomicBool) -> Vec<(String, Option<usize>)> {
-        let (gui, _bo) = std::sync::mpsc::channel();
-        let pdf = crate::dem_pdf::tim_file_pdf(&goc.to_string_lossy(), dung, &gui);
+    /// Xem trước khi Phân tích: gửi tên PDF từng thư mục ngay khi đọc xong thư mục đó (hiện dần, đúng thứ tự cây),
+    /// rồi số trang của các file đã có cache. Không mở PDF nào.
+    pub fn xem_truoc(goc: &Path, dung: &AtomicBool, gui: &std::sync::mpsc::Sender<XemTruocSuKien>) {
+        let mut tat_ca = Vec::new();
+        duyet_pdf_theo_cay(goc, dung, |ds| {
+            tat_ca.extend(ds.iter().cloned());
+            let _ = gui.send(XemTruocSuKien::Them(ds));
+        });
+        let _ = gui.send(XemTruocSuKien::DaDuyet);
         let cache = thu_muc_an(goc).join("cache");
-        pdf.into_par_iter()
-            .map(|pdf| {
-                let tuong_doi = duong_dan_ghi(goc, &pdf);
-                let so_trang = KhoaFile::cua(&pdf, &tuong_doi).and_then(|k| cache_trang::doc(&cache, &k)).map(|t| t.len());
-                (tuong_doi, so_trang)
-            })
-            .collect()
+        let so: Vec<Option<usize>> = tat_ca
+            .par_iter()
+            .map(|pdf| KhoaFile::cua(pdf, &duong_dan_ghi(goc, pdf)).and_then(|k| cache_trang::doc(&cache, &k)).map(|t| t.len()))
+            .collect();
+        let _ = gui.send(XemTruocSuKien::SoTrang(so));
     }
 
     pub fn duong_dan_pdf(&self) -> Vec<PathBuf> {
@@ -157,6 +243,22 @@ pub fn phan_tich_thu_muc(goc: &Path, ch: &CauHinhPhanTich, tien_do: &dyn Fn(usiz
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn duyet_cay_pdf_truoc_roi_thu_muc_con_ten_tu_nhien() {
+        let goc = std::env::temp_dir().join(format!("dema4_duyet_cay_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        for d in ["HS 10", "HS 2", "HS 2/con", ".an"] {
+            std::fs::create_dir_all(goc.join(d)).unwrap();
+        }
+        for f in ["b.pdf", "a10.PDF", "a2.pdf", "HS 10/x.pdf", "HS 2/y.pdf", "HS 2/con/z.pdf", ".an/an.pdf", "HS 2/ghi.txt"] {
+            std::fs::write(goc.join(f), b"").unwrap();
+        }
+        let mut lo = Vec::new();
+        duyet_pdf_theo_cay(&goc, &AtomicBool::new(false), |ds| lo.push(ds.iter().map(|p| p.strip_prefix(&goc).unwrap().to_string_lossy().replace('\\', "/")).collect::<Vec<_>>()));
+        assert_eq!(lo, vec![vec!["a2.pdf", "a10.PDF", "b.pdf"], vec!["HS 2/y.pdf"], vec!["HS 2/con/z.pdf"], vec!["HS 10/x.pdf"]]);
+        let _ = std::fs::remove_dir_all(&goc);
+    }
 
     #[test]
     fn mo_lan_2_dung_cache_khong_phan_tich_lai_va_bat_them_loai_quet() {

@@ -187,9 +187,15 @@ pub struct ManTach {
 #[derive(Default)]
 struct XemTruoc {
     thu_muc: String,
-    nhan: Option<Receiver<Vec<(String, Option<usize>)>>>,
+    nhan: Option<Receiver<crate::tach_vb::phien::XemTruocSuKien>>,
+    /// Đường dẫn đầy đủ + tương đối (theo thứ tự cây), đã duyệt hết chưa (dùng lại khi bấm Phân tích).
+    pdf: Vec<PathBuf>,
+    tuong_doi: Vec<String>,
+    da_duyet: bool,
     ten: Vec<String>,
     so_trang: Vec<Option<usize>>,
+    /// Tên hiển thị tính lại tối đa 5 lần/giây khi danh sách còn đang về.
+    luc_tinh_ten: Option<Instant>,
 }
 
 impl Default for ManTach {
@@ -411,8 +417,13 @@ impl ManTach {
         let dung = Arc::new(AtomicBool::new(false));
         let dung2 = dung.clone();
         let _ = ch;
+        let x = &self.xem_truoc;
+        let co_san = (x.da_duyet && Path::new(&x.thu_muc) == goc).then(|| x.pdf.clone());
         std::thread::spawn(move || {
-            let _ = gui.send(PhienPhanTich::mo(&goc, &dung2));
+            let _ = gui.send(match co_san {
+                Some(pdf) => PhienPhanTich::mo_tu_ds(&goc, pdf),
+                None => PhienPhanTich::mo(&goc, &dung2),
+            });
         });
         self.chay = Some(Chay::Mo { nhan, dung });
     }
@@ -548,29 +559,52 @@ impl ManTach {
         }
         let x = &mut self.xem_truoc;
         if let Some(nhan) = &x.nhan {
-            if let Ok(ds) = nhan.try_recv() {
-                let (ten, so): (Vec<String>, Vec<Option<usize>>) = ds.into_iter().unzip();
-                x.ten = ten_hien_ho_so(&ten);
-                x.so_trang = so;
-                x.nhan = None;
+            use crate::tach_vb::phien::XemTruocSuKien;
+            let goc = PathBuf::from(&x.thu_muc);
+            let mut moi = false;
+            loop {
+                match nhan.try_recv() {
+                    Ok(XemTruocSuKien::Them(ds)) => {
+                        x.tuong_doi.extend(ds.iter().map(|p| nhan::duong_dan_ghi(&goc, p)));
+                        x.so_trang.extend(ds.iter().map(|_| None));
+                        x.pdf.extend(ds);
+                        moi = true;
+                    }
+                    Ok(XemTruocSuKien::DaDuyet) => {
+                        x.da_duyet = true;
+                        moi = true;
+                        x.luc_tinh_ten = None;
+                    }
+                    Ok(XemTruocSuKien::SoTrang(so)) => {
+                        if so.len() == x.so_trang.len() {
+                            x.so_trang = so;
+                        }
+                        x.nhan = None;
+                        break;
+                    }
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => {
+                        x.nhan = None;
+                        break;
+                    }
+                }
+            }
+            if moi && (x.da_duyet || x.luc_tinh_ten.is_none_or(|t| t.elapsed() > Duration::from_millis(200))) {
+                x.ten = ten_hien_ho_so(&x.tuong_doi);
+                x.luc_tinh_ten = Some(Instant::now());
             }
         }
         let tm = self.thu_muc.trim();
         if self.bang.is_some() || self.chay.is_some() || tm == x.thu_muc {
             return;
         }
-        x.thu_muc = tm.to_string();
-        x.ten.clear();
-        x.so_trang.clear();
-        x.nhan = None;
+        *x = XemTruoc { thu_muc: tm.to_string(), ..Default::default() };
         let goc = PathBuf::from(tm);
         if tm.is_empty() || !goc.is_dir() {
             return;
         }
         let (gui, nhan) = mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = gui.send(PhienPhanTich::xem_truoc(&goc, &AtomicBool::new(false)));
-        });
+        std::thread::spawn(move || PhienPhanTich::xem_truoc(&goc, &AtomicBool::new(false), &gui));
         x.nhan = Some(nhan);
     }
 
@@ -585,15 +619,6 @@ impl ManTach {
         if let Some(&k) = self.thu_tu.iter().rev().find(|&&k| b.trang[k as usize].ho_so == h) {
             self.cuon_toi = Some(k);
             self.cuon_giua = true;
-        }
-    }
-
-    /// Đưa trang đang hiện lên đầu hàng đợi phân tích.
-    fn uu_tien_dang_xem(&self, xem: &[u32]) {
-        let (Some(Chay::PhanTich { hang, .. }), Some(b)) = (&self.chay, &self.bang) else { return };
-        let ds: Vec<ViecTrang> = xem.iter().map(|&k| &b.trang[k as usize]).filter(|t| t.tu_dong.is_none()).map(|t| ViecTrang { file: t.ho_so as usize, trang: t.so as usize }).collect();
-        if !ds.is_empty() {
-            hang.uu_tien(&ds);
         }
     }
 
@@ -1053,7 +1078,23 @@ impl ManTach {
                 None => (self.trang_thai.clone(), None),
             },
         };
-        ui.painter().text(egui::pos2(nut_r.left() - 12.0, rect.center().y), egui::Align2::RIGHT_CENTER, chu, egui::TextStyle::Small.resolve(ui.style()), CHU_PHU);
+        // Dừng giữa chừng: chữ cam đậm trên nền cam nhạt cho nổi; xong: chữ xanh lá
+        let (mau_chu, nen) = if ty_le.is_some() {
+            (CHU_PHU, None)
+        } else if chu.starts_with("Đã dừng") {
+            (Color32::from_rgb(0xB8, 0x5F, 0x00), Some(Color32::from_rgb(0xFF, 0xF1, 0xDC)))
+        } else if chu.starts_with("Phân tích xong") {
+            (XANH_LA, None)
+        } else {
+            (CHU_PHU, None)
+        };
+        let font = if nen.is_some() || mau_chu == XANH_LA { egui::FontId::new(11.5, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())) } else { egui::TextStyle::Small.resolve(ui.style()) };
+        let g = ui.painter().layout_no_wrap(chu, font, mau_chu);
+        let o = Rect::from_min_size(egui::pos2(nut_r.left() - 12.0 - g.size().x, rect.center().y - g.size().y / 2.0), g.size());
+        if let Some(nen) = nen {
+            ui.painter().rect(o.expand2(egui::vec2(8.0, 3.0)), 3.0, nen, Stroke::new(1.0, Color32::from_rgb(0xF0, 0xB9, 0x7A)), StrokeKind::Inside);
+        }
+        ui.painter().galley(o.min, g, mau_chu);
 
         if let Some(p) = ty_le {
             let day = Rect::from_min_max(egui::pos2(rect.left(), rect.bottom() - 2.0), egui::pos2(rect.right(), rect.bottom()));
@@ -1603,10 +1644,8 @@ impl ManTach {
         self.keo_tu = keo_tu;
         self.so_cot = so_cot;
         self.so_hang_nhin = so_hang_nhin;
-        if dang_xem != self.dang_xem {
-            self.uu_tien_dang_xem(&dang_xem);
-            self.dang_xem = dang_xem;
-        }
+        // Phân tích đi lần lượt từ hồ sơ đầu danh sách tới cuối (không ưu tiên trang đang hiện nữa)
+        self.dang_xem = dang_xem;
     }
 
     /// Dòng trạng thái dưới lưới (trong vùng duyệt): còn trong view, hoàn tác / làm lại, trạng thái lưu nhãn.

@@ -59,6 +59,9 @@
   .nutgon svg { width:15px; height:15px; fill:none; stroke:#444; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; }
   #manTach.gonTM #hangTM { display:none; }
   .nhantd { margin-left:auto; align-self:center; padding:0 12px; font-size:11.5px; color:var(--chu-phu); }
+  /* Dừng giữa chừng: chữ cam đậm trên nền cam nhạt; xong: chữ xanh lá đậm */
+  .nhantd.dung { color:#B85F00; font-weight:bold; background:#FFF1DC; border:1px solid #F0B97A; border-radius:3px; padding:2px 8px; margin-right:6px; }
+  .nhantd.xong { color:var(--xanh-la); font-weight:bold; }
   .vachtd { position:absolute; left:0; right:0; bottom:-1px; height:2px; z-index:2; pointer-events:none; } .vachtd b { display:block; height:2px; width:0; background:var(--chon-vien); }
   .trai { overflow-y:auto; width:290px; border-right:0; position:relative; }
   .keo { width:5px; flex-shrink:0; cursor:col-resize; background:var(--vien-nhat); background-clip:content-box; padding:0 2px; box-sizing:border-box; }
@@ -1145,7 +1148,7 @@
     $('chuaPT').classList.toggle('an', s.daPT || dangPT);
     $('cheTrang').classList.toggle('an', !(s.daPT || dangPT) || s.che !== 'trang');
     $('cheVanBan').classList.toggle('an', !s.daPT || s.che !== 'vanban');
-    if (!dangPT) { $('vachTD').style.width = '0'; $('nhanTD').textContent = s.daPT ? 'Phân tích xong (' + gioPhutGiay(tgPhanTich) + ')' : ''; }
+    if (!dangPT) { $('vachTD').style.width = '0'; $('nhanTD').textContent = s.daPT ? 'Phân tích xong (' + gioPhutGiay(tgPhanTich) + ')' : ''; $('nhanTD').className = 'nhantd' + (s.daPT ? ' xong' : ''); }
     if (s.daPT || dangPT) {
       veLuoi();
       // Menu lọc nhớ mục đã chọn (s.locMenu): đang lọc Điểm cắt thì nút menu vẫn ghi mục đó (không sáng), bấm là quay lại
@@ -1654,9 +1657,9 @@
     ve(); $('luoi').scrollTop = 0;
     var t = setInterval(function () {
       i += 0.5; $('vachTD').style.width = Math.min(i, 100) + '%';
-      $('nhanTD').textContent = 'Đang phân tích ' + Math.floor(Math.min(i, 100)) + '% (' + gioPhutGiay(Date.now() - batDau) + ')';
+      $('nhanTD').textContent = 'Đang phân tích ' + Math.floor(Math.min(i, 100)) + '% (' + gioPhutGiay(Date.now() - batDau) + ')'; $('nhanTD').className = 'nhantd';
       veTienDoHS(Math.min(i, 100) / 100);
-      if (i >= 100 || dungPT) { clearInterval(t); veTienDoHS(-1); tgPhanTich = Date.now() - batDau; dangPT = false; s.daPT = true; s.loc = 'tat'; $('nutCauHinh').disabled = false; $('nutMenu').disabled = false; ve(); if (dungPT) $('nhanTD').textContent = 'Đã dừng ở ' + Math.min(i, 100) + '% (' + gioPhutGiay(tgPhanTich) + ')'; }
+      if (i >= 100 || dungPT) { clearInterval(t); veTienDoHS(-1); tgPhanTich = Date.now() - batDau; dangPT = false; s.daPT = true; s.loc = 'tat'; $('nutCauHinh').disabled = false; $('nutMenu').disabled = false; ve(); if (dungPT) { $('nhanTD').textContent = 'Đã dừng ở ' + Math.floor(Math.min(i, 100)) + '% (' + gioPhutGiay(tgPhanTich) + ')'; $('nhanTD').className = 'nhantd dung'; } }
     }, 40);
   }
   // Hồ sơ đang phân tích: vạch xanh 2 px dưới chân dòng dài dần theo % trang đã xong của hồ sơ đó (như thanh tiến

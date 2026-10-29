@@ -431,7 +431,7 @@ fn ten_thu_muc(thu_muc: &str) -> String {
 /// Thư mục con bị bỏ qua khi quét (rác/hệ thống/cache) để không chui vào vùng chậm.
 /// Chỉ áp cho THƯ MỤC CON; thư mục gốc người dùng chọn luôn được quét.
 /// Lưu ý KHÔNG bỏ qua CloudStorage (Google Drive/iCloud) vì tài liệu có thể nằm ở đó.
-fn bo_qua_thu_muc(ten: &std::ffi::OsStr) -> bool {
+pub(crate) fn bo_qua_thu_muc(ten: &std::ffi::OsStr) -> bool {
     let ten = ten.to_string_lossy();
     if ten.starts_with('.') {
         return true; // thư mục ẩn: .Trash, .git, .cache…

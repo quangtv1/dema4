@@ -1651,6 +1651,18 @@ mod tests {
             std::thread::sleep(Duration::from_millis(50));
         }
         harness.render().unwrap().save(thu_muc_anh.join("tach_9_phong_to.png")).unwrap();
+        // Hộp phóng to ở tab Hồ sơ (có S I B)
+        harness.state_mut().tach.phong_to = None;
+        harness.state_mut().tach.tab = crate::gui_tach::Tab::HoSo;
+        harness.state_mut().tach.loc = crate::gui_tach::bang_trang::Loc::TatCa;
+        harness.run_steps(2);
+        let ds = harness.state().tach.thu_tu_hien().to_vec();
+        harness.state_mut().tach.phong_to = Some(crate::gui_tach::phong_to::PhongTo::moi(ds.clone(), ds[ds.len().min(10) - 1]));
+        for _ in 0..20 {
+            harness.run_steps(1);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        harness.render().unwrap().save(thu_muc_anh.join("tach_9b_phong_to_hs.png")).unwrap();
     }
 
     /// Chụp lúc đang Phân tích (bản sao thư mục mẫu không có cache): vạch tiến độ hồ sơ ở cột trái.
