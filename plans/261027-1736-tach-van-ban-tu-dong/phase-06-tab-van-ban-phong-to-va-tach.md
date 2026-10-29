@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Tab Văn bản + phóng to trang + nút Tách"
-status: pending
+status: in-progress
 priority: P1
 dependencies: [4, 5]
 effort: "3 ngày"
@@ -40,6 +40,7 @@ Xem trước từng văn bản sẽ được tạo (trước khi tách), phóng 
 - Góc dưới phải, cách mép dưới; tooltip `Ghi ra: <thư mục ra> (giữ cấu trúc thư mục gốc)` + khi còn trang Nghi thêm " · Phải duyệt hết Nghi trắng (x) và Nghi xoay (y) trước khi tách"; vô hiệu khi chưa phân tích/đang chạy.
 - **Thứ tự kiểm khi bấm Tách**: (1) còn trang Nghi → hộp "Chưa tách được" (nút theo thứ tự **Đóng · Duyệt Nghi xoay · Duyệt Nghi trắng** (xanh), chỉ hiện nút của loại còn; bấm Duyệt → về tab Hồ sơ, bỏ lọc hồ sơ, bật bộ lọc, chọn sẵn trang đầu) và dừng; (2) "Chưa lưu" → hỏi Lưu / Bỏ / Huỷ; (3) tách.
 - Chạy phase 4 nền, tiến độ trên vạch mảnh dưới tab; xong → popup tiêu đề **"Đã tách xong `<tên thư mục>`"**: hồ sơ · văn bản · trang bỏ (index, trắng) · sao nguyên (số hồ sơ không có nhãn **và không có trang xoay**, chép nguyên file) · ghi ra · thời gian; nút **Mở thư mục** (thư mục ra) **· Mở log** (`<đầu vào>/.sm-dema4/ketqua_tach.txt`) **· Đóng** (3 nút cùng cỡ như popup màn Đếm); dòng nhỏ cuối popup "Thông tin tách thư mục đã được ghi lại" (công khai việc gửi thống kê, như popup Đếm).
+- **Không xoá được part cũ** (chốt 2026-10-29, phương án A): tách lại mà part thừa của lần trước đang mở (Windows khoá file) → popup "Đã tách xong" thêm dòng đỏ `Không xoá được n file cũ (có thể đang mở): <đường dẫn> — đóng file rồi xoá tay hoặc Tách lại`, đồng thời ghi vào `ketqua_tach.txt`.
 - **Gửi Telegram mỗi lần tách xong** (luồng nền, im lặng khi lỗi mạng; chỉ khi có `telegram.txt`/cấu hình như màn Đếm), cùng kiểu với tin Đếm:
   ```
   Tên PC: <b>…</b>; Địa chỉ Mac: <b>…</b>
