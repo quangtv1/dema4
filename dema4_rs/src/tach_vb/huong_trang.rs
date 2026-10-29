@@ -49,12 +49,12 @@ impl MoHinhHuong {
         Ok([p[0], p[1], p[2], p[3]])
     }
 
-    /// Đoán hướng trang từ ảnh RGB (mỗi điểm 3 byte); `None` khi không đủ tin cậy ở cả 2 tầng.
-    pub fn doan_huong(&mut self, rgb: &[u8], rong: usize, cao: usize, tin_cay: f32) -> Result<Option<Huong>, String> {
+    /// Chạy mô hình trên ảnh RGB: tầng 1 luôn chạy; tầng 2 (4 góc xoay) chỉ khi tầng 1 có tin cậy < `tin_cay`.
+    pub fn phan_bo(&mut self, rgb: &[u8], rong: usize, cao: usize, tin_cay: f32) -> Result<PhanBoHuong, String> {
         let x = chuan_bi_dau_vao(rgb, rong, cao);
-        let (goc, tc) = ket_luan(&theo_goc(self.du_doan_huong(&x)?));
-        if tc >= tin_cay {
-            return Ok(Some(Huong { goc, tin_cay: tc, tang_2: false }));
+        let tang_1 = theo_goc(self.du_doan_huong(&x)?);
+        if ket_luan_mot(&tang_1).1 >= tin_cay {
+            return Ok(PhanBoHuong { tang_1, tang_2: None });
         }
         let mut cong = [0f32; 4];
         for r in 0..4 {
@@ -65,9 +65,36 @@ impl MoHinhHuong {
             }
         }
         let tong: f32 = cong.iter().sum();
-        let (goc, tc) = ket_luan(&cong.map(|v| v / tong));
-        Ok((tc >= TIN_CAY_TANG_2).then_some(Huong { goc, tin_cay: tc, tang_2: true }))
+        Ok(PhanBoHuong { tang_1, tang_2: Some(cong.map(|v| v / tong)) })
     }
+
+    /// Đoán hướng trang từ ảnh RGB; `None` khi không đủ tin cậy ở cả 2 tầng.
+    pub fn doan_huong(&mut self, rgb: &[u8], rong: usize, cao: usize, tin_cay: f32) -> Result<Option<Huong>, String> {
+        Ok(ket_luan(&self.phan_bo(rgb, rong, cao, tin_cay)?, tin_cay))
+    }
+}
+
+/// Xác suất theo "góc cần xoay theo kim" (chỉ số k = góc/90) của tầng 1 và tầng 2 (nếu đã chạy) — lưu cache.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhanBoHuong {
+    pub tang_1: [f32; 4],
+    pub tang_2: Option<[f32; 4]>,
+}
+
+/// Kết luận từ phân bố đã có (đổi `tin_cay` không cần chạy lại mô hình).
+/// `None` khi chưa đủ tin cậy — kể cả khi tầng 2 chưa chạy (cần chạy bổ sung nếu `can_tang_2`).
+pub fn ket_luan(pb: &PhanBoHuong, tin_cay: f32) -> Option<Huong> {
+    let (goc, tc) = ket_luan_mot(&pb.tang_1);
+    if tc >= tin_cay {
+        return Some(Huong { goc, tin_cay: tc, tang_2: false });
+    }
+    let (goc, tc) = ket_luan_mot(&pb.tang_2?);
+    (tc >= TIN_CAY_TANG_2).then_some(Huong { goc, tin_cay: tc, tang_2: true })
+}
+
+/// Tầng 1 chưa đủ tin cậy mà tầng 2 chưa chạy (vd sau khi tăng `tin_cay` trong Cấu hình) → cần chạy bổ sung.
+pub fn can_tang_2(pb: &PhanBoHuong, tin_cay: f32) -> bool {
+    pb.tang_2.is_none() && ket_luan_mot(&pb.tang_1).1 < tin_cay
 }
 
 /// Xác suất theo "góc cần xoay theo kim" (chỉ số k = góc / 90).
@@ -79,7 +106,7 @@ fn theo_goc(p: [f32; 4]) -> [f32; 4] {
     q
 }
 
-fn ket_luan(q: &[f32; 4]) -> (u16, f32) {
+fn ket_luan_mot(q: &[f32; 4]) -> (u16, f32) {
     let (k, &v) = q.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1)).unwrap();
     (k as u16 * 90, v)
 }
@@ -171,8 +198,13 @@ mod tests {
 
     #[test]
     fn lop_doi_ra_goc_can_xoay() {
-        assert_eq!(ket_luan(&theo_goc([0.1, 0.8, 0.05, 0.05])), (270, 0.8));
-        assert_eq!(ket_luan(&theo_goc([0.1, 0.05, 0.05, 0.8])), (90, 0.8));
+        assert_eq!(ket_luan_mot(&theo_goc([0.1, 0.8, 0.05, 0.05])), (270, 0.8));
+        assert_eq!(ket_luan_mot(&theo_goc([0.1, 0.05, 0.05, 0.8])), (90, 0.8));
+        let pb = PhanBoHuong { tang_1: [0.1, 0.7, 0.1, 0.1], tang_2: None };
+        assert_eq!(ket_luan(&pb, 0.6).map(|h| h.goc), Some(90));
+        assert!(ket_luan(&pb, 0.8).is_none() && can_tang_2(&pb, 0.8));
+        let pb2 = PhanBoHuong { tang_2: Some([0.05, 0.05, 0.85, 0.05]), ..pb };
+        assert_eq!(ket_luan(&pb2, 0.8).map(|h| (h.goc, h.tang_2)), Some((180, true)));
     }
 
     /// Xoay ảnh RGB r×90° ngược kim (trang cần xoay theo kim r×90° để đứng).

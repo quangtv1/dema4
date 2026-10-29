@@ -61,23 +61,7 @@ fn doc_mot_luot(xam: &[u8], rong: u32, cao: u32, nhi_phan: Binarizer, giu_loi: b
 fn thu_nho(xam: &[u8], rong: u32, cao: u32, ty_le: f32) -> (Vec<u8>, u32, u32) {
     let rong_moi = ((rong as f32) * ty_le).max(1.0) as usize;
     let cao_moi = ((cao as f32) * ty_le).max(1.0) as usize;
-    let (rong, cao) = (rong as usize, cao as usize);
-    // Biên vùng nguồn của từng cột / hàng đích (tính 1 lần)
-    let bien = |n_moi: usize, n: usize| -> Vec<(usize, usize)> {
-        (0..n_moi).map(|i| { let a = i * n / n_moi; (a, ((i + 1) * n / n_moi).max(a + 1).min(n)) }).collect()
-    };
-    let (cot, hang) = (bien(rong_moi, rong), bien(cao_moi, cao));
-    let mut ra = vec![0u8; rong_moi * cao_moi];
-    for (y, &(y0, y1)) in hang.iter().enumerate() {
-        for (x, &(x0, x1)) in cot.iter().enumerate() {
-            let mut tong = 0u32;
-            for yy in y0..y1 {
-                tong += xam[yy * rong + x0..yy * rong + x1].iter().map(|&v| v as u32).sum::<u32>();
-            }
-            ra[y * rong_moi + x] = (tong as f32 / ((y1 - y0) * (x1 - x0)) as f32).round() as u8;
-        }
-    }
-    (ra, rong_moi as u32, cao_moi as u32)
+    (super::anh::thu_ve_mang(xam, rong as usize, cao as usize, 1, rong_moi, cao_moi), rong_moi as u32, cao_moi as u32)
 }
 
 #[cfg(test)]
@@ -200,20 +184,6 @@ mod mau_2 {
     use super::*;
     use rayon::prelude::*;
 
-    /// Khoảng cách sửa chuỗi (Levenshtein) — mã index chấp nhận lệch ≤ 3 ký tự.
-    fn lech(a: &str, b: &str) -> usize {
-        let b: Vec<char> = b.chars().collect();
-        let mut dong: Vec<usize> = (0..=b.len()).collect();
-        for (i, ca) in a.chars().enumerate() {
-            let mut moi = vec![i + 1];
-            for (j, &cb) in b.iter().enumerate() {
-                moi.push((dong[j + 1] + 1).min(moi[j] + 1).min(dong[j] + (ca != cb) as usize));
-            }
-            dong = moi;
-        }
-        dong[b.len()]
-    }
-
     /// Mẫu 2 (`DEMA4_MAU2` = thư mục, `DEMA4_MAU2_NHAN` = file nhãn tay): đủ 1.780/1.780 index, không thừa.
     #[test]
     #[ignore = "cần DEMA4_MAU2 + DEMA4_MAU2_NHAN, chạy vài phút"]
@@ -230,7 +200,7 @@ mod mau_2 {
             let s = 150.0 / 72.0;
             (1..=doc.page_count().unwrap()).filter_map(|t| {
                 let pix = doc.load_page(t - 1).unwrap().to_pixmap(&mupdf::Matrix::new_scale(s, s), &mupdf::Colorspace::device_gray(), false, false).unwrap();
-                doc_ma_code128(pix.samples(), pix.width(), pix.height()).iter().any(|m| lech(&m.gia_tri, "NAMSAO-TACH") <= 3).then(|| (ten(p.to_str().unwrap()), t))
+                doc_ma_code128(pix.samples(), pix.width(), pix.height()).iter().any(|m| crate::tach_vb::phan_tich::lech_ky_tu(&m.gia_tri, "NAMSAO-TACH") <= 3).then(|| (ten(p.to_str().unwrap()), t))
             }).collect::<Vec<_>>().into_iter()
         }).collect();
         let tim: std::collections::HashSet<_> = tim.into_iter().collect();

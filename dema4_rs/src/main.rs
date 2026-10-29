@@ -7,7 +7,7 @@
 //! - Thêm `--dpi` để kiểm tra DPI ảnh scan, `--kyso` để kiểm tra chữ ký số (mặc định tắt).
 //! - `dema4_rs <thư mục> --khong-ghi`: chỉ đếm và in kết quả (không ghi file, không gửi thống kê), dùng để đo tốc độ.
 //! - `dema4_rs --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]`: tách văn bản theo nhãn,
-//!   ghi `<cha>/<tên>_vanban/…` và `<thư mục pdf>/.sm-dema4/ketqua_tach.txt`.
+//!   ghi `<cha>/<tên>_vanban/…` và `<thư mục pdf>/.sm-dema4/ketqua_tach.txt`; chưa có nhãn thì phân tích tự động trước.
 
 mod dem_pdf;
 mod gui;
@@ -108,9 +108,22 @@ fn chay_tach(tham_so: &[String]) -> i32 {
     };
     let thu_muc = std::fs::canonicalize(&thu_muc).unwrap_or(thu_muc);
     let an = thu_muc.join(".sm-dema4");
+    let co_nhan_rieng = file_nhan.is_some();
     let file_nhan = file_nhan.unwrap_or_else(|| an.join("index_and_blank.txt"));
+    if !co_nhan_rieng && !file_nhan.exists() {
+        // Chưa có nhãn: phân tích tự động (Cấu hình mặc định) rồi ghi index_and_blank.txt để kiểm tra
+        println!("Chưa có {} — phân tích tự động…", file_nhan.display());
+        let ch = tach_vb::phan_tich::CauHinhPhanTich::default();
+        let phien = tach_vb::phien::phan_tich_thu_muc(&thu_muc, &ch, &|xong, tong| {
+            if xong % 500 == 0 || xong == tong { eprintln!("  {xong}/{tong} trang"); }
+        });
+        if let Err(e) = std::fs::create_dir_all(&an).and_then(|_| std::fs::write(&file_nhan, nhan::ghi_file_nhan(&phien.bang_nhan_tu_dong(&ch)))) {
+            eprintln!("Không ghi được {}: {e}", file_nhan.display());
+            return 1;
+        }
+    }
     let Ok(noi_dung) = std::fs::read_to_string(&file_nhan) else {
-        eprintln!("Chưa có file nhãn {} — mở thư mục trong giao diện để Phân tích, hoặc chỉ file bằng --nhan.", file_nhan.display());
+        eprintln!("Không đọc được file nhãn {}", file_nhan.display());
         return 2;
     };
     let goc_nhan = if file_nhan.starts_with(&an) { thu_muc.clone() } else { file_nhan.parent().map(Path::to_path_buf).unwrap_or_else(|| thu_muc.clone()) };
@@ -169,9 +182,8 @@ mod tests {
         crate::tach_vb::tach::tests::tao_pdf(&nguon.join("a.pdf"), 4);
         std::fs::write(nguon.join(".sm-dema4/index_and_blank.txt"), "a.pdf;2;index\n").unwrap();
         std::fs::write(nguon.join(".sm-dema4/xoay_trang.txt"), "a.pdf;4;180\n").unwrap();
-        // Chưa có nhãn ở thư mục khác → mã thoát 2
-        std::fs::create_dir_all(goc.join("trong")).unwrap();
-        assert_eq!(chay_tach(&[goc.join("trong").to_string_lossy().into_owned()]), 2);
+        // Chỉ file nhãn không tồn tại → mã thoát 2
+        assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned(), "--nhan".into(), "/khong/co.txt".into()]), 2);
         assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned()]), 0);
         let ra = goc.join("ho so_vanban").join("a");
         let doc = mupdf::pdf::PdfDocument::open(ra.join("a_part2.pdf").to_str().unwrap()).unwrap();
@@ -179,6 +191,20 @@ mod tests {
         assert_eq!(doc.find_page(1).unwrap().get_dict("Rotate").unwrap().unwrap().as_int().unwrap(), 180);
         let log = std::fs::read_to_string(nguon.join(".sm-dema4/ketqua_tach.txt")).unwrap();
         assert_eq!(log.lines().count(), 3);
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    #[test]
+    fn tach_chua_co_nhan_thi_phan_tich_tu_dong() {
+        let goc = std::env::temp_dir().join(format!("dema4_cli_tu_dong_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let nguon = goc.join("nguon");
+        std::fs::create_dir_all(&nguon).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&nguon.join("b.pdf"), 3);
+        assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned()]), 0);
+        let nhan = std::fs::read_to_string(nguon.join(".sm-dema4/index_and_blank.txt")).unwrap();
+        assert_eq!(nhan.lines().count(), 3, "3 trang chữ nhỏ → blank: {nhan}");
+        assert!(nguon.join(".sm-dema4/cache").is_dir());
         let _ = std::fs::remove_dir_all(&goc);
     }
 }
