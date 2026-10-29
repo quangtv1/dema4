@@ -79,17 +79,22 @@ struct UngDungChinh {
     tach: crate::gui_tach::ManTach,
     cfg: crate::cau_hinh::CauHinh,
     hop_cau_hinh: Option<crate::gui_tach::hop_cau_hinh::HopCauHinh>,
+    tro_giup: Option<crate::tro_giup::HopTroGiup>,
 }
 
 impl Default for UngDungChinh {
     fn default() -> Self {
         let cfg = crate::cau_hinh::doc();
         let dem = UngDung { quy_tac: cfg.quy_tac(), ..Default::default() };
-        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach: Default::default(), cfg, hop_cau_hinh: None }
+        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach: Default::default(), cfg, hop_cau_hinh: None, tro_giup: None }
     }
 }
 
 impl UngDungChinh {
+    fn tab_huong_dan(&self) -> crate::tro_giup::TabHuongDan {
+        if self.man == Man::Tach { crate::tro_giup::TabHuongDan::Tach } else { crate::tro_giup::TabHuongDan::Dem }
+    }
+
     /// Áp Cấu hình mới cho cả 2 màn (`ghi` = ghi `sm-dema4.cfg`).
     fn ap_cau_hinh(&mut self, moi: crate::cau_hinh::CauHinh, ghi: bool) {
         self.tach.ap_cau_hinh(&self.cfg, &moi);
@@ -110,8 +115,9 @@ impl UngDungChinh {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.add_enabled_ui(!khoa, |ui| {
                     ui.menu_button("Chức năng", |ui| {
-                        for (man, ten) in [(Man::Dem, "Đếm trang A4"), (Man::Tach, "Tách văn bản"), (Man::Ky, "Ký văn bản")] {
-                            if crate::gui_tach::bieu_tuong::muc_menu(ui, ten, self.man == man, 170.0).clicked() {
+                        use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
+                        for (man, ten, icon) in [(Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
+                            if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
                                 self.man = man;
                                 ui.close();
                             }
@@ -125,6 +131,22 @@ impl UngDungChinh {
                     use crate::gui_tach::hop_cau_hinh::{HopCauHinh, TabCauHinh};
                     self.hop_cau_hinh = Some(HopCauHinh::moi(&self.cfg, if self.man == Man::Dem { TabCauHinh::Dem } else { TabCauHinh::Tach }));
                 }
+                ui.menu_button("Trợ giúp", |ui| {
+                    use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
+                    use crate::tro_giup::HopTroGiup;
+                    if muc_menu_day(ui, BieuTuong::XoayPhai, "Kiểm tra cập nhật…", false, None, 210.0).clicked() {
+                        self.tro_giup = Some(HopTroGiup::cap_nhat());
+                        ui.close();
+                    }
+                    if muc_menu_day(ui, BieuTuong::HoiDap, "Hướng dẫn sử dụng", false, Some("F1"), 210.0).clicked() {
+                        self.tro_giup = Some(HopTroGiup::HuongDan(self.tab_huong_dan()));
+                        ui.close();
+                    }
+                    if muc_menu_day(ui, BieuTuong::ThongTin, "Thông tin", false, None, 210.0).clicked() {
+                        self.tro_giup = Some(HopTroGiup::ThongTin);
+                        ui.close();
+                    }
+                });
             });
         });
     }
@@ -139,6 +161,9 @@ impl eframe::App for UngDungChinh {
         }
         if ctx.input(|i| i.viewport().close_requested()) {
             self.tach.ghi_cache();
+        }
+        if self.tro_giup.is_none() && self.hop_cau_hinh.is_none() && ctx.input(|i| i.key_pressed(egui::Key::F1)) {
+            self.tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(self.tab_huong_dan()));
         }
         self.thanh_menu(ui);
         match self.man {
@@ -155,6 +180,9 @@ impl eframe::App for UngDungChinh {
                 });
             }
         }
+        if self.tro_giup.as_mut().is_some_and(|h| h.ve(&ctx)) {
+            self.tro_giup = None;
+        }
         if let Some(hop) = &mut self.hop_cau_hinh {
             use crate::gui_tach::hop_cau_hinh::KetQuaHop;
             match hop.ve(&ctx) {
@@ -170,7 +198,7 @@ impl eframe::App for UngDungChinh {
 }
 
 /// Tên họ font đậm (egui không có chữ đậm sẵn, strong() chỉ đổi màu)
-const HO_FONT_DAM: &str = "dam";
+pub(crate) const HO_FONT_DAM: &str = "dam";
 
 /// In đậm thật bằng họ font đậm của hệ thống
 pub(crate) trait ChuDam {
@@ -1418,6 +1446,10 @@ mod tests {
         harness.state_mut().hop_cau_hinh = Some(hop);
         harness.run_steps(3);
         harness.render().unwrap().save(thu_muc_anh.join("tach_4_cau_hinh_dem.png")).unwrap();
+        harness.state_mut().hop_cau_hinh = None;
+        harness.state_mut().tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(crate::tro_giup::TabHuongDan::Tach));
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("tach_5_huong_dan.png")).unwrap();
     }
 
     /// Vẽ giao diện ra ảnh PNG (không mở cửa sổ) từ một file chi tiết thật để xem bố cục.

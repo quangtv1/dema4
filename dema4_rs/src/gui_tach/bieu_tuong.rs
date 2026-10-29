@@ -15,6 +15,11 @@ pub enum BieuTuong {
     Xoay180,
     /// ⓘ (tooltip giải thích).
     ThongTin,
+    /// Menu Chức năng / Trợ giúp
+    TaiLieu,
+    Keo,
+    But,
+    HoiDap,
 }
 
 const NET: f32 = 1.75;
@@ -58,6 +63,31 @@ pub fn ve(painter: &egui::Painter, r: Rect, bt: BieuTuong, mau: Color32) {
             painter.circle_filled(c + Vec2::new(0.0, -0.4) * k, 0.12 * k, mau);
             painter.line_segment([c + Vec2::new(0.0, -0.12) * k, c + Vec2::new(0.0, 0.5) * k], Stroke::new(1.4, mau));
         }
+        BieuTuong::TaiLieu => {
+            let (w, h) = (0.62 * k, 0.8 * k);
+            let goc = 0.3 * k;
+            let diem = vec![c + Vec2::new(-w, -h), c + Vec2::new(w - goc, -h), c + Vec2::new(w, -h + goc), c + Vec2::new(w, h), c + Vec2::new(-w, h), c + Vec2::new(-w, -h)];
+            painter.add(Shape::line(diem, s));
+            for y in [-0.05, 0.3] {
+                painter.line_segment([c + Vec2::new(-0.35, y) * k, c + Vec2::new(0.35, y) * k], s);
+            }
+        }
+        BieuTuong::Keo => {
+            for y in [-0.45, 0.45] {
+                painter.circle_stroke(c + Vec2::new(-0.5, y) * k, 0.25 * k, s);
+            }
+            painter.line_segment([c + Vec2::new(-0.3, -0.3) * k, c + Vec2::new(0.8, 0.45) * k], s);
+            painter.line_segment([c + Vec2::new(-0.3, 0.3) * k, c + Vec2::new(0.8, -0.45) * k], s);
+        }
+        BieuTuong::But => {
+            painter.line_segment([c + Vec2::new(-0.6, 0.55) * k, c + Vec2::new(0.45, -0.5) * k], Stroke::new(NET * 1.3, mau));
+            painter.line_segment([c + Vec2::new(-0.75, 0.8) * k, c + Vec2::new(-0.6, 0.55) * k], s);
+            painter.line_segment([c + Vec2::new(0.0, 0.85) * k, c + Vec2::new(0.85, 0.85) * k], s);
+        }
+        BieuTuong::HoiDap => {
+            painter.circle_stroke(c, 0.85 * k, Stroke::new(1.2, mau));
+            painter.text(c + Vec2::new(0.0, 0.05 * k), egui::Align2::CENTER_CENTER, "?", egui::FontId::proportional(1.2 * k), mau);
+        }
         BieuTuong::XoayPhai | BieuTuong::Xoay180 => {
             // Vòng 3/4 theo chiều kim đồng hồ, mũi tên ở cuối
             let r_cung = 0.62 * k;
@@ -82,6 +112,19 @@ pub fn nut(ui: &mut egui::Ui, bt: BieuTuong, goi_y: &str, bat: bool) -> Response
     let mau = if bat { v.text_color() } else { v.weak_text_color() };
     ve(ui.painter(), r.shrink(4.5), bt, mau);
     phan_hoi.on_hover_text(goi_y)
+}
+
+/// Mục menu: icon sát lề trái, chữ, cuối dòng là ✓ (đang dùng) hoặc phím tắt.
+pub fn muc_menu_day(ui: &mut egui::Ui, icon: BieuTuong, chu: &str, dang_chon: bool, phim: Option<&str>, rong: f32) -> Response {
+    let r = ui.add(egui::Button::new(format!("      {chu}")).min_size(egui::vec2(rong, 0.0)));
+    let mau = ui.visuals().text_color();
+    ve(ui.painter(), Rect::from_center_size(egui::pos2(r.rect.left() + 13.0, r.rect.center().y), egui::vec2(14.0, 14.0)), icon, mau);
+    if dang_chon {
+        ve(ui.painter(), Rect::from_center_size(egui::pos2(r.rect.right() - 12.0, r.rect.center().y), egui::vec2(12.0, 12.0)), BieuTuong::Dau, crate::gui::XANH_LA);
+    } else if let Some(p) = phim {
+        ui.painter().text(egui::pos2(r.rect.right() - 8.0, r.rect.center().y), egui::Align2::RIGHT_CENTER, p, egui::TextStyle::Small.resolve(ui.style()), ui.visuals().weak_text_color());
+    }
+    r
 }
 
 /// Nút trong menu có dấu ✓ ở cuối dòng khi `dang_chon`.

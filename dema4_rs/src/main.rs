@@ -18,6 +18,7 @@ mod gui_tach;
 #[allow(dead_code)] // dùng dần từ các phần phân tích / giao diện tách văn bản
 mod tach_vb;
 mod telegram;
+mod tro_giup;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
