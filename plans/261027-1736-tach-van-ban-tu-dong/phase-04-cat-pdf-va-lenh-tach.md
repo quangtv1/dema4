@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Cắt PDF và lệnh tách"
-status: in-progress
+status: completed
 priority: P1
 dependencies: [2]
 effort: "0,5–1 ngày"
@@ -44,7 +44,7 @@ Từ hồ sơ + nhãn → ghi các part PDF và `ketqua_tach.txt`; thêm lệnh 
 - [x] 211/211 part khớp b3 (số trang + băm ảnh từng trang); cắt 0,8–0,9 s. Code: `dema4_rs/src/tach_vb/tach.rs`, CLI `--tach` ở `main.rs`.
 - [x] Log 1-based nhất quán, chạy lại idempotent (part thừa cũ bị xoá, file khác giữ nguyên).
 - [x] Toàn bộ test đếm cũ xanh.
-- [ ] Còn lại: CLI không có `--nhan` và chưa có nhãn → chạy phát hiện (cần phase 3; hiện báo "chưa có file nhãn", mã thoát 2); test vàng cấu trúc mẫu 2 (234 thư mục hồ sơ) — chạy khi có nhãn mẫu 2 theo đúng đường dẫn `HOP …/…/….pdf`.
+- [x] CLI không có nhãn → tự phân tích rồi tách (test `tach_chua_co_nhan_thi_phan_tich_tu_dong`); test vàng cấu trúc mẫu 2: 234 hồ sơ → 1.968 part (= tổng dải cắt), 2 hồ sơ không nhãn chép nguyên, mỗi hồ sơ 1 thư mục giữ cấu trúc nguồn, 10,8 s (2026-10-29).
 
 ## Risk Assessment
 - Ghi đè/xoá part cũ nhầm thư mục người dùng → chỉ xoá file khớp mẫu tên đang áp trong thư mục `<hoso>/` của thư mục ra; test bảo vệ file khác không bị đụng.

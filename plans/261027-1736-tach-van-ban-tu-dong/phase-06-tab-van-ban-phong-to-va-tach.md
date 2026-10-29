@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Tab Văn bản + phóng to trang + nút Tách"
-status: in-progress
+status: completed
 priority: P1
 dependencies: [4, 5]
 effort: "3 ngày"

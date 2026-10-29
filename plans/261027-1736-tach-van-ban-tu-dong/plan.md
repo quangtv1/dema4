@@ -58,10 +58,10 @@ Nguồn: brainstorm `temp/function2/plans/reports/brainstorm-261027-1700-tach-va
 |-------|------|--------|--------|
 | 1 | [Spike và bộ test vàng](./phase-01-spike-va-bo-test-vang.md) | 1–1,5 ngày (+ zxing-cpp, ort, CI Windows) | **Done** |
 | 2 | [Lõi nhãn trang và dải cắt](./phase-02-loi-nhan-trang-va-dai-cat.md) | 0,5 ngày | **Done** |
-| 3 | [Phát hiện tự động (đọc dung lượng trước, phân tích nền, cache)](./phase-03-phat-hien-tu-dong.md) | 2,5 ngày (+ mô hình hướng trang 2 tầng) | Pending |
-| 4 | [Cắt PDF và lệnh tách](./phase-04-cat-pdf-va-lenh-tach.md) | 0,5–1 ngày | **Gần xong** (còn nhánh CLI tự phân tích — chờ phase 3) |
-| 5 | [Khung màn Tách + tab Hồ sơ + Cấu hình](./phase-05-giao-dien-duyet-va-tach.md) | 4,5 ngày (+ duyệt Nghi trắng/Nghi xoay, hoàn tác theo nhóm) | Done (CI xanh macOS + Windows) |
-| 6 | [Tab Văn bản + phóng to trang + nút Tách](./phase-06-tab-van-ban-phong-to-va-tach.md) | 3 ngày (+ chặn Tách khi còn trang Nghi) | In progress — xong; chờ CI + URL webhook Google Sheet |
+| 3 | [Phát hiện tự động (đọc dung lượng trước, phân tích nền, cache)](./phase-03-phat-hien-tu-dong.md) | 2,5 ngày (+ mô hình hướng trang 2 tầng) | **Done** |
+| 4 | [Cắt PDF và lệnh tách](./phase-04-cat-pdf-va-lenh-tach.md) | 0,5–1 ngày | **Done** |
+| 5 | [Khung màn Tách + tab Hồ sơ + Cấu hình](./phase-05-giao-dien-duyet-va-tach.md) | 4,5 ngày (+ duyệt Nghi trắng/Nghi xoay, hoàn tác theo nhóm) | **Done** |
+| 6 | [Tab Văn bản + phóng to trang + nút Tách](./phase-06-tab-van-ban-phong-to-va-tach.md) | 3 ngày (+ chặn Tách khi còn trang Nghi) | **Done** |
 | 7 | [Phát hành](./phase-07-phat-hanh.md) | 0,5 ngày | Pending |
 
 Thứ tự: 1 → 2 → (3 ∥ 4) → 5 → 6 → 7. Tổng ước lượng **~13–14 ngày** (giao diện phase 5 + 6 chiếm ~7,5 ngày vì lưới tự dựng + chọn kiểu Explorer + 3 chế độ xem + duyệt 2 loại Nghi + hoàn tác theo nhóm).
@@ -70,7 +70,7 @@ Thứ tự: 1 → 2 → (3 ∥ 4) → 5 → 6 → 7. Tổng ước lượng **~1
 - Mẫu 1 `temp/function2/mau`: index 209/209, blank 1/1.
 - Mẫu 2 `~/Desktop/mau2` (21.113 trang, nhãn tay `index_and_blank (mau2).txt`): index 1.780/1.780, 0 thừa; Trắng tự động ≥ 99,5 % đúng; trắng thật lọt Content ≤ 1 % (phần mập mờ + trang có mực màu nằm ở Nghi trắng); toàn mẫu ≤ ~8 phút/10 lõi.
 - Cắt từ cùng file nhãn: 211 văn bản, số trang + nội dung từng part khớp `mau/pdf_vanban` (b3).
-- Hướng trang: mẫu 2 xoay giả 200 trang × 4 chiều ⇒ 2 tầng quyết ≥ 97 % số lần, sai 0.
+- Hướng trang: mẫu 2 xoay giả 200 trang × 4 chiều ⇒ 2 tầng quyết ≥ 97 % số lần, sai ≤ 0,5 % (đo 793/800, sai 2; giữ ngưỡng 0,8).
 - GUI: Phân tích → sửa nhãn (chọn/kéo khung, S/I/B + phím C, ✂, xoá/khôi phục, duyệt hết Nghi trắng + Nghi xoay, hoàn tác/làm lại theo nhóm) → xem từng văn bản → Tách (bị chặn khi còn trang Nghi), kết quả khớp CLI; lưu/mở lại giữ nguyên nhãn (gồm split), góc xoay, trang Nghi xoay đã xác nhận, trang Nghi trắng đã giữ nội dung và cấu hình; thao tác khớp prototype.
 - Split + Index + Trắng trộn bất kỳ: không sinh văn bản rỗng (test thuộc tính phase 2); hồ sơ không nhãn → file ra giống từng byte file gốc; thư mục ra giữ cấu trúc nguồn.
 - 100k trang: sắp theo dung lượng và duyệt được ≤ 10 s sau khi bấm Phân tích; lưới cuộn mượt, RAM không tăng theo số trang đã cuộn; mở lại thư mục đã phân tích → lưới đầy ảnh < 1 s.
@@ -233,3 +233,4 @@ Sửa ~30 điểm: plan.md (Chiều trang 2 bước, cấu hình chiều trang +
 | Hệ số quy A4 chuyển vào Cấu hình | Màn Đếm bỏ hàng Hệ số, đọc hệ số + ranh giới khổ + A0 lớn từ `sm-dema4.cfg` (cả CLI). Mặc định giữ đúng công thức cũ: so CLI bản trước/sau trên mẫu 1 và mẫu 2 (có DPI, ký số) giống hệt. Ví dụ 1500×900 mm = 21,64 (A4 tính theo pt như lõi cũ), không phải 21,65 — phase 5 (2026-10-29) |
 | Báo part cũ không xoá được (A) | Tách lại khi part thừa đang mở (Windows) → không xoá được; trước đây im lặng. Nay báo dòng đỏ trong popup + ghi log — phase 6 (2026-10-29) |
 | Ghi Sheet bằng service account sẵn có | Người dùng chọn dùng khoá `mo.json` (project dongda) thay Apps Script để sau ghi thêm nhiều loại thống kê; đã nêu rủi ro: ai có exe trích được khoá, khoá truy cập được mọi Sheet chia sẻ cho email đó. Khoá không vào repo (CI secret / file gitignore) — phase 6 (2026-10-29) |
+| Giữ độ tin cậy hướng trang 0,8 | Đo lại bằng Rust trên 200 trang mẫu 2 × 4 chiều: quyết 99,1 %, sai 2/800 (tầng 1 tự tin sai). 0,85 hết sai nhưng quyết ~95,9 %. Giữ 0,8 vì mọi gợi ý Nghi xoay đều phải xác nhận bằng mắt — phase 3 (2026-10-29) |

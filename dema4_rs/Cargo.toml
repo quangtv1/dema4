@@ -1,8 +1,8 @@
 [package]
 name = "dema4_rs"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
-description = "Đếm số trang A4 trong thư mục PDF (bản Rust của dema4_gom.py, chức năng 1)"
+description = "Đếm trang A4 và tách văn bản PDF scan (Giải pháp số Sao Mai)"
 
 # Tên file chạy: sm-dema4 (sm-dema4.exe trên Windows)
 [[bin]]

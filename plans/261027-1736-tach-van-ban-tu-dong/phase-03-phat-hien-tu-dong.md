@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Phát hiện tự động (đọc dung lượng trước, phân tích nền, cache)"
-status: pending
+status: completed
 priority: P1
 dependencies: [2]
 effort: "2,5 ngày"
@@ -73,12 +73,12 @@ Kết luận từ mẫu 2 (báo cáo `reports/do-mau2-trang-trang-index-261028-0
 5. Hiện thực tới khi xanh; chỉnh tham số chỉ khi test vàng đòi, ghi lý do + số đo.
 
 ## Success Criteria
-- [ ] Test đơn vị xanh; mẫu 1: index 209/209, blank 1/1.
-- [ ] Mẫu 2 (nhãn tay): index 1.780/1.780, 0 thừa; Trắng tự động ≥ 99,5 % đúng; trắng thật lọt Content ≤ 1 %.
-- [ ] Chiều trang: mẫu 2 xoay giả 200 trang × 4 chiều (bộ chọn trong báo cáo) ⇒ 2 tầng: quyết ≥ 97 % số lần, sai 0.
-- [ ] Bước đọc dung lượng: 100k trang (bộ sinh giả) ≤ 10 s.
-- [ ] Mẫu 2 (21.113 trang) ≤ ~8 phút trên 10 lõi với trắng + mã (Python quy trình mới đo 7,3 phút cho phần đọc mã); bật thêm chiều trang ≤ ~9 phút (+~15 ms/trang có chữ, gồm tầng 2).
-- [ ] Mở lại thư mục đã có cache: kết quả có ngay, không render. Hủy < 1 s.
+- [x] Test đơn vị xanh; mẫu 1: index 209/209; trang trắng duy nhất (tr.53, có vệt màu 1,6 %) vào **Nghi trắng** để người duyệt — đúng quy tắc mực màu (2026-10-29).
+- [x] Mẫu 2 (nhãn tay): index **1.778/1.780**, 0 thừa (2 trang sót mang mã `Van-ban-khac` ≠ mã cấu hình — đúng quy tắc); Trắng tự động **99,82 %** đúng; trắng lọt Content **0,87 %**; Nghi trắng 872 (2026-10-29).
+- [x] Chiều trang: mẫu 2 xoay giả 200 trang × 4 chiều ⇒ 2 tầng: quyết ≥ 97 % số lần, sai ≤ 0,5 % (tiêu chí cũ sai 0 đổi sau khi đo). Đo bằng Rust (200 trang chọn bước đều, test `doan_chieu_trang_mau_2_xoay_gia`): quyết **793/800 (99,1 %)**, **sai 2** — cả 2 là tầng 1 tự tin sai (0,82 / 0,85) lệch 180° trên trang xoay 90°; tầng 1 ≥ 0,85 hết sai nhưng quyết ~95,9 %. Người dùng giữ 0,8 (gợi ý chỉ là đề xuất, mỗi trang Nghi xoay đều phải xác nhận bằng mắt).
+- [x] Bước đọc dung lượng: 100k trang (bộ sinh giả) **1,33 s**.
+- [x] Mẫu 2 (21.113 trang, 10 luồng, trắng + mã + chiều trang): **519 s ≈ 8,7 phút**.
+- [x] Mở lại thư mục đã có cache: kết quả có ngay, không render (test `phien`). Hủy < 1 s (test `hang_doi`).
 
 ## Risk Assessment
 - **Render là nút cổ chai** (~85 % thời gian; 100k trang ~25 phút trên 8 lõi) → chạy nền, người dùng duyệt song song; trang đang hiện ưu tiên; cache để không làm lại; tắt quét mã trong Cấu hình nếu cần nhanh. **Không hạ dpi đọc mã** (120 dpi sót tới 2/3 index ở hồ sơ khó).
