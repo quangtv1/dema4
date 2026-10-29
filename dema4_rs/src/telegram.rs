@@ -89,13 +89,21 @@ pub fn noi_dung_thong_ke(thu_muc: &str, kq: &crate::dem_pdf::KetQuaDem, thoi_gia
     soan_tin(&ten_pc(), &dia_chi_mac(), thu_muc, kq, &thoi_diem, thoi_gian)
 }
 
+/// Đường dẫn tuyệt đối, cắt còn 1000 ký tự cuối: giữ tin dưới giới hạn 4096 ký tự mà không cắt giữa thẻ HTML.
+fn thu_muc_gon(thu_muc: &str) -> String {
+    let thu_muc = std::path::absolute(thu_muc).map(|p| p.display().to_string()).unwrap_or_else(|_| thu_muc.to_string());
+    if thu_muc.chars().count() > 1000 { format!("…{}", thu_muc.chars().rev().take(1000).collect::<Vec<_>>().into_iter().rev().collect::<String>()) } else { thu_muc }
+}
+
+/// Giá trị in đậm (HTML của Telegram); mã hoá & < > để đường dẫn lạ không làm hỏng định dạng.
+fn dam(gia_tri: &str) -> String {
+    format!("<b>{}</b>", gia_tri.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;"))
+}
+
 fn soan_tin(ten_pc: &str, mac: &str, thu_muc: &str, kq: &crate::dem_pdf::KetQuaDem, thoi_diem: &str, thoi_gian: Duration) -> String {
     use crate::gui::{so_nguyen, so_thuc, thoi_gian_phut_giay};
-    let thu_muc = std::path::absolute(thu_muc).map(|p| p.display().to_string()).unwrap_or_else(|_| thu_muc.to_string());
-    // Giữ tin dưới giới hạn 4096 ký tự của Telegram mà không cắt giữa thẻ HTML
-    let thu_muc: String = if thu_muc.chars().count() > 1000 { format!("…{}", thu_muc.chars().rev().take(1000).collect::<Vec<_>>().into_iter().rev().collect::<String>()) } else { thu_muc };
-    // Giá trị in đậm (HTML của Telegram); mã hoá & < > để đường dẫn lạ không làm hỏng định dạng
-    let b = |gia_tri: &str| format!("<b>{}</b>", gia_tri.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;"));
+    let thu_muc = thu_muc_gon(thu_muc);
+    let b = dam;
     format!(
         "Tên PC: {}; Địa chỉ Mac: {}\n\
          - Thư mục đếm: {};\n\
@@ -110,6 +118,49 @@ fn soan_tin(ten_pc: &str, mac: &str, thu_muc: &str, kq: &crate::dem_pdf::KetQuaD
         b(&so_nguyen(kq.so_trang_canh_bao)),
         b(&so_nguyen(kq.so_file_loi)),
         b(thoi_diem),
+        thoi_gian_phut_giay(thoi_gian),
+    )
+}
+
+/// Số liệu 1 lần tách (tin thống kê tách).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SoLieuTach {
+    pub ho_so: usize,
+    pub van_ban: usize,
+    pub so_trang: usize,
+    pub bo_index: usize,
+    pub bo_trang: usize,
+    pub split: usize,
+    pub sao_nguyen: usize,
+    pub ho_so_loi: usize,
+}
+
+/// Tin thống kê sau mỗi lần tách xong (cùng kiểu tin Đếm).
+pub fn noi_dung_tach(thu_muc: &str, sl: &SoLieuTach, thoi_gian: Duration) -> String {
+    let thoi_diem = chrono::Local::now().format("%d.%m.%Y, %H:%M:%S").to_string();
+    soan_tin_tach(&ten_pc(), &dia_chi_mac(), thu_muc, sl, &thoi_diem, thoi_gian)
+}
+
+fn soan_tin_tach(ten_pc: &str, mac: &str, thu_muc: &str, sl: &SoLieuTach, thoi_diem: &str, thoi_gian: Duration) -> String {
+    use crate::gui::{so_nguyen, thoi_gian_phut_giay};
+    let n = |x: usize| dam(&so_nguyen(x));
+    format!(
+        "Tên PC: {}; Địa chỉ Mac: {}\n\
+         - Thư mục tách: {};\n\
+         - Hồ sơ: {}; Văn bản: {}; Số trang: {}; Bỏ index: {}; Bỏ trắng: {}; Split: {}; Sao nguyên: {}; Hồ sơ lỗi: {}\n\
+         - Thời điểm tách: {}  ({})",
+        dam(ten_pc),
+        dam(mac),
+        dam(&thu_muc_gon(thu_muc)),
+        n(sl.ho_so),
+        n(sl.van_ban),
+        n(sl.so_trang),
+        n(sl.bo_index),
+        n(sl.bo_trang),
+        n(sl.split),
+        n(sl.sao_nguyen),
+        n(sl.ho_so_loi),
+        dam(thoi_diem),
         thoi_gian_phut_giay(thoi_gian),
     )
 }
@@ -168,6 +219,19 @@ mod tests {
              - Thư mục đếm: <b>/Users/quangtv/Documents</b>;\n\
              - File PDF: <b>4</b>; Số trang: <b>78</b>; Quy ra A4: <b>128</b>; Cảnh báo: <b>0</b>; File lỗi: <b>0</b>\n\
              - Thời điểm đếm: <b>26.10.2026, 19:05:30</b>  (1 phút, 5,4 giây)"
+        );
+    }
+
+    #[test]
+    fn tin_tach_dung_mau() {
+        let sl = SoLieuTach { ho_so: 2, van_ban: 211, so_trang: 476, bo_index: 209, bo_trang: 1, split: 0, sao_nguyen: 0, ho_so_loi: 0 };
+        let tin = soan_tin_tach("ABC", "AA:BB", "/a/<b>", &sl, "29.10.2026, 11:30:00", Duration::from_millis(1_200));
+        assert_eq!(
+            tin,
+            "Tên PC: <b>ABC</b>; Địa chỉ Mac: <b>AA:BB</b>\n\
+             - Thư mục tách: <b>/a/&lt;b&gt;</b>;\n\
+             - Hồ sơ: <b>2</b>; Văn bản: <b>211</b>; Số trang: <b>476</b>; Bỏ index: <b>209</b>; Bỏ trắng: <b>1</b>; Split: <b>0</b>; Sao nguyên: <b>0</b>; Hồ sơ lỗi: <b>0</b>\n\
+             - Thời điểm tách: <b>29.10.2026, 11:30:00</b>  (0 phút, 1,2 giây)"
         );
     }
 

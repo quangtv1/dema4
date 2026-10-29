@@ -6,6 +6,7 @@ pub mod bang_trang;
 pub mod bieu_tuong;
 pub mod chon;
 pub mod hop_cau_hinh;
+pub mod nut_tach;
 pub mod phong_to;
 pub mod tab_van_ban;
 pub mod thanh_nguong;
@@ -132,6 +133,12 @@ pub struct ManTach {
     cuon_dau_vb: bool,
     dat_giua_ngang: bool,
     pub phong_to: Option<phong_to::PhongTo>,
+    // Tách
+    tach: Option<nut_tach::DangTach>,
+    xong_tach: Option<nut_tach::XongTach>,
+    chua_tach: Option<(u32, u32)>,
+    hoi_luu_tach: bool,
+    tong_tt: Option<(u64, crate::dem_pdf::QuyTac, van_ban::TongVanBan)>,
     /// Ảnh cần render trong khung này (gom từ lưới, xem trang, hộp phóng to rồi gửi 1 lần).
     yeu_cau_anh: Vec<YeuCau>,
     /// Cấu hình đổi trong màn (độ rộng cột, cỡ ảnh…) → app ghi `sm-dema4.cfg`.
@@ -174,6 +181,11 @@ impl Default for ManTach {
             cuon_dau_vb: false,
             dat_giua_ngang: true,
             phong_to: None,
+            tach: None,
+            xong_tach: None,
+            chua_tach: None,
+            hoi_luu_tach: false,
+            tong_tt: None,
             yeu_cau_anh: Vec::new(),
             cfg_doi: false,
         }
@@ -239,8 +251,9 @@ impl ManTach {
         &self.thu_tu
     }
 
+    /// Đang phân tích hoặc đang tách (khoá menu, Cấu hình, nút Phân tích).
     pub fn dang_chay(&self) -> bool {
-        self.chay.is_some()
+        self.chay.is_some() || self.tach.is_some()
     }
 
     pub fn da_phan_tich(&self) -> bool {
@@ -710,13 +723,14 @@ impl ManTach {
         let ctx = ui.ctx().clone();
         let ch = cfg.cau_hinh_phan_tich();
         self.nhan_su_kien(&ch, Some(&ctx));
+        self.nhan_ket_qua_tach();
         if let (None, Some(p)) = (&self.anh, &self.phien) {
             self.anh = Some(AnhNho::moi(p.duong_dan_pdf(), 2, ctx.clone()));
         }
         if let Some(a) = &mut self.anh {
             a.nhan_anh(&ctx);
         }
-        if self.chay.is_some() {
+        if self.dang_chay() {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
         if self.bao.as_ref().is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(3)) {
@@ -761,15 +775,17 @@ impl ManTach {
         }
         self.hop_phan_tich_lai(&ctx, &ch);
         self.hop_phong_to(&ctx);
+        self.hop_tach(&ctx, cfg);
     }
 
     fn hang_thu_muc(&mut self, ui: &mut egui::Ui, ch: &CauHinhPhanTich) {
         let dang_chay = self.chay.is_some();
         ui.horizontal(|ui| {
             let nhan = ui.label("Thư mục hồ sơ PDF:");
+            let khoa = dang_chay || self.tach.is_some();
             let o = egui::TextEdit::singleline(&mut self.thu_muc).desired_width(ui.available_width() - 2.0 * 86.0 - 12.0);
-            ui.add_enabled(!dang_chay, o).labelled_by(nhan.id);
-            if ui.add_enabled(!dang_chay, nut("Chọn")).clicked() {
+            ui.add_enabled(!khoa, o).labelled_by(nhan.id);
+            if ui.add_enabled(!khoa, nut("Chọn")).clicked() {
                 if let Some(p) = rfd::FileDialog::new().pick_folder() {
                     self.thu_muc = p.display().to_string();
                 }
@@ -781,7 +797,7 @@ impl ManTach {
             } else {
                 ("Phân tích", XANH_LA)
             };
-            let bat = dang_chay || !self.thu_muc.trim().is_empty();
+            let bat = (dang_chay || !self.thu_muc.trim().is_empty()) && self.tach.is_none();
             if ui.add_enabled(bat, nut_mau(chu, mau)).on_disabled_hover_text("Chọn thư mục hồ sơ PDF trước").clicked() {
                 self.bam_phan_tich(ch);
             }
@@ -833,7 +849,13 @@ impl ManTach {
                 let p = *xong as f32 / (*tong).max(1) as f32;
                 (format!("Đang phân tích {}%", (p * 100.0) as u32), Some(p))
             }
-            None => (self.trang_thai.clone(), None),
+            None => match &self.tach {
+                Some(t) => {
+                    let p = t.xong.load(std::sync::atomic::Ordering::Relaxed) as f32 / t.tong.max(1) as f32;
+                    (format!("Đang tách {}%", (p * 100.0) as u32), Some(p))
+                }
+                None => (self.trang_thai.clone(), None),
+            },
         };
         ui.painter().text(egui::pos2(nut_r.left() - 8.0, rect.center().y), egui::Align2::RIGHT_CENTER, chu, egui::TextStyle::Small.resolve(ui.style()), CHU_PHU);
         ui.painter().hline(rect.x_range(), rect.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
@@ -1246,8 +1268,10 @@ impl ManTach {
         };
         let nhom = self.nhom();
         ui.horizontal(|ui| {
-            ui.label(format!("Còn trong view: {} trang · đã xoá {} · Đã chọn: {} trang", so_nguyen(self.thu_tu.len()), so_nguyen(b.tong.da_xoa as usize), so_nguyen(self.chon.so_luong())));
-            let ten = ten_loc(self.loc);
+            if self.tab == Tab::HoSo {
+                ui.label(format!("Còn trong view: {} trang · đã xoá {} · Đã chọn: {} trang", so_nguyen(self.thu_tu.len()), so_nguyen(b.tong.da_xoa as usize), so_nguyen(self.chon.so_luong())));
+            }
+            let ten = if self.tab == Tab::HoSo { ten_loc(self.loc) } else { "Văn bản" };
             for (bt, lam_lai, phim) in [(BieuTuong::HoanTac, false, "Ctrl+Z"), (BieuTuong::LamLai, true, "Ctrl+Y")] {
                 let buoc = b.buoc_ke(nhom, lam_lai);
                 let goi_y = match buoc {
@@ -1271,6 +1295,8 @@ impl ManTach {
                 }
             });
         });
+        ui.add_space(2.0);
+        self.dong_thong_tin_tach(ui, cfg);
     }
 
     fn hop_phan_tich_lai(&mut self, ctx: &egui::Context, ch: &CauHinhPhanTich) {
