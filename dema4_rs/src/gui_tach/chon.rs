@@ -19,6 +19,9 @@ pub enum PhimDiChuyen {
     Xuong,
     DauDs,
     CuoiDs,
+    /// PageUp / PageDown: lùi / tiến 1 vùng nhìn (số hàng thấy được), như Explorer.
+    TrangTruoc(usize),
+    TrangSau(usize),
 }
 
 /// Việc còn chờ lúc thả chuột (Explorer quyết định khi thả để còn kéo khung từ ô đang chọn).
@@ -197,6 +200,8 @@ impl BoChon {
                     PhimDiChuyen::Trai => -1,
                     PhimDiChuyen::Phai => 1,
                     PhimDiChuyen::Len => -cot,
+                    PhimDiChuyen::TrangTruoc(h) => -cot * h.max(1) as isize,
+                    PhimDiChuyen::TrangSau(h) => cot * h.max(1) as isize,
                     _ => cot,
                 };
                 (i as isize + buoc).clamp(0, cuoi as isize) as usize
@@ -324,6 +329,18 @@ mod tests {
     fn bam(b: &mut BoChon, o: Option<u32>, phu: PhimPhu) {
         b.nhan(o, phu, &thu_tu());
         b.tha();
+    }
+
+    #[test]
+    fn page_up_down_doi_1_vung_nhin() {
+        let ds: Vec<u32> = (0..100).collect();
+        let mut c = BoChon::default();
+        c.chon_rieng(12);
+        let khong = PhimPhu { ctrl: false, shift: false };
+        assert_eq!(c.phim(PhimDiChuyen::TrangSau(3), khong, &ds, 5), Some(27), "3 hàng × 5 cột");
+        assert_eq!(c.phim(PhimDiChuyen::TrangTruoc(3), khong, &ds, 5), Some(12));
+        assert_eq!(c.phim(PhimDiChuyen::TrangTruoc(3), khong, &ds, 5), Some(0), "kẹp đầu danh sách");
+        assert_eq!(c.phim(PhimDiChuyen::TrangSau(50), khong, &ds, 5), Some(99), "kẹp cuối danh sách");
     }
 
     #[test]

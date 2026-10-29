@@ -216,7 +216,7 @@ const HD_TACH: &[Khoi] = &[
     Khoi::Bang(&[
         ("#Chọn trang · cả 2 tab", ""),
         ("Chuột", "bấm · [Ctrl] + bấm thêm/bớt · [Shift] + bấm chọn dải · kéo khung"),
-        ("Bàn phím", "[←] [→] [↑] [↓] [Home] [End] · [Ctrl+A] chọn hết · [Esc] bỏ chọn"),
+        ("Bàn phím", "[←] [→] [↑] [↓] [Home] [End] · [PgUp] [PgDn] 1 vùng nhìn (tab Hồ sơ) · [Ctrl+A] chọn hết · [Esc] bỏ chọn"),
         ("Xem", "[Enter] hoặc bấm đúp: xem lớn · chuột phải: menu thao tác"),
         ("#Sửa", ""),
         ("Nhãn", "[S] [I] [B] gán / bấm lại để huỷ · [C] bỏ nhãn"),

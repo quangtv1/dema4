@@ -196,7 +196,7 @@ impl ManTach {
         let vi_tri = if cuon { hien.iter().position(|&i| i == vb) } else { None };
         if self.trai_gon {
             let ds = &self.ds_vb;
-            if let Some(j) = super::cot_trai::cot_so_gon(ui, "cot_so_vb", hien.len(), 26.0, super::CAO_DAU_BANG, |j| (hien[j] + 1).to_string(), |j| ten_vb(&ds[hien[j]]), |j| hien[j] == vb, |_| false, vi_tri) {
+            if let Some(j) = super::cot_trai::cot_so_gon(ui, "cot_so_vb", hien.len(), 26.0, super::CAO_DAU_BANG, |j| (hien[j] + 1).to_string(), |j| ten_vb(&ds[hien[j]]), |j| hien[j] == vb, |_| None, vi_tri) {
                 viec.push(Viec::DenVb(hien[j]));
             }
             return;
@@ -512,24 +512,32 @@ fn ve_goc_xoay(painter: &egui::Painter, r: Rect, goc: u16, font: &egui::FontId) 
 
 /// Menu chuột phải trên trang của văn bản.
 fn menu_phai_vb(ui: &mut egui::Ui, so_chon: usize, viec: &mut Vec<Viec>, tieu_diem: Option<u32>) {
-    let mut muc = |ui: &mut egui::Ui, chu: &str, v: Viec, bat: bool| {
-        if ui.add_enabled(bat, egui::Button::new(chu).min_size(egui::vec2(220.0, 0.0))).clicked() {
+    bieu_tuong::menu_gon(ui);
+    let mut muc = |ui: &mut egui::Ui, icon: BieuTuong, chu: &str, phim: &str, v: Viec, bat: bool| {
+        if bieu_tuong::muc_menu_phai(ui, icon, chu, phim, false, bat).clicked() {
             viec.push(v);
             ui.close();
         }
     };
     if so_chon > 0 {
-        ui.label(RichText::new(format!("{} trang đang chọn", so_nguyen(so_chon))).color(CHU_PHU));
+        ui.add_space(3.0);
+        ui.horizontal(|ui| {
+            ui.add_space(12.0);
+            ui.label(RichText::new(format!("{} trang đang chọn", so_nguyen(so_chon))).size(11.5).color(CHU_PHU));
+        });
+        ui.add_space(3.0);
     }
     if let Some(k) = tieu_diem {
-        muc(ui, "Xem lớn   Enter", Viec::PhongTo(k), true);
+        muc(ui, BieuTuong::KinhCong, "Xem lớn", "Enter", Viec::PhongTo(k), true);
+        ui.separator();
     }
-    muc(ui, "Xoay phải 90°   R", Viec::Xoay(90), so_chon > 0);
-    muc(ui, "Xoay 180°   Shift+R", Viec::Xoay(180), so_chon > 0);
-    muc(ui, "Bỏ khỏi văn bản   Del", Viec::BoKhoiVb, so_chon > 0);
+    muc(ui, BieuTuong::XoayPhai, "Xoay phải 90°", "R", Viec::Xoay(90), so_chon > 0);
+    muc(ui, BieuTuong::Xoay180, "Xoay 180°", "Shift+R", Viec::Xoay(180), so_chon > 0);
     ui.separator();
-    muc(ui, "Chọn tất cả   Ctrl+A", Viec::ChonTat, true);
-    muc(ui, "Bỏ chọn   Esc", Viec::BoChon, so_chon > 0);
+    muc(ui, BieuTuong::TrangGach, "Bỏ khỏi văn bản", "Del", Viec::BoKhoiVb, so_chon > 0);
+    ui.separator();
+    muc(ui, BieuTuong::ChonTat, "Chọn tất cả", "Ctrl+A", Viec::ChonTat, true);
+    muc(ui, BieuTuong::BoChon, "Bỏ chọn", "Esc", Viec::BoChon, so_chon > 0);
 }
 
 #[cfg(test)]

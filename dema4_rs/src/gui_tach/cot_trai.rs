@@ -10,8 +10,64 @@ use crate::gui::{CHU, CHU_PHU, VIEN, VIEN_NHAT, VIEN_TAB_CHON};
 pub const RONG_GON: f32 = 36.0;
 pub const CAO_DAY: f32 = 30.0;
 const NEN_DAY: Color32 = Color32::from_rgb(0xFA, 0xFA, 0xFA);
-/// Hàng hồ sơ chứa trang đang xem.
-pub const NEN_DANG: Color32 = Color32::from_rgb(0xEE, 0xF4, 0xFB);
+
+/// Tiến độ từng hồ sơ trong lúc Phân tích: số trang cần / đã xong, hồ sơ vừa có trang xong gần nhất, hồ sơ vừa xong hết.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct TienDoHoSo {
+    can: Vec<u32>,
+    xong: Vec<u32>,
+    /// Hồ sơ đang xử lý (vừa có trang xong gần nhất).
+    pub dang: Option<u32>,
+    vua_xong: Vec<u32>,
+}
+
+impl TienDoHoSo {
+    /// `file_can` = hồ sơ của từng trang trong hàng đợi phân tích.
+    pub fn moi(so_ho_so: usize, file_can: impl IntoIterator<Item = usize>) -> Self {
+        let mut can = vec![0; so_ho_so];
+        for f in file_can {
+            if let Some(c) = can.get_mut(f) {
+                *c += 1;
+            }
+        }
+        Self { xong: vec![0; so_ho_so], can, dang: None, vua_xong: Vec::new() }
+    }
+
+    /// 1 trang của hồ sơ `f` vừa xong (kết quả hoặc lỗi).
+    pub fn nhan(&mut self, f: usize) {
+        let (Some(x), Some(&c)) = (self.xong.get_mut(f), self.can.get(f)) else { return };
+        *x += 1;
+        self.dang = Some(f as u32);
+        if *x == c {
+            self.vua_xong.push(f as u32);
+        }
+    }
+
+    /// Phần đã xong (0..1) của hồ sơ đang dở; None = chưa bắt đầu / đã xong / không cần phân tích.
+    pub fn phan(&self, h: u32) -> Option<f32> {
+        let (x, c) = (*self.xong.get(h as usize)?, *self.can.get(h as usize)?);
+        (x > 0 && x < c).then(|| x as f32 / c as f32)
+    }
+
+    /// Hồ sơ vừa xong hết từ lần gọi trước.
+    pub fn lay_vua_xong(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.vua_xong)
+    }
+}
+
+/// Vạch tiến độ 2 px dưới chân ô (`f` = phần của cả dòng, `x_trai`..`x_trai + rong` = bề ngang dòng).
+pub fn vach_tien_do(ui: &egui::Ui, f: f32, x_trai: f32, rong: f32) {
+    let r = ui.max_rect();
+    let cuoi = (x_trai + f * rong).min(r.right());
+    if cuoi > r.left() {
+        ui.painter().rect_filled(Rect::from_min_max(egui::pos2(r.left(), r.bottom() - 2.0), egui::pos2(cuoi, r.bottom())), 0.0, VIEN_TAB_CHON);
+    }
+}
+
+/// Người dùng vừa cuộn / bấm trong vùng `r` (để tạm dừng tự cuộn).
+pub fn vua_cham(ui: &egui::Ui, r: Rect) -> bool {
+    ui.rect_contains_pointer(r) && ui.input(|i| i.smooth_scroll_delta != egui::Vec2::ZERO || i.pointer.any_pressed())
+}
 
 /// Tên khớp chuỗi tìm (không phân biệt hoa thường); chuỗi trống = khớp hết.
 pub fn khop_tim(ten: &str, tim: &str) -> bool {
@@ -75,8 +131,8 @@ fn o_tim(ui: &mut egui::Ui, id: &str, tim: &mut String, goi_y: &str, rong: f32) 
 }
 
 /// Cột # khi thu gọn: số thứ tự canh giữa, không cuộn tay (chỉ tự cuộn tới `cuon_toi`). Trả hàng vừa bấm.
-/// `chu(i)` = số hiển thị, `chon(i)` = hàng đang chọn (nền xanh), `dang(i)` = hồ sơ chứa trang đang xem (vạch xanh trái).
-pub fn cot_so_gon(ui: &mut egui::Ui, id: &str, so_dong: usize, cao: f32, cao_dau: f32, chu: impl Fn(usize) -> String, goi_y: impl Fn(usize) -> String, chon: impl Fn(usize) -> bool, dang: impl Fn(usize) -> bool, cuon_toi: Option<usize>) -> Option<usize> {
+/// `chu(i)` = số hiển thị, `chon(i)` = hàng đang chọn (nền xanh).
+pub fn cot_so_gon(ui: &mut egui::Ui, id: &str, so_dong: usize, cao: f32, cao_dau: f32, chu: impl Fn(usize) -> String, goi_y: impl Fn(usize) -> String, chon: impl Fn(usize) -> bool, tien_do: impl Fn(usize) -> Option<f32>, cuon_toi: Option<usize>) -> Option<usize> {
     let mut bam = None;
     ui.style_mut().interaction.selectable_labels = false;
     // Tiêu đề "#"
@@ -104,12 +160,13 @@ pub fn cot_so_gon(ui: &mut egui::Ui, id: &str, so_dong: usize, cao: f32, cao_dau
                 let p = ui.painter();
                 if chon(i) {
                     p.rect_filled(r, 0.0, crate::gui::NEN_TAB_CHON);
-                } else if dang(i) {
-                    p.rect_filled(r, 0.0, NEN_DANG);
                 } else if ph.hovered() {
                     p.rect_filled(r, 0.0, Color32::from_rgb(0xF2, 0xF7, 0xFC));
                 }
                 p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, super::VACH_DONG));
+                if let Some(f) = tien_do(i) {
+                    p.rect_filled(Rect::from_min_size(egui::pos2(r.left(), r.bottom() - 2.0), egui::vec2(f * r.width(), 2.0)), 0.0, VIEN_TAB_CHON);
+                }
                 let dam = chon(i);
                 let font = if dam { egui::FontId::new(12.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())) } else { egui::FontId::proportional(12.0) };
                 p.text(r.center(), egui::Align2::CENTER_CENTER, chu(i), font, if dam { CHU } else { CHU_PHU });
@@ -130,6 +187,21 @@ pub fn bao_khong_thay(ui: &egui::Ui, chu: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tien_do_ho_so_theo_trang_xong() {
+        let mut t = TienDoHoSo::moi(3, [0, 0, 1, 1, 1, 0]);
+        assert_eq!(t.phan(0), None, "chưa bắt đầu");
+        t.nhan(0);
+        assert_eq!((t.phan(0), t.dang), (Some(1.0 / 3.0), Some(0)));
+        t.nhan(1);
+        t.nhan(0);
+        t.nhan(0);
+        assert_eq!(t.phan(0), None, "xong hết thì bỏ vạch");
+        assert_eq!(t.lay_vua_xong(), [0]);
+        assert!(t.lay_vua_xong().is_empty());
+        assert_eq!((t.phan(1), t.phan(2), t.dang), (Some(1.0 / 3.0), None, Some(0)));
+    }
 
     #[test]
     fn tim_khong_phan_biet_hoa_thuong() {

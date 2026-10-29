@@ -1,13 +1,14 @@
 //! Hộp phóng to 1 trang (bấm đúp / Enter ở tab Hồ sơ và tab Văn bản): ‹ › / ←→ theo thứ tự đang xem,
 //! − / + 50–250 %, Esc / ✕ / bấm nền để đóng. Ảnh render nền theo cỡ hiển thị, có ảnh nhỏ tạm trong lúc chờ.
 
-use eframe::egui::{self, Align, Color32, Margin, Rect, RichText};
+use eframe::egui::{self, Align, Color32, Margin, Rect, RichText, Stroke, StrokeKind};
 
 use super::anh_nho::{self, bac_cho, KhoaAnh, YeuCau};
 use super::bang_trang::ten_nhan;
 use super::bieu_tuong::{self, BieuTuong};
-use super::ManTach;
-use crate::gui::{ChuDam, CHU_PHU};
+use super::{nhom_nut, ngan_nho, nut_nhom, ve_net_dut, Loc, ManTach, NoiDungNut, Tab, Viec, CAM, MAU_S};
+use crate::cau_hinh::CauHinh;
+use crate::gui::{ChuDam, CHU_PHU, VIEN_NHAT, XANH_COBALT};
 use crate::tach_vb::nhan::Nhan;
 
 pub const TY_LE: [u16; 9] = [50, 75, 100, 125, 150, 175, 200, 225, 250];
@@ -51,7 +52,10 @@ impl PhongTo {
 
 impl ManTach {
     /// Vẽ hộp phóng to nếu đang mở.
-    pub(super) fn hop_phong_to(&mut self, ctx: &egui::Context) {
+    pub(super) fn hop_phong_to(&mut self, ctx: &egui::Context, cfg: &mut CauHinh) {
+        let la_vb = self.tab == Tab::VanBan;
+        let duyet_nghi = !la_vb && self.loc == Loc::NghiTrang;
+        let mut viec: Vec<Viec> = Vec::new();
         let Some(pt) = &mut self.phong_to else { return };
         let (Some(b), Some(k)) = (&self.bang, pt.trang()) else {
             self.phong_to = None;
@@ -71,6 +75,21 @@ impl ManTach {
             }
             if i.key_pressed(egui::Key::Minus) {
                 pt.nac = pt.nac.saturating_sub(1);
+            }
+            // Gán nhãn / xoay / xoá ngay trong hộp, cùng phím với lưới
+            if !i.modifiers.command {
+                let gan = |n: Nhan| if duyet_nghi && n != Nhan::Split { Viec::DuyetNghiTrang(n) } else { Viec::Gan(n) };
+                for (phim, v) in [(egui::Key::S, Viec::Gan(Nhan::Split)), (egui::Key::I, gan(Nhan::Index)), (egui::Key::B, gan(Nhan::Trang)), (egui::Key::C, gan(Nhan::NoiDung))] {
+                    if i.key_pressed(phim) {
+                        viec.push(v);
+                    }
+                }
+                if i.key_pressed(egui::Key::R) {
+                    viec.push(Viec::Xoay(if i.modifiers.shift { 180 } else { 90 }));
+                }
+                if i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace) {
+                    viec.push(if la_vb { Viec::BoKhoiVb } else { Viec::Xoa });
+                }
             }
         });
         let man = ctx.content_rect();
@@ -94,6 +113,38 @@ impl ManTach {
                 if bieu_tuong::nut(ui, BieuTuong::PhaiChevron, "Trang sau (→)", pt.co_sau()).clicked() {
                     pt.di(true);
                 }
+                // Nhóm gắn nhãn + nhóm xoay / xoá như thanh công cụ lưới, áp cho trang đang xem
+                ui.add_space(10.0);
+                let nhan_t = t.nhan();
+                let gan = |n: Nhan| if duyet_nghi && n != Nhan::Split { Viec::DuyetNghiTrang(n) } else { Viec::Gan(n) };
+                nhom_nut(ui, |ui| {
+                    if nut_nhom(ui, NoiDungNut::Chu("S", Some(MAU_S)), (nhan_t == Nhan::Split, false), matches!(nhan_t, Nhan::NoiDung | Nhan::Split), "Split — văn bản mới bắt đầu từ trang này (S, bấm lại để huỷ)").clicked() {
+                        viec.push(Viec::Gan(Nhan::Split));
+                    }
+                    ngan_nho(ui);
+                    if nut_nhom(ui, NoiDungNut::Chu("I", None), (nhan_t == Nhan::Index, false), true, "Index — tờ mã vạch, bỏ khi tách (I, bấm lại để huỷ)").clicked() {
+                        viec.push(gan(Nhan::Index));
+                    }
+                    ngan_nho(ui);
+                    if nut_nhom(ui, NoiDungNut::Chu("B", None), (nhan_t == Nhan::Trang, false), true, "Trắng — bỏ khi tách (B, bấm lại để huỷ)").clicked() {
+                        viec.push(gan(Nhan::Trang));
+                    }
+                });
+                ui.add_space(8.0);
+                nhom_nut(ui, |ui| {
+                    if nut_nhom(ui, NoiDungNut::Icon(BieuTuong::XoayPhai), (false, false), true, "Xoay phải 90° (R)").clicked() {
+                        viec.push(Viec::Xoay(90));
+                    }
+                    ngan_nho(ui);
+                    if nut_nhom(ui, NoiDungNut::Icon(BieuTuong::Xoay180), (false, false), true, "Xoay 180° (Shift+R)").clicked() {
+                        viec.push(Viec::Xoay(180));
+                    }
+                    ngan_nho(ui);
+                    let (bt, goi_y) = if la_vb { (BieuTuong::TrangGach, "Bỏ khỏi văn bản (Del)") } else { (BieuTuong::ThungRac, "Xoá khỏi lưới (Del)") };
+                    if nut_nhom(ui, NoiDungNut::Icon(bt), (false, false), true, goi_y).clicked() {
+                        viec.push(if la_vb { Viec::BoKhoiVb } else { Viec::Xoa });
+                    }
+                });
                 ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                     if bieu_tuong::nut(ui, BieuTuong::Dong, "Đóng (Esc)", true).clicked() {
                         dong = true;
@@ -126,19 +177,55 @@ impl ManTach {
                 let rong_vung = ui.available_width().max(kich.x);
                 let (vung, _) = ui.allocate_exact_size(egui::vec2(rong_vung, kich.y.max(cao_100)), egui::Sense::hover());
                 let hop = Rect::from_center_size(vung.center(), kich);
-                match &tex {
-                    Some(tex) => {
-                        anh_nho::ve_xoay(ui.painter(), hop, tex, t.sua.goc);
-                    }
+                let anh = match &tex {
+                    Some(tex) => anh_nho::ve_xoay(ui.painter(), hop, tex, t.sua.goc),
                     None => {
                         ui.painter().rect_filled(hop, 0.0, Color32::from_gray(225));
                         ui.painter().text(hop.center(), egui::Align2::CENTER_CENTER, "Đang tải…", egui::FontId::proportional(13.0), CHU_PHU);
+                        hop
+                    }
+                };
+                // Viền theo nhãn như ô lưới (nét dày hơn cho ảnh lớn)
+                let p = ui.painter();
+                match t.nhan() {
+                    Nhan::Index => {
+                        p.rect_stroke(anh, 0.0, Stroke::new(3.0, XANH_COBALT), StrokeKind::Outside);
+                    }
+                    Nhan::Trang => {
+                        p.rect_filled(anh, 0.0, Color32::from_rgba_unmultiplied(0xEA, 0xF3, 0xFC, 110));
+                        ve_net_dut(p, anh.expand(1.5), Stroke::new(2.5, XANH_COBALT), 8.0);
+                    }
+                    Nhan::Split => {
+                        p.rect_stroke(anh, 0.0, Stroke::new(2.5, CAM), StrokeKind::Outside);
+                        p.rect_filled(Rect::from_min_size(anh.min - egui::vec2(9.0, 0.0), egui::vec2(5.0, anh.height())), 0.0, CAM);
+                    }
+                    Nhan::NoiDung if t.nghi_trang() => ve_net_dut(p, anh.expand(1.5), Stroke::new(2.5, Color32::from_rgb(0xD4, 0xA0, 0x00)), 8.0),
+                    Nhan::NoiDung if t.nghi_xoay().is_some() => ve_net_dut(p, anh.expand(1.5), Stroke::new(2.5, CAM), 8.0),
+                    Nhan::NoiDung => {
+                        p.rect_stroke(anh, 0.0, Stroke::new(1.0, VIEN_NHAT), StrokeKind::Outside);
                     }
                 }
             });
         });
         if dong || ph.should_close() {
             self.phong_to = None;
+        }
+        // Thao tác áp cho đúng trang đang xem trong hộp (chọn riêng trang đó rồi làm như trên lưới)
+        let k = self.phong_to.as_ref().and_then(|p| p.trang());
+        for v in viec {
+            let Some(k) = k else { break };
+            if la_vb { self.chon_vb.chon_rieng(k) } else { self.chon.chon_rieng(k) }
+            self.lam(v, cfg);
+            // Xoá / bỏ khỏi văn bản: trang ra khỏi danh sách → hộp sang trang kế
+            if matches!(v, Viec::Xoa | Viec::BoKhoiVb) {
+                if let Some(pt) = &mut self.phong_to {
+                    pt.ds.retain(|&x| x != k);
+                    pt.i = pt.i.min(pt.ds.len().saturating_sub(1));
+                    if pt.ds.is_empty() {
+                        self.phong_to = None;
+                    }
+                }
+            }
         }
     }
 }

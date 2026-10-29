@@ -1653,6 +1653,44 @@ mod tests {
         harness.render().unwrap().save(thu_muc_anh.join("tach_9_phong_to.png")).unwrap();
     }
 
+    /// Chụp lúc đang Phân tích (bản sao thư mục mẫu không có cache): vạch tiến độ hồ sơ ở cột trái.
+    /// Chạy: DEMA4_MAU_TACH=<thư mục mẫu> DEMA4_ANH=<thư mục ảnh> cargo test -- --ignored chup_dang_phan_tich
+    #[test]
+    #[ignore = "cần GPU và thư mục mẫu"]
+    fn chup_dang_phan_tich() {
+        let mau = crate::tach_vb::thu_muc_mau().expect("DEMA4_MAU_TACH");
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        let ban_sao = std::env::temp_dir().join(format!("dema4_dang_pt_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&ban_sao);
+        std::fs::create_dir_all(&ban_sao).unwrap();
+        for f in std::fs::read_dir(mau.join("pdf_goc")).unwrap().flatten() {
+            if f.path().extension().is_some_and(|e| e == "pdf") {
+                std::fs::copy(f.path(), ban_sao.join(f.file_name())).unwrap();
+            }
+        }
+        let tm = ban_sao.display().to_string();
+        let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 760.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut app = UngDungChinh { man: Man::Tach, ..Default::default() };
+            app.cfg = crate::cau_hinh::CauHinh::default();
+            app.tach.thu_muc = tm.clone();
+            let ch = app.cfg.cau_hinh_phan_tich();
+            app.tach.bam_phan_tich(&ch);
+            app
+        });
+        let bat_dau = Instant::now();
+        let mut lan = 0;
+        while harness.state().tach.dang_chay() && bat_dau.elapsed() < Duration::from_secs(120) {
+            harness.run_steps(1);
+            std::thread::sleep(Duration::from_millis(50));
+            lan += 1;
+            if lan % 40 == 0 && lan <= 160 {
+                harness.render().unwrap().save(thu_muc_anh.join(format!("dang_pt_{lan}.png"))).unwrap();
+            }
+        }
+        let _ = std::fs::remove_dir_all(&ban_sao);
+    }
+
     /// Vẽ giao diện ra ảnh PNG (không mở cửa sổ) từ một file chi tiết thật để xem bố cục.
     /// Chạy: DEMA4_MAU=<..._dem_chitiet.txt> DEMA4_ANH=<thư mục ảnh> cargo test -- --ignored chup_giao_dien
     /// Chụp hộp Cấu hình (2 tab) và Hướng dẫn để so với prototype. Chạy: DEMA4_ANH=<thư mục ảnh> cargo test -- --ignored chup_hop

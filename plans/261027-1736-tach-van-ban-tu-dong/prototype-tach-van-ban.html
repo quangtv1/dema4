@@ -69,6 +69,9 @@
   .banghs .tieude-cot { position:sticky; top:0; background:#EBEBEB; border-bottom:1px solid var(--vien-nhat); padding:6px 5px; color:var(--chu-phu); z-index:1; }
   .banghs .vbdong > span { padding:7px 5px; }
   .vbdong.tong > span { font-weight:bold; border-bottom:1px solid var(--vien-nhat); }
+  /* Vạch tiến độ dưới chân dòng hồ sơ đang phân tích */
+  .banghs { position:relative; }
+  .vachhs { position:absolute; left:0; height:2px; background:var(--chon-vien); pointer-events:none; z-index:2; transition:width .2s linear; }
   .bangvb .tieude-cot { position:sticky; top:0; background:#EBEBEB; border-bottom:1px solid var(--vien-nhat); padding:6px 6px; color:var(--chu-phu); z-index:1; }
   .vbdong { display:contents; }
   .vbdong > span { padding:6px 6px; border-bottom:1px solid #F0F0F0; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -144,9 +147,7 @@
   .banghs .so, .bangvb .so { text-align:center; }
   .banghs > .tieude-cot:first-child, .bangvb > .tieude-cot:first-child, .banghs .vbdong > span:first-child, .bangvb .vbdong > span:first-child { padding-left:0; padding-right:0; }
   .cottrai.gon .vbdong.tong > span:first-child::before { content:'∑'; }
-  /* Hồ sơ chứa trang đang xem (khi đang xem Tất cả hồ sơ) */
-  .vbdong.dang > span { background:#EEF4FB; }
-  .vbdong.dang > span:first-child { box-shadow:inset 3px 0 0 var(--chon-vien); color:var(--chu); font-weight:bold; }
+  /* Hồ sơ chứa trang đang xem: không tô màu (chỉ dòng đang chọn có nền), chỉ tự cuộn tới */
   .cottrai.gon .daytrai { justify-content:center; padding:0; }
   .cottrai.gon + .keo { display:none; }
   .xemtruoc { padding:7px 12px; border-bottom:1px solid var(--vien-nhat); background:#FAFAFA; font-size:12px; line-height:1.6; }
@@ -350,13 +351,16 @@
   /* Ô đang có tiêu điểm bàn phím (như Explorer): viền chấm */
   .o.tieudiem { outline:1px dotted #333; outline-offset:1px; }
   /* Menu chuột phải */
-  .menuphai { position:absolute; z-index:60; min-width:220px; background:#fff; border:1px solid var(--vien); border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.2); padding:4px 0; display:none; font-size:12.5px; }
+  .menuphai { position:absolute; z-index:60; min-width:190px; background:#fff; border:1px solid var(--vien); border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.2); padding:4px 0; display:none; font-size:12.5px; }
   .menuphai.mo { display:block; }
-  .menuphai button { display:grid; grid-template-columns:18px 1fr auto; gap:6px; width:100%; text-align:left; padding:5px 12px 5px 8px; border:0; background:#fff; cursor:pointer; }
+  .menuphai button { display:grid; grid-template-columns:16px 1fr auto 12px; align-items:center; gap:7px; width:100%; text-align:left; padding:3px 8px 3px 9px; border:0; background:#fff; cursor:pointer; }
+  /* Icon nét mảnh đầu mục menu chuột phải; ✓ (đang dùng) ở cuối dòng */
+  .menuphai .icomp { width:14px; height:14px; fill:none; stroke:#555; stroke-width:1.3; stroke-linecap:round; stroke-linejoin:round; }
+  .menuphai button:disabled .icomp { stroke:#BBB; }
   .menuphai button:hover:not(:disabled) { background:#E5F1FB; }
   .menuphai button:disabled { color:#AAA; cursor:default; }
   .menuphai button .dau { color:var(--chon-vien); } .menuphai button kbd { font-family:inherit; color:var(--chu-phu); font-size:11.5px; }
-  .menuphai hr { border:0; border-top:1px solid #EAEAEA; margin:4px 0; }
+  .menuphai hr { border:0; border-top:1px solid #EAEAEA; margin:3px 0; }
   .menuphai .tdm { padding:4px 12px 6px; color:var(--chu-phu); font-size:11.5px; }
   /* Xoay trang: chỉ là thuộc tính hiển thị/xuất, không sửa file gốc; 90/270 thu nhỏ để vừa ô */
   .giay.x90 { transform:rotate(90deg) scale(.71); } .giay.x180 { transform:rotate(180deg); } .giay.x270 { transform:rotate(270deg) scale(.71); }
@@ -703,7 +707,7 @@
         <table class="hdbang">
           <tr><th colspan="2">Chọn trang · cả 2 tab</th></tr>
           <tr><td>Chuột</td><td>bấm · <kbd>Ctrl</kbd> + bấm thêm/bớt · <kbd>Shift</kbd> + bấm chọn dải · kéo khung</td></tr>
-          <tr><td>Bàn phím</td><td><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd> · <kbd>Ctrl+A</kbd> chọn hết · <kbd>Esc</kbd> bỏ chọn</td></tr>
+          <tr><td>Bàn phím</td><td><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd> · <kbd>PgUp</kbd> <kbd>PgDn</kbd> 1 vùng nhìn (tab Hồ sơ) · <kbd>Ctrl+A</kbd> chọn hết · <kbd>Esc</kbd> bỏ chọn</td></tr>
           <tr><td>Xem</td><td><kbd>Enter</kbd> hoặc bấm đúp: xem lớn · chuột phải: menu thao tác</td></tr>
           <tr><th colspan="2">Sửa</th></tr>
           <tr><td>Nhãn</td><td><kbd>S</kbd> <kbd>I</kbd> <kbd>B</kbd> gán / bấm lại để huỷ · <kbd>C</kbd> bỏ nhãn</td></tr>
@@ -1138,11 +1142,11 @@
     var tabs = document.querySelectorAll('.tabdau > button');
     for (var c = 0; c < tabs.length; c++) tabs[c].classList.toggle('chon', tabs[c].getAttribute('data-che') === s.che);
     document.querySelector('[data-che="vanban"]').disabled = !s.daPT;
-    $('chuaPT').classList.toggle('an', s.daPT);
-    $('cheTrang').classList.toggle('an', !s.daPT || s.che !== 'trang');
+    $('chuaPT').classList.toggle('an', s.daPT || dangPT);
+    $('cheTrang').classList.toggle('an', !(s.daPT || dangPT) || s.che !== 'trang');
     $('cheVanBan').classList.toggle('an', !s.daPT || s.che !== 'vanban');
     if (!dangPT) { $('vachTD').style.width = '0'; $('nhanTD').textContent = s.daPT ? 'Phân tích xong (' + gioPhutGiay(tgPhanTich) + ')' : ''; }
-    if (s.daPT) {
+    if (s.daPT || dangPT) {
       veLuoi();
       // Menu lọc nhớ mục đã chọn (s.locMenu): đang lọc Điểm cắt thì nút menu vẫn ghi mục đó (không sáng), bấm là quay lại
       var mucLoc = document.querySelectorAll('#menuLoc [data-loc]'), locMenu = s.locMenu;
@@ -1647,11 +1651,40 @@
     s.chonDs = {}; s.neo = ''; s.vb = 0; s.loc = 'tat'; s.locMenu = 'tat'; chuaLuu = false; s.daPT = false; s.che = 'trang'; ve();
     var nut = $('nutPhanTich'), i = 0, batDau = Date.now();
     dangPT = true; dungPT = false; $('nutCauHinh').disabled = true; $('nutMenu').disabled = true; nut.textContent = 'Dừng'; // Dừng vẫn bấm được; khoá Cấu hình + Chức năng
+    ve(); $('luoi').scrollTop = 0;
     var t = setInterval(function () {
-      i += 8; $('vachTD').style.width = Math.min(i, 100) + '%';
-      $('nhanTD').textContent = 'Đang phân tích ' + Math.min(i, 100) + '% (' + gioPhutGiay(Date.now() - batDau) + ')';
-      if (i >= 100 || dungPT) { clearInterval(t); tgPhanTich = Date.now() - batDau; dangPT = false; s.daPT = true; s.loc = 'tat'; $('nutCauHinh').disabled = false; $('nutMenu').disabled = false; ve(); if (dungPT) $('nhanTD').textContent = 'Đã dừng ở ' + Math.min(i, 100) + '% (' + gioPhutGiay(tgPhanTich) + ')'; }
-    }, 60);
+      i += 0.5; $('vachTD').style.width = Math.min(i, 100) + '%';
+      $('nhanTD').textContent = 'Đang phân tích ' + Math.floor(Math.min(i, 100)) + '% (' + gioPhutGiay(Date.now() - batDau) + ')';
+      veTienDoHS(Math.min(i, 100) / 100);
+      if (i >= 100 || dungPT) { clearInterval(t); veTienDoHS(-1); tgPhanTich = Date.now() - batDau; dangPT = false; s.daPT = true; s.loc = 'tat'; $('nutCauHinh').disabled = false; $('nutMenu').disabled = false; ve(); if (dungPT) $('nhanTD').textContent = 'Đã dừng ở ' + Math.min(i, 100) + '% (' + gioPhutGiay(tgPhanTich) + ')'; }
+    }, 40);
+  }
+  // Hồ sơ đang phân tích: vạch xanh 2 px dưới chân dòng dài dần theo % trang đã xong của hồ sơ đó (như thanh tiến
+  // độ cả thư mục ở hàng tab); dòng ngoài vùng nhìn thì cột trái tự cuộn tới — trừ khi người dùng vừa cuộn / bấm
+  // cột trái trong 5 giây. `p` = tiến độ cả thư mục 0..1 (mô phỏng: các hồ sơ lần lượt), p < 0 = xong, bỏ vạch.
+  var tuCuonTat = 0, luoiTat = 0, hsDangPT = -1;
+  ['wheel', 'mousedown', 'keydown'].forEach(function (ev) { $('dsTrai').addEventListener(ev, function () { tuCuonTat = Date.now(); }, { passive: true }); });
+  // Lưới: hồ sơ phân tích xong thì cuộn mượt tới ảnh cuối (trang cuối) của hồ sơ đó — trừ khi người dùng vừa cuộn /
+  // bấm / chọn trên lưới trong 5 giây. Chỉ 1 lần cuộn mỗi hồ sơ nên nhẹ (app: chỉ render ảnh nhỏ các ô vừa hiện ra).
+  ['wheel', 'mousedown', 'keydown'].forEach(function (ev) { $('luoi').addEventListener(ev, function () { luoiTat = Date.now(); }, { passive: true }); });
+  function denTrangCuoi(hs) {
+    if (Date.now() - luoiTat < 5000 || s.locHS >= 0 && s.locHS !== hs) return;
+    var ds = $('luoi').querySelectorAll('[data-k^="' + hs + '."]'); if (!ds.length) return;
+    ds[ds.length - 1].scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  function veTienDoHS(p) {
+    var bang = $('dsTrai').querySelector('.banghs'); if (!bang) return;
+    var cu = bang.querySelector('.vachhs');
+    if (p < 0) { if (cu) cu.remove(); if (hsDangPT >= 0) denTrangCuoi(hsDangPT); hsDangPT = -1; return; }
+    var vt = p * TEN.length, hs = Math.min(TEN.length - 1, Math.floor(vt)), phan = vt - hs;
+    var o = bang.querySelector('.vbdong[data-hs="' + hs + '"] > span'); if (!o) return;
+    if (!cu) { cu = document.createElement('div'); cu.className = 'vachhs'; bang.appendChild(cu); }
+    cu.style.top = (o.offsetTop + o.offsetHeight - 2) + 'px';
+    cu.style.width = (phan * 100) + '%';
+    cu.title = TEN[hs] + ': đang phân tích ' + Math.round(phan * 100) + '%';
+    if (hs !== hsDangPT && Date.now() - tuCuonTat > 5000) cuonTrai(o);
+    if (hs !== hsDangPT && hsDangPT >= 0) denTrangCuoi(hsDangPT); // hồ sơ trước vừa xong
+    hsDangPT = hs;
   }
 
   $('dsTrai').onclick = function (e) {
@@ -1861,7 +1894,12 @@
   var CHON_VB = { lay: function () { return s.chonVB; }, dat: function (m) { s.chonVB = m; }, neo: function () { return s.neoVB; }, datNeo: function (k) { s.neoVB = k; }, thuTu: function () { return dsTrangVB(); }, ap: function () { veChonVB(); },
                   td: function () { return s.tdVB; }, datTd: function (k) { s.tdVB = k; }, khung: function () { return $('vbTrang'); } };
   // ---- Bàn phím kiểu Explorer (dùng chung 2 tab) ----
-  // ←/→ ±1 ô, ↑/↓ ±1 hàng, Home/End đầu/cuối; Shift: chọn dải từ neo; Ctrl: chỉ dời tiêu điểm; Ctrl+Space bật/tắt ô tiêu điểm; Ctrl+A chọn tất cả
+  // ←/→ ±1 ô, ↑/↓ ±1 hàng, PageUp/PageDown ±1 vùng nhìn, Home/End đầu/cuối; Shift: chọn dải từ neo; Ctrl: chỉ dời tiêu điểm; Ctrl+Space bật/tắt ô tiêu điểm; Ctrl+A chọn tất cả
+  // Số hàng thấy được trong khung (PageUp/PageDown dời đúng 1 vùng nhìn như Explorer)
+  function soHangNhin(kh, cot) {
+    var os = kh.querySelectorAll('[data-k]'); if (os.length <= cot) return 1;
+    var buoc = os[cot].offsetTop - os[0].offsetTop; return buoc > 0 ? Math.max(1, Math.floor(kh.clientHeight / buoc)) : 1;
+  }
   function soCot(kh) { var os = kh.querySelectorAll('[data-k]'), n = 0; if (!os.length) return 1; for (var i = 0; i < os.length && os[i].offsetTop === os[0].offsetTop; i++) n++; return n || 1; }
   function veTieuDiem(C, cuon) {
     var kh = C.khung(), cu = kh.querySelector('.tieudiem'); if (cu) cu.classList.remove('tieudiem');
@@ -1873,7 +1911,8 @@
     if (ctrl && e.key.toLowerCase() === 'a') { var tat = {}; ds.forEach(function (k) { tat[k] = true; }); C.dat(tat); if (!C.td()) C.datTd(ds[0]); C.ap(); veTieuDiem(C, false); return true; }
     if (ctrl && e.key === ' ') { var t = C.td(); if (t) { if (C.lay()[t]) delete C.lay()[t]; else C.lay()[t] = true; C.datNeo(t); C.ap(); } return true; }
     var i = ds.indexOf(C.td()), cot = soCot(C.khung()), dich;
-    var buoc = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cot, ArrowDown: cot }[e.key];
+    var trang = cot * soHangNhin(C.khung(), cot);
+    var buoc = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cot, ArrowDown: cot, PageUp: -trang, PageDown: trang }[e.key];
     if (buoc !== undefined) dich = i < 0 ? 0 : Math.max(0, Math.min(ds.length - 1, i + buoc));
     else if (e.key === 'Home') dich = 0; else if (e.key === 'End') dich = ds.length - 1; else return false;
     var kd = ds[dich]; C.datTd(kd);
@@ -1918,11 +1957,14 @@
     if (n) nut('Bỏ chọn', 'Esc', function () { C.dat({}); C.ap(); }, false);
     if (laHoSo && !n) { var coXoa = daXoa.some(function (d) { return Object.keys(d).length; }); nut('Khôi phục trang đã xoá', '', khoiPhuc, !coXoa); }
     var mp = $('menuPhai'), hanhs = [];
+    // Icon nét mảnh đầu mỗi mục (khớp nghĩa); "Bỏ nhãn" / "Giữ nội dung" dùng chung icon bỏ nhãn
+    var ICON_MP = {'Xoay đề xuất':'<path d="M12.5 7.5A4.5 4.5 0 1 1 8 3h3.5"/><path d="M9.5 1 11.5 3 9.5 5"/>','Về chiều gốc':'<path d="M6 9.5 2.5 6 6 2.5"/><path d="M2.5 6H10a3.5 3.5 0 0 1 0 7H8"/>','Xác nhận và tiếp':'<path d="M3.5 8.5 6.5 11.5 12.5 4.5"/>','Xem lớn':'<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M5 7h4M7 5v4"/>','Split — văn bản mới từ trang này':'<circle cx="4.5" cy="4.5" r="2"/><circle cx="4.5" cy="11.5" r="2"/><path d="M6 6l7.5 7.5M6 10 13.5 2.5"/>','Index':'<path d="M2.5 3.5v9M4.5 3.5v9M6.5 3.5v9M9 3.5v9M11 3.5v9M13.5 3.5v9"/>','Trắng':'<path d="M9.5 1.5H4.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-8.5z"/><path d="M9.5 1.5v3h3"/>','Bỏ nhãn':'<circle cx="8" cy="8" r="5.5"/><path d="M4.1 11.9l7.8-7.8"/>','Xoay phải 90°':'<path d="M12.5 7.5A4.5 4.5 0 1 1 8 3h3.5"/><path d="M9.5 1 11.5 3 9.5 5"/>','Xoay 180°':'<path d="M3.5 8a4.5 4.5 0 0 1 9 0v3"/><path d="M10.5 9 12.5 11 14.5 9"/>','Xoá khỏi lưới':'<path d="M2.5 4h11"/><path d="M6 4V2.5h4V4"/><path d="M3.8 4l.7 9.5h7l.7-9.5"/><path d="M6.5 6.5v4.5M9.5 6.5v4.5"/>','Bỏ khỏi văn bản':'<path d="M9.5 1.5H4.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-8.5z"/><path d="M9.5 1.5v3h3"/><path d="M2 14 14 2"/>','Chọn tất cả':'<rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8.2 7 10.2 11 5.8"/>','Bỏ chọn':'<rect x="2" y="2" width="12" height="12" rx="2"/>','Khôi phục trang đã xoá':'<path d="M2.5 3v3.5H6"/><path d="M2.8 6.5A5.5 5.5 0 1 1 3 10"/>'};
+    function iconMp(ten) { var p = ICON_MP[ten] || ICON_MP[ten.indexOf('Giữ nội dung') === 0 || ten.indexOf('Bỏ nhãn') === 0 ? 'Bỏ nhãn' : ''] || ''; return '<svg class="icomp" viewBox="0 0 16 16" aria-hidden="true">' + p + '</svg>'; }
     mp.innerHTML = muc.map(function (x) {
       if (x === null) return '<hr>';
       if (x.tieuDe) return '<div class="tdm">' + x.tieuDe + '</div>';
       hanhs.push(x.hanh);
-      return '<button role="menuitem" data-mp="' + (hanhs.length - 1) + '"' + (x.khoa ? ' disabled' : '') + '><span class="dau">' + (x.dau ? '✓' : '') + '</span><span>' + x.ten + '</span><kbd>' + x.phim + '</kbd></button>';
+      return '<button role="menuitem" data-mp="' + (hanhs.length - 1) + '"' + (x.khoa ? ' disabled' : '') + '>' + iconMp(x.ten) + '<span>' + x.ten + '</span><kbd>' + x.phim + '</kbd><span class="dau">' + (x.dau ? '✓' : '') + '</span></button>';
     }).join('');
     mp._hanh = hanhs;
     var rc = document.querySelector('.cuaso').getBoundingClientRect();

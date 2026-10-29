@@ -55,6 +55,11 @@ pub enum BieuTuong {
     KinhLup,
     AnDong,
     HienDong,
+    /// Menu chuột phải: bỏ nhãn (dấu cấm), chọn tất cả / bỏ chọn, khôi phục
+    BoNhan,
+    ChonTat,
+    BoChon,
+    KhoiPhuc,
 }
 
 /// (path SVG, cạnh viewBox, độ dày nét) — chép nguyên từ prototype.
@@ -100,14 +105,18 @@ fn svg_cua(bt: BieuTuong) -> Option<(&'static str, u8, f32)> {
         KinhLup => (r#"<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>"#, 16, 1.4),
         AnDong => (r#"<path d="M3 3.5h10"/><path d="M5 10l3-3 3 3"/>"#, 16, 1.4),
         HienDong => (r#"<path d="M3 3.5h10"/><path d="M5 7l3 3 3-3"/>"#, 16, 1.4),
+        BoNhan => (r#"<circle cx="8" cy="8" r="5.5"/><path d="M4.1 11.9l7.8-7.8"/>"#, 16, 1.3),
+        ChonTat => (r#"<rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8.2 7 10.2 11 5.8"/>"#, 16, 1.3),
+        BoChon => (r#"<rect x="2" y="2" width="12" height="12" rx="2"/>"#, 16, 1.3),
+        KhoiPhuc => (r#"<path d="M2.5 3v3.5H6"/><path d="M2.8 6.5A5.5 5.5 0 1 1 3 10"/>"#, 16, 1.3),
     })
 }
 
-const TAT_CA: [BieuTuong; 40] = {
+const TAT_CA: [BieuTuong; 44] = {
     use BieuTuong::*;
     [
         Dau, MuiTenXuong, HoanTac, LamLai, XoayPhai, Xoay180, ThongTin, CapNhat, HoiDap, TaiLieu, Keo, But, TraiChevron, PhaiChevron, Luoi, MotTrang, HaiTrang, BoKhoi, Dong, ChevronXuong, KinhTru, KinhCong, SapXep, MenuLuoi,
-        BanhRang, ChongTrang, MaVach, TrangTrong, TrangHoi, XoayMenu, DanhSachSo, TangDan, GiamDan, ThungRac, TrangGach, ThuGon, MoRong, KinhLup, AnDong, HienDong,
+        BanhRang, ChongTrang, MaVach, TrangTrong, TrangHoi, XoayMenu, DanhSachSo, TangDan, GiamDan, ThungRac, TrangGach, ThuGon, MoRong, KinhLup, AnDong, HienDong, BoNhan, ChonTat, BoChon, KhoiPhuc,
     ]
 };
 
@@ -180,6 +189,27 @@ pub fn muc_menu_icon(ui: &mut egui::Ui, icon: BieuTuong, chu: impl Into<String>,
         ve(ui.painter(), Rect::from_center_size(egui::pos2(r.rect.right() - 12.0, r.rect.center().y), egui::vec2(12.0, 12.0)), BieuTuong::Dau, crate::gui::VIEN_TAB_CHON);
     }
     r
+}
+
+/// Mục menu chuột phải (gọn, như prototype): icon 14 px đầu dòng · chữ · phím tắt xám · ✓ cuối dòng khi `dau`.
+pub fn muc_menu_phai(ui: &mut egui::Ui, icon: BieuTuong, chu: &str, phim: &str, dau: bool, bat: bool) -> Response {
+    let r = ui.add_enabled(bat, egui::Button::new(format!("      {chu}")).min_size(egui::vec2(190.0, 22.0)));
+    let mau = if bat { Color32::from_gray(0x55) } else { Color32::from_gray(0xBB) };
+    let p = ui.painter();
+    ve(p, Rect::from_center_size(egui::pos2(r.rect.left() + 15.0, r.rect.center().y), egui::vec2(14.0, 14.0)), icon, mau);
+    if !phim.is_empty() {
+        p.text(egui::pos2(r.rect.right() - 26.0, r.rect.center().y), egui::Align2::RIGHT_CENTER, phim, egui::FontId::proportional(11.5), if bat { crate::gui::CHU_PHU } else { Color32::from_gray(0xBB) });
+    }
+    if dau {
+        ve(p, Rect::from_center_size(egui::pos2(r.rect.right() - 12.0, r.rect.center().y), egui::vec2(12.0, 12.0)), BieuTuong::Dau, crate::gui::VIEN_TAB_CHON);
+    }
+    r
+}
+
+/// Khoảng cách gọn cho menu chuột phải (đệm dòng 3 px, vạch ngăn sát).
+pub fn menu_gon(ui: &mut egui::Ui) {
+    ui.spacing_mut().button_padding = egui::vec2(8.0, 3.0);
+    ui.spacing_mut().item_spacing.y = 0.0;
 }
 
 /// Nút phẳng thanh công cụ (`.nutma` của prototype): chỉ có nền khi rê chuột; `sang` = đang chọn (nền + viền xanh).
