@@ -21,6 +21,8 @@ macro_rules! dong {
 }
 
 const RONG_HOP: f32 = 560.0;
+/// Chiều cao hộp ngoài phần thân cuộn (lề, tiêu đề, tab, nút) + khoảng hở trên/dưới.
+const PHAN_NGOAI_THAN: f32 = 190.0;
 const CAO_THAN: f32 = 470.0;
 const RONG_NHAN: f32 = 118.0;
 const VANG_CHU: Color32 = Color32::from_rgb(0xA0, 0x70, 0x00);
@@ -189,8 +191,10 @@ impl HopCauHinh {
                 }
             });
             ui.separator();
-            egui::ScrollArea::vertical().id_salt("than_cau_hinh").max_height(CAO_THAN).min_scrolled_height(CAO_THAN).auto_shrink([false, false]).show(ui, |ui| {
-                ui.set_min_height(CAO_THAN);
+            // Cửa sổ thấp thì thân hộp co lại (cuộn) để nút Lưu/Đóng không tràn ra ngoài
+            let cao_than = CAO_THAN.min(ctx.content_rect().height() - PHAN_NGOAI_THAN).max(160.0);
+            egui::ScrollArea::vertical().id_salt("than_cau_hinh").max_height(cao_than).min_scrolled_height(cao_than).auto_shrink([false, false]).show(ui, |ui| {
+                ui.set_min_height(cao_than);
                 match self.tab {
                     TabCauHinh::Tach => self.tab_tach(ui),
                     TabCauHinh::Dem => self.tab_dem(ui),

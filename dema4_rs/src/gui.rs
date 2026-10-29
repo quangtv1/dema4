@@ -39,7 +39,7 @@ pub(crate) const XAM_TIEN_DO: Color32 = Color32::from_rgb(0xA8, 0xD1, 0xF5);
 pub(crate) const XANH_COBALT: Color32 = Color32::from_rgb(0x00, 0x47, 0xAB);
 
 pub fn chay() -> eframe::Result {
-    let mut viewport = egui::ViewportBuilder::default().with_inner_size([980.0, 600.0]).with_min_inner_size([800.0, 420.0]).with_title(TIEU_DE);
+    let mut viewport = egui::ViewportBuilder::default().with_inner_size([1100.0, 720.0]).with_min_inner_size([800.0, 420.0]).with_title(TIEU_DE);
     if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../../icon.png")) {
         viewport = viewport.with_icon(Arc::new(icon));
     }
@@ -1467,6 +1467,29 @@ mod tests {
         h.run();
         assert!(h.state().hop_cau_hinh.is_none());
         assert_eq!(h.state().cfg.mau_ten, "{hoso}_part{n}");
+    }
+
+    /// Cửa sổ thấp (980×600) hay mặc định: nút Lưu/Huỷ của hộp Cấu hình vẫn nằm trong cửa sổ, cả 2 tab.
+    #[test]
+    fn cau_hinh_khong_tran_cua_so() {
+        use egui_kittest::kittest::Queryable;
+        for (rong, cao) in [(980.0, 600.0), (1100.0, 720.0), (800.0, 420.0)] {
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(rong, cao)).build_eframe(|cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                UngDungChinh { man: Man::Dem, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() }
+            });
+            h.run();
+            h.get_by_label("Cấu hình").click();
+            h.run();
+            for tab in ["Đếm trang A4", "Tách PDF"] {
+                h.get_by_label(tab).click();
+                h.run();
+                for nut in ["Lưu", "Huỷ"] {
+                    let r = h.get_by_label(nut).rect();
+                    assert!(r.min.y >= 0.0 && r.max.y <= cao, "{rong}×{cao} tab {tab}: nút {nut} tràn ({r:?})");
+                }
+            }
+        }
     }
 
     #[test]

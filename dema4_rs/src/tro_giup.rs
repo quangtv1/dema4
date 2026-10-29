@@ -12,6 +12,8 @@ const API_PHAT_HANH: &str = "https://api.github.com/repos/quangtv1/dema4/release
 pub const TRANG_TAI: &str = "https://github.com/quangtv1/dema4/releases/latest";
 pub const PHIEN_BAN: &str = env!("CARGO_PKG_VERSION");
 const RONG: f32 = 560.0;
+/// Chiều cao hộp ngoài phần thân cuộn (lề, tiêu đề, tab, nút) + khoảng hở trên/dưới.
+const PHAN_NGOAI_THAN: f32 = 190.0;
 const CAO_THAN: f32 = 440.0;
 
 /// So 2 phiên bản dạng `v1.2.3` / `1.2.3` theo từng số.
@@ -115,8 +117,10 @@ impl HopTroGiup {
                     }
                 });
                 ui.separator();
-                egui::ScrollArea::vertical().id_salt("than_huong_dan").max_height(CAO_THAN).min_scrolled_height(CAO_THAN).auto_shrink([false, false]).show(ui, |ui| {
-                    ui.set_min_height(CAO_THAN);
+                // Cửa sổ thấp thì thân hộp co lại (cuộn) để nút Lưu/Đóng không tràn ra ngoài
+                let cao_than = CAO_THAN.min(ctx.content_rect().height() - PHAN_NGOAI_THAN).max(160.0);
+                egui::ScrollArea::vertical().id_salt("than_huong_dan").max_height(cao_than).min_scrolled_height(cao_than).auto_shrink([false, false]).show(ui, |ui| {
+                    ui.set_min_height(cao_than);
                     ve_khoi(ui, if *tab == TabHuongDan::Dem { HD_DEM } else { HD_TACH });
                 });
                 ui.separator();
