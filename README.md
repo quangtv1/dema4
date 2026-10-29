@@ -7,6 +7,11 @@
 
 Tải bản mới nhất ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
 
+File chạy chưa ký số với Apple / Microsoft nên lần đầu mở hệ điều hành sẽ cảnh báo:
+
+- **macOS** ("cannot be opened because it is from an unidentified developer"): bấm OK, vào **System Settings › Privacy & Security › Open Anyway**; hoặc trong Terminal `xattr -d com.apple.quarantine ~/Downloads/dema4_saomai && chmod +x ~/Downloads/dema4_saomai`.
+- **Windows** (SmartScreen): **More info › Run anyway**.
+
 `dema4_rs/` — mã nguồn Rust (giao diện egui + chế độ dòng lệnh), build qua GitHub Actions. Bản gốc Python (PyQt5 + PyMuPDF) giữ cục bộ trong `temp/`, không đưa lên repo.
 
 ## Đếm trang A4
