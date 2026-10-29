@@ -159,8 +159,10 @@ fn chay_tach(tham_so: &[String]) -> i32 {
     };
     kq.canh_bao.iter().for_each(|c| eprintln!("Cảnh báo: {c}"));
     kq.loi.iter().for_each(|(p, e)| eprintln!("Lỗi {}: {e}", p.display()));
+    kq.khong_xoa.iter().for_each(|p| eprintln!("Không xoá được file cũ (có thể đang mở): {}", p.display()));
     let log = an.join("ketqua_tach.txt");
-    if let Err(e) = std::fs::create_dir_all(&an).and_then(|_| std::fs::write(&log, tach::noi_dung_log(&kq.dong))) {
+    let noi_dung = tach::noi_dung_log(&kq.dong) + &tach::dong_log_khong_xoa(&kq.khong_xoa);
+    if let Err(e) = std::fs::create_dir_all(&an).and_then(|_| std::fs::write(&log, noi_dung)) {
         eprintln!("Không ghi được {}: {e}", log.display());
         return 1;
     }

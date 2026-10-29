@@ -77,7 +77,12 @@ pub struct KetQuaTach {
     /// Số hồ sơ chép nguyên file (không nhãn, không xoay).
     pub sao_nguyen: usize,
     pub canh_bao: Vec<String>,
+    /// Part cũ của lần tách trước không xoá được (thường do đang mở trong trình xem PDF trên Windows).
+    pub khong_xoa: Vec<PathBuf>,
 }
+
+/// Kết quả tách 1 hồ sơ: dòng log, có chép nguyên không, cảnh báo, part cũ không xoá được.
+type KetQuaHoSo = (Vec<DongLog>, bool, Vec<String>, Vec<PathBuf>);
 
 fn so_trang_pdf(pdf: &Path) -> Result<usize, String> {
     let doc = mupdf::Document::open(pdf.to_str().ok_or("đường dẫn không hợp lệ")?).map_err(|e| format!("không mở được: {e}"))?;
@@ -85,7 +90,7 @@ fn so_trang_pdf(pdf: &Path) -> Result<usize, String> {
 }
 
 /// Tách 1 hồ sơ vào `thu_muc_ho_so` (= `<ra>/<thư mục con>/<hồ sơ>/`). Trả các dòng log + có chép nguyên không.
-fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<(Vec<DongLog>, bool, Vec<String>), String> {
+fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<KetQuaHoSo, String> {
     let ten_ho_so = ho_so.pdf.file_stem().ok_or("tên file không hợp lệ")?.to_string_lossy().into_owned();
     let so_trang = so_trang_pdf(&ho_so.pdf)?;
     if let Some(&t) = ho_so.nhan.keys().chain(ho_so.xoay.keys()).filter(|&&t| t > so_trang).max() {
@@ -108,15 +113,17 @@ fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<(Vec<
         dong.push(DongLog { file_vao: ho_so.pdf.clone(), tu: vb.tu, den: vb.den, file_ra: ra, trang_bo: vb.bo.clone(), so_trang: vb.trang_giu.len() });
     }
     // Dọn văn bản cũ của lần tách trước không còn sinh ra (chỉ file khớp mẫu tên đang áp)
+    let mut khong_xoa = Vec::new();
     if let Ok(ds) = std::fs::read_dir(thu_muc_ho_so) {
         for muc in ds.flatten() {
             let ten = muc.file_name().to_string_lossy().into_owned();
-            if !da_ghi.contains(&ten) && khop_mau(mau, &ten_ho_so, &ten) {
-                let _ = std::fs::remove_file(muc.path());
+            if !da_ghi.contains(&ten) && khop_mau(mau, &ten_ho_so, &ten) && std::fs::remove_file(muc.path()).is_err() {
+                khong_xoa.push(muc.path());
             }
         }
     }
-    Ok((dong, dai.nguyen_ven, dai.canh_bao.iter().map(|c| format!("{}: {c}", ho_so.pdf.display())).collect()))
+    khong_xoa.sort();
+    Ok((dong, dai.nguyen_ven, dai.canh_bao.iter().map(|c| format!("{}: {c}", ho_so.pdf.display())).collect(), khong_xoa))
 }
 
 /// Tách mọi hồ sơ (song song theo hồ sơ). `nguon` = thư mục đầu vào (để giữ cấu trúc thư mục con), `ra` = thư mục ra.
@@ -124,7 +131,7 @@ fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<(Vec<
 pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung: &AtomicBool, tien_do: &(dyn Fn(usize, usize) + Sync)) -> Result<KetQuaTach, String> {
     kiem_mau_ten(mau)?;
     let xong = std::sync::atomic::AtomicUsize::new(0);
-    let tung: Vec<(usize, Result<(Vec<DongLog>, bool, Vec<String>), String>)> = ho_so
+    let tung: Vec<(usize, Result<KetQuaHoSo, String>)> = ho_so
         .par_iter()
         .enumerate()
         .filter(|_| !dung.load(Ordering::Relaxed))
@@ -141,10 +148,11 @@ pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung
     tung.sort_by_key(|x| x.0);
     for (i, r) in tung {
         match r {
-            Ok((dong, nguyen, cb)) => {
+            Ok((dong, nguyen, cb, khong_xoa)) => {
                 kq.dong.extend(dong);
                 kq.sao_nguyen += nguyen as usize;
                 kq.canh_bao.extend(cb);
+                kq.khong_xoa.extend(khong_xoa);
             }
             Err(e) => kq.loi.push((ho_so[i].pdf.clone(), e)),
         }
@@ -185,6 +193,11 @@ pub fn noi_dung_log(dong: &[DongLog]) -> String {
         s.push_str(&format!("{}\t{}\t{}-{}\t{}\t[{bo}]\t{}\n", i + 1, d.file_vao.display(), d.tu, d.den, d.file_ra.display(), d.so_trang));
     }
     s
+}
+
+/// Dòng ghi thêm cuối log (bắt đầu bằng `#` để script đọc bảng bỏ qua): part cũ không xoá được.
+pub fn dong_log_khong_xoa(khong_xoa: &[PathBuf]) -> String {
+    khong_xoa.iter().map(|p| format!("# Không xoá được file cũ (có thể đang mở): {}\n", p.display())).collect()
 }
 
 #[cfg(test)]
@@ -296,6 +309,14 @@ pub(crate) mod tests {
         assert_eq!(kq2.dong.len(), 2);
         assert!(!thu_muc_hs.join("4766_part3.pdf").exists());
         assert!(thu_muc_hs.join("ghi_chu.txt").exists());
+        assert!(kq2.khong_xoa.is_empty());
+        // Part cũ không xoá được (Windows: file đang mở; giả lập bằng thư mục trùng tên part) → báo lại, không im lặng
+        std::fs::create_dir(thu_muc_hs.join("4766_part3.pdf")).unwrap();
+        std::fs::write(thu_muc_hs.join("4766_part3.pdf").join("x"), b"").unwrap();
+        let kq3 = tach_thu_muc(&nguon, &ra, &ho_so_2, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        assert!(kq3.loi.is_empty(), "{:?}", kq3.loi);
+        assert_eq!(kq3.khong_xoa, vec![thu_muc_hs.join("4766_part3.pdf")]);
+        assert!(dong_log_khong_xoa(&kq3.khong_xoa).starts_with("# Không xoá được file cũ"));
         let _ = std::fs::remove_dir_all(&goc);
     }
 
