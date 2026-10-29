@@ -27,7 +27,7 @@ pub(crate) const NEN: Color32 = Color32::from_rgb(0xF0, 0xF0, 0xF0);
 pub(crate) const VIEN: Color32 = Color32::from_rgb(0xAD, 0xAD, 0xAD);
 pub(crate) const VIEN_NHAT: Color32 = Color32::from_rgb(0xD4, 0xD4, 0xD4);
 const NUT: Color32 = Color32::from_rgb(0xE1, 0xE1, 0xE1);
-const NUT_HOVER: Color32 = Color32::from_rgb(0xE5, 0xF1, 0xFB);
+pub(crate) const NUT_HOVER: Color32 = Color32::from_rgb(0xE5, 0xF1, 0xFB);
 pub(crate) const CHU: Color32 = Color32::from_rgb(0x1A, 0x1A, 0x1A);
 pub(crate) const CHU_PHU: Color32 = Color32::from_rgb(0x60, 0x60, 0x60);
 pub(crate) const XANH_LA: Color32 = Color32::from_rgb(0x00, 0x80, 0x00);
@@ -150,10 +150,14 @@ impl UngDungChinh {
 
     fn thanh_menu(&mut self, ui: &mut egui::Ui) {
         let khoa = self.dang_chay();
-        egui::Panel::top("menu").frame(egui::Frame::new().fill(Color32::WHITE).inner_margin(Margin::symmetric(6, 2))).show(ui, |ui| {
+        use crate::gui_tach::bieu_tuong::{atom, BieuTuong};
+        // Thanh menu như prototype: nền #F7F7F7, viền dưới, nút có mũi ▾ khi mở menu con
+        let r = egui::Panel::top("menu").frame(egui::Frame::new().fill(NEN_TAB).inner_margin(Margin::symmetric(6, 1))).show(ui, |ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            ui.spacing_mut().icon_spacing = 5.0;
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.add_enabled_ui(!khoa, |ui| {
-                    ui.menu_button("Chức năng", |ui| {
+                    egui::containers::menu::MenuButton::from_button(egui::Button::new(("Chức năng", atom(BieuTuong::MuiTenXuong, 10.0)))).ui(ui, |ui| {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
                         for (man, ten, icon) in [(Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
                             if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
@@ -170,7 +174,7 @@ impl UngDungChinh {
                     use crate::gui_tach::hop_cau_hinh::{HopCauHinh, TabCauHinh};
                     self.hop_cau_hinh = Some(HopCauHinh::moi(&self.cfg, if self.man == Man::Dem { TabCauHinh::Dem } else { TabCauHinh::Tach }));
                 }
-                ui.menu_button("Trợ giúp", |ui| {
+                egui::containers::menu::MenuButton::from_button(egui::Button::new(("Trợ giúp", atom(BieuTuong::MuiTenXuong, 10.0)))).ui(ui, |ui| {
                     use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
                     use crate::tro_giup::HopTroGiup;
                     if muc_menu_day(ui, BieuTuong::XoayPhai, "Kiểm tra cập nhật…", false, None, 210.0).clicked() {
@@ -188,6 +192,7 @@ impl UngDungChinh {
                 });
             });
         });
+        ui.painter().hline(r.response.rect.x_range(), r.response.rect.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
     }
 }
 
@@ -512,8 +517,8 @@ enum CanLe {
 }
 
 pub(crate) const NEN_TIEU_DE: Color32 = Color32::from_rgb(0xEB, 0xEB, 0xEB);
-const NEN_TAB: Color32 = Color32::from_rgb(0xF7, 0xF7, 0xF7);
-const NEN_TAB_CHON: Color32 = Color32::from_rgb(0xDC, 0xEB, 0xFA);
+pub(crate) const NEN_TAB: Color32 = Color32::from_rgb(0xF7, 0xF7, 0xF7);
+pub(crate) const NEN_TAB_CHON: Color32 = Color32::from_rgb(0xDC, 0xEB, 0xFA);
 pub(crate) const VIEN_TAB_CHON: Color32 = Color32::from_rgb(0x2F, 0x7B, 0xD9);
 pub(crate) const NEN_XEN_KE: Color32 = Color32::from_rgb(0xF6, 0xF6, 0xF6);
 /// Lề trái/phải trong mỗi ô để chữ không sát mép

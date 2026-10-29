@@ -139,8 +139,7 @@ impl ManTach {
         ui.horizontal(|ui| {
             if let Some(t) = tong {
                 let mut job = egui::text::LayoutJob::default();
-                let thuong = egui::TextFormat { color: CHU_PHU, font_id: egui::FontId::proportional(12.5), ..Default::default() };
-                let dam = egui::TextFormat { color: CHU, font_id: egui::FontId::new(12.5, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), ..Default::default() };
+                let (thuong, dam) = (super::chu_dong(CHU_PHU, false), super::chu_dong(CHU, true));
                 for (i, (ten, gia_tri)) in [("Hồ sơ", so_nguyen(so_hs)), ("Văn bản", so_nguyen(t.so_van_ban)), ("Số trang", so_nguyen(t.so_trang)), ("Quy A4", so_thuc(t.quy_a4))].into_iter().enumerate() {
                     job.append(&format!("{}{ten}: ", if i == 0 { "Thông tin: " } else { "; " }), 0.0, thuong.clone());
                     job.append(&gia_tri, 0.0, dam.clone());
@@ -164,7 +163,8 @@ impl ManTach {
                     goi_y += &format!(" · Phải duyệt hết Nghi trắng ({nghi_trang}) và Nghi xoay ({nghi_xoay}) trước khi tách");
                 }
                 let bat = self.da_phan_tich() && self.chay.is_none() && ra.is_ok();
-                if ui.add_enabled(bat, nut_mau("Tách", XANH_LA)).on_hover_text(&goi_y).on_disabled_hover_text(if self.da_phan_tich() { goi_y.as_str() } else { "Phân tích thư mục trước" }).clicked() {
+                let nut = nut_mau("Tách", if bat { XANH_LA } else { Color32::from_rgb(0xB8, 0xB8, 0xB8) }).min_size(egui::vec2(110.0, 28.0));
+                if ui.add_enabled(bat, nut).on_hover_text(&goi_y).on_disabled_hover_text(if self.da_phan_tich() { goi_y.as_str() } else { "Phân tích thư mục trước" }).clicked() {
                     self.bam_tach(cfg);
                 }
             });

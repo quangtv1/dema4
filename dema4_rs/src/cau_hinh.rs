@@ -98,7 +98,7 @@ impl Default for CauHinh {
             thu_muc_ra: String::new(),
             mau_ten: MAU_TEN_MAC_DINH.into(),
             luu_nhan: LuuNhan::TuDong,
-            rong_cot_trai: 260.0,
+            rong_cot_trai: 290.0,
             co_anh_hs: 2,
             co_anh_vb: 2,
             ty_le_vb: 100,

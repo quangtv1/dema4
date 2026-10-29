@@ -7,15 +7,18 @@ use eframe::egui::{self, Align, Color32, Margin, Pos2, Rect, RichText, Sense, St
 use egui_extras::{Column, TableBuilder};
 
 use super::anh_nho::{self, bac_cho, KhoaAnh, YeuCau};
-use super::bieu_tuong::{self, BieuTuong};
+use super::bieu_tuong::{self, atom, nut_phang, BieuTuong};
 use super::chon::{BoCucLuoi, PhimDiChuyen, PhimPhu};
 use super::van_ban::{self, MucVanBan};
 use super::xem_trang::{self, NAC_LUOI, TY_LE};
-use super::{chuot_luoi, ChuotLuoi, ManTach, Tab, Viec, CAM, NEN_ANH_CHO, NEN_CHON, NEN_HOVER, VIEN_CHON};
+use super::{bat_dau_bang, chuot_luoi, ke_duoi, ngan, o_so, ChuotLuoi, ManTach, Tab, Viec, CAM, NEN_ANH_CHO, NEN_CHON, NEN_HOVER, VACH_DONG, VIEN_CHON};
 use crate::cau_hinh::{CauHinh, CheDoVb};
 use crate::gui::{so_nguyen, ChuDam, CHU, CHU_PHU, VIEN_NHAT};
 
 const CAO_CHU_VB: f32 = 18.0;
+/// Nền vùng xem 1 trang / 2 trang (trang giấy trắng đổ bóng nổi trên nền xám).
+const NEN_XEM_TRANG: Color32 = Color32::from_rgb(0xE9, 0xE9, 0xE9);
+const NEN_DIEU_HUONG: Color32 = Color32::from_rgb(0xFA, 0xFA, 0xFA);
 
 /// Chỉ số tỷ lệ gần nhất với giá trị % đã lưu.
 pub fn nac_ty_le(ty_le: u16) -> usize {
@@ -147,20 +150,25 @@ impl ManTach {
             .resizable(true)
             .default_size(cfg.rong_cot_trai)
             .size_range(160.0..=520.0)
-            .frame(egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, VIEN_NHAT)))
+            .frame(egui::Frame::new().fill(Color32::WHITE))
             .show(ui, |ui| self.bang_van_ban(ui, cfg, viec));
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(crate::gui::NEN).inner_margin(Margin { left: 8, right: 0, top: 0, bottom: 0 })).show(ui, |ui| {
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| {
             if self.ds_vb.is_empty() {
                 ui.centered_and_justified(|ui| ui.label(RichText::new("Chưa có văn bản nào").color(CHU_PHU)));
                 return;
             }
             self.thanh_dieu_huong(ui, cfg, viec);
             let vb = self.ds_vb[self.vb].clone();
-            if !vb.bo.is_empty() {
-                egui::Panel::bottom("vb_bo_trang").frame(egui::Frame::new().inner_margin(Margin::symmetric(4, 3))).show(ui, |ui| {
-                    ui.label(RichText::new(format!("Bỏ trắng: tr.{}", vb.bo.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", "))).color(CHU_PHU));
+            // Đáy vùng xem: hoàn tác / làm lại nhóm Văn bản + trang trắng bị bỏ trong dải
+            egui::Panel::bottom("vb_bo_trang").frame(egui::Frame::new().fill(Color32::WHITE).inner_margin(Margin::symmetric(12, 3))).show(ui, |ui| {
+                ui.painter().hline(ui.max_rect().expand2(egui::vec2(12.0, 0.0)).x_range(), ui.max_rect().top() - 3.5, Stroke::new(1.0, VIEN_NHAT));
+                ui.horizontal(|ui| {
+                    self.nut_hoan_tac(ui, viec);
+                    if !vb.bo.is_empty() {
+                        ui.label(RichText::new(format!("Bỏ trắng: tr.{}", vb.bo.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", "))).size(12.0).color(CHU_PHU));
+                    }
                 });
-            }
+            });
             match cfg.che_do_vb {
                 CheDoVb::Luoi => self.luoi_van_ban(ui, cfg, &vb, viec),
                 che_do => self.xem_trang_van_ban(ui, cfg, &vb, che_do == CheDoVb::HaiTrang, viec),
@@ -172,50 +180,47 @@ impl ManTach {
         let n = self.ds_vb.len();
         let (vb, cuon) = (self.vb, std::mem::take(&mut self.cuon_ds_vb));
         let Some(b) = &self.bang else { return };
+        bat_dau_bang(ui);
         let mut bang = TableBuilder::new(ui)
-            .striped(true)
             .sense(Sense::click())
             .cell_layout(egui::Layout::left_to_right(Align::Center))
-            .column(Column::exact(40.0))
+            .column(Column::exact(36.0))
             .column(Column::remainder().at_least(80.0).clip(true))
-            .column(Column::auto().at_least(40.0));
+            .column(Column::exact(52.0));
         if cuon {
             bang = bang.scroll_to_row(vb, Some(Align::Center));
         }
-        bang.header(24.0, |mut h| {
-            for t in ["#", "Tên văn bản", "Trang"] {
-                h.col(|ui| {
-                    ui.label(RichText::new(t).dam());
-                });
+        bang.header(super::CAO_DAU_BANG, |mut h| {
+            for (i, t) in ["#", "Tên văn bản", "Trang"].into_iter().enumerate() {
+                h.col(|ui| o_so(ui, RichText::new(t).color(CHU_PHU), i != 1));
             }
         })
         .body(|body| {
-            body.rows(22.0, n, |mut row| {
+            body.rows(26.0, n, |mut row| {
                 let i = row.index();
                 let m = &self.ds_vb[i];
-                row.set_selected(i == vb);
-                let doi_ho_so = i > 0 && self.ds_vb[i - 1].ho_so != m.ho_so;
+                let chon = i == vb;
+                row.set_selected(chon);
+                // Vạch đậm hơn ở chỗ đổi hồ sơ
+                let vach = if self.ds_vb.get(i + 1).is_some_and(|sau| sau.ho_so != m.ho_so) { VIEN_NHAT } else { VACH_DONG };
+                let dam = |s: String| if chon { RichText::new(s).dam() } else { RichText::new(s) };
                 row.col(|ui| {
-                    if doi_ho_so {
-                        ui.painter().hline(ui.max_rect().x_range(), ui.max_rect().top() - 1.0, Stroke::new(1.0, crate::gui::VIEN));
-                    }
-                    ui.label(RichText::new((i + 1).to_string()).color(CHU_PHU));
+                    ke_duoi(ui, vach);
+                    o_so(ui, RichText::new((i + 1).to_string()).color(CHU_PHU), true);
                 });
                 row.col(|ui| {
-                    if doi_ho_so {
-                        ui.painter().hline(ui.max_rect().x_range(), ui.max_rect().top() - 1.0, Stroke::new(1.0, crate::gui::VIEN));
-                    }
+                    ke_duoi(ui, vach);
+                    ui.add_space(super::LE_O_BANG);
                     if m.mo_dau_split {
                         let (r, _) = ui.allocate_exact_size(egui::vec2(13.0, 13.0), Sense::hover());
                         bieu_tuong::ve(ui.painter(), r, BieuTuong::Keo, CAM);
+                        ui.add_space(3.0);
                     }
-                    ui.label(van_ban::ten(&cfg.mau_ten, &b.ho_so[m.ho_so as usize], m.so)).on_hover_text(&b.ho_so[m.ho_so as usize]);
+                    ui.label(dam(van_ban::ten(&cfg.mau_ten, &b.ho_so[m.ho_so as usize], m.so))).on_hover_text(&b.ho_so[m.ho_so as usize]);
                 });
                 row.col(|ui| {
-                    if doi_ho_so {
-                        ui.painter().hline(ui.max_rect().x_range(), ui.max_rect().top() - 1.0, Stroke::new(1.0, crate::gui::VIEN));
-                    }
-                    ui.label(so_nguyen(m.trang.len()));
+                    ke_duoi(ui, vach);
+                    o_so(ui, dam(so_nguyen(m.trang.len())), true);
                 });
                 if row.response().clicked() {
                     viec.push(Viec::DenVb(i));
@@ -230,69 +235,67 @@ impl ManTach {
         let Some(b) = &self.bang else { return };
         let ten = van_ban::ten(&cfg.mau_ten, &b.ho_so[m.ho_so as usize], m.so);
         let so_chon = self.chon_vb.so_luong();
-        ui.horizontal(|ui| {
-            ui.set_height(30.0);
-            if bieu_tuong::nut(ui, BieuTuong::TraiChevron, "Văn bản trước (PgUp)", self.vb > 0).clicked() {
-                viec.push(Viec::DoiVb(-1));
-            }
-            let nhan = ui.label("");
-            let id_o = ui.make_persistent_id("o_so_vb");
-            if !ui.memory(|m| m.has_focus(id_o)) {
-                self.o_so_vb = (self.vb + 1).to_string();
-            }
-            let o = ui.add(egui::TextEdit::singleline(&mut self.o_so_vb).id(id_o).desired_width(42.0).align(egui::Align2::CENTER_CENTER)).labelled_by(nhan.id).on_hover_text("Gõ số văn bản rồi Enter");
-            if o.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                match van_ban::tu_o_so(&self.o_so_vb, n) {
-                    Some(i) => viec.push(Viec::DenVb(i)),
-                    None => self.o_so_vb = (self.vb + 1).to_string(),
+        let thanh = egui::Frame::new().fill(NEN_DIEU_HUONG).inner_margin(Margin::symmetric(12, 4)).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.spacing_mut().interact_size.y = 22.0;
+            ui.spacing_mut().button_padding.x = 6.0;
+            ui.spacing_mut().item_spacing.x = 4.0;
+            ui.horizontal(|ui| {
+                ui.set_height(30.0);
+                if ui.add_enabled(self.vb > 0, nut_phang(atom(BieuTuong::TraiChevron, 15.0), false)).on_hover_text("Văn bản trước (PgUp)").clicked() {
+                    viec.push(Viec::DoiVb(-1));
                 }
-            }
-            ui.label(RichText::new(format!("/ {}", so_nguyen(n))).color(CHU_PHU));
-            if bieu_tuong::nut(ui, BieuTuong::PhaiChevron, "Văn bản sau (PgDn)", self.vb + 1 < n).clicked() {
-                viec.push(Viec::DoiVb(1));
-            }
-            ui.add_space(6.0);
-            ui.label(RichText::new(ten).dam());
-            ui.label(RichText::new(format!("· {} trang", so_nguyen(m.trang.len()))).color(CHU_PHU));
-            if m.mo_dau_split {
-                ui.label(RichText::new("· mở đầu bằng Split").color(CAM));
-            }
-            ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                for (che_do, bt, goi_y) in [(CheDoVb::HaiTrang, BieuTuong::HaiTrang, "2 trang liên tục"), (CheDoVb::MotTrang, BieuTuong::MotTrang, "1 trang vừa chiều ngang"), (CheDoVb::Luoi, BieuTuong::Luoi, "Lưới")] {
-                    let r = bieu_tuong::nut(ui, bt, goi_y, true);
-                    if cfg.che_do_vb == che_do {
-                        ui.painter().rect_stroke(r.rect, 3.0, Stroke::new(1.0, super::XANH_NUT), StrokeKind::Inside);
-                    }
-                    if r.clicked() {
-                        viec.push(Viec::CheDoVb(che_do));
+                let nhan = ui.label("");
+                let id_o = ui.make_persistent_id("o_so_vb");
+                if !ui.memory(|m| m.has_focus(id_o)) {
+                    self.o_so_vb = (self.vb + 1).to_string();
+                }
+                let o = ui.add(egui::TextEdit::singleline(&mut self.o_so_vb).id(id_o).desired_width(44.0).align(egui::Align2::CENTER_CENTER)).labelled_by(nhan.id).on_hover_text("Gõ số văn bản rồi Enter");
+                if o.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    match van_ban::tu_o_so(&self.o_so_vb, n) {
+                        Some(i) => viec.push(Viec::DenVb(i)),
+                        None => self.o_so_vb = (self.vb + 1).to_string(),
                     }
                 }
-                ui.add_space(8.0);
-                if ui.button("+").on_hover_text("To hơn (Ctrl + cuộn)").clicked() {
-                    viec.push(Viec::NacVb(1));
+                ui.label(RichText::new(format!("/ {}", so_nguyen(n))).color(CHU_PHU));
+                if ui.add_enabled(self.vb + 1 < n, nut_phang(atom(BieuTuong::PhaiChevron, 15.0), false)).on_hover_text("Văn bản sau (PgDn)").clicked() {
+                    viec.push(Viec::DoiVb(1));
                 }
-                if cfg.che_do_vb != CheDoVb::Luoi {
-                    ui.label(format!("{}%", TY_LE[nac_ty_le(cfg.ty_le_vb)]));
+                ui.add_space(12.0);
+                ui.label(RichText::new(ten).dam());
+                ui.label(RichText::new(format!("· {} trang", so_nguyen(m.trang.len()))).color(CHU_PHU));
+                if m.mo_dau_split {
+                    ui.label(RichText::new("· mở đầu bằng Split").color(CAM));
                 }
-                if ui.button("−").on_hover_text("Nhỏ hơn (Ctrl + cuộn)").clicked() {
-                    viec.push(Viec::NacVb(-1));
-                }
-                ui.add_space(8.0);
-                let co = so_chon > 0;
-                if bieu_tuong::nut(ui, BieuTuong::Xoay180, "Xoay 180° (Shift+R)", co).clicked() {
-                    viec.push(Viec::Xoay(180));
-                }
-                if bieu_tuong::nut(ui, BieuTuong::XoayPhai, "Xoay phải 90° (R)", co).clicked() {
-                    viec.push(Viec::Xoay(90));
-                }
-                if bieu_tuong::nut(ui, BieuTuong::BoKhoi, "Bỏ khỏi văn bản — trang thành Trắng, không có trong file tách (Del)", co).clicked() {
-                    viec.push(Viec::BoKhoiVb);
-                }
-                ui.label(RichText::new(format!("{} chọn", so_nguyen(so_chon))).color(CHU_PHU));
+                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                    for (che_do, bt, goi_y) in [(CheDoVb::HaiTrang, BieuTuong::HaiTrang, "2 trang cạnh nhau, cuộn liên tục"), (CheDoVb::MotTrang, BieuTuong::MotTrang, "1 trang vừa chiều ngang, cuộn liên tục"), (CheDoVb::Luoi, BieuTuong::Luoi, "Lưới ảnh nhỏ")] {
+                        let chon = cfg.che_do_vb == che_do;
+                        if ui.add(nut_phang(atom(bt, 15.0), chon)).on_hover_text(goi_y).clicked() {
+                            viec.push(Viec::CheDoVb(che_do));
+                        }
+                    }
+                    ngan(ui);
+                    if ui.add(nut_phang(atom(BieuTuong::KinhCong, 15.0), false)).on_hover_text("Phóng to (Ctrl + cuộn lên)").clicked() {
+                        viec.push(Viec::NacVb(1));
+                    }
+                    if cfg.che_do_vb != CheDoVb::Luoi {
+                        ui.label(RichText::new(format!("{}%", TY_LE[nac_ty_le(cfg.ty_le_vb)])).size(12.0).color(CHU_PHU));
+                    }
+                    if ui.add(nut_phang(atom(BieuTuong::KinhTru, 15.0), false)).on_hover_text("Thu nhỏ (Ctrl + cuộn xuống)").clicked() {
+                        viec.push(Viec::NacVb(-1));
+                    }
+                    ngan(ui);
+                    let co = so_chon > 0;
+                    super::nut_xoay(ui, co, viec);
+                    if ui.add_enabled(co, nut_phang(atom(BieuTuong::BoKhoi, 15.0), false)).on_hover_text("Bỏ khỏi văn bản — trang đang chọn thành Trắng, không có trong file tách (Del) · Ctrl+Z hoàn tác").on_disabled_hover_text("Chọn trang trước (Del)").clicked() {
+                        viec.push(Viec::BoKhoiVb);
+                    }
+                    super::so_chon(ui, so_chon);
+                });
             });
         });
-        ui.painter().hline(ui.max_rect().x_range(), ui.min_rect().bottom() + 2.0, Stroke::new(1.0, VIEN_NHAT));
-        ui.add_space(4.0);
+        ui.painter().hline(thanh.response.rect.x_range(), thanh.response.rect.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
+        ui.add_space(-ui.spacing().item_spacing.y);
     }
 
     /// Nhãn ảnh: `i/n · gốc tr.X`.
@@ -416,6 +419,7 @@ impl ManTach {
             }
             let hover = ph.hover_pos().and_then(o_tai);
             let painter = ui.painter_at(vung_nhin);
+            painter.rect_filled(vung_nhin, 0.0, NEN_XEM_TRANG);
             let font = egui::TextStyle::Small.resolve(ui.style());
             for (i, o) in bo_cuc.o.iter().enumerate() {
                 let r = o_man(o);
@@ -426,9 +430,11 @@ impl ManTach {
                 let t = &b.trang[k as usize];
                 ve_nen_o(&painter, r.expand2(egui::vec2(0.0, 9.0)).translate(egui::vec2(0.0, 9.0)), chon.co(k), hover == Some(k), chon.tieu_diem == Some(k));
                 let bac = bac_cho(o.rong * ppp);
+                painter.add(egui::epaint::Shadow { offset: [0, 1], blur: 4, spread: 0, color: Color32::from_black_alpha(46) }.as_shape(r, 0.0));
                 let ra = ve_anh(&painter, anh, yeu_cau, r, k, t.ho_so, t.so, t.sua.goc, bac);
-                let vien = if i == 0 && vb.mo_dau_split { Stroke::new(2.0, CAM) } else { Stroke::new(1.0, VIEN_NHAT) };
-                painter.rect_stroke(ra, 0.0, vien, StrokeKind::Outside);
+                if i == 0 && vb.mo_dau_split {
+                    painter.rect_stroke(ra, 0.0, Stroke::new(2.0, CAM), StrokeKind::Outside);
+                }
                 ve_goc_xoay(&painter, ra, t.sua.goc, &font);
                 painter.text(egui::pos2(r.center().x, r.bottom() + 2.0), egui::Align2::CENTER_TOP, Self::nhan_trang_vb(i, n, t.so), font.clone(), CHU_PHU);
             }

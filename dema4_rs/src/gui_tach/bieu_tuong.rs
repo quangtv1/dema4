@@ -28,6 +28,11 @@ pub enum BieuTuong {
     HaiTrang,
     BoKhoi,
     Dong,
+    /// Thanh công cụ: mũi ▾ nét của nút thả xuống, kính lúp thu nhỏ / phóng to, sắp xếp ⇅
+    ChevronXuong,
+    KinhTru,
+    KinhCong,
+    SapXep,
 }
 
 const NET: f32 = 1.75;
@@ -123,6 +128,26 @@ pub fn ve(painter: &egui::Painter, r: Rect, bt: BieuTuong, mau: Color32) {
             painter.line_segment([c + Vec2::new(-0.55, -0.55) * k, c + Vec2::new(0.55, 0.55) * k], s);
             painter.line_segment([c + Vec2::new(0.55, -0.55) * k, c + Vec2::new(-0.55, 0.55) * k], s);
         }
+        BieuTuong::ChevronXuong => {
+            painter.add(Shape::line(vec![c + Vec2::new(-0.45, -0.22) * k, c + Vec2::new(0.0, 0.22) * k, c + Vec2::new(0.45, -0.22) * k], Stroke::new(1.3, mau)));
+        }
+        BieuTuong::KinhTru | BieuTuong::KinhCong => {
+            let s = Stroke::new(1.3, mau);
+            let tam = c + Vec2::new(-0.15, -0.15) * k;
+            painter.circle_stroke(tam, 0.58 * k, s);
+            painter.line_segment([c + Vec2::new(0.3, 0.3) * k, c + Vec2::new(0.85, 0.85) * k], s);
+            painter.line_segment([tam - Vec2::new(0.3 * k, 0.0), tam + Vec2::new(0.3 * k, 0.0)], s);
+            if bt == BieuTuong::KinhCong {
+                painter.line_segment([tam - Vec2::new(0.0, 0.3 * k), tam + Vec2::new(0.0, 0.3 * k)], s);
+            }
+        }
+        BieuTuong::SapXep => {
+            let s = Stroke::new(1.3, mau);
+            painter.line_segment([c + Vec2::new(-0.4, -0.75) * k, c + Vec2::new(-0.4, 0.75) * k], s);
+            painter.add(Shape::line(dau_mui_ten(c + Vec2::new(-0.4, 0.75) * k, Vec2::new(0.0, 1.0), 0.32 * k), s));
+            painter.line_segment([c + Vec2::new(0.4, 0.75) * k, c + Vec2::new(0.4, -0.75) * k], s);
+            painter.add(Shape::line(dau_mui_ten(c + Vec2::new(0.4, -0.75) * k, Vec2::new(0.0, -1.0), 0.32 * k), s));
+        }
         BieuTuong::XoayPhai | BieuTuong::Xoay180 => {
             // Vòng 3/4 theo chiều kim đồng hồ, mũi tên ở cuối
             let r_cung = 0.62 * k;
@@ -147,6 +172,21 @@ pub fn nut(ui: &mut egui::Ui, bt: BieuTuong, goi_y: &str, bat: bool) -> Response
     let mau = if bat { v.text_color() } else { v.weak_text_color() };
     ve(ui.painter(), r.shrink(4.5), bt, mau);
     phan_hoi.on_hover_text(goi_y)
+}
+
+/// Icon làm 1 phần tử của `Button` (`Button::new((atom(..), "chữ"))`): nhãn truy cập vẫn chỉ là chữ.
+pub fn atom(bt: BieuTuong, co: f32) -> egui::Atom<'static> {
+    egui::Atom::paint(Vec2::splat(co), move |ui, a| ve(ui.painter(), a.rect, bt, a.fallback_text_color))
+}
+
+/// Nút phẳng thanh công cụ (`.nutma` của prototype): chỉ có nền khi rê chuột; `sang` = đang chọn (nền + viền xanh).
+pub fn nut_phang<'a>(atoms: impl egui::IntoAtoms<'a>, sang: bool) -> egui::Button<'a> {
+    let nut = egui::Button::new(atoms).stroke(Stroke::NONE).min_size(egui::vec2(24.0, 24.0));
+    if sang {
+        nut.fill(crate::gui::NEN_TAB_CHON).stroke(Stroke::new(1.0, crate::gui::VIEN_TAB_CHON))
+    } else {
+        nut.frame_when_inactive(false)
+    }
 }
 
 /// Mục menu: icon sát lề trái, chữ, cuối dòng là ✓ (đang dùng) hoặc phím tắt.
