@@ -43,13 +43,17 @@ pub fn phim(i: usize, mm: f32, tang: bool, lon: bool) -> f32 {
     dat(i, mm + if lon { BUOC_LON } else { BUOC } * if tang { 1.0 } else { -1.0 })
 }
 
-/// Kết quả ô "Thử cạnh dài": khổ theo ranh giới đang kéo, kèm A0 quy theo diện tích nếu vượt ngưỡng.
-pub fn thu(mm: f64, ranh: &[f64; 7], a0_nguong: f64) -> String {
+/// Kết quả ô "Thử cạnh dài": khổ theo ranh giới đang kéo; A0 vượt ngưỡng ghi rõ cách quy A4
+/// (`co_dinh` = hệ số cố định đang gõ, None = theo diện tích).
+pub fn thu(mm: f64, ranh: &[f64; 7], a0_nguong: f64, co_dinh: Option<&str>) -> String {
     let kho = ranh.iter().position(|&r| mm >= r).unwrap_or(7);
     if kho == 0 && mm > a0_nguong {
-        "→ A0 · quy A4 theo diện tích".to_string()
+        match co_dinh {
+            Some(hs) => format!("A0 lớn · hệ số {hs}"),
+            None => "A0 lớn · quy A4 theo diện tích".to_string(),
+        }
     } else {
-        format!("→ {}", KHO[kho])
+        KHO[kho].to_string()
     }
 }
 
@@ -82,12 +86,13 @@ mod tests {
     #[test]
     fn thu_canh_dai_theo_ranh_gioi() {
         let mut rg = RANH_GIOI_MAC_DINH;
-        assert_eq!(thu(297.0, &rg, 1399.0), "→ A4");
-        assert_eq!(thu(370.0, &rg, 1399.0), "→ A3");
+        assert_eq!(thu(297.0, &rg, 1399.0, None), "A4");
+        assert_eq!(thu(370.0, &rg, 1399.0, None), "A3");
         rg[3] = 380.0;
-        assert_eq!(thu(370.0, &rg, 1399.0), "→ A4");
-        assert_eq!(thu(1500.0, &rg, 1399.0), "→ A0 · quy A4 theo diện tích");
-        assert_eq!(thu(1300.0, &rg, 1399.0), "→ A0");
-        assert_eq!(thu(50.0, &rg, 1399.0), "→ A7");
+        assert_eq!(thu(370.0, &rg, 1399.0, None), "A4");
+        assert_eq!(thu(1500.0, &rg, 1399.0, None), "A0 lớn · quy A4 theo diện tích");
+        assert_eq!(thu(1500.0, &rg, 1399.0, Some("20")), "A0 lớn · hệ số 20");
+        assert_eq!(thu(1300.0, &rg, 1399.0, None), "A0");
+        assert_eq!(thu(50.0, &rg, 1399.0, None), "A7");
     }
 }

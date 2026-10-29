@@ -104,22 +104,21 @@ impl UngDungChinh {
             return;
         }
         let mut chon = None;
-        egui::Modal::new(egui::Id::unique("hoi_dong")).show(ctx, |ui| {
-            ui.set_width(340.0);
-            ui.label(RichText::new("Nhãn chưa lưu").dam());
-            ui.add_space(4.0);
-            ui.label("Có thay đổi nhãn chưa ghi vào index_and_blank.txt. Lưu trước khi đóng?");
-            ui.add_space(8.0);
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui.add(nut_mau("Lưu", XANH_LA)).clicked() {
-                    chon = Some(1);
-                }
-                if ui.add(nut("Bỏ")).clicked() {
-                    chon = Some(2);
-                }
-                if ui.add(nut("Huỷ")).clicked() {
-                    chon = Some(0);
-                }
+        use crate::gui_tach::khung_hop as kh;
+        kh::hop(ctx, "hoi_dong", 340.0, "Nhãn chưa lưu", |ui| {
+            kh::than_chu(ui, "Có thay đổi nhãn chưa ghi vào index_and_blank.txt. Lưu trước khi đóng?");
+            kh::chan(ui, |ui| {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(kh::nut_chan_mau("Lưu", XANH_LA)).clicked() {
+                        chon = Some(1);
+                    }
+                    if ui.add(kh::nut_chan("Bỏ")).clicked() {
+                        chon = Some(2);
+                    }
+                    if ui.add(kh::nut_chan("Huỷ")).clicked() {
+                        chon = Some(0);
+                    }
+                });
             });
         });
         if let Some(c) = chon {
@@ -1622,6 +1621,55 @@ mod tests {
 
     /// Vẽ giao diện ra ảnh PNG (không mở cửa sổ) từ một file chi tiết thật để xem bố cục.
     /// Chạy: DEMA4_MAU=<..._dem_chitiet.txt> DEMA4_ANH=<thư mục ảnh> cargo test -- --ignored chup_giao_dien
+    /// Chụp hộp Cấu hình (2 tab) và Hướng dẫn để so với prototype. Chạy: DEMA4_ANH=<thư mục ảnh> cargo test -- --ignored chup_hop
+    #[test]
+    #[ignore = "cần GPU, chỉ chạy tay khi chỉnh giao diện"]
+    fn chup_hop() {
+        use egui_kittest::kittest::Queryable;
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        for (ten, tab) in [("ch_dem", "Đếm trang A4"), ("ch_tach", "Tách PDF")] {
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_pixels_per_point(1.5).build_eframe(|cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                UngDungChinh { man: Man::Dem, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() }
+            });
+            h.run();
+            h.get_by_label("Cấu hình").click();
+            h.run();
+            h.get_by_label(tab).click();
+            h.run_steps(4);
+            h.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
+        }
+        use crate::tro_giup::{HopTroGiup, TabHuongDan};
+        let hop_mau = |ten: &str| match ten {
+            "hd_dem" => HopTroGiup::HuongDan(TabHuongDan::Dem),
+            "hd_tach" => HopTroGiup::HuongDan(TabHuongDan::Tach),
+            "thong_tin" => HopTroGiup::ThongTin,
+            _ => {
+                let (gui, nhan) = mpsc::channel();
+                gui.send(Ok("v9.9.9".to_string())).unwrap();
+                HopTroGiup::CapNhat { nhan, kq: None }
+            }
+        };
+        for ten in ["hd_dem", "hd_tach", "thong_tin", "cap_nhat"] {
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_pixels_per_point(1.5).build_eframe(|cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                UngDungChinh { man: Man::Dem, cfg: crate::cau_hinh::CauHinh::default(), tro_giup: Some(hop_mau(ten)), ..Default::default() }
+            });
+            h.run_steps(4);
+            h.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
+        }
+        for ten in ["chua_tach", "phan_tich_lai", "tach_xong"] {
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_pixels_per_point(1.5).build_eframe(|cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                let mut app = UngDungChinh { man: Man::Tach, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
+                app.tach.mo_popup_mau(ten);
+                app
+            });
+            h.run_steps(4);
+            h.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
+        }
+    }
+
     #[test]
     #[ignore = "cần GPU và file mẫu, chỉ chạy tay khi chỉnh giao diện"]
     fn chup_giao_dien() {

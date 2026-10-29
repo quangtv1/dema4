@@ -7,14 +7,15 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use eframe::egui::{self, Align, Color32, Margin, RichText};
+use eframe::egui::{self, Align, Color32};
 
 use super::bang_trang::{BangTrang, Loc};
+use super::khung_hop;
 use super::van_ban::{self, TongVanBan};
 use super::{ManTach, Tab};
 use crate::cau_hinh::{CauHinh, LuuNhan};
 use crate::dem_pdf::QuyTac;
-use crate::gui::{mo_bang_he_dieu_hanh, nut, nut_mau, so_nguyen, so_thuc, thoi_gian_phut_giay, ChuDam, CHU, CHU_PHU, DO, XANH_LA};
+use crate::gui::{mo_bang_he_dieu_hanh, nut_mau, so_nguyen, so_thuc, thoi_gian_phut_giay, CHU, CHU_PHU, DO, XANH_LA};
 use crate::tach_vb::nhan::{Nhan, Xoay};
 use crate::tach_vb::phien::{thu_muc_an, PhienPhanTich};
 use crate::tach_vb::chi_so_trang::phan_loai;
@@ -45,6 +46,16 @@ pub(super) struct XongTach {
     khong_xoa: Vec<PathBuf>,
     loi: Vec<String>,
     co_telegram: bool,
+}
+
+#[cfg(test)]
+impl XongTach {
+    /// Số liệu mẫu cho ảnh chụp so prototype.
+    pub(super) fn mau() -> Self {
+        let so_lieu = telegram::SoLieuTach { ho_so: 2, van_ban: 7, so_trang: 41, bo_index: 5, bo_trang: 3, split: 1, sao_nguyen: 0, ho_so_loi: 0 };
+        let ra = PathBuf::from("/Users/a/pdf_goc_vanban");
+        XongTach { ten_thu_muc: "pdf_goc".into(), so_lieu, log: ra.join("log.txt"), ra, thoi_gian: Duration::from_secs(21), da_dung: false, khong_xoa: Vec::new(), loi: Vec::new(), co_telegram: true }
+    }
 }
 
 /// Hồ sơ cần tách từ bảng trang hiện tại: nhãn dùng (khác nội dung) + góc xoay ≠ 0.
@@ -250,24 +261,28 @@ impl ManTach {
     pub(super) fn hop_tach(&mut self, ctx: &egui::Context, cfg: &CauHinh) {
         if let Some((nt, nx)) = self.chua_tach {
             let mut chon: Option<Option<Loc>> = None;
-            egui::Modal::new(egui::Id::unique("chua_tach")).show(ctx, |ui| {
-                ui.set_width(340.0);
-                ui.label(RichText::new("Chưa tách được").dam());
-                ui.add_space(4.0);
-                ui.label(format!(
-                    "Còn {nt} trang Nghi trắng và {nx} trang Nghi xoay chưa duyệt. Duyệt hết (Nghi trắng: Enter / B / C / I · Nghi xoay: Xác nhận và tiếp) rồi bấm Tách lại."
-                ));
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                    if nt > 0 && ui.add(nut_mau("Duyệt Nghi trắng", XANH_LA)).clicked() {
-                        chon = Some(Some(Loc::NghiTrang));
-                    }
-                    if nx > 0 && ui.add(nut("Duyệt Nghi xoay")).clicked() {
-                        chon = Some(Some(Loc::NghiXoay));
-                    }
-                    if ui.add(nut("Đóng")).clicked() {
-                        chon = Some(None);
-                    }
+            let mut con = Vec::new();
+            if nt > 0 {
+                con.push(format!("*{nt}* trang *Nghi trắng*"));
+            }
+            if nx > 0 {
+                con.push(format!("*{nx}* trang *Nghi xoay*"));
+            }
+            let noi_dung = format!("Còn {} chưa duyệt. Duyệt hết (Nghi trắng: Enter / B / C / I · Nghi xoay: Xác nhận và tiếp) rồi bấm Tách lại.", con.join(" và "));
+            khung_hop::hop(ctx, "chua_tach", 340.0, "Chưa tách được", |ui| {
+                khung_hop::than_chu(ui, &noi_dung);
+                khung_hop::chan(ui, |ui| {
+                    ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                        if nt > 0 && ui.add(khung_hop::nut_chan_mau("Duyệt Nghi trắng", XANH_LA)).clicked() {
+                            chon = Some(Some(Loc::NghiTrang));
+                        }
+                        if nx > 0 && ui.add(khung_hop::nut_chan("Duyệt Nghi xoay")).clicked() {
+                            chon = Some(Some(Loc::NghiXoay));
+                        }
+                        if ui.add(khung_hop::nut_chan("Đóng")).clicked() {
+                            chon = Some(None);
+                        }
+                    });
                 });
             });
             if let Some(c) = chon {
@@ -279,22 +294,20 @@ impl ManTach {
         }
         if self.hoi_luu_tach {
             let mut chon = None;
-            egui::Modal::new(egui::Id::unique("hoi_luu_tach")).show(ctx, |ui| {
-                ui.set_width(340.0);
-                ui.label(RichText::new("Nhãn chưa lưu").dam());
-                ui.add_space(4.0);
-                ui.label("Có thay đổi nhãn chưa ghi vào index_and_blank.txt. Lưu trước khi tách?");
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(nut_mau("Lưu", XANH_LA)).clicked() {
-                        chon = Some(1);
-                    }
-                    if ui.add(nut("Bỏ")).clicked() {
-                        chon = Some(2);
-                    }
-                    if ui.add(nut("Huỷ")).clicked() {
-                        chon = Some(0);
-                    }
+            khung_hop::hop(ctx, "hoi_luu_tach", 340.0, "Nhãn chưa lưu", |ui| {
+                khung_hop::than_chu(ui, "Có thay đổi nhãn chưa ghi vào index_and_blank.txt. Lưu trước khi tách?");
+                khung_hop::chan(ui, |ui| {
+                    ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                        if ui.add(khung_hop::nut_chan_mau("Lưu", XANH_LA)).clicked() {
+                            chon = Some(1);
+                        }
+                        if ui.add(khung_hop::nut_chan("Bỏ")).clicked() {
+                            chon = Some(2);
+                        }
+                        if ui.add(khung_hop::nut_chan("Huỷ")).clicked() {
+                            chon = Some(0);
+                        }
+                    });
                 });
             });
             if let Some(c) = chon {
@@ -328,47 +341,36 @@ impl ManTach {
     fn popup_tach_xong(&mut self, ctx: &egui::Context) {
         let Some(x) = &self.xong_tach else { return };
         let (mut dong, mut mo_ra, mut mo_log) = (false, false, false);
-        let khung = egui::Frame::popup(&ctx.global_style()).fill(Color32::WHITE).inner_margin(Margin::same(18));
-        let ph = egui::Modal::new(egui::Id::unique("tach_xong")).frame(khung).show(ctx, |ui| {
-            ui.set_width(440.0);
-            let mut tieu_de = egui::text::LayoutJob::default();
-            tieu_de.append(if x.da_dung { "Đã dừng tách " } else { "Đã tách xong " }, 0.0, egui::TextFormat { font_id: egui::FontId::proportional(14.0), color: CHU, ..Default::default() });
-            tieu_de.append(&x.ten_thu_muc, 0.0, egui::TextFormat { font_id: egui::FontId::new(14.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), color: CHU, ..Default::default() });
-            ui.add(egui::Label::new(tieu_de).truncate());
-            ui.add_space(10.0);
-            let s = &x.so_lieu;
-            egui::Grid::new("tach_xong_tt").num_columns(2).spacing([18.0, 8.0]).show(ui, |ui| {
-                let mut dong_tt = |ten: &str, gia_tri: String| {
-                    ui.label(RichText::new(ten).color(CHU_PHU));
-                    ui.label(RichText::new(gia_tri).dam());
-                    ui.end_row();
-                };
-                dong_tt("Hồ sơ:", format!("{}{}", so_nguyen(s.ho_so), if s.ho_so_loi > 0 { format!(" ({} lỗi)", s.ho_so_loi) } else { String::new() }));
-                dong_tt("Văn bản:", format!("{} ({} trang)", so_nguyen(s.van_ban), so_nguyen(s.so_trang)));
-                dong_tt("Trang bỏ:", format!("{} index, {} trắng", so_nguyen(s.bo_index), so_nguyen(s.bo_trang)));
-                dong_tt("Sao nguyên:", format!("{} hồ sơ", so_nguyen(s.sao_nguyen)));
-                dong_tt("Ghi ra:", x.ra.display().to_string());
-                dong_tt("Thời gian:", thoi_gian_phut_giay(x.thoi_gian));
-            });
+        let s = &x.so_lieu;
+        let ho_so = format!("{}{}", so_nguyen(s.ho_so), if s.ho_so_loi > 0 { format!(" ({} lỗi)", s.ho_so_loi) } else { String::new() });
+        let van_ban = format!("{} ({} trang)", so_nguyen(s.van_ban), so_nguyen(s.so_trang));
+        let bo = format!("{} index · {} trắng", so_nguyen(s.bo_index), so_nguyen(s.bo_trang));
+        let sao = format!("{} hồ sơ (chép nguyên file)", so_nguyen(s.sao_nguyen));
+        let ra = x.ra.display().to_string();
+        let thoi_gian = thoi_gian_phut_giay(x.thoi_gian);
+        let tieu_de = khung_hop::tieu_de_dam(if x.da_dung { "Đã dừng tách " } else { "Đã tách xong " }, &x.ten_thu_muc);
+        let ph = khung_hop::hop(ctx, "tach_xong", 340.0, tieu_de, |ui| {
+            khung_hop::bang_gon(
+                ui,
+                &[("Hồ sơ", &ho_so, true, 12.0), ("Văn bản", &van_ban, true, 12.0), ("Trang bỏ", &bo, true, 12.0), ("Sao nguyên", &sao, true, 12.0), ("Ghi ra", &ra, false, 11.5), ("Thời gian", &thoi_gian, true, 12.0)],
+            );
             if !x.khong_xoa.is_empty() {
-                ui.add_space(8.0);
                 let ds: Vec<String> = x.khong_xoa.iter().take(3).map(|p| p.display().to_string()).collect();
                 let them = if x.khong_xoa.len() > 3 { format!(" … (+{})", x.khong_xoa.len() - 3) } else { String::new() };
-                ui.colored_label(DO, format!("Không xoá được {} file cũ (có thể đang mở): {}{them} — đóng file rồi xoá tay hoặc Tách lại.", x.khong_xoa.len(), ds.join("; ")));
+                khung_hop::ghi_gon(ui, &format!("Không xoá được {} file cũ (có thể đang mở): {}{them} — đóng file rồi xoá tay hoặc Tách lại.", x.khong_xoa.len(), ds.join("; ")), DO);
             }
             for l in x.loi.iter().take(5) {
-                ui.colored_label(DO, l);
+                khung_hop::ghi_gon(ui, l, DO);
             }
             if x.co_telegram {
-                ui.add_space(8.0);
-                ui.label(RichText::new("Thông tin tách thư mục đã được ghi lại").small().color(CHU_PHU));
+                khung_hop::ghi_gon(ui, "Thông tin tách thư mục đã được ghi lại", CHU_PHU);
             }
-            ui.add_space(10.0);
-            let rong_nut = egui::vec2(104.0, 28.0);
-            ui.columns(3, |c| {
-                c[0].vertical_centered(|ui| mo_ra = ui.add(nut("Mở thư mục").min_size(rong_nut)).clicked());
-                c[1].vertical_centered(|ui| mo_log = ui.add(nut("Mở log").min_size(rong_nut)).clicked());
-                c[2].vertical_centered(|ui| dong = ui.add(nut("Đóng").min_size(rong_nut)).clicked());
+            khung_hop::chan(ui, |ui| {
+                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                    dong = ui.add(khung_hop::nut_chan("Đóng")).clicked();
+                    mo_log = ui.add(khung_hop::nut_chan("Mở log")).clicked();
+                    mo_ra = ui.add(khung_hop::nut_chan("Mở thư mục")).clicked();
+                });
             });
         });
         if mo_ra {

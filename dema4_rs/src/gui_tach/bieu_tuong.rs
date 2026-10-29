@@ -214,8 +214,11 @@ pub fn muc_menu(ui: &mut egui::Ui, chu: impl Into<egui::WidgetText>, dang_chon: 
 
 /// ⓘ 14 px, rê chuột hiện giải thích.
 pub fn thong_tin(ui: &mut egui::Ui, giai_thich: &str) -> Response {
+    // Vòng tròn 14 px viền xám, chữ "i" đậm (như ⓘ của prototype)
     let (r, phan_hoi) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), Sense::hover());
-    let mau = if phan_hoi.hovered() { crate::gui::XANH_COBALT } else { ui.visuals().weak_text_color() };
-    ve(ui.painter(), r, BieuTuong::ThongTin, mau);
+    let (vien, chu) = if phan_hoi.hovered() { (crate::gui::VIEN_TAB_CHON, crate::gui::VIEN_TAB_CHON) } else { (egui::Color32::from_gray(0x9A), egui::Color32::from_gray(0x77)) };
+    let p = ui.painter();
+    p.circle_stroke(r.center(), 6.5, Stroke::new(1.0, vien));
+    p.text(r.center() + Vec2::new(0.0, 0.5), egui::Align2::CENTER_CENTER, "i", egui::FontId::new(9.5, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), chu);
     phan_hoi.on_hover_text(giai_thich)
 }

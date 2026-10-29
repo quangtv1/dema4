@@ -4,17 +4,18 @@ use std::cmp::Ordering;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
-use eframe::egui::{self, Align, Color32, Margin, RichText, Stroke};
+use eframe::egui::{self, Align, Color32, Margin, Rect, RichText, Stroke};
 
-use crate::gui::{nut_mau, ChuDam, CHU, CHU_PHU, VIEN_NHAT, XANH_LA};
+use crate::gui::{ChuDam, CHU, CHU_PHU, XANH_LA};
+use crate::gui_tach::khung_hop as kh;
 
 const API_PHAT_HANH: &str = "https://api.github.com/repos/quangtv1/dema4/releases/latest";
 pub const TRANG_TAI: &str = "https://github.com/quangtv1/dema4/releases/latest";
 pub const PHIEN_BAN: &str = env!("CARGO_PKG_VERSION");
 const RONG: f32 = 560.0;
-/// Chiều cao hộp ngoài phần thân cuộn (lề, tiêu đề, tab, nút) + khoảng hở trên/dưới.
-const PHAN_NGOAI_THAN: f32 = 190.0;
-const CAO_THAN: f32 = 440.0;
+/// Popup gọn (Cập nhật, Thông tin).
+const RONG_GON: f32 = 340.0;
+const CAO_THAN: f32 = 430.0;
 
 /// So 2 phiên bản dạng `v1.2.3` / `1.2.3` theo từng số.
 pub fn so_phien_ban(a: &str, b: &str) -> Ordering {
@@ -68,97 +69,76 @@ impl HopTroGiup {
     /// Vẽ hộp; trả true khi đóng.
     pub fn ve(&mut self, ctx: &egui::Context) -> bool {
         let mut dong = false;
-        let khung = egui::Frame::popup(&ctx.global_style()).inner_margin(Margin::same(14)).fill(Color32::WHITE);
-        let ph = egui::Modal::new(egui::Id::unique("hop_tro_giup")).frame(khung).show(ctx, |ui| match self {
+        let ph = match self {
             HopTroGiup::CapNhat { nhan, kq } => {
                 if kq.is_none() {
                     *kq = nhan.try_recv().ok();
                     ctx.request_repaint_after(Duration::from_millis(200));
                 }
-                ui.set_width(340.0);
-                ui.label(RichText::new("Kiểm tra cập nhật").dam());
-                ui.add_space(6.0);
-                ui.label(format!("Đang dùng {PHIEN_BAN}"));
-                let co_moi = match kq {
-                    None => {
-                        ui.label("Mới nhất: đang kiểm tra…");
-                        false
-                    }
-                    Some(Err(_)) => {
-                        ui.label("Không kiểm tra được (mất mạng hoặc GitHub không trả lời)");
-                        false
-                    }
+                let (moi_nhat, co_moi) = match kq {
+                    None => ("đang kiểm tra…".to_string(), false),
+                    Some(Err(_)) => ("không kiểm tra được (mất mạng hoặc GitHub không trả lời)".to_string(), false),
                     Some(Ok(tag)) => {
                         let moi = so_phien_ban(tag, PHIEN_BAN) == Ordering::Greater;
-                        ui.label(if moi { format!("Mới nhất {} — có bản mới", tag.trim_start_matches('v')) } else { format!("Mới nhất {} — đang dùng bản mới nhất", tag.trim_start_matches('v')) });
-                        moi
+                        (format!("{}{}", tag.trim_start_matches('v'), if moi { " — có bản mới" } else { " — đang dùng bản mới nhất" }), moi)
                     }
                 };
-                ui.label(RichText::new("Tải từ trang phát hành của sm-dema4 (GitHub); không gửi dữ liệu nào khác.").small().color(CHU_PHU));
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new("Đóng").min_size(egui::vec2(70.0, 24.0))).clicked() {
-                        dong = true;
-                    }
-                    if co_moi && ui.add(nut_mau("Tải bản mới", XANH_LA).min_size(egui::vec2(90.0, 24.0))).clicked() {
-                        ctx.open_url(egui::OpenUrl::new_tab(TRANG_TAI));
-                    }
-                });
+                kh::hop(ctx, "hop_tro_giup", RONG_GON, "Kiểm tra cập nhật", |ui| {
+                    kh::bang_gon(ui, &[("Đang dùng", PHIEN_BAN, true, 12.0), ("Mới nhất", &moi_nhat, true, 12.0)]);
+                    kh::ghi_gon(ui, "Tải từ trang phát hành của sm-dema4 (GitHub); không gửi dữ liệu nào khác.", CHU_PHU);
+                    kh::chan(ui, |ui| {
+                        ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                            if ui.add(kh::nut_chan("Đóng")).clicked() {
+                                dong = true;
+                            }
+                            if ui.add_enabled(co_moi, kh::nut_chan_mau("Tải bản mới", XANH_LA)).clicked() {
+                                ctx.open_url(egui::OpenUrl::new_tab(TRANG_TAI));
+                            }
+                        });
+                    });
+                })
             }
-            HopTroGiup::HuongDan(tab) => {
-                ui.set_width(RONG);
-                ui.label(RichText::new("Hướng dẫn sử dụng").dam().size(15.0));
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    for (t, ten) in [(TabHuongDan::Dem, "Đếm trang A4"), (TabHuongDan::Tach, "Tách văn bản")] {
-                        if ui.selectable_label(*tab == t, ten).clicked() {
-                            *tab = t;
-                        }
-                    }
-                });
-                ui.separator();
-                // Cửa sổ thấp thì thân hộp co lại (cuộn) để nút Lưu/Đóng không tràn ra ngoài
-                let cao_than = CAO_THAN.min(ctx.content_rect().height() - PHAN_NGOAI_THAN).max(160.0);
-                egui::ScrollArea::vertical().id_salt("than_huong_dan").max_height(cao_than).min_scrolled_height(cao_than).auto_shrink([false, false]).show(ui, |ui| {
-                    ui.set_min_height(cao_than);
+            HopTroGiup::HuongDan(tab) => kh::hop(ctx, "hop_tro_giup", RONG, "Hướng dẫn sử dụng", |ui| {
+                kh::hang_tab(ui, &[(TabHuongDan::Dem, "Đếm trang A4"), (TabHuongDan::Tach, "Tách văn bản")], tab);
+                kh::than(ui, "than_huong_dan", CAO_THAN, Margin { left: 22, right: 22, top: 4, bottom: 16 }, |ui| {
                     ve_khoi(ui, if *tab == TabHuongDan::Dem { HD_DEM } else { HD_TACH });
                 });
-                ui.separator();
-                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new("Đóng").min_size(egui::vec2(70.0, 24.0))).clicked() {
-                        dong = true;
-                    }
+                kh::chan(ui, |ui| {
+                    ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                        if ui.add(kh::nut_chan("Đóng")).clicked() {
+                            dong = true;
+                        }
+                    });
                 });
-            }
-            HopTroGiup::ThongTin => {
-                ui.set_width(400.0);
-                ui.label(RichText::new("Thông tin").dam());
-                ui.add_space(6.0);
-                ve_khoi(
+            }),
+            HopTroGiup::ThongTin => kh::hop(ctx, "hop_tro_giup", RONG_GON, "Thông tin", |ui| {
+                kh::bang_gon(
                     ui,
-                    &[Khoi::Bang(&[
-                        ("Ứng dụng", "sm-dema4"),
-                        ("Phiên bản", PHIEN_BAN),
-                        ("Chức năng", "Đếm trang A4 · Tách văn bản PDF"),
-                        ("Đơn vị", "Giải pháp số Sao Mai"),
-                        ("Thư viện", "MuPDF (AGPL) · zxing-cpp (Apache 2.0) · ONNX Runtime (MIT) · mô hình PP-LCNet_x1_0_doc_ori (Apache 2.0) · egui"),
-                    ])],
+                    &[
+                        ("Ứng dụng", "sm-dema4", true, 12.0),
+                        ("Phiên bản", PHIEN_BAN, true, 12.0),
+                        ("Chức năng", "Đếm trang A4 · Tách văn bản PDF", false, 12.0),
+                        ("Đơn vị", "Giải pháp số Sao Mai", false, 12.0),
+                        ("Thư viện", "MuPDF (AGPL) · zxing-cpp (Apache 2.0) · ONNX Runtime (MIT) · mô hình PP-LCNet_x1_0_doc_ori (Apache 2.0) · egui", false, 11.5),
+                    ],
                 );
-                ui.add_space(4.0);
-                ui.label(RichText::new("Ứng dụng gửi thống kê đếm / tách (tên máy, thư mục, số liệu) về nhóm quản lý.").small().color(CHU_PHU));
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                    if ui.add(egui::Button::new("Đóng").min_size(egui::vec2(70.0, 24.0))).clicked() {
-                        dong = true;
-                    }
+                kh::ghi_gon(ui, "Ứng dụng gửi thống kê đếm/tách (tên máy, thư mục, số liệu) về nhóm quản lý.", CHU_PHU);
+                kh::chan(ui, |ui| {
+                    ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                        if ui.add(kh::nut_chan("Đóng")).clicked() {
+                            dong = true;
+                        }
+                    });
                 });
-            }
-        });
+            }),
+        };
         dong || ph.should_close()
     }
 }
 
-/// Khối nội dung hướng dẫn. Trong chuỗi: `[phím]` vẽ dạng nút phím, `*đậm*` in đậm.
+/// Khối nội dung hướng dẫn. Trong chuỗi: `*đậm*`, `~nghiêng~`, `[phím]`, `` `mã` ``.
+/// Cột tên của `Bang`: bắt đầu `#` = dòng tiêu đề nhóm; `{s}` `{i}` `{b}` `{.}` `{nghi}` `{xoay}` = huy hiệu nhãn.
+/// `Muc("Tiêu đề|chú thích")`: phần sau `|` là chú thích nhỏ.
 pub enum Khoi {
     Muc(&'static str),
     Buoc(&'static [&'static str]),
@@ -169,147 +149,289 @@ pub enum Khoi {
 const HD_DEM: &[Khoi] = &[
     Khoi::Muc("Các bước"),
     Khoi::Buoc(&[
-        "Chọn thư mục chứa PDF (quét cả thư mục con). Tuỳ chọn: *Check DPI*, *Check ký số* (chậm hơn).",
+        "*Chọn thư mục* chứa PDF (quét cả thư mục con). Tuỳ chọn: *Check DPI*, *Check ký số* (chậm hơn).",
         "Bấm *Đếm*. Bảng hiện từng trang: khổ, hướng, DPI, ký số, cảnh báo. *Dừng* để ngừng giữa chừng.",
-        "Lọc bằng hàng tab trên bảng (Tất cả, A0–A7) hoặc bấm số *Cảnh báo · File lỗi · Ký số*. Bấm tên file để mở PDF.",
-        "Xong: tự lưu *<thư mục>_dem.txt* và *_dem_chitiet.txt*; popup có *Mở kết quả · Copy dữ liệu*.",
+        "*Lọc* bằng hàng tab trên bảng (Tất cả, A0–A7) hoặc bấm số *Cảnh báo* · *File lỗi* · *Ký số*. Bấm tên file để mở PDF.",
+        "Xong: tự lưu `<thư mục>_dem.txt` và `_dem_chitiet.txt`; popup có *Mở kết quả* · *Copy dữ liệu*.",
     ]),
     Khoi::Muc("Cách quy ra A4"),
     Khoi::Bang(&[
-        ("Xếp khổ", "Theo cạnh dài của trang, không phụ thuộc dọc / ngang."),
+        ("Xếp khổ", "Theo *cạnh dài* của trang, không phụ thuộc dọc/ngang."),
         ("Quy A4", "Σ số trang mỗi khổ × hệ số. Vd 10 A3 + 5 A4 = 10×2 + 5×1 = *25*."),
-        ("Sát ngưỡng", "Cạnh dài đã đi ≥ 80 % quãng tới ranh giới khổ kề bên → nên mở file xem lại."),
+        ("Sát ngưỡng", "Cạnh dài đã đi ≥ 80 % quãng tới khổ kề bên → nên mở file xem lại."),
     ]),
     Khoi::Muc("Cấu hình › Đếm trang A4"),
     Khoi::Bang(&[
-        ("Hệ số", "A0–A7, mặc định 16 · 8 · 4 · 2 · 1 · 0,5 · 0,25 · 0,125."),
-        ("Lớn hơn A0", "Cạnh dài > 1399 mm: theo diện tích ÷ A4 (vd 1500×900 mm ≈ 21,64) hoặc hệ số cố định ≥ hệ số A0."),
+        ("Hệ số quy A4", "A0–A7, mặc định 16 · 8 · 4 · 2 · 1 · 0,5 · 0,25 · 0,125."),
+        ("Lớn hơn A0", "Cạnh dài > 1399 mm: ~theo diện tích ÷ A4~ (vd 1500×900 mm ≈ 21,64) hoặc ~hệ số cố định~ ≥ hệ số A0."),
         ("Ranh giới khổ", "Kéo vạch trên thước (mặc định ở giữa 2 khổ, vd A3|A4 = 358,5 mm). Gõ *Thử cạnh dài* để xem trang thuộc khổ nào."),
-        ("Lưu · Mặc định", "Áp cho lần Đếm sau (*sm-dema4.cfg* cạnh file chạy). Ranh giới khác mặc định được ghi trong *_dem.txt*."),
+        ("Lưu · Mặc định", "Áp cho lần Đếm sau (`sm-dema4.cfg` cạnh file chạy). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
     ]),
 ];
 
 const HD_TACH: &[Khoi] = &[
     Khoi::Muc("Các bước"),
     Khoi::Buoc(&[
-        "Chọn thư mục hồ sơ PDF → *Phân tích*. Lưới hiện ngay, nhãn tự động đến dần trong lúc chạy.",
-        "Tab *Hồ sơ*: kiểm tra nhãn, sửa bằng [S] [I] [B]. Chọn trang như Explorer; sắp *Dung lượng* để dồn trang index / trắng.",
+        "*Chọn thư mục* hồ sơ PDF → *Phân tích*. Lưới hiện ngay, nhãn tự động đến dần trong lúc chạy.",
+        "Tab *Hồ sơ*: kiểm tra nhãn, sửa bằng [S] [I] [B]. Chọn trang như Explorer; sắp ~Dung lượng~ để dồn trang index/trắng.",
         "Duyệt hết *Nghi trắng* và *Nghi xoay* (menu lọc) — bắt buộc trước khi tách.",
         "Tab *Văn bản*: xem trước từng văn bản (Lưới · 1 trang · 2 trang); xoay hoặc *Bỏ khỏi văn bản* nếu cần.",
-        "*Tách* → *<gốc>_vanban*, giữ nguyên cấu trúc thư mục; mỗi hồ sơ một thư mục chứa *<hồ sơ>_part1.pdf* …",
+        "*Tách* → `<gốc>_vanban`, giữ nguyên cấu trúc thư mục; mỗi hồ sơ một thư mục chứa `<hồ sơ>_part1.pdf`…",
     ]),
     Khoi::Muc("Nhãn trang"),
     Khoi::Bang(&[
-        ("[S] Split", "Văn bản mới bắt đầu từ trang này, trang được giữ. Dùng khi thiếu tờ index."),
-        ("[I] Index", "Tờ mã vạch phân cách: điểm cắt, bị bỏ khi tách."),
-        ("[B] Trắng", "Trang trắng, bìa, chữ thấm mặt sau: bị bỏ khi tách."),
-        ("Nội dung", "Trang chưa gắn nhãn."),
+        ("{s}Split", "Văn bản mới bắt đầu từ trang này, trang được giữ. Dùng khi thiếu tờ index."),
+        ("{i}Index", "Tờ mã vạch phân cách: điểm cắt, bị bỏ khi tách."),
+        ("{b}Trắng", "Trang trắng, bìa, chữ thấm mặt sau: bị bỏ khi tách."),
+        ("{.}Nội dung", "Trang chưa gắn nhãn."),
     ]),
-    Khoi::Muc("Duyệt trang Nghi (chỉ trong bộ lọc tương ứng)"),
+    Khoi::Muc("Duyệt trang Nghi|chỉ có tác dụng trong bộ lọc tương ứng"),
     Khoi::Bang(&[
-        ("Nghi trắng", "[Enter] / [B] Trắng · [C] giữ nội dung · [I] Index → tự sang trang tiếp."),
-        ("Nghi xoay", "1. [Enter] xoay đề xuất · 2. sai thì [R] / [Shift+R] chỉnh, [C] về gốc · 3. [Enter] xác nhận và tiếp."),
+        ("{nghi}Nghi trắng", "[Enter] / [B] Trắng · [C] giữ nội dung · [I] Index → tự sang trang tiếp."),
+        ("{xoay}Nghi xoay", "*1.* [Enter] xoay đề xuất · *2.* sai thì [R] / [Shift+R] chỉnh, [C] về gốc · *3.* [Enter] xác nhận và tiếp."),
     ]),
     Khoi::Muc("Phím tắt"),
     Khoi::Bang(&[
-        ("Chọn trang", "bấm · [Ctrl] + bấm thêm / bớt · [Shift] + bấm chọn dải · kéo khung"),
+        ("#Chọn trang · cả 2 tab", ""),
+        ("Chuột", "bấm · [Ctrl] + bấm thêm/bớt · [Shift] + bấm chọn dải · kéo khung"),
         ("Bàn phím", "[←] [→] [↑] [↓] [Home] [End] · [Ctrl+A] chọn hết · [Esc] bỏ chọn"),
         ("Xem", "[Enter] hoặc bấm đúp: xem lớn · chuột phải: menu thao tác"),
+        ("#Sửa", ""),
         ("Nhãn", "[S] [I] [B] gán / bấm lại để huỷ · [C] bỏ nhãn"),
         ("Xoay · xoá", "[R] 90° · [Shift+R] 180° · [Del] xoá khỏi lưới / bỏ khỏi văn bản"),
+        ("#Chung", ""),
         ("Hoàn tác", "[Ctrl+Z] hoàn tác · [Ctrl+Y] làm lại — riêng từng nhóm lọc"),
-        ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước / sau · [F1] hướng dẫn"),
+        ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc nút − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước/sau · [F1] hướng dẫn"),
     ]),
-    Khoi::Ghi("Nhãn, góc xoay và log lưu trong thư mục ẩn *.sm-dema4* của thư mục gốc; file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
+    Khoi::Ghi("Nhãn, góc xoay và log lưu trong thư mục ẩn `.sm-dema4` của thư mục gốc; file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
 ];
 
-/// Tách chuỗi thành đoạn: (chữ, đậm, phím).
-pub fn tach_doan(s: &str) -> Vec<(String, bool, bool)> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KieuDoan {
+    Thuong,
+    Dam,
+    Nghieng,
+    Phim,
+    Ma,
+}
+
+/// Tách chuỗi thành đoạn (chữ, kiểu). Trong `[phím]` và `` `mã` `` không hiểu dấu định dạng khác.
+pub fn tach_doan(s: &str) -> Vec<(String, KieuDoan)> {
     let mut kq = Vec::new();
     let mut hien = String::new();
-    let mut dam = false;
-    let mut chu = s.chars().peekable();
+    let mut kieu = KieuDoan::Thuong;
+    let mut chu = s.chars();
+    let day = |hien: &mut String, kieu: KieuDoan, kq: &mut Vec<(String, KieuDoan)>| {
+        if !hien.is_empty() {
+            kq.push((std::mem::take(hien), kieu));
+        }
+    };
     while let Some(c) = chu.next() {
         match c {
-            '*' => {
-                if !hien.is_empty() {
-                    kq.push((std::mem::take(&mut hien), dam, false));
-                }
-                dam = !dam;
+            '*' | '~' => {
+                day(&mut hien, kieu, &mut kq);
+                let k = if c == '*' { KieuDoan::Dam } else { KieuDoan::Nghieng };
+                kieu = if kieu == k { KieuDoan::Thuong } else { k };
             }
-            '[' => {
-                if !hien.is_empty() {
-                    kq.push((std::mem::take(&mut hien), dam, false));
-                }
-                let phim: String = chu.by_ref().take_while(|&c| c != ']').collect();
-                kq.push((phim, false, true));
+            '[' | '`' => {
+                day(&mut hien, kieu, &mut kq);
+                let dong = if c == '[' { ']' } else { '`' };
+                let trong: String = chu.by_ref().take_while(|&x| x != dong).collect();
+                kq.push((trong, if c == '[' { KieuDoan::Phim } else { KieuDoan::Ma }));
             }
             c => hien.push(c),
         }
     }
-    if !hien.is_empty() {
-        kq.push((hien, dam, false));
-    }
+    day(&mut hien, kieu, &mut kq);
     kq
 }
 
-/// 1 đoạn = 1 LayoutJob (tự xuống dòng): đậm dùng họ font đậm, phím có nền xám.
-fn ve_doan(ui: &mut egui::Ui, s: &str) {
+const CO_CHU: f32 = 12.5;
+/// line-height 1.6 của prototype.
+const CAO_DONG: f32 = CO_CHU * 1.6;
+const XANH_BUOC: Color32 = Color32::from_rgb(0x2F, 0x7B, 0xD9);
+
+/// 1 đoạn tự xuống dòng; phím vẽ khung viền (đáy dày 2 px), mã nền xám — tính vị trí theo glyph sau khi dàn trang.
+pub(crate) fn ve_doan(ui: &mut egui::Ui, s: &str, co: f32, mau: Color32) {
     use egui::text::{LayoutJob, TextFormat};
-    let co = 12.5;
-    let thuong = egui::FontId::proportional(co);
-    let dam = egui::FontId::new(co, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into()));
-    let mau = ui.visuals().override_text_color.unwrap_or(CHU);
+    let cao_dong = co * 1.6;
+    let dam = egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into());
     let mut job = LayoutJob { wrap: egui::text::TextWrapping { max_width: ui.available_width(), ..Default::default() }, ..Default::default() };
-    for (chu, la_dam, phim) in tach_doan(s) {
-        let dinh_dang = if phim {
-            TextFormat { font_id: egui::FontId::proportional(11.5), color: CHU, background: Color32::from_gray(228), ..Default::default() }
-        } else {
-            TextFormat { font_id: if la_dam { dam.clone() } else { thuong.clone() }, color: mau, ..Default::default() }
+    // (chỉ số ký tự đầu, số ký tự, kiểu) của các đoạn cần vẽ nền
+    let mut nen: Vec<(usize, usize, KieuDoan)> = Vec::new();
+    let (mut so_ky_tu, mut cach_truoc) = (0usize, 0.0f32);
+    for (chu, kieu) in tach_doan(s) {
+        let dinh_dang = match kieu {
+            KieuDoan::Phim => TextFormat { font_id: egui::FontId::proportional(10.5), color: CHU, line_height: Some(cao_dong), valign: Align::Center, ..Default::default() },
+            KieuDoan::Ma => TextFormat { font_id: egui::FontId::monospace(11.5), color: CHU, line_height: Some(cao_dong), valign: Align::Center, ..Default::default() },
+            KieuDoan::Dam => TextFormat { font_id: egui::FontId::new(co, dam.clone()), color: CHU, line_height: Some(cao_dong), ..Default::default() },
+            KieuDoan::Nghieng => TextFormat { font_id: egui::FontId::proportional(co), color: mau, italics: true, line_height: Some(cao_dong), ..Default::default() },
+            KieuDoan::Thuong => TextFormat { font_id: egui::FontId::proportional(co), color: mau, line_height: Some(cao_dong), ..Default::default() },
         };
-        let chu = if phim { format!("\u{2009}{chu}\u{2009}") } else { chu };
-        job.append(&chu, 0.0, dinh_dang);
+        let n = chu.chars().count();
+        let le = match kieu {
+            KieuDoan::Phim => 10.0,
+            KieuDoan::Ma => 4.0,
+            _ => 0.0,
+        };
+        if le > 0.0 {
+            nen.push((so_ky_tu, n, kieu));
+        }
+        job.append(&chu, cach_truoc + le, dinh_dang);
+        cach_truoc = le;
+        so_ky_tu += n;
     }
-    ui.label(job);
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let (r, _) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
+    // Vị trí từng ký tự: đếm glyph tuần tự qua các dòng (chỉ dùng khi khớp số ký tự)
+    let mut vi_tri: Vec<(f32, f32, f32)> = Vec::new(); // (x trái, x phải, tâm y)
+    for dong in &galley.rows {
+        let cy = r.top() + dong.pos.y + dong.row.size.y / 2.0;
+        for g in &dong.row.glyphs {
+            let x = r.left() + dong.pos.x + g.pos.x;
+            vi_tri.push((x, x + g.advance_width, cy));
+        }
+    }
+    let p = ui.painter();
+    if vi_tri.len() == so_ky_tu {
+        for (dau, n, kieu) in nen {
+            // Đoạn có thể bị ngắt dòng: vẽ từng mảnh theo dòng
+            let mut i = dau;
+            while i < dau + n {
+                let cy = vi_tri[i].2;
+                let mut j = i;
+                while j + 1 < dau + n && vi_tri[j + 1].2 == cy {
+                    j += 1;
+                }
+                let (x0, x1) = (vi_tri[i].0, vi_tri[j].1);
+                match kieu {
+                    KieuDoan::Phim => {
+                        // min-width 12 + padding 5 mỗi bên + viền; đáy viền dày 2 px
+                        let (giua, rong) = ((x0 + x1) / 2.0, (x1 - x0).max(12.0) + 12.0);
+                        let o = Rect::from_x_y_ranges((giua - rong / 2.0)..=(giua + rong / 2.0), (cy - 8.0)..=(cy + 9.0));
+                        p.rect(o, 3.0, Color32::from_gray(0xFA), Stroke::new(1.0, Color32::from_gray(0xCF)), egui::StrokeKind::Inside);
+                        p.hline(o.x_range().shrink(2.0), o.bottom() - 1.5, Stroke::new(1.0, Color32::from_gray(0xCF)));
+                    }
+                    _ => {
+                        p.rect_filled(Rect::from_x_y_ranges((x0 - 4.0)..=(x1 + 4.0), (cy - 8.0)..=(cy + 8.0)), 2.0, Color32::from_gray(0xF2));
+                    }
+                }
+                i = j + 1;
+            }
+        }
+    }
+    p.galley(r.min, galley, CHU);
+}
+
+/// Huy hiệu nhãn 18×18 trước tên dòng bảng (S / I / B / · / Nghi trắng / Nghi xoay).
+fn huy_hieu(ui: &mut egui::Ui, ma: &str) {
+    let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), egui::Sense::hover());
+    let p = ui.painter();
+    let o = r.shrink(0.5);
+    let duong = |p: &egui::Painter, mau: Color32, nen: Color32| {
+        p.rect_filled(o, 3.0, nen);
+        let canh = [o.left_top(), o.right_top(), o.right_bottom(), o.left_bottom(), o.left_top()];
+        p.extend(egui::Shape::dashed_line(&canh, Stroke::new(1.0, mau), 3.0, 2.0));
+    };
+    let chu = |p: &egui::Painter, s: &str, mau: Color32| {
+        p.text(r.center(), egui::Align2::CENTER_CENTER, s, egui::FontId::proportional(11.0), mau);
+    };
+    match ma {
+        "s" => {
+            p.rect(o, 3.0, Color32::WHITE, Stroke::new(1.0, Color32::from_rgb(0xE0, 0x7A, 0x00)), egui::StrokeKind::Inside);
+            chu(p, "S", Color32::from_rgb(0xB8, 0x5F, 0x00));
+        }
+        "i" => {
+            p.rect(r, 3.0, Color32::WHITE, Stroke::new(2.0, crate::gui::XANH_COBALT), egui::StrokeKind::Inside);
+            chu(p, "I", crate::gui::XANH_COBALT);
+        }
+        "b" => {
+            duong(p, Color32::from_gray(0x8A), Color32::from_rgb(0xE6, 0xF0, 0xF8));
+            chu(p, "B", CHU);
+        }
+        "nghi" => {
+            duong(p, Color32::from_rgb(0xD9, 0xA4, 0x00), Color32::from_rgb(0xFF, 0xFC, 0xEB));
+            chu(p, "?", Color32::from_rgb(0x9A, 0x74, 0x00));
+        }
+        "xoay" => {
+            duong(p, Color32::from_rgb(0xC2, 0x5E, 0x00), Color32::from_rgb(0xFF, 0xF6, 0xEC));
+            crate::gui_tach::bieu_tuong::ve(p, Rect::from_center_size(r.center(), egui::vec2(11.0, 11.0)), crate::gui_tach::bieu_tuong::BieuTuong::XoayPhai, Color32::from_rgb(0xB8, 0x5F, 0x00));
+        }
+        _ => {
+            p.rect(o, 3.0, Color32::WHITE, Stroke::new(1.0, Color32::from_gray(0xBD)), egui::StrokeKind::Inside);
+            chu(p, "·", CHU);
+        }
+    }
 }
 
 pub fn ve_khoi(ui: &mut egui::Ui, khoi: &[Khoi]) {
+    ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+    let ke = |ui: &mut egui::Ui, mau: u8| crate::gui_tach::khung_hop::ke_ngang(ui, Color32::from_gray(mau));
     for k in khoi {
         match k {
             Khoi::Muc(t) => {
-                ui.add_space(8.0);
-                let r = ui.label(RichText::new(*t).dam());
-                ui.painter().hline(r.rect.left()..=ui.max_rect().right(), r.rect.bottom() + 2.0, Stroke::new(1.0, VIEN_NHAT));
+                ui.add_space(16.0);
+                let (ten, phu) = t.split_once('|').unwrap_or((t, ""));
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(ten).dam().size(CO_CHU));
+                    if !phu.is_empty() {
+                        ui.add_space(6.0);
+                        ui.label(RichText::new(phu).size(11.5).color(CHU_PHU));
+                    }
+                });
                 ui.add_space(4.0);
+                ke(ui, 0xE6);
+                ui.add_space(8.0);
             }
             Khoi::Buoc(ds) => {
                 for (i, b) in ds.iter().enumerate() {
                     ui.horizontal_top(|ui| {
-                        let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), egui::Sense::hover());
-                        ui.painter().circle_filled(r.center(), 8.5, crate::gui::XANH_COBALT);
-                        ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, (i + 1).to_string(), egui::FontId::proportional(11.0), Color32::WHITE);
-                        ui.vertical(|ui| ve_doan(ui, b));
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(20.0, 20.0), egui::Sense::hover());
+                        ui.painter().circle_filled(r.center(), 10.0, XANH_BUOC);
+                        ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, (i + 1).to_string(), egui::FontId::new(11.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), Color32::WHITE);
+                        ui.add_space(10.0);
+                        ui.vertical(|ui| ve_doan(ui, b, CO_CHU, CHU));
                     });
+                    ui.add_space(7.0);
                 }
             }
             Khoi::Bang(dong) => {
-                for (ten, mo_ta) in dong.iter() {
+                for (i, (ten, mo_ta)) in dong.iter().enumerate() {
+                    if let Some(nhom) = ten.strip_prefix('#') {
+                        ui.add_space(if i == 0 { 2.0 } else { 10.0 });
+                        ui.label(RichText::new(nhom).dam().size(11.5).color(CHU_PHU));
+                        ui.add_space(3.0);
+                        ke(ui, 0xE6);
+                        continue;
+                    }
+                    ui.add_space(5.0);
                     ui.horizontal_top(|ui| {
-                        ui.allocate_ui_with_layout(egui::vec2(120.0, 18.0), egui::Layout::left_to_right(Align::Min), |ui| {
-                            ui.set_min_width(120.0);
-                            ve_doan(ui, &format!("*{}*", ten.replace('*', "")));
+                        ui.allocate_ui_with_layout(egui::vec2(132.0, CAO_DONG), egui::Layout::left_to_right(Align::Center), |ui| {
+                            ui.set_min_width(132.0);
+                            let ten = match ten.strip_prefix('{').and_then(|s| s.split_once('}')) {
+                                Some((ma, con)) => {
+                                    huy_hieu(ui, ma);
+                                    ui.add_space(6.0);
+                                    con
+                                }
+                                None => ten,
+                            };
+                            ui.label(RichText::new(ten).dam().size(CO_CHU));
                         });
-                        ui.vertical(|ui| ve_doan(ui, mo_ta));
+                        ui.vertical(|ui| ve_doan(ui, mo_ta, CO_CHU, Color32::from_gray(0x44)));
                     });
+                    ui.add_space(5.0);
+                    ke(ui, 0xF2);
                 }
             }
             Khoi::Ghi(t) => {
-                ui.add_space(8.0);
-                ui.scope(|ui| {
-                    ui.visuals_mut().override_text_color = Some(CHU_PHU);
-                    ve_doan(ui, t);
+                ui.add_space(14.0);
+                let khung = egui::Frame::new().fill(Color32::from_rgb(0xF6, 0xF8, 0xFB)).inner_margin(Margin { left: 13, right: 10, top: 8, bottom: 8 }).show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ve_doan(ui, t, 11.5, CHU_PHU);
                 });
-                ui.visuals_mut().override_text_color = Some(CHU);
+                let r = khung.response.rect;
+                ui.painter().rect_filled(Rect::from_min_size(r.min, egui::vec2(3.0, r.height())), 0.0, XANH_BUOC);
             }
         }
     }
@@ -335,9 +457,10 @@ mod tests {
 
     #[test]
     fn tach_doan_dam_va_phim() {
+        use KieuDoan::*;
         assert_eq!(
-            tach_doan("bấm [Enter] để *xem* lớn"),
-            [("bấm ".into(), false, false), ("Enter".into(), false, true), (" để ".into(), false, false), ("xem".into(), true, false), (" lớn".into(), false, false)]
+            tach_doan("bấm [Enter] để *xem* ~lớn~ `<gốc>_vanban`"),
+            [("bấm ".into(), Thuong), ("Enter".into(), Phim), (" để ".into(), Thuong), ("xem".into(), Dam), (" ".into(), Thuong), ("lớn".into(), Nghieng), (" ".into(), Thuong), ("<gốc>_vanban".into(), Ma)]
         );
     }
 }

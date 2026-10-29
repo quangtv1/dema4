@@ -6,6 +6,7 @@ pub mod bang_trang;
 pub mod bieu_tuong;
 pub mod chon;
 pub mod hop_cau_hinh;
+pub mod khung_hop;
 pub mod nut_tach;
 pub mod phong_to;
 pub mod tab_van_ban;
@@ -1358,19 +1359,17 @@ impl ManTach {
             return;
         }
         let mut chon = None;
-        egui::Modal::new(egui::Id::unique("hoi_phan_tich_lai")).show(ctx, |ui| {
-            ui.set_width(340.0);
-            ui.label(RichText::new("Phân tích lại từ đầu?").dam());
-            ui.add_space(4.0);
-            ui.label("Nhãn sửa tay, Split, góc xoay, trang đã duyệt và trang đã xoá sẽ mất; nhãn tính lại theo Cấu hình.");
-            ui.add_space(8.0);
-            ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                if ui.add(nut_mau("Phân tích lại", XANH_LA)).clicked() {
-                    chon = Some(true);
-                }
-                if ui.add(nut("Huỷ")).clicked() {
-                    chon = Some(false);
-                }
+        khung_hop::hop(ctx, "hoi_phan_tich_lai", 340.0, "Phân tích lại từ đầu?", |ui| {
+            khung_hop::than_chu(ui, "Nhãn sửa tay, Split, góc xoay, trang đã duyệt và trang đã xoá sẽ mất; nhãn tính lại theo Cấu hình.");
+            khung_hop::chan(ui, |ui| {
+                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(khung_hop::nut_chan_mau("Phân tích lại", XANH_LA)).clicked() {
+                        chon = Some(true);
+                    }
+                    if ui.add(khung_hop::nut_chan("Huỷ")).clicked() {
+                        chon = Some(false);
+                    }
+                });
             });
         });
         if let Some(c) = chon {
@@ -1378,6 +1377,18 @@ impl ManTach {
             if c {
                 self.bat_dau(ch, true);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+impl ManTach {
+    /// Dựng sẵn 1 popup để chụp ảnh so prototype.
+    pub(crate) fn mo_popup_mau(&mut self, ten: &str) {
+        match ten {
+            "chua_tach" => self.chua_tach = Some((3, 2)),
+            "phan_tich_lai" => self.hoi_phan_tich_lai = true,
+            _ => self.xong_tach = Some(nut_tach::XongTach::mau()),
         }
     }
 }
