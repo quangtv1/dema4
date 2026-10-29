@@ -5,7 +5,8 @@
 //! (chỉ trang bị đổi + giá trị trước/sau), đặt cờ chưa lưu, cập nhật số đếm cộng dồn — không quét lại cả bảng.
 
 use crate::tach_vb::cache_trang::{DANG_CHINH_XOAY, DA_XOA, GIU_NOI_DUNG};
-use crate::tach_vb::nhan::{BangNhan, BangXoay, Nhan, Xoay};
+use crate::tach_vb::nhan::{tinh_dai, BangNhan, BangXoay, DaiVanBan, Nhan, Xoay};
+use std::collections::BTreeMap;
 use crate::tach_vb::phan_tich::{gan_nhan, CauHinhPhanTich, NhanTuDong};
 use crate::tach_vb::phien::PhienPhanTich;
 
@@ -202,12 +203,23 @@ pub struct BangTrang {
     pub tong: Dem,
     lich_su: [LichSu; 7],
     pub chua_luu: bool,
+    /// Chỉ số trang đầu của từng hồ sơ (+ phần tử cuối = tổng số trang).
+    dau: Vec<u32>,
+    /// Tăng mỗi khi có trang đổi (để giao diện biết khi nào tính lại số liệu tốn công).
+    pub phien_ban: u64,
 }
 
 impl BangTrang {
     /// `trang` theo thứ tự hồ sơ rồi số trang.
     pub fn moi(ho_so: Vec<String>, trang: Vec<TrangMeta>) -> Self {
-        let mut b = BangTrang { dem_ho_so: vec![Dem::default(); ho_so.len()], ho_so, trang, tong: Dem::default(), lich_su: Default::default(), chua_luu: false };
+        let mut dau = vec![0u32; ho_so.len() + 1];
+        for t in &trang {
+            dau[t.ho_so as usize + 1] += 1;
+        }
+        for i in 1..dau.len() {
+            dau[i] += dau[i - 1];
+        }
+        let mut b = BangTrang { dem_ho_so: vec![Dem::default(); ho_so.len()], ho_so, trang, tong: Dem::default(), lich_su: Default::default(), chua_luu: false, dau, phien_ban: 0 };
         for t in &b.trang {
             let d = Dem::cua(t);
             b.dem_ho_so[t.ho_so as usize].cong(d, 1);
@@ -220,8 +232,33 @@ impl BangTrang {
         self.dem_ho_so[h as usize]
     }
 
+    /// Chỉ số trong bảng của trang `so` (1-based) thuộc hồ sơ `h`.
+    pub fn chi_so(&self, h: usize, so: usize) -> u32 {
+        self.dau[h] + so as u32 - 1
+    }
+
+    pub fn so_trang(&self, h: usize) -> usize {
+        (self.dau[h + 1] - self.dau[h]) as usize
+    }
+
+    /// Các văn bản sẽ tách từ hồ sơ `h` theo nhãn + góc hiện tại.
+    pub fn van_ban(&self, h: usize) -> DaiVanBan {
+        let (mut nhan, mut xoay) = (BTreeMap::new(), BTreeMap::new());
+        for t in &self.trang[self.dau[h] as usize..self.dau[h + 1] as usize] {
+            let n = t.nhan();
+            if n != Nhan::NoiDung {
+                nhan.insert(t.so as usize, n);
+            }
+            if t.sua.goc != 0 {
+                xoay.insert(t.so as usize, Xoay { goc: t.sua.goc, xac_nhan: false });
+            }
+        }
+        tinh_dai(self.so_trang(h), &nhan, &xoay)
+    }
+
     /// Đổi 1 trang và cập nhật số đếm.
     fn dat(&mut self, k: u32, f: impl FnOnce(&mut TrangMeta)) {
+        self.phien_ban += 1;
         let t = &mut self.trang[k as usize];
         let truoc = Dem::cua(t);
         f(t);
@@ -794,5 +831,10 @@ mod tests {
         assert_eq!(n["a.pdf"].iter().map(|(&p, &n)| (p, n)).collect::<Vec<_>>(), [(2, Nhan::Index), (4, Nhan::Trang)]);
         assert_eq!(n["b/b.pdf"][&1], Nhan::Split);
         assert_eq!(b.trang[3].trang_thai_cache(), 0);
+        assert_eq!((b.chi_so(1, 2), b.so_trang(0), b.so_trang(1)), (7, 6, 4));
+        // a: Index ở trang 2, Trắng ở 4 → 2 văn bản [1] và [3..6] bỏ 4; b: Split trang 1 → 1 văn bản
+        let a = b.van_ban(0);
+        assert_eq!(a.van_ban.iter().map(|v| (v.tu, v.den, v.bo.clone())).collect::<Vec<_>>(), [(1, 1, vec![]), (3, 6, vec![4])]);
+        assert_eq!(b.van_ban(1).van_ban.len(), 1);
     }
 }

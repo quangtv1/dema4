@@ -23,20 +23,20 @@ const THONG_BAO_THONG_KE: &str = "Thông tin đếm thư mục đã được ghi
 const SO_COT: usize = 10;
 
 // Bảng màu xám kiểu Windows cổ điển; chỉ nút Đếm/Dừng và chữ cảnh báo có màu
-const NEN: Color32 = Color32::from_rgb(0xF0, 0xF0, 0xF0);
-const VIEN: Color32 = Color32::from_rgb(0xAD, 0xAD, 0xAD);
-const VIEN_NHAT: Color32 = Color32::from_rgb(0xD4, 0xD4, 0xD4);
+pub(crate) const NEN: Color32 = Color32::from_rgb(0xF0, 0xF0, 0xF0);
+pub(crate) const VIEN: Color32 = Color32::from_rgb(0xAD, 0xAD, 0xAD);
+pub(crate) const VIEN_NHAT: Color32 = Color32::from_rgb(0xD4, 0xD4, 0xD4);
 const NUT: Color32 = Color32::from_rgb(0xE1, 0xE1, 0xE1);
 const NUT_HOVER: Color32 = Color32::from_rgb(0xE5, 0xF1, 0xFB);
-const CHU: Color32 = Color32::from_rgb(0x1A, 0x1A, 0x1A);
-const CHU_PHU: Color32 = Color32::from_rgb(0x60, 0x60, 0x60);
-const XANH_LA: Color32 = Color32::from_rgb(0x00, 0x80, 0x00);
-const DO: Color32 = Color32::from_rgb(0xC4, 0x2B, 0x1C);
+pub(crate) const CHU: Color32 = Color32::from_rgb(0x1A, 0x1A, 0x1A);
+pub(crate) const CHU_PHU: Color32 = Color32::from_rgb(0x60, 0x60, 0x60);
+pub(crate) const XANH_LA: Color32 = Color32::from_rgb(0x00, 0x80, 0x00);
+pub(crate) const DO: Color32 = Color32::from_rgb(0xC4, 0x2B, 0x1C);
 const DO_SAM: Color32 = Color32::from_rgb(0xA0, 0x10, 0x10);
-const CHU_MO: Color32 = Color32::from_rgb(0xA8, 0xA8, 0xA8);
+pub(crate) const CHU_MO: Color32 = Color32::from_rgb(0xA8, 0xA8, 0xA8);
 /// Màu phần đã chạy của thanh tiến độ (xanh nhạt cho dễ nhìn)
-const XAM_TIEN_DO: Color32 = Color32::from_rgb(0xA8, 0xD1, 0xF5);
-const XANH_COBALT: Color32 = Color32::from_rgb(0x00, 0x47, 0xAB);
+pub(crate) const XAM_TIEN_DO: Color32 = Color32::from_rgb(0xA8, 0xD1, 0xF5);
+pub(crate) const XANH_COBALT: Color32 = Color32::from_rgb(0x00, 0x47, 0xAB);
 
 pub fn chay() -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default().with_inner_size([980.0, 600.0]).with_min_inner_size([800.0, 420.0]).with_title(TIEU_DE);
@@ -49,16 +49,102 @@ pub fn chay() -> eframe::Result {
         options,
         Box::new(|cc| {
             cai_giao_dien(&cc.egui_ctx);
-            Ok(Box::new(UngDung::default()))
+            Ok(Box::new(UngDungChinh::default()))
         }),
     )
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+enum Man {
+    Dem,
+    Tach,
+    Ky,
+}
+
+impl Man {
+    fn tieu_de(self) -> &'static str {
+        match self {
+            Man::Dem => TIEU_DE,
+            Man::Tach => "Tách văn bản PDF (Giải pháp số Sao Mai)",
+            Man::Ky => "Ký văn bản (Giải pháp số Sao Mai)",
+        }
+    }
+}
+
+/// Cửa sổ chính: menu Chức năng + các màn (Đếm, Tách, Ký giữ chỗ).
+struct UngDungChinh {
+    man: Man,
+    tieu_de_da_dat: Man,
+    dem: UngDung,
+    tach: crate::gui_tach::ManTach,
+    cfg: crate::cau_hinh::CauHinh,
+}
+
+impl Default for UngDungChinh {
+    fn default() -> Self {
+        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem: UngDung::default(), tach: Default::default(), cfg: crate::cau_hinh::doc() }
+    }
+}
+
+impl UngDungChinh {
+    fn dang_chay(&self) -> bool {
+        self.dem.dang_dem.is_some() || self.tach.dang_chay()
+    }
+
+    fn thanh_menu(&mut self, ui: &mut egui::Ui) {
+        let khoa = self.dang_chay();
+        egui::Panel::top("menu").frame(egui::Frame::new().fill(Color32::WHITE).inner_margin(Margin::symmetric(6, 2))).show(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
+                ui.add_enabled_ui(!khoa, |ui| {
+                    ui.menu_button("Chức năng", |ui| {
+                        for (man, ten) in [(Man::Dem, "Đếm trang A4"), (Man::Tach, "Tách văn bản"), (Man::Ky, "Ký văn bản")] {
+                            if crate::gui_tach::bieu_tuong::muc_menu(ui, ten, self.man == man, 170.0).clicked() {
+                                self.man = man;
+                                ui.close();
+                            }
+                        }
+                    });
+                })
+                .response
+                .on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để đổi chức năng");
+            });
+        });
+    }
+}
+
+impl eframe::App for UngDungChinh {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
+        if self.tieu_de_da_dat != self.man {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.man.tieu_de().into()));
+            self.tieu_de_da_dat = self.man;
+        }
+        if ctx.input(|i| i.viewport().close_requested()) {
+            self.tach.ghi_cache();
+        }
+        self.thanh_menu(ui);
+        match self.man {
+            Man::Dem => self.dem.ve(ui),
+            Man::Tach => {
+                egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN).inner_margin(Margin { left: 12, right: 12, top: 8, bottom: 0 })).show(ui, |ui| self.tach.ve(ui, &mut self.cfg));
+                if std::mem::take(&mut self.tach.cfg_doi) {
+                    let _ = crate::cau_hinh::ghi(&self.cfg);
+                }
+            }
+            Man::Ky => {
+                egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN)).show(ui, |ui| {
+                    ui.centered_and_justified(|ui| ui.label(RichText::new("Ký văn bản — Chức năng đang phát triển").color(CHU_PHU)));
+                });
+            }
+        }
+    }
 }
 
 /// Tên họ font đậm (egui không có chữ đậm sẵn, strong() chỉ đổi màu)
 const HO_FONT_DAM: &str = "dam";
 
 /// In đậm thật bằng họ font đậm của hệ thống
-trait ChuDam {
+pub(crate) trait ChuDam {
     fn dam(self) -> Self;
 }
 
@@ -313,7 +399,7 @@ pub(crate) fn thoi_gian_phut_giay(t: Duration) -> String {
 }
 
 /// Mở file bằng app mặc định (PDF: trình duyệt / Foxit…), hoặc mở thư mục bằng trình quản lý file
-fn mo_bang_he_dieu_hanh(p: &Path) {
+pub(crate) fn mo_bang_he_dieu_hanh(p: &Path) {
     let lenh = if cfg!(windows) { "explorer" } else if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
     let _ = std::process::Command::new(lenh).arg(p).spawn();
 }
@@ -325,11 +411,11 @@ enum CanLe {
     Phai,
 }
 
-const NEN_TIEU_DE: Color32 = Color32::from_rgb(0xEB, 0xEB, 0xEB);
+pub(crate) const NEN_TIEU_DE: Color32 = Color32::from_rgb(0xEB, 0xEB, 0xEB);
 const NEN_TAB: Color32 = Color32::from_rgb(0xF7, 0xF7, 0xF7);
 const NEN_TAB_CHON: Color32 = Color32::from_rgb(0xDC, 0xEB, 0xFA);
-const VIEN_TAB_CHON: Color32 = Color32::from_rgb(0x2F, 0x7B, 0xD9);
-const NEN_XEN_KE: Color32 = Color32::from_rgb(0xF6, 0xF6, 0xF6);
+pub(crate) const VIEN_TAB_CHON: Color32 = Color32::from_rgb(0x2F, 0x7B, 0xD9);
+pub(crate) const NEN_XEN_KE: Color32 = Color32::from_rgb(0xF6, 0xF6, 0xF6);
 /// Lề trái/phải trong mỗi ô để chữ không sát mép
 const LE_O: f32 = 8.0;
 const CAO_TIEU_DE: f32 = 26.0;
@@ -408,11 +494,11 @@ fn nut_copy(ui: &mut egui::Ui, bat: bool) -> egui::Response {
     }
 }
 
-fn nut(chu: &str) -> egui::Button<'static> {
+pub(crate) fn nut(chu: &str) -> egui::Button<'static> {
     egui::Button::new(chu.to_owned()).min_size(egui::vec2(RONG_NUT, 26.0))
 }
 
-fn nut_mau(chu: &str, nen: Color32) -> egui::Button<'static> {
+pub(crate) fn nut_mau(chu: &str, nen: Color32) -> egui::Button<'static> {
     egui::Button::new(RichText::new(chu.to_owned()).color(Color32::WHITE)).fill(nen).min_size(egui::vec2(RONG_NUT, 26.0))
 }
 
@@ -1128,6 +1214,13 @@ impl UngDung {
 
 impl eframe::App for UngDung {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.ve(ui);
+    }
+}
+
+impl UngDung {
+    /// Màn Đếm trang A4.
+    fn ve(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         if let Some((kq, xong)) = self.nhan_su_kien() {
             self.luu_va_thong_bao(&kq, xong);
@@ -1301,6 +1394,39 @@ mod tests {
         app.luu_va_thong_bao(&kq, xong);
         assert_eq!(app.ket_qua_chep.as_deref(), Some("KẾT QUẢ ĐẾM\n===\n"));
         let _ = std::fs::remove_dir_all(std::env::temp_dir().join("dema4_kiem_thu_copy"));
+    }
+
+    /// Chụp màn Tách sau khi phân tích thư mục mẫu 1.
+    /// Chạy: DEMA4_MAU_TACH=<thư mục mẫu> DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_man_tach
+    #[test]
+    #[ignore = "cần GPU và thư mục mẫu"]
+    fn chup_man_tach() {
+        let mau = crate::tach_vb::thu_muc_mau().expect("DEMA4_MAU_TACH");
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 760.0)).with_pixels_per_point(1.5).build_eframe(|cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut app = UngDungChinh { man: Man::Tach, ..Default::default() };
+            app.cfg = crate::cau_hinh::CauHinh::default();
+            app.tach.thu_muc = mau.join("pdf_goc").display().to_string();
+            let ch = app.cfg.cau_hinh_phan_tich();
+            app.tach.bam_phan_tich(&ch);
+            app
+        });
+        let bat_dau = Instant::now();
+        while harness.state().tach.dang_chay() && bat_dau.elapsed() < Duration::from_secs(120) {
+            harness.run_steps(1);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("tach_1_tat_ca.png")).unwrap();
+        harness.state_mut().tach.loc = crate::gui_tach::bang_trang::Loc::NghiTrang;
+        harness.run_steps(2);
+        let dau = harness.state().tach.thu_tu_hien().first().copied();
+        if let Some(k) = dau {
+            harness.state_mut().tach.chon.chon_rieng(k);
+        }
+        harness.run_steps(3);
+        harness.render().unwrap().save(thu_muc_anh.join("tach_2_nghi_trang.png")).unwrap();
     }
 
     /// Vẽ giao diện ra ảnh PNG (không mở cửa sổ) từ một file chi tiết thật để xem bố cục.
