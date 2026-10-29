@@ -13,3 +13,7 @@ status: completed
 
 ## Kiểm thử
 - 139 test; báo cáo kiểm thử Tách: `plans/reports/kiem-thu-tach-van-ban-261030-0100-loi-treo-crash-report.md`.
+
+## Bổ sung → phát hành thành v0.5.0
+7. Hộp phóng to trong bộ lọc Nghi: thanh hỏi duyệt căn giữa, B/C/I/S chọn nhãn rồi Enter áp (cả lưới), Hoàn tác / Làm lại trong hộp; chữ gợi ý đơn giản hơn.
+8. README viết lại kèm ảnh từng chức năng (`docs/anh/`), hướng dẫn mở file chưa ký trên macOS / Windows.
