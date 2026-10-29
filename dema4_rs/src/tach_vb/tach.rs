@@ -278,6 +278,7 @@ pub(crate) mod tests {
         // Trang 9 xoay 90 → trang thứ 3 của part3 mang /Rotate 90; file gốc không đổi
         let doc = PdfDocument::open(thu_muc_hs.join("4766_part3.pdf").to_str().unwrap()).unwrap();
         assert_eq!(doc.find_page(2).unwrap().get_dict("Rotate").unwrap().unwrap().as_int().unwrap(), 90);
+        drop(doc); // Windows không xoá được file đang mở (lần chạy lại bên dưới phải xoá part3)
         // Hồ sơ không nhãn → chép nguyên từng byte; thư mục chỉ có ảnh không được tạo
         assert_eq!(std::fs::read(ra.join("goc").join("goc_part1.pdf")).unwrap(), std::fs::read(nguon.join("goc.pdf")).unwrap());
         assert_eq!(kq.sao_nguyen, 1);
