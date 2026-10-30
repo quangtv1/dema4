@@ -40,6 +40,15 @@ Màn egui theo prototype đã duyệt, nối lõi phase 2; tính lượt license
 2. Test 2–3 (đỏ) → màn, cấu hình, tab Cấu hình → xanh.
 3. Ảnh chụp, README + Hướng dẫn, phát hành (tag mới).
 
+## Tiến độ (31/10)
+- [x] License `muc_luc` (app + trạm, cột Q/R), trạm triển khai @11 **trước** app (bắt buộc: app mới gửi `cn: muc_luc` tới trạm cũ sẽ làm nghẽn ghi bù Đếm/Tách).
+- [x] Lõi bổ sung: `khop.rs` (tự khớp như `TextUtil.Normalize`, đếm giá trị khác nhau), `sinh.rs` (sinh hàng loạt, Dừng, ghi đè / bỏ qua), `mo_phong.rs` (trang mô phỏng: đoạn + bảng, viền theo DOCX).
+- [x] Màn `gui_muc_luc` đúng bố cục duyệt: 2 dòng đầu vào, tab Mẫu / Kết quả, sidebar kéo được + sửa nguồn tại chỗ, Nhóm theo, định vị biến 2 chiều, zoom, hộp Ghép biến, popup Đang sinh / Đã sinh, license + Telegram.
+- [x] Cấu hình › tab Sinh mục lục; nhớ lựa chọn gần nhất (`ml_*`); Hướng dẫn tab Sinh mục lục; README + ảnh.
+- [x] Review độc lập (`reports/from-code-reviewer-to-main-sinh-muc-luc-phase3-review-report.md`): đã sửa M1 (đóng app khi đang sinh), M2 (Esc trong hộp), M3 (ràng buộc sai mẫu), M5 (hoàn lượt khi luồng chết) + 3 Low. Chưa sửa: M4 (biến mới thêm vào mẫu không tự khớp khi đã có ràng buộc lưu — cần lưu riêng "bỏ ghép" có chủ ý).
+- [ ] CLI `--muc-luc` (tuỳ chọn) — để sau.
+- [ ] Phát hành bản mới (chờ chủ sản phẩm duyệt + thử trên Windows).
+
 ## Success Criteria
 - [ ] Người dùng tạo được 22 mục lục DOCX từ Excel mẫu trên Windows + macOS.
 - [ ] License + Telegram hoạt động với trạm thật.
