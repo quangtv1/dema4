@@ -495,7 +495,8 @@
   #manMucLuc .tabkho .dem.canh { background:#FFF1D6; color:#8A5A00; }
   #manMucLuc .dieuhuong .nut { height:24px; padding:0 10px; font-size:12px; }
   .canhml { color:#B85F00; font-weight:bold; text-align:center; }
-  #manMucLuc .tabkho { grid-template-columns:200px 200px 1fr; }
+  #manMucLuc .tabkho { grid-template-columns:calc(var(--rong-trai, 290px) / 2) calc(var(--rong-trai, 290px) / 2) 1fr; } /* 2 tab cộng lại = độ rộng sidebar */
+  #manMucLuc .tabkho > span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 6px; }
   #manMucLuc .canhtab { justify-self:end; padding-right:12px; color:#B85F00; font-size:12px; cursor:pointer; }
   #manMucLuc .canhtab:hover { text-decoration:underline; }
   #manMucLuc .tabkho > span { cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
@@ -2111,10 +2112,10 @@
     e.preventDefault(); thuPhongVB(e.deltaY < 0 ? 1 : -1);
   }, { passive: false });
   // Kéo thả đổi độ rộng cột trái (160–520 px); phím ←/→ khi thanh kéo đang focus
-  function ganKeo(keo, trai, khoa, min, max) {
+  function ganKeo(keo, trai, khoa, min, max, khiDoi) {
     var x0 = 0, w0 = 0;
     function dat(w, khongLuu) {
-      w = Math.max(min, Math.min(max, w)); trai.style.width = w + 'px';
+      w = Math.max(min, Math.min(max, w)); trai.style.width = w + 'px'; if (khiDoi) khiDoi(w);
       if (!khongLuu) { try { localStorage.setItem(khoa, w); } catch (e) {} }
     }
     try { var daLuu = +localStorage.getItem(khoa); if (daLuu) dat(daLuu, true); } catch (e) {}
@@ -2675,7 +2676,7 @@
   if (h === '#muc-luc-ghep' || h === '#muc-luc-ghep-chon') { if (h === '#muc-luc-ghep-chon') ml.mo = 4; moGhep(); }
   if (h === '#muc-luc-mau-sua') { ml.moTrai = 4; veMucLuc(); }
   ganNguon($('mlBien'), 'mo'); ganNguon($('mlTrai'), 'moTrai');
-  ganKeo($('mlKeo'), $('mlTrai'), 'smdema4.rongTraiML', 220, 600);
+  ganKeo($('mlKeo'), $('mlTrai'), 'smdema4.rongTraiML', 220, 600, function (w) { $('manMucLuc').style.setProperty('--rong-trai', w + 'px'); });
   // Bấm ra ngoài ô / danh sách nguồn thì đóng danh sách đang mở
   document.addEventListener('click', function (e) {
     if ((ml.mo < 0 && ml.moTrai < 0) || e.target.closest('.dsml, .oml')) return;
