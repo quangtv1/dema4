@@ -21,6 +21,10 @@ xếp và gửi tin Telegram (token ở tab `Cấu hình`), ghi tab `Ngưỡng t
 7. Chạy `caiTrigger` 1 lần, cấp quyền khi Google hỏi.
 8. Gửi `license_pub.pem` + URL cho người build app (khoá công khai không phải bí mật).
 
+## Bản đang chạy
+- Dự án Apps Script gắn Monitor_dema4 (tạo bằng `clasp create --parentId <id Sheet>`); deployment web app `AKfycbyR90…` — URL nằm ở `URL_TRAM` (`src/tram.rs`).
+- Sửa script: chép `loi.js`, `license.gs` (đổi tên `license.js`), `appsscript.json` vào thư mục có `.clasp.json` → `clasp push --force` → `clasp update-deployment <deploymentId>` (giữ URL). clasp 3 có thể báo "already up to date" khi chỉ xoá file: sửa 1 file rồi push lại, kiểm bằng `clasp pull` vào thư mục trống.
+
 ## Cấp lượt
 Tab `license` → tìm mã máy → sửa **Hạn mức Đếm / Tách** (tổng số lần) → Trạng thái **Đã cấp** → khách bấm **Kiểm tra lại**. Xem tab `Mô tả license`.
 

@@ -1,5 +1,5 @@
 //! Popup "Liên hệ Sao Mai" khi hết lượt Đếm / Tách (theo prototype `#het-luot`): logo, ổ khoá đỏ + lý do,
-//! mã máy / điện thoại / email (mỗi dòng có Copy), website; nút Đóng, Kiểm tra lại (hỏi trạm, chờ tối đa 8 s).
+//! mã máy / điện thoại / email (mỗi dòng có Copy), website; nút Đóng, Kiểm tra lại (hỏi trạm, chờ tối đa 15 s).
 
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::{Duration, Instant};
@@ -17,7 +17,7 @@ const RONG: f32 = 380.0;
 const LE: f32 = 18.0;
 const COT_NHAN: f32 = 70.0;
 const KHOANG: f32 = 8.0;
-const CHO_TOI_DA: Duration = Duration::from_secs(8);
+const CHO_TOI_DA: Duration = Duration::from_secs(15);
 
 pub enum KetQuaHop {
     Mo,

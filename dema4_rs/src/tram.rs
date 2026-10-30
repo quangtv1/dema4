@@ -6,11 +6,11 @@ use base64::Engine;
 use serde_json::{json, Value};
 use std::time::Duration;
 
-/// URL web app trạm (README apps-script, bước 5). Trống = chưa triển khai → app dùng luật offline, không gửi thống kê.
-pub const URL_TRAM: &str = "";
+/// URL web app trạm (README apps-script, bước 5; sửa script dùng New version để giữ URL). Trống = app dùng luật offline, không gửi thống kê.
+pub const URL_TRAM: &str = "https://script.google.com/macros/s/AKfycbyR90faddKygBf70AcElFIT9Rfxo0jZG78DDqBUPLN5OEbqQxOxj8MesqpzQMs6hzpRzw/exec";
 const KHOA_CONG_KHAI_PEM: &str = include_str!("../assets/license_pub.pem");
-/// Trạm chờ khoá Sheet tối đa 2,5 s; 8 s đủ cho cả chuyển hướng 302 của Apps Script.
-const CHO_TOI_DA: Duration = Duration::from_secs(8);
+/// Trạm trả lời ~3 s (lần đầu sau lúc nghỉ ~7 s, gồm chuyển hướng 302 của Apps Script); lời gọi chạy nền nên chờ rộng tay.
+const CHO_TOI_DA: Duration = Duration::from_secs(15);
 
 /// Thông tin máy gửi kèm mỗi lời gọi; IP đọc lại mỗi lần (máy có thể đã chuyển mạng).
 #[derive(Debug, Clone, PartialEq)]
@@ -34,8 +34,8 @@ pub struct KetQuaTram {
 /// Nơi lưu hạn mức / lần chạy: trạm thật, hoặc kho giả trong test.
 pub trait KhoLicense: Send + Sync {
     fn kiem_tra(&self, may: &ThongTinMay) -> Result<KetQuaTram, String>;
-    /// `ma_vua_chay`: lần vừa chạy xong (nguồn "online"); các lần khác là bù offline.
-    fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay], ma_vua_chay: Option<&str>) -> Result<KetQuaTram, String>;
+    /// `online`: lần chạy xong trong phiên này (nguồn "online"); các lần khác là bù offline.
+    fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay], online: &std::collections::HashSet<String>) -> Result<KetQuaTram, String>;
     /// `hanh_dong`: "thong_ke_dem" | "thong_ke_tach"; `them`: các trường số liệu (`so_lieu`, `nguong`).
     fn thong_ke(&self, may: &ThongTinMay, hanh_dong: &str, them: Value) -> Result<(), String>;
     /// Câu trả lời đã lưu trên đĩa còn tin được không (chữ ký, mã máy; không kiểm nonce).
@@ -74,8 +74,8 @@ impl KhoLicense for KhoTram {
         self.goi_ky(may, "kiem_tra", json!({}))
     }
 
-    fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay], ma_vua_chay: Option<&str>) -> Result<KetQuaTram, String> {
-        self.goi_ky(may, "ghi_lan", json!({ "lan": ds_lan(lan, ma_vua_chay) }))
+    fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay], online: &std::collections::HashSet<String>) -> Result<KetQuaTram, String> {
+        self.goi_ky(may, "ghi_lan", json!({ "lan": ds_lan(lan, online) }))
     }
 
     fn thong_ke(&self, may: &ThongTinMay, hanh_dong: &str, them: Value) -> Result<(), String> {
@@ -105,8 +105,8 @@ fn yeu_cau(may: &ThongTinMay, hanh_dong: &str, nonce: &str, them: Value) -> Valu
     v
 }
 
-fn ds_lan(lan: &[LanChay], ma_vua_chay: Option<&str>) -> Value {
-    lan.iter().map(|l| json!({ "ma_lan": l.ma, "cn": l.cn.ma(), "luc": l.luc, "nguon": if Some(l.ma.as_str()) == ma_vua_chay { "online" } else { "bu_offline" } })).collect()
+fn ds_lan(lan: &[LanChay], online: &std::collections::HashSet<String>) -> Value {
+    lan.iter().map(|l| json!({ "ma_lan": l.ma, "cn": l.cn.ma(), "luc": l.luc, "nguon": if online.contains(&l.ma) { "online" } else { "bu_offline" } })).collect()
 }
 
 /// Thân trả lời của trạm → cặp dữ liệu / chữ ký. HTML (trang đăng nhập, lỗi Google), `ok:false`, thiếu trường → lỗi.
@@ -277,7 +277,7 @@ impl KhoLicense for KhoGia {
         self.goi(may, || Ok(self.tra_loi(may, Vec::new())))
     }
 
-    fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay], _ma_vua_chay: Option<&str>) -> Result<KetQuaTram, String> {
+    fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay], _online: &std::collections::HashSet<String>) -> Result<KetQuaTram, String> {
         self.goi(may, || {
             let mut ghi = Vec::new();
             for l in lan {
@@ -358,6 +358,28 @@ mod tests {
         assert_eq!(phan_tich_phan_hoi(r#"{"ok":true,"du_lieu":"{}","chu_ky":"YQ=="}"#), Ok(TraLoiKy { du_lieu: "{}".into(), chu_ky: "YQ==".into() }));
     }
 
+    /// Câu trả lời thật của trạm đã triển khai (Utilities.computeRsaSha256Signature) kiểm được bằng khoá công khai nhúng.
+    #[test]
+    fn chu_ky_tu_apps_script_kiem_duoc() {
+        use rsa::pkcs8::DecodePublicKey;
+        let khoa = rsa::RsaPublicKey::from_public_key_pem(KHOA_CONG_KHAI_PEM.trim()).expect("khoá công khai nhúng hợp lệ");
+        let tl = TraLoiKy { du_lieu: "{\"ma_may\":\"SM-0000-0000-0000\",\"nonce\":\"thu1\",\"han_dem\":2,\"han_tach\":2,\"da_dung_dem\":0,\"da_dung_tach\":0,\"trang_thai\":\"dung_thu\",\"da_ghi\":[]}".into(), chu_ky: "ZwEMMvTPwXdWL9ADG/PuSChGAlUdWCU7ScsUztQvmFEXXwHAGH/SsGbDyG6U2Z7/5lJ4x0FkifvFekvPDNNOoWpCDeCzR2YkOEcIR784pD0atoW50OQ0948vqCU2kkU2G9p8e7Hye1vPpOHyrRYXdutg+V9N2P+HTpkw6JTj4AcSp0ypp0b801aDNsE10bkOwEDzZqP/xXL/2aJXfRBnhFW7zboCKAUZ6k9Y+Ts1U4DHMa+60CQ+EyOqleRzB1yxWIZpPbJZfE7+xrfq6EF48/f1XBYnusfHrsx/YZiArvuRfEwNHIL7i/HX9BW830rh0mqPPVcTcleNKFSab8viKg==".into() };
+        let kq = doc_tra_loi(&tl, &khoa, "SM-0000-0000-0000", Some("thu1")).unwrap();
+        assert_eq!((kq.may.han.dem, kq.may.han.tach, kq.may.trang_thai), (2, 2, crate::license::TrangThai::DungThu));
+        assert!(KhoTram::moi().is_some(), "URL + khoá đã điền");
+    }
+
+    /// Gọi trạm thật (cần mạng): đăng ký máy thử, câu trả lời ký đúng.
+    #[test]
+    #[ignore = "gọi trạm thật"]
+    fn kho_tram_that() {
+        let kho = KhoTram::moi().unwrap();
+        let mut m = may();
+        m.ma = "SM-0000-0000-0000".into();
+        let kq = kho.kiem_tra(&m).unwrap();
+        println!("{:?}", kq.may);
+    }
+
     fn may() -> ThongTinMay {
         ThongTinMay { ma: "SM-2145-6787-A9FB".into(), ten: "PC-01".into(), mac: "AA:BB".into(), ip_noi_bo: "10.0.0.2".into(), ip_public: "1.2.3.4".into(), phien_ban: "0.6.0".into() }
     }
@@ -366,7 +388,7 @@ mod tests {
     fn yeu_cau_dung_dinh_dang_tram() {
         use crate::license::{ChucNang, TrangThaiLan};
         let lan = |ma: &str| LanChay { ma: ma.into(), cn: ChucNang::Tach, luc: "x".into(), trang_thai: TrangThaiLan::DaChay };
-        let v = yeu_cau(&may(), "ghi_lan", "n1", json!({ "lan": ds_lan(&[lan("a"), lan("b")], Some("b")) }));
+        let v = yeu_cau(&may(), "ghi_lan", "n1", json!({ "lan": ds_lan(&[lan("a"), lan("b")], &["b".to_string()].into()) }));
         assert_eq!((v["hanh_dong"].as_str(), v["ma_may"].as_str(), v["nonce"].as_str()), (Some("ghi_lan"), Some("SM-2145-6787-A9FB"), Some("n1")));
         assert_eq!(v["may"]["ip_public"], "1.2.3.4");
         assert_eq!((v["lan"][0]["nguon"].as_str(), v["lan"][1]["nguon"].as_str(), v["lan"][1]["cn"].as_str()), (Some("bu_offline"), Some("online"), Some("tach")));

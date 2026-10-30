@@ -320,7 +320,7 @@ impl SoLuot {
 /// Việc của luồng gửi (1 luồng / app: không có 2 lời gọi trạm cùng lúc).
 enum Viec {
     /// Ghi các lần chờ lên trạm (không có thì `kiem_tra`) rồi cập nhật câu trả lời ký.
-    DongBo(Option<String>),
+    DongBo,
     ThongKe(&'static str, Box<dyn FnOnce(&ThongTinMay) -> serde_json::Value + Send>),
     /// Mốc: báo khi mọi việc trước đó đã xong.
     Moc(std::sync::mpsc::Sender<()>),
@@ -338,6 +338,8 @@ struct Chung {
     da_ky: Mutex<Option<TrangThaiMay>>,
     /// Đặt chỗ của chính app này đang chạy (không gửi trạm khi chưa xong).
     dang_chay: Mutex<HashSet<String>>,
+    /// Lần chạy xong trong phiên này (ghi trạm với nguồn "online"; còn lại là bù offline).
+    xong_phien: Mutex<HashSet<String>>,
 }
 
 impl Chung {
@@ -354,11 +356,14 @@ impl Chung {
     }
 
     /// Lỗi → giữ nguyên sổ, lần sau gửi lại (trạm chống trùng theo mã lần).
-    fn dong_bo(&self, ma_vua_chay: Option<&str>) {
+    fn dong_bo(&self) {
         let Some(kho) = &self.kho else { return };
         let may = self.may();
-        let dang = self.dang_chay.lock().unwrap().clone();
-        let cho: Vec<LanChay> = self.so.cho_ghi().into_iter().filter(|l| l.trang_thai == TrangThaiLan::DaChay || !dang.contains(&l.ma)).collect();
+        // Đọc sổ dưới khoá `dang_chay`: đặt chỗ vừa ghi đĩa luôn đã nằm trong `dang_chay` (xem `bat_dau`)
+        let cho: Vec<LanChay> = {
+            let dang = self.dang_chay.lock().unwrap();
+            self.so.cho_ghi().into_iter().filter(|l| l.trang_thai == TrangThaiLan::DaChay || !dang.contains(&l.ma)).collect()
+        };
         if cho.is_empty() {
             if let Ok(kq) = kho.kiem_tra(&may) {
                 self.nhan(&kq);
@@ -366,7 +371,8 @@ impl Chung {
             return;
         }
         for phan in cho.chunks(TOI_DA_LAN_MOI_LOI_GOI) {
-            match kho.ghi_lan(&may, phan, ma_vua_chay) {
+            let online = self.xong_phien.lock().unwrap().clone();
+            match kho.ghi_lan(&may, phan, &online) {
                 Ok(kq) => self.nhan(&kq),
                 Err(_) => return,
             }
@@ -386,13 +392,13 @@ pub struct KiemTra {
 impl KiemTra {
     pub fn moi(kho: Option<Arc<dyn KhoLicense>>, so: SoLuot, ma: String, ten: String, mac: String, lay_ip: LayIp) -> Self {
         let da_ky = so.tra_loi().zip(kho.as_ref()).and_then(|(tl, k)| k.doc_da_luu(&tl, &ma));
-        let chung = Arc::new(Chung { kho, so, ma, ten, mac, lay_ip, da_ky: Mutex::new(da_ky), dang_chay: Mutex::default() });
+        let chung = Arc::new(Chung { kho, so, ma, ten, mac, lay_ip, da_ky: Mutex::new(da_ky), dang_chay: Mutex::default(), xong_phien: Mutex::default() });
         let (gui, nhan) = std::sync::mpsc::channel::<Viec>();
         let c = Arc::clone(&chung);
         std::thread::spawn(move || {
             for v in nhan {
                 match v {
-                    Viec::DongBo(ma) => c.dong_bo(ma.as_deref()),
+                    Viec::DongBo => c.dong_bo(),
                     Viec::ThongKe(hd, soan) => {
                         if let Some(kho) = &c.kho {
                             let may = c.may();
@@ -454,8 +460,10 @@ impl KiemTra {
     pub fn bat_dau(&self, cn: ChucNang) -> Result<LanChay, QuyetDinh> {
         match self.quyet_dinh(cn) {
             QuyetDinh::Cho => {
+                // Ghi đĩa + đánh dấu đang chạy cùng 1 khoá: luồng gửi không thấy đặt chỗ này như lần bỏ dở
+                let mut dang = self.chung.dang_chay.lock().unwrap();
                 let lan = self.chung.so.dat_cho(cn);
-                self.chung.dang_chay.lock().unwrap().insert(lan.ma.clone());
+                dang.insert(lan.ma.clone());
                 Ok(lan)
             }
             qd => Err(qd),
@@ -467,18 +475,19 @@ impl KiemTra {
         self.chung.so.xong(&lan.ma, co_ket_qua);
         self.chung.dang_chay.lock().unwrap().remove(&lan.ma);
         if co_ket_qua {
-            self.gui(Viec::DongBo(Some(lan.ma.clone())));
+            self.chung.xong_phien.lock().unwrap().insert(lan.ma.clone());
+            self.gui(Viec::DongBo);
         }
     }
 
     /// Mở app: hỏi trạm + ghi bù các lần chạy offline.
     pub fn mo_app(&self) {
-        self.gui(Viec::DongBo(None));
+        self.gui(Viec::DongBo);
     }
 
     /// Nút Kiểm tra lại: hỏi trạm; nhận tín hiệu khi xong (nơi gọi chờ tối đa 8 s rồi `quyet_dinh` lại).
     pub fn kiem_tra_lai(&self) -> std::sync::mpsc::Receiver<()> {
-        self.gui(Viec::DongBo(None));
+        self.gui(Viec::DongBo);
         self.moc()
     }
 
