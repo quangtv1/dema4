@@ -105,7 +105,11 @@ impl Default for UngDungChinh {
 
 impl UngDungChinh {
     fn tab_huong_dan(&self) -> crate::tro_giup::TabHuongDan {
-        if self.man == Man::Tach { crate::tro_giup::TabHuongDan::Tach } else { crate::tro_giup::TabHuongDan::Dem }
+        match self.man {
+            Man::Tach => crate::tro_giup::TabHuongDan::Tach,
+            Man::MucLuc => crate::tro_giup::TabHuongDan::MucLuc,
+            _ => crate::tro_giup::TabHuongDan::Dem,
+        }
     }
 
     /// Hỏi Lưu / Bỏ / Huỷ khi đóng app còn nhãn chưa lưu.
@@ -1588,6 +1592,17 @@ mod tests {
         h.get_by_label("Đóng").click();
         h.run();
         assert!(h.state().tro_giup.is_none());
+        h.get_by_label("Chức năng").click();
+        h.run();
+        h.get_by_label_contains("Sinh mục lục").click();
+        h.run();
+        assert_eq!(h.state().man, Man::MucLuc);
+        h.get_by_label("File biên mục:");
+        h.key_press(egui::Key::F1);
+        h.run();
+        assert!(matches!(h.state().tro_giup, Some(crate::tro_giup::HopTroGiup::HuongDan(crate::tro_giup::TabHuongDan::MucLuc))));
+        h.get_by_label("Đóng").click();
+        h.run();
         h.get_by_label("Chức năng").click();
         h.run();
         h.get_by_label_contains("Ký văn bản").click();

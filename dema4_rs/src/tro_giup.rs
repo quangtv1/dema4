@@ -62,6 +62,7 @@ fn hoi_ban_moi() -> Result<String, String> {
 pub enum TabHuongDan {
     Dem,
     Tach,
+    MucLuc,
 }
 
 pub enum HopTroGiup {
@@ -112,9 +113,16 @@ impl HopTroGiup {
                 })
             }
             HopTroGiup::HuongDan(tab) => kh::hop(ctx, "hop_tro_giup", RONG, "Hướng dẫn sử dụng", |ui| {
-                kh::hang_tab(ui, &[(TabHuongDan::Dem, "Đếm trang A4"), (TabHuongDan::Tach, "Tách văn bản")], tab);
+                kh::hang_tab(ui, &[(TabHuongDan::Dem, "Đếm trang A4"), (TabHuongDan::Tach, "Tách văn bản"), (TabHuongDan::MucLuc, "Sinh mục lục")], tab);
                 kh::than(ui, "than_huong_dan", CAO_THAN, Margin { left: 22, right: 22, top: 4, bottom: 16 }, |ui| {
-                    ve_khoi(ui, if *tab == TabHuongDan::Dem { HD_DEM } else { HD_TACH });
+                    ve_khoi(
+                        ui,
+                        match tab {
+                            TabHuongDan::Dem => HD_DEM,
+                            TabHuongDan::Tach => HD_TACH,
+                            TabHuongDan::MucLuc => HD_MUC_LUC,
+                        },
+                    );
                 });
                 kh::chan(ui, |ui| {
                     ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
@@ -169,9 +177,9 @@ pub enum Khoi {
     Ghi(&'static str),
 }
 
-/// Mục "Lượt dùng" chung cho tab Đếm và Tách.
+/// Mục "Lượt dùng" chung cho các tab.
 const LUOT_DUNG: Khoi = Khoi::Bang(&[
-    ("Dùng thử", "Mỗi máy *10 lần Đếm* và *10 lần Tách*. Chỉ lần chạy có kết quả mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt."),
+    ("Dùng thử", "Mỗi máy *10 lần Đếm*, *10 lần Tách* và *10 lần Sinh mục lục*. Chỉ lần chạy có kết quả mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt."),
     ("Hết lượt", "Popup *Liên hệ Sao Mai*: mã máy, điện thoại, email. Sao Mai cấp thêm lượt → bấm *Kiểm tra lại*."),
     ("Mất mạng", "Chạy được tối đa 2 lần chưa được máy chủ xác nhận; có mạng lại app tự ghi bù."),
     ("Mã máy", "Xem ở *Trợ giúp › Thông tin*; không đổi khi đổi tên máy."),
@@ -237,6 +245,27 @@ const HD_TACH: &[Khoi] = &[
         ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc nút − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước/sau · [F1] hướng dẫn"),
     ]),
     Khoi::Ghi("Nhãn, góc xoay, log và cache lưu trong thư mục ẩn `.sm-dema4` cạnh file ứng dụng (mỗi thư mục đầu vào 1 thư mục con riêng); thư mục đầu vào và file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
+    Khoi::Muc("Lượt dùng"),
+    LUOT_DUNG,
+];
+
+const HD_MUC_LUC: &[Khoi] = &[
+    Khoi::Muc("Các bước"),
+    Khoi::Buoc(&[
+        "*Chọn* file biên mục Excel (.xlsx .xlsb .xls) hoặc CSV; chọn *Sheet* và *Dòng tiêu đề* (số dòng như Excel hiển thị). Mỗi văn bản một dòng, các dòng cùng hồ sơ nằm liền nhau.",
+        "Chọn *Mẫu mục lục*: 4 mẫu có sẵn hoặc *Chọn* mẫu DOCX riêng của đơn vị (biến viết dạng `{ten_bien}`).",
+        "Tab *Mẫu*: biến tự khớp với cột cùng tên; bấm ô *Lấy từ* để chọn cột khác hoặc gõ giá trị cố định rồi [Enter]. *Nhóm theo* (chân sidebar) = cột tách hồ sơ.",
+        "Tab *Kết quả*: xem trước mục lục từng hồ sơ; dấu cảnh báo tam giác = hồ sơ có ô trống ở cột đã ghép.",
+        "*Sinh mục lục* → mỗi hồ sơ một file DOCX, tên theo mẫu ở Cấu hình (mặc định `MLHS_{so_ho_so}`).",
+    ]),
+    Khoi::Muc("Màu biến"),
+    Khoi::Bang(&[
+        ("Thông tin hồ sơ", "Biến in một lần (tiêu đề, số hồ sơ…): lấy ở dòng đầu của hồ sơ."),
+        ("Bảng văn bản", "Biến trong hàng mẫu của bảng: mỗi văn bản (mỗi dòng Excel) thêm một hàng."),
+        ("Tự động", "`{trang_so}` `{tong_so_trang}`: Word tự tính khi in, không cần ghép."),
+        ("Chưa ghép", "Giữ nguyên `{bien}` trong file kết quả. Rê chuột lên dòng biến để thấy vị trí trên trang mẫu."),
+    ]),
+    Khoi::Ghi("File kết quả mặc định nằm trong thư mục ẩn `.sm-dema4/muc_luc/<tên file biên mục>` cạnh file ứng dụng — mở bằng *Mở thư mục* trong popup kết quả, hoặc đặt thư mục khác ở *Cấu hình › Sinh mục lục*. Trang xem trước là bản mô phỏng (chữ + bảng); xuất PDF có ở bản sau."),
     Khoi::Muc("Lượt dùng"),
     LUOT_DUNG,
 ];
