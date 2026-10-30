@@ -3,40 +3,50 @@
 // TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.
 
 var TAB = {
-  MAY: 'license',
-  HANG_DOI: 'Hàng đợi Telegram',
-  MO_TA: 'Mô tả license',
-  NGUONG: 'Ngưỡng trắng',
-  MO_TA_NGUONG: 'Mô tả ngưỡng trắng',
+  MAY: '1_license',
+  NGUONG: '2_nguong_trang',
+  HANG_DOI: '3_hang_doi_telegram',
 };
 var TIEU_DE = {
   MAY: ['Mã máy', 'Tên máy', 'MAC', 'IP nội bộ', 'IP public', 'Phiên bản', 'Ngày đăng ký', 'Lần dùng cuối', 'Đã dùng Đếm', 'Đã dùng Tách', 'Hạn mức Đếm', 'Hạn mức Tách', 'Trạng thái', 'Đơn vị', 'Ghi chú', 'Mã lần gần đây'],
   HANG_DOI: ['Mã', 'Thời điểm', 'Nội dung', 'Tên CSV', 'CSV', 'Số lần thử', 'Trạng thái', 'Lúc đánh dấu'],
 };
-var MO_TA_LICENSE = [
-  ['Cột (tab license)', 'Ý nghĩa', 'Ai sửa'],
-  ['Mã máy', 'Băm từ ID hệ điều hành (không đổi khi đổi tên máy / card mạng). Khách đọc mã trên popup "Liên hệ Sao Mai" (có nút Copy).', 'Trạm'],
-  ['Tên máy · MAC · IP · Phiên bản', 'Thông tin máy ở lần liên lạc gần nhất.', 'Trạm'],
-  ['Ngày đăng ký · Lần dùng cuối', 'Lần đầu và lần gần nhất máy gọi trạm.', 'Trạm'],
-  ['Đã dùng Đếm / Tách', 'Tổng số lần đã dùng; trạm cộng +1 mỗi lần chạy có kết quả. Chữ đỏ = đã hết lượt.', 'Trạm — không sửa tay'],
-  ['Mã lần gần đây (cột ẩn P)', '20 mã lần chạy gần nhất — trạm dùng để không cộng trùng khi app gửi lại.', 'Trạm — không sửa tay'],
-  ['Hạn mức Đếm / Tách', 'TỔNG số lần được phép (không phải số cộng thêm). Trống = 2 (dùng thử).', 'Sao Mai'],
-  ['Trạng thái', 'Dùng thử / Đã cấp / Khoá — chọn trong danh sách. Giá trị khác bị coi là Khoá.', 'Sao Mai'],
-  ['Đơn vị · Ghi chú', 'Tự do (đơn vị, số hợp đồng, ngày cấp…).', 'Sao Mai'],
-  ['', '', ''],
-  ['Cấp thêm lượt', '1. Khách gửi mã máy. 2. Tab license → Ctrl/Cmd+F tìm mã. 3. Sửa Hạn mức thành tổng mới (vd đã dùng 37, cho thêm 100 → 137). 4. Trạng thái = Đã cấp. 5. Khách bấm "Kiểm tra lại" — dùng được ngay.', 'Sao Mai'],
-  ['Khoá máy', 'Trạng thái = Khoá → máy chạy được tối đa thêm 1 lần rồi bị chặn (mở lại app hoặc mất mạng vẫn chặn). Mở khoá: chọn lại Đã cấp / Dùng thử.', 'Sao Mai'],
-  ['Đưa về dùng thử', 'Xoá trống Hạn mức, chọn Dùng thử (Đã dùng không về 0 — đã dùng ≥ 2 thì vẫn hết lượt).', 'Sao Mai'],
-  ['Máy nội bộ / dev', 'Hạn mức 100000, Trạng thái Đã cấp.', 'Sao Mai'],
-  ['Không được', 'Xoá dòng máy (máy đăng ký lại từ 0) · sửa cột Đã dùng / Mã lần gần đây · gõ trạng thái ngoài danh sách.', ''],
-  ['', '', ''],
-  ['Tab khác', 'Ngưỡng trắng: mỗi lần Tách 1 dòng. Hàng đợi Telegram (tab ẩn — chuột phải thanh tab › Hiện): tin chờ gửi, trigger mỗi phút, tự dọn sau 7 ngày.', ''],
-  ['Telegram', 'Token + id nhóm ở Apps Script › Project Settings › Script Properties: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID. Đổi nhóm / token: sửa ở đó, không cần cài lại app.', ''],
-];
+/** Ghi chú (note) ô tiêu đề — thay cho tab mô tả. Ô A1 tab license kèm hướng dẫn cấp lượt. */
+var GHI_CHU = {
+  MAY: [
+    'Mã máy: băm từ ID hệ điều hành (không đổi khi đổi tên máy / card mạng). Khách đọc mã trên popup "Liên hệ Sao Mai".\n\n' +
+      'CẤP THÊM LƯỢT: Ctrl/Cmd+F tìm mã máy → sửa Hạn mức thành TỔNG mới (vd đã dùng 37, cho thêm 100 → 137) → Trạng thái = Đã cấp → khách bấm "Kiểm tra lại".\n' +
+      'KHOÁ: Trạng thái = Khoá (máy chạy tối đa thêm 1 lần rồi bị chặn). Mở khoá: chọn lại Đã cấp / Dùng thử.\n' +
+      'MÁY NỘI BỘ: Hạn mức 100000 + Đã cấp.\n' +
+      'KHÔNG: xoá dòng máy (đăng ký lại từ 0), sửa cột Đã dùng / Mã lần, gõ trạng thái ngoài danh sách.\n\n' +
+      'Tiêu đề vàng = cột Sao Mai sửa; xanh = trạm tự ghi.',
+    'Tên máy tính ở lần liên lạc gần nhất (trạm ghi).',
+    'Địa chỉ MAC card mạng chính (trạm ghi).',
+    'IP trong mạng LAN ở lần liên lạc gần nhất (trạm ghi).',
+    'IP ra Internet ở lần liên lạc gần nhất (trạm ghi).',
+    'Phiên bản app ở lần liên lạc gần nhất (trạm ghi).',
+    'Lần đầu máy gọi trạm (trạm ghi).',
+    'Lần gần nhất máy gọi trạm (trạm ghi).',
+    'Tổng số lần Đếm đã dùng; +1 mỗi lần chạy có kết quả. Chữ đỏ = hết lượt. Không sửa tay.',
+    'Tổng số lần Tách đã dùng; +1 mỗi lần chạy có kết quả. Chữ đỏ = hết lượt. Không sửa tay.',
+    'TỔNG số lần Đếm được phép (không phải số cộng thêm). Trống = 2 (dùng thử). Sao Mai sửa.',
+    'TỔNG số lần Tách được phép (không phải số cộng thêm). Trống = 2 (dùng thử). Sao Mai sửa.',
+    'Dùng thử / Đã cấp / Khoá — chọn trong danh sách. Giá trị khác bị coi là Khoá. Sao Mai sửa.',
+    'Tự do: đơn vị sử dụng. Sao Mai sửa.',
+    'Tự do: số hợp đồng, ngày cấp… Sao Mai sửa.',
+    '20 mã lần chạy gần nhất — trạm dùng để không cộng trùng khi app gửi lại. Cột ẩn, không sửa tay.',
+  ],
+  HANG_DOI: [
+    'Mã dòng (trạm tạo). Tab ẩn: tin Telegram chờ gửi, trigger gửi mỗi phút (tối đa 15 lời gọi/lượt), tự dọn sau 7 ngày. ' +
+      'Token + id nhóm ở Apps Script › Project Settings › Script Properties: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.',
+    'Lúc xếp tin.', 'Nội dung tin (HTML Telegram).', 'Tên file CSV gửi kèm (lần Tách).', 'Nội dung CSV histogram ngưỡng trắng.',
+    'Số lần gửi lỗi (5 lần → loi).', 'cho · dang_gui · da_gui · loi', 'Lúc đánh dấu đang gửi (ms).',
+  ],
+};
 /** Cột lưu dạng chữ (không để Sheets đổi "0.6.0" thành ngày, mã hex thành số). */
 var COT_CHU = ['Mã máy', 'Phiên bản', 'Mã lần gần đây', 'Mã', 'MAC', 'Địa chỉ MAC', 'IP nội bộ', 'IP public'];
 
-function bang(ten, tieuDe, moTa) {
+function bang(ten, tieuDe, ghiChu) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(ten);
   if (!sh) {
@@ -45,20 +55,26 @@ function bang(ten, tieuDe, moTa) {
       sh.getRange(1, 1, 1, tieuDe.length).setValues([tieuDe]).setFontWeight('bold');
       sh.setFrozenRows(1);
       tieuDe.forEach(function (t, i) { if (COT_CHU.indexOf(t) >= 0) sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat('@'); });
+      if (ghiChu && ghiChu.length === tieuDe.length) sh.getRange(1, 1, 1, tieuDe.length).setNotes([ghiChu]);
     }
     if (ten === TAB.MAY) {
       var quyTac = SpreadsheetApp.newDataValidation().requireValueInList(['Dùng thử', 'Đã cấp', 'Khoá'], true).setAllowInvalid(false).build();
       sh.getRange('M2:M').setDataValidation(quyTac);
-      sh.getRange('K1:O1').setBackground('#FFF2CC');
-      sh.getRange('A1:J1').setBackground('#EDEDED');
-      bang(TAB.MO_TA, null).getRange(1, 1, MO_TA_LICENSE.length, 3).setValues(MO_TA_LICENSE);
+      sh.getRange('K1:O1').setBackground('#BF8F00');
+      sh.getRange('A1:J1').setBackground('#1F4E79');
+      sh.hideColumns(16);
     }
-    if (moTa && moTa.length) {
-      var mt = ss.getSheetByName(TAB.MO_TA_NGUONG) || ss.insertSheet(TAB.MO_TA_NGUONG, ss.getNumSheets());
-      if (mt.getLastRow() === 0) mt.getRange(1, 1, moTa.length, 3).setValues(moTa.map(function (r) { return [r[0] || '', r[1] || '', r[2] || '']; }));
-    }
+    if (ten === TAB.HANG_DOI) sh.hideSheet();
   }
   return sh;
+}
+
+/** Ghi chú tiêu đề tab Ngưỡng trắng từ mô tả app gửi kèm: [Cột, Ý nghĩa, Cách đọc]. */
+function ghiChuTuMoTa(tieuDe, moTa) {
+  return tieuDe.map(function (t) {
+    var r = (moTa || []).filter(function (x) { return x[0] === t; })[0];
+    return r ? [r[1], r[2]].filter(Boolean).join('\n') : '';
+  });
 }
 
 function themDong(sh, rows) {
@@ -71,8 +87,8 @@ function themDong(sh, rows) {
 
 function khoSheet() {
   var cache = CacheService.getScriptCache();
-  var may = bang(TAB.MAY, TIEU_DE.MAY);
-  var hangDoi = bang(TAB.HANG_DOI, TIEU_DE.HANG_DOI);
+  var may = bang(TAB.MAY, TIEU_DE.MAY, GHI_CHU.MAY);
+  var hangDoi = bang(TAB.HANG_DOI, TIEU_DE.HANG_DOI, GHI_CHU.HANG_DOI);
   return {
     timMay: function (ma) {
       var o = may.getRange('A:A').createTextFinder(ma).matchEntireCell(true).findNext();
@@ -93,7 +109,7 @@ function khoSheet() {
       return hangDoi.getRange(2, 7, n, 1).getValues().filter(function (r) { return r[0] === 'cho'; }).length;
     },
     xepTin: function (h) { themDong(hangDoi, [[h.ma, thoiDiem(new Date()), oChu(h.noi_dung), h.ten_csv, oChu(h.csv), 0, 'cho', 0]]); },
-    themNguong: function (tieuDe, moTa, dong) { themDong(bang(TAB.NGUONG, tieuDe, moTa), [dong]); },
+    themNguong: function (tieuDe, moTa, dong) { themDong(bang(TAB.NGUONG, tieuDe, ghiChuTuMoTa(tieuDe, moTa)), [dong]); },
   };
 }
 
@@ -147,7 +163,7 @@ function cauHinh(khoa) {
 function guiHangDoi() {
   var token = cauHinh('TELEGRAM_TOKEN'), chat = cauHinh('TELEGRAM_CHAT_ID');
   if (!token || !chat) return;
-  var sh = bang(TAB.HANG_DOI, TIEU_DE.HANG_DOI);
+  var sh = bang(TAB.HANG_DOI, TIEU_DE.HANG_DOI, GHI_CHU.HANG_DOI);
   var khoa = LockService.getScriptLock();
   if (!khoa.tryLock(5000)) return;
   var chon;

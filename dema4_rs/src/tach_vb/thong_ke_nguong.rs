@@ -124,10 +124,6 @@ pub fn csv(tk: &ThongKeNguong, dau: &[(&str, String)]) -> String {
     s
 }
 
-/// Tab dữ liệu trên Google Sheet (tiêu đề tiếng Việt). Tab cũ "nguong" (tiêu đề không dấu, ít cột hơn) giữ làm lịch sử.
-pub const TAB_SHEET: &str = "Ngưỡng trắng";
-/// Tab mô tả cột, tạo cùng lúc (nằm bên phải tab dữ liệu).
-pub const TAB_MO_TA: &str = "Mô tả ngưỡng trắng";
 
 /// Số ô đầu hàng: thời điểm, máy, MAC, IP nội bộ, IP public, thư mục, phiên bản, t1, t2.
 pub const SO_DAU: usize = 9;

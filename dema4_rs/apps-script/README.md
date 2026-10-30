@@ -1,7 +1,7 @@
 # Trạm license dema4 (Google Apps Script)
 
 Trạm là bên **duy nhất** ghi Google Sheet: đăng ký máy, đếm lượt (chống trùng theo mã lần chạy), ký RSA câu trả lời,
-xếp và gửi tin Telegram (token ở Script Properties), ghi tab `Ngưỡng trắng`. App chỉ giữ khoá **công khai**.
+xếp và gửi tin Telegram (token ở Script Properties), ghi tab `2_nguong_trang`. App chỉ giữ khoá **công khai**.
 
 | File | Vai trò |
 |---|---|
@@ -26,10 +26,10 @@ xếp và gửi tin Telegram (token ở Script Properties), ghi tab `Ngưỡng t
 - Sửa script: chép `loi.js`, `license.gs` (đổi tên `license.js`), `appsscript.json` vào thư mục có `.clasp.json` → `clasp push --force` → `clasp update-deployment <deploymentId>` (giữ URL). clasp 3 có thể báo "already up to date" khi chỉ xoá file: sửa 1 file rồi push lại, kiểm bằng `clasp pull` vào thư mục trống.
 
 ## Bố cục Sheet
-`license` (cột ẩn P: 20 mã lần gần nhất để chống trùng) · `Mô tả license` (xanh dương) — `Ngưỡng trắng` · `Mô tả ngưỡng trắng` (xanh lá) — `Hàng đợi Telegram` (tab ẩn: chuột phải thanh tab › Hiện). Tiêu đề vàng = cột Sao Mai sửa. Cột mã / phiên bản / MAC / IP định dạng chữ (tránh Sheets đổi `0.6.0` thành ngày).
+`1_license` (mỗi máy 1 dòng; cột ẩn P: 20 mã lần gần nhất để chống trùng) · `2_nguong_trang` (mỗi lần Tách 1 dòng) · `3_hang_doi_telegram` (ẩn: chuột phải thanh tab › Hiện). Ý nghĩa từng cột: rê chuột vào ô tiêu đề (ghi chú); hướng dẫn cấp lượt ở ghi chú ô A1 tab `1_license`. Tiêu đề vàng = cột Sao Mai sửa. Cột mã / phiên bản / MAC / IP định dạng chữ (tránh Sheets đổi `0.6.0` thành ngày).
 
 ## Cấp lượt
-Tab `license` → tìm mã máy → sửa **Hạn mức Đếm / Tách** (tổng số lần) → Trạng thái **Đã cấp** → khách bấm **Kiểm tra lại**. Xem tab `Mô tả license`.
+Tab `1_license` → tìm mã máy → sửa **Hạn mức Đếm / Tách** (tổng số lần) → Trạng thái **Đã cấp** → khách bấm **Kiểm tra lại**. Chi tiết: ghi chú ô A1.
 
 ## Đổi mẫu tin Telegram
 Sửa `soanTinDem` / `soanTinTach` / `dongNguong` trong `loi.js` + mẫu trong `test/mau-tin/`, chạy test Node, dán lại vào Apps Script (New version).

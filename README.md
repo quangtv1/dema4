@@ -136,7 +136,7 @@ Hệ số và ranh giới khổ đọc từ `sm-dema4.cfg` (không có file → 
 - Hết lượt → popup **Liên hệ Sao Mai** (mã máy, điện thoại **0979824615**, email **hotro@saomaiso.com**, saomaiso.com). Sao Mai cấp thêm lượt trên Sheet → bấm **Kiểm tra lại**.
 - **Mã máy** `SM-XXXX-XXXX-XXXX` lấy từ ID hệ điều hành (không đổi khi đổi tên máy), xem ở **Trợ giúp › Thông tin**.
 - Bấm Đếm / Tách quyết định ngay, không chờ mạng. Mất mạng: chạy được tối đa 2 lần chưa được máy chủ xác nhận, có mạng lại app tự ghi bù. Bị **Khoá** thì mất mạng vẫn khoá.
-- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `license` (mỗi máy 1 dòng, cộng dồn lượt đã dùng); câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `license` → sửa **Hạn mức Đếm / Tách** + Trạng thái **Đã cấp** (xem tab `Mô tả license`).
+- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `1_license` (mỗi máy 1 dòng, cộng dồn lượt đã dùng); câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `1_license` → sửa **Hạn mức Đếm / Tách** + Trạng thái **Đã cấp** (hướng dẫn ở ghi chú ô A1, ý nghĩa cột ở ghi chú từng ô tiêu đề).
 
 ![Liên hệ Sao Mai](docs/anh/het-luot.png)
 
@@ -146,8 +146,8 @@ Sau mỗi lần đếm / tách xong, app gửi thống kê (mã máy, tên máy,
 
 App gửi số liệu tới **trạm license** (Google Apps Script gắn vào Sheet "Monitor_dema4", mã nguồn `dema4_rs/apps-script/`); app không giữ token Telegram hay khoá ghi Sheet. Trạm:
 
-- soạn tin và gửi nhóm Telegram qua hàng đợi (tab ẩn `Hàng đợi Telegram`; token, id nhóm nằm trong Script Properties của trạm, không có trên Sheet). Lần tách gửi thêm 2 dòng thống kê ngưỡng trắng và file CSV histogram (dùng để chỉnh ngưỡng mặc định: `dema4_rs/scripts/tong-hop-nguong.py`);
-- ghi tab `Ngưỡng trắng` (mỗi lần Tách 1 hàng) và tab `Mô tả ngưỡng trắng` giải thích từng cột (dữ liệu tab cũ `nguong` của v0.5.x đã gộp vào đây). IP public lấy từ api.ipify.org.
+- soạn tin và gửi nhóm Telegram qua hàng đợi (tab ẩn `3_hang_doi_telegram`; token, id nhóm nằm trong Script Properties của trạm, không có trên Sheet). Lần tách gửi thêm 2 dòng thống kê ngưỡng trắng và file CSV histogram (dùng để chỉnh ngưỡng mặc định: `dema4_rs/scripts/tong-hop-nguong.py`);
+- ghi tab `2_nguong_trang` (mỗi lần Tách 1 hàng; ý nghĩa cột ở ghi chú ô tiêu đề; dữ liệu tab cũ `nguong` của v0.5.x đã gộp vào đây). IP public lấy từ api.ipify.org.
 
 Triển khai trạm: xem `dema4_rs/apps-script/README.md`; URL trạm đặt ở `URL_TRAM` (`dema4_rs/src/tram.rs`), khoá công khai ở `dema4_rs/assets/license_pub.pem`. Chưa có trạm thì app không gửi gì.
 
