@@ -15,7 +15,7 @@ Bấm Đếm / Tách quyết định **tức thì** trên bản sao license tron
 ## Requirements
 - Bấm Đếm / Tách không chờ mạng; chỉ nút **Kiểm tra lại** trên popup mới chờ (hiện "Đang kiểm tra…", bỏ cuộc sau 4 s).
 - Gọi trạm chỉ ở 3 thời điểm: lúc mở app, sau mỗi lần chạy xong (`ghi_lan` trả luôn trạng thái mới), khi bấm Kiểm tra lại. **Không hẹn giờ làm mới.**
-- Popup chặn: **icon cảnh báo** (tam giác, màu cam, ~40 px) ở đầu; lý do **một mẫu chung, 2 dòng**: `Lý do: Số lần Đếm còn lại (0)` / `Liên hệ với Sao Mai để được hỗ trợ.` (Đếm / Tách theo nút vừa bấm; máy bị Khoá cũng hiện còn lại 0, không nói là bị khoá; hết lượt offline thêm dòng nhỏ "Chưa kết nối được máy chủ — kết nối mạng rồi bấm Kiểm tra lại."); mã máy + Copy; SĐT **0979824615** (Copy); email **hotro@saomaiso.com** (bấm mở `mailto:` kèm mã máy trong tiêu đề, Copy); web **saomaiso.com**; nút **Kiểm tra lại**, **Đóng**.
+- Popup chặn: **icon cảnh báo** (vòng tròn có dấu chấm than, màu đỏ, ~34 px) **bên trái** 2 dòng lý do; icon nằm trên cột nhãn, 2 dòng lý do cân trái thẳng cột giá trị của bảng Mã máy / Điện thoại / Email bên dưới; lý do **một mẫu chung, 2 dòng**: `Lý do: Số lần Đếm còn lại (0)` / `Liên hệ với Sao Mai để được hỗ trợ.` (Đếm / Tách theo nút vừa bấm; máy bị Khoá cũng hiện còn lại 0, không nói là bị khoá; hết lượt offline thêm dòng nhỏ "Chưa kết nối được máy chủ — kết nối mạng rồi bấm Kiểm tra lại."); mã máy + Copy; SĐT **0979824615** (Copy); email **hotro@saomaiso.com** (bấm mở `mailto:` kèm mã máy trong tiêu đề, Copy); web **saomaiso.com**; nút **Kiểm tra lại**, **Đóng**.
 - Dòng lệnh: chặn → in thông báo + mã máy, mã thoát 3.
 - Hộp Thông tin hiện mã máy (có Copy).
 
