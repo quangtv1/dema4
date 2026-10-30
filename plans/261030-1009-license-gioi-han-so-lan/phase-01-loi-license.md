@@ -37,6 +37,8 @@ impl BoDemOffline { fn doc(&self) -> HanMuc /*max 2 nơi*/; fn cong(&self, cn); 
 - Định dạng file offline: `dem=N\ntach=M\n` (1 dòng / chức năng); số lần chờ ghi bù = chính các số này.
 - `quyet_dinh`: Khoa → Khoa; online có → so `da_dung` với `han` (cộng thêm offline chưa ghi bù); online None → offline.cn < 2 thì Cho, ngược lại HetLuotOffline.
 
+- Kiểu dùng chung với phase 3 (kho trạm): `ThongTinMay { ma, ten, mac, ip_noi_bo, ip_public, phien_ban }`.
+
 ## Related Code Files
 - Create: `dema4_rs/src/license.rs`
 - Modify: `dema4_rs/src/main.rs` (khai báo `mod license`), `dema4_rs/src/telegram.rs` (dùng lại `ten_pc`, `dia_chi_mac`)

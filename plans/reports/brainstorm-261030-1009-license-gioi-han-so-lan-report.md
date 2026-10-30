@@ -1,6 +1,6 @@
 # Brainstorm: License giới hạn số lần Đếm / Tách
 
-Ngày 2026-10-30 · Trạng thái: đã chốt phương án A (+ 2 biện pháp giảm rủi ro), chờ lập kế hoạch.
+Ngày 2026-10-30 · Trạng thái: **đổi sang phương án B** (repo giữ công khai; chặn cố tình phá Sheet bằng trạm Apps Script + chữ ký RSA, bỏ khoá khỏi exe). Phần thiết kế A và mục repo riêng tư bên dưới chỉ còn giá trị tham khảo. Kế hoạch: `plans/261030-1009-license-gioi-han-so-lan/plan.md`.
 
 ## 1. Vấn đề & mục tiêu
 - Mục tiêu: **kiểm soát phân phối** — biết máy / đơn vị nào dùng, cấp hoặc thu hồi quyền từng máy từ Google Sheet; người dùng thử phải liên hệ Sao Mai.

@@ -10,7 +10,7 @@ effort: "1 ngày"
 # Phase 6: Kiểm thử tổng và phát hành v0.6.0
 
 ## Overview
-Chạy thật với Sheet đã khoá vùng trên Mac + Windows, theo ma trận tình huống; cập nhật tài liệu; phát hành v0.6.0 qua repo phát hành.
+Chạy thật với trạm Apps Script trên Mac + Windows theo ma trận tình huống; cập nhật tài liệu; phát hành v0.6.0; sau đó thu hồi service account cũ (phase 5 bước 7).
 
 ## Requirements
 - Mọi tiêu chí trong `plan.md` đạt trên máy thật.
@@ -28,24 +28,26 @@ Chạy thật với Sheet đã khoá vùng trên Mac + Windows, theo ma trận t
 | 7 | Xoá 1 file đếm offline | Vẫn tính 2 (lấy nơi còn lại) |
 | 8 | Mạng chập chờn / rút cáp khi bấm | Đếm / Tách bắt đầu ngay, giao diện không đứng |
 | 9 | CLI `--tach` khi hết lượt | In thông báo + mã máy, mã thoát 3 |
-| 10 | Service account ghi J2 | 403 |
+| 10 | Gửi câu trả lời giả (sửa `du_lieu` / chữ ký máy khác) vào app qua proxy | App từ chối, dùng luật offline |
+| 11 | `strings` exe tìm khoá | Không có `BEGIN PRIVATE KEY` / `private_key` |
+| 12 | Tách xong | Hàng mới ở tab Ngưỡng trắng (qua trạm) |
 
 ## Related Code Files
 - Modify: `README.md` (mục License: cách hoạt động, mã máy, liên hệ; mục Gửi thống kê thêm mã máy), `dema4_rs/src/tro_giup.rs` (Hướng dẫn: mục License), `dema4_rs/Cargo.toml` (0.6.0)
 - Create: `plans/261030-1009-license-gioi-han-so-lan/reports/kiem-thu-license-report.md`
 
 ## Implementation Steps
-1. Chạy `cargo test --release` (xanh) + các test `#[ignore]` của phase 2, 4.
+1. Chạy `cargo test --release` (xanh) + test `#[ignore]` `kho_tram_that`.
 2. Chạy ma trận trên Mac (build local) và Windows (bản CI tag rc).
 3. Ghi kết quả vào báo cáo kiểm thử; sửa lỗi phát sinh (test trước rồi sửa).
-4. Cập nhật README + Hướng dẫn; bump 0.6.0; tag `v0.6.0` → kiểm tra Release ở `dema4-releases`.
-5. Xác nhận lại với chủ Sheet: khoá vùng đã bật trước khi công bố bản.
+4. Cập nhật README (mục License, Gửi thống kê: qua trạm, mã máy) + Hướng dẫn; bump 0.6.0; tag `v0.6.0`.
+5. Sau khi phát hành: thu hồi service account cũ (phase 5 bước 7), thử khoá cũ → 403.
 
 ## Success Criteria
-- [ ] 10 tình huống đạt trên cả Mac và Windows.
-- [ ] Release v0.6.0 có 2 file ở repo phát hành; app cũ được hướng dẫn tải tay.
+- [ ] 12 tình huống đạt trên cả Mac và Windows.
+- [ ] Release v0.6.0 có 2 file; service account cũ đã thu hồi.
 - [ ] Báo cáo kiểm thử lưu trong plan.
 
 ## Risk Assessment
-- Phát hành khi chưa khoá vùng → chặn bằng bước 5 (checklist bắt buộc).
+- Bản cũ ≤ v0.5.x mất ghi thống kê sau khi thu hồi service account (chấp nhận; nhắc cập nhật).
 - Máy dev bị tính lượt khi test → cấp "Đã cấp" cho mã máy dev trước khi chạy ma trận (trừ tình huống 1–2 dùng máy / mã thử).
