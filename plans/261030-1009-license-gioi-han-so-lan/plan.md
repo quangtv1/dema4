@@ -60,7 +60,7 @@ Thứ tự: 1 và 2 làm song song → 3 → 4; 5 sau 2 (cần trước khi test
 Không phụ thuộc plan khác. Plan `261027-1736-tach-van-ban-tu-dong` (pending) không trùng phạm vi.
 
 ## Liên hệ trên popup
-- Logo Sao Mai nhỏ (dùng lại `tro_giup::logo`, bấm mở saomaiso.com) · SĐT **0979824615** · Email **hotro@saomaiso.com** · Web **saomaiso.com**.
+- Icon cảnh báo (tam giác cam) · lý do 2 dòng "Lý do: Số lần … còn lại (0)" / "Liên hệ với Sao Mai để được hỗ trợ." · mã máy · SĐT **0979824615** · Email **hotro@saomaiso.com** · Web **saomaiso.com**.
 
 ## Câu hỏi còn mở
 Không.
