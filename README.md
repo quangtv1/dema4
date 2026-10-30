@@ -130,7 +130,7 @@ Hệ số và ranh giới khổ đọc từ `sm-dema4.cfg` (không có file → 
 
 ## Gửi thống kê
 
-Sau mỗi lần đếm / tách xong, app gửi thống kê (tên máy, địa chỉ MAC, thư mục, số liệu — không gửi nội dung PDF) và báo công khai trong popup "Thông tin … đã được ghi lại".
+Sau mỗi lần đếm / tách xong, app gửi thống kê (tên máy, địa chỉ MAC, IP nội bộ và IP public, thư mục, số liệu — không gửi nội dung PDF) và báo công khai trong popup "Thông tin … đã được ghi lại".
 
 - **Telegram**: token và id nhóm nhúng sẵn (xem `dema4_rs/src/telegram.rs`). Ghi đè bằng `telegram.txt` cạnh file chạy:
   ```
@@ -138,7 +138,7 @@ Sau mỗi lần đếm / tách xong, app gửi thống kê (tên máy, địa ch
   chat_id=<id nhóm>
   ```
   Lần tách gửi thêm 2 dòng thống kê ngưỡng trắng và file CSV histogram (dùng để chỉnh ngưỡng mặc định: `dema4_rs/scripts/tong-hop-nguong.py`).
-- **Google Sheet** "Monitor_dema4" (tab `nguong`): ghi bằng service account; khoá nhúng lúc build từ `dema4_rs/bi_mat/sheet_key.json` (máy) hoặc secret `SHEET_KEY_JSON` (CI) — **không có trong repo**. Sheet phải chia sẻ quyền chỉnh sửa cho email service account.
+- **Google Sheet** "Monitor_dema4": tab `Ngưỡng trắng` (tiêu đề tiếng Việt, mỗi lần Tách 1 hàng) và tab `Mô tả ngưỡng trắng` ngay bên phải giải thích từng cột; tab cũ `nguong` giữ làm lịch sử. IP public lấy từ api.ipify.org. Ghi bằng service account; khoá nhúng lúc build từ `dema4_rs/bi_mat/sheet_key.json` (máy) hoặc secret `SHEET_KEY_JSON` (CI) — **không có trong repo**. Sheet phải chia sẻ quyền chỉnh sửa cho email service account.
 
 ## Build từ mã nguồn
 

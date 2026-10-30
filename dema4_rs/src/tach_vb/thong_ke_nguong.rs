@@ -124,13 +124,57 @@ pub fn csv(tk: &ThongKeNguong, dau: &[(&str, String)]) -> String {
     s
 }
 
-/// Cột tab "nguong" trên Google Sheet.
-pub const COT_SHEET: [&str; 18] = [
-    "thoi_diem", "may", "thu_muc", "phien_ban", "t1", "t2", "trang_tu_dong", "trang_tu_dong_sua", "nghi", "nghi_thanh_trang", "nghi_giu", "trang_lot", "de_xuat_t1", "de_xuat_t2", "xoay_xac_nhan", "xoay_chinh", "xoay_0", "histogram",
+/// Tab dữ liệu trên Google Sheet (tiêu đề tiếng Việt). Tab cũ "nguong" (tiêu đề không dấu, ít cột hơn) giữ làm lịch sử.
+pub const TAB_SHEET: &str = "Ngưỡng trắng";
+/// Tab mô tả cột, tạo cùng lúc (nằm bên phải tab dữ liệu).
+pub const TAB_MO_TA: &str = "Mô tả ngưỡng trắng";
+
+/// Số ô đầu hàng: thời điểm, máy, MAC, IP nội bộ, IP public, thư mục, phiên bản, t1, t2.
+pub const SO_DAU: usize = 9;
+/// Khoá ngắn của 9 ô đầu, dùng ở dòng `#` đầu file CSV gửi Telegram (script tổng hợp đọc `may=`).
+pub const KHOA_CSV: [&str; SO_DAU] = ["thoi_diem", "may", "mac", "ip_noi_bo", "ip_public", "thu_muc", "phien_ban", "t1", "t2"];
+
+/// Cột tab dữ liệu: (tiêu đề, ý nghĩa, cách đọc) — tiêu đề làm hàng 1 tab dữ liệu, cả 3 làm tab mô tả.
+pub const COT: [(&str, &str, &str); 21] = [
+    ("Thời điểm", "Lúc bấm Tách (giờ máy).", ""),
+    ("Tên máy", "Tên máy tính chạy app.", ""),
+    ("Địa chỉ MAC", "MAC card mạng chính.", "Phân biệt máy trùng tên."),
+    ("IP nội bộ", "IP trong mạng LAN của máy.", ""),
+    ("IP public", "IP ra Internet (hỏi api.ipify.org).", "Trống / ? khi không có mạng."),
+    ("Thư mục", "Tên thư mục hồ sơ (không có đường dẫn đầy đủ).", ""),
+    ("Phiên bản", "Phiên bản app.", ""),
+    ("Ngưỡng Trắng t1 (%)", "Ngưỡng Trắng đang dùng: chỉ số < t1 → Trắng.", "Mặc định 1,00."),
+    ("Ngưỡng Nghi t2 (%)", "Ngưỡng Nghi trắng: t1 ≤ chỉ số < t2 → Nghi trắng, ≥ t2 → nội dung.", "Mặc định 3,20."),
+    ("Trắng tự động", "Số trang máy tự cho là Trắng.", ""),
+    ("Trắng tự động bị sửa", "Trong số trên, trang người dùng sửa thành không trắng.", "Cao → t1 quá cao, máy bỏ nhầm trang có chữ (lỗi nguy hiểm nhất)."),
+    ("Nghi trắng", "Số trang nằm giữa t1 và t2, người phải duyệt.", "Nhiều → tốn công duyệt."),
+    ("Nghi → Trắng", "Trang Nghi trắng người duyệt chốt là Trắng.", ""),
+    ("Nghi → giữ", "Trang Nghi trắng người duyệt giữ (nội dung / Index / Split).", "Nếu hầu hết Nghi đều thành Trắng → có thể hạ t2."),
+    ("Trắng lọt", "Máy cho là có nội dung nhưng người dùng gán Trắng.", "Cao → t2 quá thấp."),
+    ("Đề xuất t1 (%)", "t1 cao nhất mà dưới đó ≤ 0,2 % trang có nội dung.", "Trống khi lô < 50 trang trắng."),
+    ("Đề xuất t2 (%)", "t2 nhỏ nhất mà trên đó chỉ còn ≤ 1 % trang trắng lọt.", "Trống khi lô < 50 trang trắng."),
+    ("Xoay đúng đề xuất", "Trang Nghi xoay người duyệt giữ đúng góc máy đề xuất.", ""),
+    ("Xoay chỉnh góc khác", "Máy đoán sai góc, người duyệt xoay góc khác.", "Cùng cột sau cao → tăng độ tin cậy Nghi xoay."),
+    ("Xoay về 0°", "Trang không hề bị xoay (máy báo nhầm).", ""),
+    ("Histogram", "101 cặp trắng|nội dung theo chỉ số trắng: ô i = i×0,1 % đến (i+1)×0,1 %, ô cuối gom ≥ 10 %.", "Dữ liệu thô cho scripts/tong-hop-nguong.py."),
 ];
 
-/// 1 hàng tab "nguong": 6 ô đầu (thời điểm, máy, thư mục, phiên bản, t1, t2) + số liệu + histogram `trắng|nội dung` theo ô.
-pub fn dong_sheet(tk: &ThongKeNguong, dau: [String; 6]) -> Vec<serde_json::Value> {
+/// Hàng tiêu đề tab dữ liệu.
+pub fn tieu_de_sheet() -> Vec<&'static str> {
+    COT.iter().map(|c| c.0).collect()
+}
+
+/// Các hàng tab mô tả: tiêu đề cột + 1 hàng mỗi cột dữ liệu + ghi chú chỉ số trắng.
+pub fn mo_ta_sheet() -> Vec<Vec<serde_json::Value>> {
+    let mut h: Vec<Vec<serde_json::Value>> = vec![vec!["Cột".into(), "Ý nghĩa".into(), "Cách đọc".into()]];
+    h.extend(COT.iter().map(|(a, b, c)| vec![(*a).into(), (*b).into(), (*c).into()]));
+    h.push(vec!["".into()]);
+    h.push(vec!["Chỉ số trắng".into(), "Tỷ lệ diện tích có nét mực = đậm + 0,3 × màu (1,5 % = 1,5 % diện tích có mực).".into(), "Mỗi lần bấm Tách ghi 1 hàng; chỉ đếm, không có ảnh / nội dung trang.".into()]);
+    h
+}
+
+/// 1 hàng tab dữ liệu: 9 ô đầu (xem `KHOA_CSV`) + số liệu + histogram `trắng|nội dung` theo ô.
+pub fn dong_sheet(tk: &ThongKeNguong, dau: [String; SO_DAU]) -> Vec<serde_json::Value> {
     use serde_json::Value;
     let mut d: Vec<Value> = dau.into_iter().map(Value::from).collect();
     d.extend([tk.trang_tu_dong, tk.trang_tu_dong_sua, tk.nghi, tk.nghi_thanh_trang, tk.nghi_giu, tk.trang_lot].map(Value::from));
@@ -216,9 +260,11 @@ mod tests {
         assert_eq!(dong[2 + 12], "1.2;1.3;1;0");
         assert_eq!(dong.last().unwrap(), &"10.0;100;0;0");
         assert_eq!(dong.len(), 2 + SO_O);
-        let d = dong_sheet(&t, ["2026-10-29 12:00:00", "PC", "x", "0.3.0", "1.00", "3.20"].map(String::from));
-        assert_eq!(d.len(), COT_SHEET.len());
-        assert_eq!((d[8].as_u64(), d[9].as_u64(), d[12].as_str()), (Some(1), Some(1), Some("")), "nghi, nghi→trắng, chưa đủ dữ liệu đề xuất");
-        assert!(d[17].as_str().unwrap().starts_with("0|0,"));
+        let d = dong_sheet(&t, ["2026-10-29 12:00:00", "PC", "AA:BB", "192.168.1.5", "1.2.3.4", "x", "0.3.0", "1.00", "3.20"].map(String::from));
+        assert_eq!(d.len(), COT.len());
+        assert_eq!((d[11].as_u64(), d[12].as_u64(), d[15].as_str()), (Some(1), Some(1), Some("")), "nghi, nghi→trắng, chưa đủ dữ liệu đề xuất");
+        assert!(d[20].as_str().unwrap().starts_with("0|0,"));
+        assert_eq!(mo_ta_sheet()[0].len(), 3);
+        assert_eq!(mo_ta_sheet().len(), COT.len() + 3);
     }
 }

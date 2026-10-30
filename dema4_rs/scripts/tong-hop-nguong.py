@@ -62,11 +62,12 @@ def doc_csv_sheet(duong_dan):
     with open(duong_dan, encoding="utf-8") as f:
         for dong in csv.DictReader(f):
             o = [[0, 0] for _ in range(SO_O)]
-            for i, cap in enumerate(dong.get("histogram", "").split(",")[:SO_O]):
+            # Tab mới "Ngưỡng trắng" tiêu đề tiếng Việt; tab cũ "nguong" tiêu đề không dấu
+            for i, cap in enumerate((dong.get("Histogram") or dong.get("histogram") or "").split(",")[:SO_O]):
                 if "|" in cap:
                     a, b = cap.split("|")
                     o[i] = [int(a), int(b)]
-            kq.append((dong.get("may", "?"), o))
+            kq.append((dong.get("Tên máy") or dong.get("may") or "?", o))
     return kq
 
 

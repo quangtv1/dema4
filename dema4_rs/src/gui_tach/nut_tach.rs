@@ -170,13 +170,24 @@ fn gui_thong_ke(thu_muc: String, so_lieu: telegram::SoLieuTach, thoi_gian: Durat
             let _ = telegram::gui_tin(ch, &tin);
         }
         let Some(tk) = thong_ke else { return };
-        let dau = [bay_gio.format("%Y-%m-%d %H:%M:%S").to_string(), telegram::ten_pc(), ten.clone(), env!("CARGO_PKG_VERSION").to_string(), format!("{:.2}", nguong.0), format!("{:.2}", nguong.1)];
+        let dau = [
+            bay_gio.format("%Y-%m-%d %H:%M:%S").to_string(),
+            telegram::ten_pc(),
+            telegram::dia_chi_mac(),
+            telegram::ip_noi_bo(),
+            telegram::ip_public(),
+            ten.clone(),
+            env!("CARGO_PKG_VERSION").to_string(),
+            format!("{:.2}", nguong.0),
+            format!("{:.2}", nguong.1),
+        ];
         if let Some(ch) = &ch {
-            let csv = thong_ke_nguong::csv(&tk, &thong_ke_nguong::COT_SHEET[..6].iter().copied().zip(dau.iter().cloned()).collect::<Vec<_>>());
+            let csv = thong_ke_nguong::csv(&tk, &thong_ke_nguong::KHOA_CSV.iter().copied().zip(dau.iter().cloned()).collect::<Vec<_>>());
             let _ = telegram::gui_file(ch, &format!("nguong_{ten}_{}.csv", bay_gio.format("%Y%m%d-%H%M%S")), csv.as_bytes());
         }
         if sheet {
-            let _ = crate::google_sheet::ghi_dong("nguong", &thong_ke_nguong::COT_SHEET, thong_ke_nguong::dong_sheet(&tk, dau));
+            let mo_ta = Some((thong_ke_nguong::TAB_MO_TA, thong_ke_nguong::mo_ta_sheet()));
+            let _ = crate::google_sheet::ghi_dong(thong_ke_nguong::TAB_SHEET, &thong_ke_nguong::tieu_de_sheet(), thong_ke_nguong::dong_sheet(&tk, dau), mo_ta);
         }
     });
     true

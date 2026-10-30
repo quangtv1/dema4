@@ -105,8 +105,9 @@ fn ma_hoa_url(s: &str) -> String {
     s.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
 }
 
-/// Thêm 1 hàng vào tab `tab`; tab chưa có → tạo tab, ghi hàng `tieu_de` trước. Gọi từ luồng nền.
-pub fn ghi_dong(tab: &str, tieu_de: &[&str], dong: Vec<Value>) -> Result<(), String> {
+/// Thêm 1 hàng vào tab `tab`; tab chưa có → tạo tab, ghi hàng `tieu_de` trước, rồi (nếu có `mo_ta`) tạo tab mô tả
+/// ngay bên phải và ghi các hàng mô tả. Gọi từ luồng nền.
+pub fn ghi_dong(tab: &str, tieu_de: &[&str], dong: Vec<Value>, mo_ta: Option<(&str, Vec<Vec<Value>>)>) -> Result<(), String> {
     if !co_khoa() {
         return Err("bản build không có khoá Sheet".into());
     }
@@ -117,10 +118,17 @@ pub fn ghi_dong(tab: &str, tieu_de: &[&str], dong: Vec<Value>) -> Result<(), Str
         (400, v) if v.to_string().contains("parse range") => {
             tao_tab(&t, tab)?;
             let dau: Vec<Value> = tieu_de.iter().map(|s| Value::from(*s)).collect();
-            match them_hang(&t, tab, &[dau, dong])? {
+            let kq = match them_hang(&t, tab, &[dau, dong])? {
                 (200, _) => Ok(()),
                 (ma, v) => Err(format!("Sheet trả lỗi {ma}: {v}")),
+            };
+            // Tab mô tả: lỗi (vd đã có sẵn) không ảnh hưởng hàng dữ liệu vừa ghi
+            if let Some((tab_mt, hang)) = mo_ta {
+                if tao_tab(&t, tab_mt).is_ok() {
+                    let _ = them_hang(&t, tab_mt, &hang);
+                }
             }
+            kq
         }
         (ma, v) => Err(format!("Sheet trả lỗi {ma}: {v}")),
     }
@@ -153,11 +161,24 @@ mod tests {
         assert_eq!(ma_hoa_url("'nguong'!A1"), "%27nguong%27%21A1");
     }
 
+    /// Tạo sẵn tab "Ngưỡng trắng" (chỉ hàng tiêu đề) + tab mô tả bên phải — không ghi hàng số liệu nào.
+    #[test]
+    #[ignore = "ghi thật lên Google Sheet"]
+    fn tao_tab_nguong_trang() {
+        use crate::tach_vb::thong_ke_nguong as tk;
+        let t = token().unwrap();
+        tao_tab(&t, tk::TAB_SHEET).unwrap();
+        let dau: Vec<Value> = tk::tieu_de_sheet().into_iter().map(Value::from).collect();
+        assert_eq!(them_hang(&t, tk::TAB_SHEET, &[dau]).unwrap().0, 200);
+        tao_tab(&t, tk::TAB_MO_TA).unwrap();
+        assert_eq!(them_hang(&t, tk::TAB_MO_TA, &tk::mo_ta_sheet()).unwrap().0, 200);
+    }
+
     /// Ghi thật 1 hàng vào tab "kiem_tra" của Sheet (cần khoá + Sheet đã chia sẻ cho service account).
     #[test]
     #[ignore = "ghi thật lên Google Sheet"]
     fn ghi_that_len_sheet() {
         let luc = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        ghi_dong("kiem_tra", &["thoi_diem", "noi_dung"], vec![luc.into(), "sm-dema4 ghi thử".into()]).unwrap();
+        ghi_dong("kiem_tra", &["thoi_diem", "noi_dung"], vec![luc.into(), "sm-dema4 ghi thử".into()], None).unwrap();
     }
 }
