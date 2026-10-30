@@ -43,7 +43,7 @@
   .nut.xam { background:#B8B8B8; color:#fff; border-color:#A0A0A0; }
   .nut.do { background:#D32F2F; color:#fff; border-color:#B71C1C; }
   /* Popup hết lượt (license) */
-  .hl-logo { text-align:center; padding:14px 16px 0; } .hl-logo img { width:56px; height:auto; cursor:pointer; }
+  .hl-canh-bao { text-align:center; padding:16px 16px 0; color:#E8731A; } .hl-canh-bao svg { width:40px; height:40px; }
   .hl-lydo { padding:10px 18px 4px; font-size:13px; text-align:center; line-height:1.5; }
   .hl-lydo b { color:var(--do); }
   .hl-mang { padding:0 18px 6px; font-size:11.5px; color:var(--chu-phu); text-align:center; }
@@ -884,8 +884,8 @@
   <div class="phu" id="phuHetLuot">
     <div class="popup" role="dialog" aria-label="Hết lượt dùng" style="width:380px">
       <div class="dau">Liên hệ Sao Mai</div>
-      <div class="hl-logo"><a href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a></div>
-      <div class="hl-lydo">Lý do: Số lần <span id="hlChucNang">Tách</span> còn lại (<b>0</b>) → Liên hệ với Sao Mai để được hỗ trợ.</div>
+      <div class="hl-canh-bao" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+      <div class="hl-lydo">Lý do: Số lần <span id="hlChucNang">Tách</span> còn lại (<b>0</b>)<br>Liên hệ với Sao Mai để được hỗ trợ.</div>
       <div class="hl-mang an" id="hlMang">Chưa kết nối được máy chủ — kết nối mạng rồi bấm Kiểm tra lại.</div>
       <div class="hl-bang">
         <span>Mã máy</span><b id="hlMa">SM-7F3A-91C2-04BE</b><button class="nut hl-copy" data-copy="hlMa">Copy</button>
