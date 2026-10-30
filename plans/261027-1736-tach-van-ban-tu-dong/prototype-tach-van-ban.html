@@ -835,9 +835,16 @@
   <div class="phu" id="phuDangTach">
     <div class="popup" role="dialog" aria-label="Đang tách">
       <div class="dau">Đang tách <b>pdf_goc</b></div>
-      <div class="than" style="display:block">
-        <div class="tiendo" style="padding:0;height:24px"><div style="height:22px"><b id="dtVach" style="width:0"></b><span id="dtChu">0 / 2 hồ sơ</span></div></div>
-        <div id="dtTen" style="margin-top:9px;font-size:12px;color:var(--chu-phu)">Đang tách L1_05_13.pdf…</div>
+      <div class="than" style="display:block;padding-bottom:6px">
+        <div class="tiendo" style="padding:0;height:24px"><div style="height:22px"><b id="dtVach" style="width:0"></b><span id="dtChu">0 / 2 hồ sơ · 0%</span></div></div>
+      </div>
+      <div class="than" style="padding-top:4px">
+        <span>Đang tách</span><b id="dtTen" style="font-weight:normal">L1_05_13.pdf (491 trang)</b>
+        <span>Đã ghi</span><b id="dtGhi">0 văn bản · 0 trang · 0 MB</b>
+        <span>Lỗi</span><b id="dtLoi">0</b>
+        <span>Thời gian</span><b id="dtTg">00:00:00</b>
+        <span>Còn lại (ước)</span><b id="dtCon" style="font-weight:normal">đang tính…</b>
+        <span>Tốc độ</span><b id="dtToc" style="font-weight:normal">—</b>
       </div>
       <div class="cuoi"><button class="nut do" id="dtDung">Dừng</button></div>
     </div>
@@ -2091,22 +2098,41 @@
     batDauTach();
   };
   // Mô phỏng tách nền: mỗi hồ sơ ~0,9 s; xong (hoặc Dừng) thì đổi sang popup kết quả
-  var tachHenGio = null;
+  // Số liệu mô phỏng từng hồ sơ (như mẫu 1): số trang, số văn bản, dung lượng ghi ra
+  var DT_TRANG = [491, 405], DT_VB = [108, 103], DT_MB = [268, 203];
+  function soVN(n) { return String(n).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  var tachHenGio = null, tachDongHo = null;
+  function hhmmss(ms) { var g = Math.max(0, Math.round(ms / 1000)); return [Math.floor(g / 3600), Math.floor(g % 3600 / 60), g % 60].map(function (x) { return (x < 10 ? '0' : '') + x; }).join(':'); }
   function batDauTach(dungO) {
-    var tong = TEN.length, xong = 0;
-    $('dtVach').style.width = '0'; $('dtChu').textContent = '0 / ' + tong + ' hồ sơ'; $('dtTen').textContent = 'Đang tách ' + TEN[0] + '…';
-    $('phuDangTach').classList.add('mo');
-    function buoc() {
-      xong++;
-      $('dtVach').style.width = Math.round(xong * 100 / tong) + '%'; $('dtChu').textContent = xong + ' / ' + tong + ' hồ sơ';
-      if (xong >= tong || xong === dungO) { ketThucTach(xong < tong); return; }
-      $('dtTen').textContent = 'Đang tách ' + TEN[xong] + '…';
-      tachHenGio = setTimeout(buoc, 900);
+    var tong = TEN.length, xong = 0, batDau = Date.now(), tongTrang = DT_TRANG.reduce(function (a, b) { return a + b; }, 0);
+    var ghi = { vb: 0, trang: 0, mb: 0 };
+    function veDangTach() {
+      var tg = Date.now() - batDau;
+      $('dtVach').style.width = Math.round(xong * 100 / tong) + '%';
+      $('dtChu').textContent = xong + ' / ' + tong + ' hồ sơ · ' + Math.round(xong * 100 / tong) + '%';
+      $('dtTen').textContent = xong < tong ? TEN[xong] + ' (' + soVN(DT_TRANG[xong]) + ' trang)' : '—';
+      $('dtGhi').textContent = soVN(ghi.vb) + ' văn bản · ' + soVN(ghi.trang) + ' trang · ' + soVN(ghi.mb) + ' MB';
+      $('dtTg').textContent = hhmmss(tg);
+      // Ước còn lại theo số trang đã ghi (hồ sơ dài ngắn khác nhau); chưa xong hồ sơ nào thì chưa ước được
+      if (ghi.trang > 0) {
+        var conMs = tg / ghi.trang * (tongTrang - ghi.trang), xongLuc = new Date(Date.now() + conMs);
+        $('dtCon').textContent = '~' + hhmmss(conMs) + ' · xong lúc ' + (xongLuc.getHours() < 10 ? '0' : '') + xongLuc.getHours() + ':' + (xongLuc.getMinutes() < 10 ? '0' : '') + xongLuc.getMinutes();
+        $('dtToc').textContent = Math.round(ghi.trang / (tg / 1000)) + ' trang/giây · ' + (ghi.mb / (tg / 1000)).toFixed(1) + ' MB/giây';
+      } else { $('dtCon').textContent = 'đang tính…'; $('dtToc').textContent = '—'; }
     }
-    tachHenGio = setTimeout(buoc, 900);
+    $('dtLoi').textContent = '0';
+    veDangTach(); $('phuDangTach').classList.add('mo');
+    tachDongHo = setInterval(veDangTach, 200);
+    function buoc() {
+      ghi.vb += DT_VB[xong]; ghi.trang += DT_TRANG[xong]; ghi.mb += DT_MB[xong]; xong++;
+      veDangTach();
+      if (xong >= tong || xong === dungO) { ketThucTach(xong < tong); return; }
+      tachHenGio = setTimeout(buoc, 2200);
+    }
+    tachHenGio = setTimeout(buoc, 2200);
   }
   function ketThucTach(daDung) {
-    clearTimeout(tachHenGio); tachHenGio = null;
+    clearTimeout(tachHenGio); tachHenGio = null; clearInterval(tachDongHo); tachDongHo = null;
     $('phuDangTach').classList.remove('mo');
     document.querySelector('#phu .dau').innerHTML = (daDung ? 'Đã dừng tách ' : 'Đã tách xong ') + '<b>pdf_goc</b>';
     $('phu').classList.add('mo');
@@ -2151,7 +2177,11 @@
   if (location.hash === '#thong-tin') moTroGiup('thongtin');
   if (location.hash === '#tach-xong') { s.daPT = true; nghi = TEN.map(function () { return {}; }); goiy = TEN.map(function () { return {}; }); ve(); $('nutTach').onclick(); }
   if (location.hash === '#tach-chua-duyet') { s.daPT = true; ve(); $('nutTach').onclick(); }
-  if (location.hash === '#dang-tach') { s.daPT = true; ve(); batDauTach(1); $('dtVach').style.width = '50%'; $('dtChu').textContent = '1 / 2 hồ sơ'; $('dtTen').textContent = 'Đang tách L1_06_14.pdf…'; clearTimeout(tachHenGio); }
+  if (location.hash === '#dang-tach') {
+    s.daPT = true; ve(); batDauTach(99); clearTimeout(tachHenGio); clearInterval(tachDongHo);
+    $('dtVach').style.width = '50%'; $('dtChu').textContent = '1 / 2 hồ sơ · 50%'; $('dtTen').textContent = 'L1_06_14.pdf (405 trang)';
+    $('dtGhi').textContent = '108 văn bản · 491 trang · 268 MB'; $('dtTg').textContent = '00:00:21'; $('dtCon').textContent = '~00:00:17 · xong lúc 08:42'; $('dtToc').textContent = '23 trang/giây · 12,8 MB/giây';
+  }
   if (location.hash === '#phan-tich-lai') $('nutPhanTich').onclick();
   if (location.hash === '#xem-1-trang') { s.daPT = true; s.che = 'vanban'; s.vb = 3; s.xemVB = 'mot'; ve(); }
   if (location.hash === '#xem-2-trang') { s.daPT = true; s.che = 'vanban'; s.vb = 3; s.xemVB = 'hai'; ve(); }
