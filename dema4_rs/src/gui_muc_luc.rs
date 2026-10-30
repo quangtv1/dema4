@@ -99,6 +99,9 @@ pub struct ManMucLuc {
     doc_nen: Option<Receiver<Result<DuLieu, String>>>,
     chon_file: Option<Receiver<Option<PathBuf>>>,
     chon_mau: Option<Receiver<Option<PathBuf>>>,
+    /// Hộp lưu mẫu đang mở (link "Lưu mẫu" ở đuôi ô chọn mẫu) và kết quả lần lưu gần nhất (hiện ở dòng đáy).
+    luu_mau: Option<Receiver<Option<PathBuf>>>,
+    da_luu_mau: Option<(Result<PathBuf, String>, Instant)>,
     pub mau: Option<MauDung>,
     loi_mau: Option<String>,
     /// Ràng buộc đã lưu (mẫu, JSON) — áp lại khi đọc xong dữ liệu.
@@ -145,6 +148,8 @@ impl ManMucLuc {
             doc_nen: None,
             chon_file: None,
             chon_mau: None,
+            luu_mau: None,
+            da_luu_mau: None,
             mau: None,
             loi_mau: None,
             bien_luu: (c.mau.clone(), c.bien.clone()),
@@ -385,8 +390,28 @@ impl ManMucLuc {
                 Err(TryRecvError::Empty) => {}
             }
         }
+        if let Some(n) = &self.luu_mau {
+            match n.try_recv() {
+                Ok(p) => {
+                    self.luu_mau = None;
+                    if let Some(p) = p {
+                        let kq = byte_mau(&self.mau_chon).and_then(|b| std::fs::write(&p, b).map_err(|e| format!("không ghi được {}: {e}", p.display()))).map(|_| p);
+                        self.da_luu_mau = Some((kq, Instant::now()));
+                    }
+                }
+                Err(TryRecvError::Disconnected) => self.luu_mau = None,
+                Err(TryRecvError::Empty) => {}
+            }
+        }
+        // Báo "Đã lưu mẫu" ở dòng đáy 15 giây
+        if self.da_luu_mau.as_ref().is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(15)) {
+            self.da_luu_mau = None;
+        }
+        if self.da_luu_mau.is_some() {
+            ctx.request_repaint_after(Duration::from_secs(1));
+        }
         self.nhan_sinh();
-        if self.chon_file.is_some() || self.chon_mau.is_some() || self.doc_nen.is_some() {
+        if self.chon_file.is_some() || self.chon_mau.is_some() || self.luu_mau.is_some() || self.doc_nen.is_some() {
             ctx.request_repaint_after(Duration::from_millis(50));
         }
         if self.sinh.is_some() {
@@ -490,7 +515,28 @@ impl ManMucLuc {
                         let _ = ui.selectable_label(true, ten_mau(&self.mau_chon));
                     }
                 });
+                let o = ph.response.rect;
                 ph.response.labelled_by(nhan_mau.id);
+                // Link "Lưu mẫu" ở đuôi ô chọn mẫu, trước mũi tên: chữ xám, rê chuột → đen + gạch chân
+                let f = egui::FontId::proportional(12.0);
+                let rong_chu = ui.fonts_mut(|x| x.layout_no_wrap("Lưu mẫu".into(), f.clone(), CHU).size().x);
+                let r = Rect::from_center_size(egui::pos2(o.right() - 30.0 - rong_chu / 2.0, o.center().y), egui::vec2(rong_chu + 8.0, 18.0));
+                let link = ui.interact(r, ui.scope_id().with("ml_luu_mau"), if khoa { Sense::hover() } else { Sense::click() });
+                link.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, !khoa, "Lưu mẫu"));
+                let re = link.hovered() && !khoa;
+                let g = ui.painter().layout_no_wrap("Lưu mẫu".into(), f, if re { CHU } else { CHU_PHU });
+                let goc = egui::pos2(r.center().x - g.size().x / 2.0, r.center().y - g.size().y / 2.0);
+                if re {
+                    ui.painter().hline(goc.x..=goc.x + g.size().x, goc.y + g.size().y - 1.0, Stroke::new(1.0, CHU));
+                }
+                ui.painter().galley(goc, g, CHU);
+                if link.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Lưu mẫu đang chọn ra file DOCX — sửa trong Word rồi bấm Chọn để dùng làm mẫu riêng").clicked() && self.luu_mau.is_none() {
+                    let ten = match self.mau_chon.parse::<usize>() {
+                        Ok(_) => format!("{}.docx", khop::ten_file_khong_dau(&ten_mau(&self.mau_chon))),
+                        Err(_) => Path::new(&self.mau_chon).file_name().map_or_else(|| "mau_muc_luc.docx".into(), |s| s.to_string_lossy().into_owned()),
+                    };
+                    self.luu_mau = Some(luu_file_nen(&ten, ui.ctx()));
+                }
             });
             if let Some(ma) = chon {
                 self.mau_chon = ma;
@@ -778,6 +824,27 @@ impl ManMucLuc {
 
     fn dong_day(&mut self, ui: &mut egui::Ui, cfg: &CauHinhMucLuc) {
         ui.horizontal(|ui| {
+            if self.sinh.is_none() {
+                if let Some((kq, _)) = &self.da_luu_mau {
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), Sense::hover());
+                    crate::gui_tach::bieu_tuong::ve(ui.painter(), r, crate::gui_tach::bieu_tuong::BieuTuong::ThongTin, CHU_PHU);
+                    match kq {
+                        Ok(p) => {
+                            ui.label(RichText::new(format!("Đã lưu mẫu {}: {}", ten_mau(&self.mau_chon), p.display())).color(CHU_PHU));
+                            if ui.link("Mở thư mục").clicked() {
+                                if let Some(cha) = p.parent() {
+                                    crate::gui::mo_bang_he_dieu_hanh(cha);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            ui.label(RichText::new(format!("Không lưu được mẫu: {e}")).color(DO));
+                        }
+                    }
+                    self.nut_day(ui, cfg);
+                    return;
+                }
+            }
             let chu = match &self.sinh {
                 Some(s) => Some(format!("Đang sinh {}/{} hồ sơ · {} · đã chạy {}", (s.i + 1).min(s.tong), s.tong, s.ten, crate::gui_tach::gio_phut_giay(s.bat_dau.elapsed()))),
                 None if self.co_du_lieu() => Some(format!("Hồ sơ: {}; Văn bản: {}", so_nguyen(self.kq.ho_so.len()), so_nguyen(self.so_van_ban()))),
@@ -789,7 +856,13 @@ impl ManMucLuc {
                 crate::gui_tach::bieu_tuong::ve(ui.painter(), r, crate::gui_tach::bieu_tuong::BieuTuong::ThongTin, CHU_PHU);
                 ui.label(RichText::new(chu).color(CHU_PHU));
             }
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            self.nut_day(ui, cfg);
+        });
+    }
+
+    /// Bên phải dòng đáy: ☐ Kèm PDF + nút Sinh mục lục / Dừng.
+    fn nut_day(&mut self, ui: &mut egui::Ui, cfg: &CauHinhMucLuc) {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if let Some(s) = &self.sinh {
                     if ui.add(nut_mau("Dừng", DO).min_size(egui::vec2(130.0, 28.0))).on_hover_text("Dừng sau hồ sơ đang làm").clicked() {
                         s.dung.store(true, Ordering::Relaxed);
@@ -803,13 +876,29 @@ impl ManMucLuc {
                 }
                 let mut pdf = false;
                 ui.add_enabled(false, egui::Checkbox::new(&mut pdf, "Kèm PDF")).on_disabled_hover_text("Xuất PDF cần Word / LibreOffice — có ở bản sau");
-            });
         });
     }
 }
 
 /// Hộp chọn file: Windows chạy ở luồng riêng (cửa sổ app không đứng hình) và đánh thức giao diện khi chọn xong;
 /// macOS bắt buộc mở trên luồng chính (rfd).
+/// Hộp lưu file mẫu (DOCX), cùng cách chạy như `chon_file_nen`.
+fn luu_file_nen(ten: &str, ctx: &egui::Context) -> Receiver<Option<PathBuf>> {
+    let (gui, nhan) = mpsc::channel();
+    let ten = ten.to_string();
+    let ctx = ctx.clone();
+    let mo = move || {
+        let _ = gui.send(rfd::FileDialog::new().set_title("Lưu mẫu mục lục").add_filter("Mẫu Word", &["docx"]).set_file_name(&ten).save_file());
+        ctx.request_repaint();
+    };
+    if cfg!(target_os = "windows") {
+        std::thread::spawn(mo);
+    } else {
+        mo();
+    }
+    nhan
+}
+
 fn chon_file_nen(hien_tai: &str, ctx: &egui::Context, tieu_de: &'static str, duoi: &'static [&'static str]) -> Receiver<Option<PathBuf>> {
     let (gui, nhan) = mpsc::channel();
     let dau = PathBuf::from(hien_tai.trim());

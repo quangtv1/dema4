@@ -37,6 +37,22 @@ pub fn chuan_hoa(s: &str) -> String {
         .collect()
 }
 
+/// Tên file không dấu từ tên hiển thị: chữ / số giữ nguyên (bỏ dấu, giữ hoa thường), còn lại gộp thành `_`.
+/// Vd "Mẫu 01 – Quảng Trị" → "Mau_01_Quang_Tri".
+pub fn ten_file_khong_dau(s: &str) -> String {
+    let mut ra = String::new();
+    for c in s.chars().filter(|c| !('\u{0300}'..='\u{036F}').contains(c)) {
+        let thuong = c.to_lowercase().next().unwrap_or(c);
+        let k = bo_dau(thuong);
+        if k.is_ascii_alphanumeric() {
+            ra.push(if c.is_uppercase() { k.to_ascii_uppercase() } else { k });
+        } else if !ra.ends_with('_') && !ra.is_empty() {
+            ra.push('_');
+        }
+    }
+    ra.trim_end_matches('_').to_string()
+}
+
 /// Biến của mẫu theo 3 nhóm hiển thị (thông tin hồ sơ, bảng văn bản, tự động), mỗi nhóm theo thứ tự xuất hiện.
 pub fn nhom_bien(mau: &MauDaBien) -> [Vec<String>; 3] {
     let theo = |tap: &std::collections::BTreeSet<String>| mau.thu_tu.iter().filter(|b| tap.contains(*b)).cloned().collect::<Vec<_>>();
@@ -96,6 +112,13 @@ mod tests {
         assert_eq!(chuan_hoa("Tiêu đề hồ sơ"), "tieudehoso");
         assert_eq!(chuan_hoa("Ngày tháng\u{0300}"), "ngaythang", "dấu tổ hợp rời bị bỏ");
         assert_eq!(chuan_hoa("  "), "");
+    }
+
+    #[test]
+    fn ten_file_khong_dau_tu_ten_mau() {
+        assert_eq!(ten_file_khong_dau("Mẫu 01 – Quảng Trị"), "Mau_01_Quang_Tri");
+        assert_eq!(ten_file_khong_dau("Mẫu 03 – Đống Đa"), "Mau_03_Dong_Da");
+        assert_eq!(ten_file_khong_dau("  "), "");
     }
 
     #[test]
