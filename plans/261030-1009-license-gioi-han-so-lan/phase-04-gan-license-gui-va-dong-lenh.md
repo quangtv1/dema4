@@ -1,10 +1,12 @@
 ---
 phase: 4
-title: "Gan license GUI va dong lenh"
-status: pending
+title: Gan license GUI va dong lenh
+status: completed
 priority: P1
-dependencies: [1, 3]
-effort: "1.5 ngày"
+dependencies:
+  - 1
+  - 3
+effort: 1.5 ngày
 ---
 
 # Phase 4: Gắn license vào giao diện và dòng lệnh

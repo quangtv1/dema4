@@ -48,7 +48,9 @@ pub fn chay() -> eframe::Result {
         options,
         Box::new(|cc| {
             cai_giao_dien(&cc.egui_ctx);
-            Ok(Box::new(UngDungChinh::default()))
+            let app = UngDungChinh::default();
+            app.dem.license.mo_app();
+            Ok(Box::new(app))
         }),
     )
 }
@@ -90,7 +92,9 @@ impl Default for UngDungChinh {
     fn default() -> Self {
         let cfg = crate::cau_hinh::doc();
         let dem = UngDung { quy_tac: cfg.quy_tac(), ..Default::default() };
-        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach: Default::default(), cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
+        let mut tach = crate::gui_tach::ManTach::default();
+        tach.license = dem.license.clone();
+        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach, cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
     }
 }
 
@@ -422,6 +426,7 @@ struct DangDem {
     dung: Arc<AtomicBool>,
     thu_muc: String,
     bat_dau: Instant,
+    lan: crate::license::LanChay,
 }
 
 /// Thông tin khi luồng đếm kết thúc
@@ -495,6 +500,9 @@ struct UngDung {
     kiem_tra_ky: bool,
     /// Đã gửi số liệu lên trạm (có trạm); quyết định có hiện dòng báo trong popup không
     co_telegram: bool,
+    /// License dùng chung với màn Tách; popup "Liên hệ Sao Mai" khi hết lượt Đếm.
+    license: Arc<crate::license::KiemTra>,
+    hop_license: Option<crate::hop_license::HopLicense>,
 }
 
 impl Default for UngDung {
@@ -521,6 +529,8 @@ impl Default for UngDung {
             kiem_tra_dpi: false,
             kiem_tra_ky: true,
             co_telegram: false,
+            license: crate::license::KiemTra::mac_dinh(),
+            hop_license: None,
         }
     }
 }
@@ -691,6 +701,13 @@ impl UngDung {
             self.trang_thai = format!("Lỗi: không tìm thấy thư mục {thu_muc}");
             return;
         }
+        let lan = match self.license.bat_dau(crate::license::ChucNang::Dem) {
+            Ok(l) => l,
+            Err(qd) => {
+                self.hop_license = Some(crate::hop_license::HopLicense::moi(qd));
+                return;
+            }
+        };
         let quy_tac = self.quy_tac;
 
         self.xoa_ket_qua();
@@ -704,7 +721,7 @@ impl UngDung {
             ctx.request_repaint();
         });
         self.quy_tac_da_dung = Some(quy_tac);
-        self.dang_dem = Some(DangDem { nhan, dung, thu_muc, bat_dau: Instant::now() });
+        self.dang_dem = Some(DangDem { nhan, dung, thu_muc, bat_dau: Instant::now(), lan });
     }
 
     fn them_dong(&mut self, s: String) {
@@ -822,12 +839,16 @@ impl UngDung {
             self.trang_thai.clear();
         }
         if mat_ket_noi {
-            self.dang_dem = None;
+            if let Some(dd) = self.dang_dem.take() {
+                self.license.ket_thuc(&dd.lan, false);
+            }
             self.trang_thai = "Lỗi: luồng đếm dừng bất thường".into();
             return None;
         }
         let kq = xong?;
         let dd = self.dang_dem.take()?;
+        // Có kết quả là tính lượt (kể cả Dừng giữa chừng); không đếm được file nào → hoàn lượt
+        self.license.ket_thuc(&dd.lan, !kq.dong_tong_hop.is_empty());
         let (thoi_gian, da_dung) = (dd.bat_dau.elapsed(), dd.dung.load(Ordering::Relaxed));
         Some((kq, DaXong { thu_muc: dd.thu_muc, thoi_gian, da_dung }))
     }
@@ -847,7 +868,7 @@ impl UngDung {
         // Gửi số liệu lên trạm ở luồng riêng (trạm ghi Sheet + xếp tin Telegram); chạy ngầm, im lặng khi lỗi.
         // Popup có dòng báo app gửi thống kê. Test (kể cả chụp ảnh màn hình) không gọi trạm thật
         let so_lieu = crate::tram::so_lieu_dem(&xong.thu_muc, kq, xong.thoi_gian);
-        self.co_telegram = crate::tram::gui_thong_ke_nen("thong_ke_dem", move |_| so_lieu);
+        self.co_telegram = self.license.thong_ke("thong_ke_dem", move |_| so_lieu);
         let ten_thu_muc = Path::new(xong.thu_muc.trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or(xong.thu_muc);
         self.thong_bao = Some(ThongBaoXong {
             ten_thu_muc,
@@ -1339,6 +1360,17 @@ impl UngDung {
         if let Some((kq, xong)) = self.nhan_su_kien() {
             self.luu_va_thong_bao(&kq, xong);
         }
+        if let Some(h) = &mut self.hop_license {
+            use crate::hop_license::KetQuaHop;
+            match h.ve(&ctx, &self.license) {
+                KetQuaHop::Mo => {}
+                KetQuaHop::Dong => self.hop_license = None,
+                KetQuaHop::DuocChay => {
+                    self.hop_license = None;
+                    self.bat_dau_dem(&ctx);
+                }
+            }
+        }
         if self.dang_dem.is_some() {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
@@ -1451,6 +1483,47 @@ mod tests {
         })
     }
 
+    /// Hết lượt Đếm: popup Liên hệ Sao Mai (lý do, mã máy), không đếm; Sao Mai nâng hạn → Kiểm tra lại thì đếm luôn.
+    #[test]
+    fn het_luot_dem_hien_popup_kiem_tra_lai_thi_dem() {
+        use egui_kittest::kittest::Queryable;
+        let goc = std::env::temp_dir().join(format!("dema4_het_luot_dem_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        std::fs::create_dir_all(&goc).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 1);
+        let kho = Arc::new(crate::tram::KhoGia::moi(0, 5));
+        let kt = crate::license::KiemTra::gia(kho.clone());
+        kt.mo_app();
+        kt.moc().recv().unwrap();
+        let ma = kt.ma_may().to_string();
+        let tm = goc.display().to_string();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 700.0)).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut app = UngDungChinh { man: Man::Dem, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
+            app.dem.license = kt.clone();
+            app.dem.thu_muc = tm.clone();
+            app
+        });
+        h.run();
+        // Nút Đếm ở thanh chọn thư mục (nút đầu tiên có nhãn "Đếm")
+        h.get_all_by_label("Đếm").next().unwrap().click();
+        h.run();
+        h.get_by_label("Lý do: Số lần Đếm còn lại (");
+        h.get_by_label(&ma);
+        h.get_by_label(crate::hop_license::DIEN_THOAI);
+        assert!(h.state().dem.dang_dem.is_none(), "hết lượt: không chạy đếm");
+        *kho.han.lock().unwrap() = crate::license::HanMuc { dem: 5, tach: 5 };
+        h.get_by_label("Kiểm tra lại").click();
+        let bat_dau = Instant::now();
+        while h.state().dem.hop_license.is_some() {
+            assert!(bat_dau.elapsed() < Duration::from_secs(5), "Kiểm tra lại không xong");
+            std::thread::sleep(Duration::from_millis(20));
+            h.run();
+        }
+        assert!(h.state().dem.dang_dem.is_some() || h.state().dem.thong_bao.is_some(), "được cấp lượt → đếm chạy luôn");
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
     /// Menu Chức năng 3 mục đổi màn; F1 mở Hướng dẫn đúng tab của màn đang dùng; Đóng tắt hộp.
     #[test]
     fn menu_chuc_nang_doi_man_va_f1_mo_huong_dan() {
@@ -1546,7 +1619,7 @@ mod tests {
     fn luong_dem_chet_khong_lam_sap_giao_dien() {
         let mut app = UngDung::default();
         let (gui, nhan) = mpsc::channel::<SuKien>();
-        app.dang_dem = Some(DangDem { nhan, dung: Arc::new(AtomicBool::new(false)), thu_muc: "x".into(), bat_dau: Instant::now() });
+        app.dang_dem = Some(DangDem { nhan, dung: Arc::new(AtomicBool::new(false)), thu_muc: "x".into(), bat_dau: Instant::now(), lan: app.license.bat_dau(crate::license::ChucNang::Dem).unwrap() });
         drop(gui); // luồng đếm panic/chết: đầu gửi bị huỷ mà chưa có Xong
         assert!(app.nhan_su_kien().is_none());
         assert!(app.dang_dem.is_none());
@@ -1828,7 +1901,7 @@ mod tests {
             h.run_steps(4);
             h.render().unwrap().save(thu_muc_anh.join("ky_mo_dau.png")).unwrap();
         }
-        for ten in ["chua_tach", "phan_tich_lai", "dang_tach", "tach_xong"] {
+        for ten in ["chua_tach", "phan_tich_lai", "dang_tach", "tach_xong", "het_luot", "het_luot_offline"] {
             let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_pixels_per_point(1.5).build_eframe(|cc| {
                 cai_giao_dien(&cc.egui_ctx);
                 let mut app = UngDungChinh { man: Man::Tach, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
@@ -1855,7 +1928,7 @@ mod tests {
             if dang_dem {
                 let (gui, nhan) = mpsc::channel();
                 std::mem::forget(gui); // giữ kênh mở để app coi như đang đếm
-                app.dang_dem = Some(DangDem { nhan, dung: Arc::new(AtomicBool::new(false)), thu_muc: app.thu_muc.clone(), bat_dau: Instant::now() });
+                app.dang_dem = Some(DangDem { nhan, dung: Arc::new(AtomicBool::new(false)), thu_muc: app.thu_muc.clone(), bat_dau: Instant::now(), lan: app.license.bat_dau(crate::license::ChucNang::Dem).unwrap() });
                 app.tien_do = Some((48, 121));
             } else {
                 app.tien_do = Some((121, 121));

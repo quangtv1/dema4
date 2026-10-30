@@ -75,6 +75,7 @@ pub(super) struct DangTach {
     /// Thống kê ngưỡng trắng chụp lúc bấm Tách (None khi tắt quét trắng).
     thong_ke: Option<ThongKeNguong>,
     nguong: (f32, f32),
+    lan: crate::license::LanChay,
 }
 
 pub(super) struct XongTach {
@@ -103,7 +104,7 @@ impl DangTach {
         td.nhan(SuKienTach::BatDauVanBan { ho_so: 1, ten: "L1_06_14.8.pdf".into() });
         let (gui, nhan) = mpsc::channel();
         std::mem::forget(gui); // giữ kênh mở để popup không tự đóng trong ảnh chụp
-        DangTach { nhan, tien_do: Arc::new(td), tong: 2, tong_vb: 211, tong_trang: 896, ten_thu_muc: "pdf_goc".into(), dung: Arc::new(AtomicBool::new(false)), bat_dau: Instant::now() - Duration::from_secs(21), ra: PathBuf::new(), so_lieu: Default::default(), thong_ke: None, nguong: (1.0, 3.2) }
+        DangTach { nhan, tien_do: Arc::new(td), tong: 2, tong_vb: 211, tong_trang: 896, ten_thu_muc: "pdf_goc".into(), dung: Arc::new(AtomicBool::new(false)), bat_dau: Instant::now() - Duration::from_secs(21), ra: PathBuf::new(), so_lieu: Default::default(), thong_ke: None, nguong: (1.0, 3.2), lan: crate::license::LanChay { ma: String::new(), cn: crate::license::ChucNang::Tach, luc: String::new(), trang_thai: crate::license::TrangThaiLan::DatCho } }
     }
 }
 
@@ -150,11 +151,6 @@ pub fn thong_ke_lo(phien: &PhienPhanTich, b: &BangTrang, cfg: &CauHinh) -> Optio
         }
     }
     Some(thong_ke_nguong::thong_ke(&trang, &xoay))
-}
-
-/// Gửi thống kê tách lên trạm ở luồng nền (trạm soạn tin + CSV Telegram, ghi 1 hàng tab "Ngưỡng trắng"), im lặng khi lỗi.
-fn gui_thong_ke(thu_muc: String, so_lieu: telegram::SoLieuTach, thoi_gian: Duration, thong_ke: Option<ThongKeNguong>, nguong: (f32, f32)) -> bool {
-    crate::tram::gui_thong_ke_nen("thong_ke_tach", move |may| crate::tram::so_lieu_tach(may, &thu_muc, &so_lieu, thoi_gian, thong_ke.as_ref(), nguong))
 }
 
 impl ManTach {
@@ -245,6 +241,13 @@ impl ManTach {
                 return;
             }
         };
+        let lan = match self.license.bat_dau(crate::license::ChucNang::Tach) {
+            Ok(l) => l,
+            Err(qd) => {
+                self.hop_license = Some(crate::hop_license::HopLicense::moi(qd));
+                return;
+            }
+        };
         let ho_so = ho_so_tach(phien, b);
         let so_lieu = telegram::SoLieuTach { ho_so: ho_so.len(), bo_index: b.tong.index as usize, bo_trang: b.tong.trang as usize, split: b.tong.split as usize, ..Default::default() };
         let thong_ke = thong_ke_lo(phien, b, cfg);
@@ -262,7 +265,7 @@ impl ManTach {
             let _ = gui.send(kq);
         });
         self.trang_thai = "Đang tách…".into();
-        self.tach = Some(DangTach { nhan, tien_do, tong, tong_vb, tong_trang, ten_thu_muc, dung, bat_dau: Instant::now(), ra, so_lieu, thong_ke, nguong });
+        self.tach = Some(DangTach { nhan, tien_do, tong, tong_vb, tong_trang, ten_thu_muc, dung, bat_dau: Instant::now(), ra, so_lieu, thong_ke, nguong, lan });
     }
 
     /// Nhận kết quả tách: ghi log, gửi thống kê, mở popup.
@@ -274,6 +277,8 @@ impl ManTach {
             Err(TryRecvError::Disconnected) => Err("luồng tách dừng bất thường".into()),
         };
         let t = self.tach.take().unwrap();
+        // Có kết quả là tính lượt (kể cả Dừng giữa chừng); không ghi ra văn bản nào → hoàn lượt
+        self.license.ket_thuc(&t.lan, kq.as_ref().is_ok_and(|k| !k.dong.is_empty()));
         let kq = match kq {
             Ok(k) => k,
             Err(e) => {
@@ -296,8 +301,9 @@ impl ManTach {
         so_lieu.sao_nguyen = kq.sao_nguyen;
         so_lieu.ho_so_loi = kq.loi.len();
         let thoi_gian = t.bat_dau.elapsed();
-        // Test không gọi trạm thật (xem tram::kho_that)
-        let co_telegram = gui_thong_ke(self.thu_muc.trim().to_string(), so_lieu.clone(), thoi_gian, t.thong_ke, t.nguong);
+        // Gửi trạm ở luồng gửi của license (trạm soạn tin + CSV Telegram, ghi 1 hàng tab "Ngưỡng trắng"); test dùng kho giả
+        let (thu_muc, sl, tk, nguong) = (self.thu_muc.trim().to_string(), so_lieu.clone(), t.thong_ke, t.nguong);
+        let co_telegram = self.license.thong_ke("thong_ke_tach", move |may| crate::tram::so_lieu_tach(may, &thu_muc, &sl, thoi_gian, tk.as_ref(), nguong));
         let ten_thu_muc = Path::new(self.thu_muc.trim().trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         self.xong_tach = Some(XongTach { ten_thu_muc, so_lieu, ra: t.ra, log, thoi_gian, da_dung: t.dung.load(Ordering::Relaxed), khong_xoa: kq.khong_xoa, loi, so_canh_bao: kq.canh_bao.len(), co_telegram });
     }
@@ -354,6 +360,17 @@ impl ManTach {
     /// Hộp "Chưa tách được" (còn trang Nghi) + hỏi lưu trước khi tách + popup "Đang tách" / "Đã tách xong".
     pub(super) fn hop_tach(&mut self, ctx: &egui::Context, cfg: &CauHinh) {
         self.popup_dang_tach(ctx);
+        if let Some(h) = &mut self.hop_license {
+            use crate::hop_license::KetQuaHop;
+            match h.ve(ctx, &self.license) {
+                KetQuaHop::Mo => {}
+                KetQuaHop::Dong => self.hop_license = None,
+                KetQuaHop::DuocChay => {
+                    self.hop_license = None;
+                    self.bat_dau_tach(cfg);
+                }
+            }
+        }
         if let Some((nt, nx)) = self.chua_tach {
             let mut chon: Option<Option<Loc>> = None;
             let mut con = Vec::new();
@@ -524,6 +541,31 @@ mod tests {
         assert!(x.loi[0].contains("hong.pdf"), "{:?}", x.loi);
         let log = std::fs::read_to_string(&x.log).unwrap();
         assert!(log.contains("# Lỗi ") && log.contains("hong.pdf"), "{log}");
+        let _ = std::fs::remove_dir_all(thu_muc_an(&nguon));
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Hết lượt Tách: hiện popup Liên hệ Sao Mai, không có luồng tách, không ghi file nào.
+    #[test]
+    fn het_luot_tach_hien_popup_khong_tach() {
+        let goc = std::env::temp_dir().join(format!("dema4_het_luot_tach_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let nguon = goc.join("nguon");
+        std::fs::create_dir_all(&nguon).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&nguon.join("a.pdf"), 3);
+        let cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
+        let ch = cfg.cau_hinh_phan_tich();
+        let kt = crate::license::KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(5, 0)));
+        kt.mo_app();
+        kt.moc().recv().unwrap();
+        let mut man = ManTach { thu_muc: nguon.display().to_string(), license: kt, ..Default::default() };
+        man.bam_phan_tich(&ch);
+        cho_xong(&mut man, &ch);
+        man.bat_dau_tach(&cfg);
+        use crate::license::{ChucNang, QuyetDinh};
+        assert!(man.tach.is_none());
+        assert_eq!(man.hop_license.as_ref().map(|h| h.qd), Some(QuyetDinh::HetLuot(ChucNang::Tach)));
+        assert!(!goc.join("nguon_vanban").exists(), "hết lượt: không ghi file");
         let _ = std::fs::remove_dir_all(thu_muc_an(&nguon));
         let _ = std::fs::remove_dir_all(&goc);
     }

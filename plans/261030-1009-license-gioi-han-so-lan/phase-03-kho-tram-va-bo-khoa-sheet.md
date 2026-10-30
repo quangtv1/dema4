@@ -1,10 +1,12 @@
 ---
 phase: 3
-title: "Kho tram va bo khoa Sheet khoi exe"
-status: pending
+title: Kho tram va bo khoa Sheet khoi exe
+status: completed
 priority: P1
-dependencies: [1, 2]
-effort: "1 ngày"
+dependencies:
+  - 1
+  - 2
+effort: 1 ngày
 ---
 
 # Phase 3: Kho trạm + bỏ khoá service account và token khỏi app

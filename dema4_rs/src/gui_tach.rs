@@ -168,6 +168,9 @@ pub struct ManTach {
     xong_tach: Option<nut_tach::XongTach>,
     chua_tach: Option<(u32, u32)>,
     hoi_luu_tach: bool,
+    /// License dùng chung với màn Đếm; popup "Liên hệ Sao Mai" khi hết lượt Tách.
+    pub license: Arc<crate::license::KiemTra>,
+    hop_license: Option<crate::hop_license::HopLicense>,
     tong_tt: Option<(u64, crate::dem_pdf::QuyTac, van_ban::TongVanBan)>,
     /// Ảnh cần render trong khung này (gom từ lưới, xem trang, hộp phóng to rồi gửi 1 lần).
     yeu_cau_anh: Vec<YeuCau>,
@@ -257,6 +260,8 @@ impl Default for ManTach {
             xong_tach: None,
             chua_tach: None,
             hoi_luu_tach: false,
+            license: crate::license::KiemTra::mac_dinh(),
+            hop_license: None,
             tong_tt: None,
             yeu_cau_anh: Vec::new(),
             cfg_doi: false,
@@ -1846,6 +1851,8 @@ impl ManTach {
             "chua_tach" => self.chua_tach = Some((3, 2)),
             "phan_tich_lai" => self.hoi_phan_tich_lai = true,
             "dang_tach" => self.tach = Some(nut_tach::DangTach::mau()),
+            "het_luot" => self.hop_license = Some(crate::hop_license::HopLicense::moi(crate::license::QuyetDinh::HetLuot(crate::license::ChucNang::Tach))),
+            "het_luot_offline" => self.hop_license = Some(crate::hop_license::HopLicense::moi(crate::license::QuyetDinh::HetLuotOffline(crate::license::ChucNang::Tach))),
             _ => self.xong_tach = Some(nut_tach::XongTach::mau()),
         }
     }

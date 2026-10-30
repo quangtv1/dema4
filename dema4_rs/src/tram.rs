@@ -4,7 +4,6 @@
 use crate::license::{HanMuc, LanChay, TraLoiKy, TrangThaiMay};
 use base64::Engine;
 use serde_json::{json, Value};
-use std::sync::OnceLock;
 use std::time::Duration;
 
 /// URL web app trạm (README apps-script, bước 5). Trống = chưa triển khai → app dùng luật offline, không gửi thống kê.
@@ -24,14 +23,6 @@ pub struct ThongTinMay {
     pub phien_ban: String,
 }
 
-impl ThongTinMay {
-    /// Đọc lại toàn bộ (IP public chờ tối đa 4 s) — gọi ở luồng nền.
-    pub fn hien_tai() -> Self {
-        use crate::telegram::{dia_chi_mac, ip_noi_bo, ip_public, ten_pc};
-        ThongTinMay { ma: crate::license::ma_may(), ten: ten_pc(), mac: dia_chi_mac(), ip_noi_bo: ip_noi_bo(), ip_public: ip_public(), phien_ban: env!("CARGO_PKG_VERSION").into() }
-    }
-}
-
 /// Câu trả lời trạm đã kiểm chữ ký.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KetQuaTram {
@@ -47,6 +38,8 @@ pub trait KhoLicense: Send + Sync {
     fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay], ma_vua_chay: Option<&str>) -> Result<KetQuaTram, String>;
     /// `hanh_dong`: "thong_ke_dem" | "thong_ke_tach"; `them`: các trường số liệu (`so_lieu`, `nguong`).
     fn thong_ke(&self, may: &ThongTinMay, hanh_dong: &str, them: Value) -> Result<(), String>;
+    /// Câu trả lời đã lưu trên đĩa còn tin được không (chữ ký, mã máy; không kiểm nonce).
+    fn doc_da_luu(&self, tl: &TraLoiKy, ma_may: &str) -> Option<TrangThaiMay>;
 }
 
 pub struct KhoTram {
@@ -74,10 +67,6 @@ impl KhoTram {
         doc_tra_loi(&tl, &self.khoa, &may.ma, Some(&nonce))
     }
 
-    /// Kiểm lại câu trả lời ký đã lưu trên đĩa (không kiểm nonce).
-    pub fn doc_da_luu(&self, tl: &TraLoiKy) -> Option<TrangThaiMay> {
-        doc_tra_loi(tl, &self.khoa, &crate::license::ma_may(), None).ok().map(|k| k.may)
-    }
 }
 
 impl KhoLicense for KhoTram {
@@ -97,12 +86,10 @@ impl KhoLicense for KhoTram {
             Err(_) => Err("trạm trả về không phải JSON".into()),
         }
     }
-}
 
-/// Trạm thật dùng chung cả app (None khi chưa triển khai; test không bao giờ gọi trạm thật).
-pub fn kho_that() -> Option<&'static KhoTram> {
-    static KHO: OnceLock<Option<KhoTram>> = OnceLock::new();
-    KHO.get_or_init(KhoTram::moi).as_ref().filter(|_| !cfg!(test))
+    fn doc_da_luu(&self, tl: &TraLoiKy, ma_may: &str) -> Option<TrangThaiMay> {
+        doc_tra_loi(tl, &self.khoa, ma_may, None).ok().map(|k| k.may)
+    }
 }
 
 fn yeu_cau(may: &ThongTinMay, hanh_dong: &str, nonce: &str, them: Value) -> Value {
@@ -142,6 +129,11 @@ pub fn doc_tra_loi(tl: &TraLoiKy, khoa: &rsa::RsaPublicKey, ma_may: &str, nonce:
     let ky = base64::engine::general_purpose::STANDARD.decode(tl.chu_ky.trim()).map_err(|_| "chữ ký không phải base64".to_string())?;
     let ky = Signature::try_from(ky.as_slice()).map_err(|_| "chữ ký sai định dạng".to_string())?;
     VerifyingKey::<rsa::sha2::Sha256>::new(khoa.clone()).verify(tl.du_lieu.as_bytes(), &ky).map_err(|_| "chữ ký không hợp lệ".to_string())?;
+    giai_du_lieu(tl, ma_may, nonce)
+}
+
+/// Phần dữ liệu (đã kiểm chữ ký) → trạng thái máy; sai mã máy / nonce → lỗi.
+fn giai_du_lieu(tl: &TraLoiKy, ma_may: &str, nonce: Option<&str>) -> Result<KetQuaTram, String> {
     let v: Value = serde_json::from_str(&tl.du_lieu).map_err(|_| "dữ liệu ký không phải JSON".to_string())?;
     if v["ma_may"].as_str() != Some(ma_may) {
         return Err("câu trả lời không phải của máy này".into());
@@ -217,15 +209,104 @@ pub fn so_lieu_tach(may: &ThongTinMay, thu_muc: &str, sl: &crate::telegram::SoLi
     v
 }
 
-/// Gửi thống kê lên trạm ở luồng nền, im lặng khi lỗi. Trả false khi chưa có trạm (popup không hiện dòng "đã ghi lại").
-/// `soan` nhận thông tin máy đọc lại trong luồng nền (IP public chờ tối đa 4 s).
-pub fn gui_thong_ke_nen(hanh_dong: &'static str, soan: impl FnOnce(&ThongTinMay) -> Value + Send + 'static) -> bool {
-    let Some(kho) = kho_that() else { return false };
-    std::thread::spawn(move || {
-        let may = ThongTinMay::hien_tai();
-        let _ = kho.thong_ke(&may, hanh_dong, soan(&may));
-    });
-    true
+/// Kho giả cho test: giữ hạn mức / đã dùng trong bộ nhớ, chống trùng theo mã lần như trạm, đếm lời gọi.
+#[cfg(test)]
+pub struct KhoGia {
+    pub han: std::sync::Mutex<HanMuc>,
+    pub trang_thai: std::sync::Mutex<&'static str>,
+    /// Mọi lời gọi lỗi (mất mạng).
+    pub mat_mang: std::sync::atomic::AtomicBool,
+    /// Ghi xong rồi mới báo lỗi (giả hết thời gian chờ).
+    pub loi_sau_ghi: std::sync::atomic::AtomicBool,
+    pub cho: Duration,
+    dung: std::sync::Mutex<HanMuc>,
+    da_ghi: std::sync::Mutex<std::collections::HashSet<String>>,
+    pub so_goi: std::sync::atomic::AtomicUsize,
+    dang_goi: std::sync::atomic::AtomicUsize,
+    pub dong_thoi_toi_da: std::sync::atomic::AtomicUsize,
+    /// IP nội bộ của từng lời gọi, theo thứ tự.
+    pub ip: std::sync::Mutex<Vec<String>>,
+    pub thong_ke_da_gui: std::sync::Mutex<Vec<String>>,
+}
+
+#[cfg(test)]
+impl KhoGia {
+    pub fn moi(dem: u32, tach: u32) -> Self {
+        KhoGia {
+            han: std::sync::Mutex::new(HanMuc { dem, tach }),
+            trang_thai: std::sync::Mutex::new("dung_thu"),
+            mat_mang: Default::default(),
+            loi_sau_ghi: Default::default(),
+            cho: Duration::ZERO,
+            dung: Default::default(),
+            da_ghi: Default::default(),
+            so_goi: Default::default(),
+            dang_goi: Default::default(),
+            dong_thoi_toi_da: Default::default(),
+            ip: Default::default(),
+            thong_ke_da_gui: Default::default(),
+        }
+    }
+
+    pub fn da_dung(&self) -> HanMuc {
+        *self.dung.lock().unwrap()
+    }
+
+    fn goi<R>(&self, may: &ThongTinMay, f: impl FnOnce() -> Result<R, String>) -> Result<R, String> {
+        use std::sync::atomic::Ordering::SeqCst;
+        self.so_goi.fetch_add(1, SeqCst);
+        let n = self.dang_goi.fetch_add(1, SeqCst) + 1;
+        self.dong_thoi_toi_da.fetch_max(n, SeqCst);
+        self.ip.lock().unwrap().push(may.ip_noi_bo.clone());
+        std::thread::sleep(self.cho);
+        let kq = if self.mat_mang.load(SeqCst) { Err("mất mạng".into()) } else { f() };
+        self.dang_goi.fetch_sub(1, SeqCst);
+        kq
+    }
+
+    fn tra_loi(&self, may: &ThongTinMay, da_ghi: Vec<String>) -> KetQuaTram {
+        let (han, dung) = (*self.han.lock().unwrap(), self.da_dung());
+        let du_lieu = json!({ "ma_may": may.ma, "nonce": "", "han_dem": han.dem, "han_tach": han.tach, "da_dung_dem": dung.dem, "da_dung_tach": dung.tach, "trang_thai": *self.trang_thai.lock().unwrap(), "da_ghi": da_ghi });
+        giai_du_lieu(&TraLoiKy { du_lieu: du_lieu.to_string(), chu_ky: "gia".into() }, &may.ma, None).unwrap()
+    }
+}
+
+#[cfg(test)]
+impl KhoLicense for KhoGia {
+    fn kiem_tra(&self, may: &ThongTinMay) -> Result<KetQuaTram, String> {
+        self.goi(may, || Ok(self.tra_loi(may, Vec::new())))
+    }
+
+    fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay], _ma_vua_chay: Option<&str>) -> Result<KetQuaTram, String> {
+        self.goi(may, || {
+            let mut ghi = Vec::new();
+            for l in lan {
+                if self.da_ghi.lock().unwrap().insert(l.ma.clone()) {
+                    let mut d = self.dung.lock().unwrap();
+                    match l.cn {
+                        crate::license::ChucNang::Dem => d.dem += 1,
+                        crate::license::ChucNang::Tach => d.tach += 1,
+                    }
+                }
+                ghi.push(l.ma.clone());
+            }
+            if self.loi_sau_ghi.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                return Err("hết thời gian chờ".into());
+            }
+            Ok(self.tra_loi(may, ghi))
+        })
+    }
+
+    fn thong_ke(&self, may: &ThongTinMay, hanh_dong: &str, _them: Value) -> Result<(), String> {
+        self.goi(may, || {
+            self.thong_ke_da_gui.lock().unwrap().push(hanh_dong.into());
+            Ok(())
+        })
+    }
+
+    fn doc_da_luu(&self, tl: &TraLoiKy, ma_may: &str) -> Option<TrangThaiMay> {
+        giai_du_lieu(tl, ma_may, None).ok().map(|k| k.may)
+    }
 }
 
 #[cfg(test)]

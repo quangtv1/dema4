@@ -138,6 +138,7 @@ impl HopTroGiup {
                     &[
                         ("Ứng dụng", "sm-dema4", true, 12.0),
                         ("Phiên bản", PHIEN_BAN, true, 12.0),
+                        ("Mã máy", &crate::license::ma_may(), true, 12.0),
                         ("Chức năng", "Đếm trang A4 · Tách văn bản PDF", false, 12.0),
                         ("Đơn vị", "Giải pháp số Sao Mai", false, 12.0),
                         ("Website", WEBSITE, false, 12.0),

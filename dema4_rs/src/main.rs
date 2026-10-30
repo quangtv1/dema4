@@ -15,6 +15,7 @@ mod dem_pdf;
 mod gioi_thieu;
 mod license;
 mod tram;
+mod hop_license;
 mod gui;
 #[allow(dead_code)] // nối dần vào giao diện
 mod gui_tach;
@@ -35,13 +36,19 @@ fn main() {
                 use windows_sys::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
                 AttachConsole(ATTACH_PARENT_PROCESS);
             }
-            if thu_muc == "--tach" {
-                std::process::exit(chay_tach(&std::env::args().skip(2).collect::<Vec<_>>()));
-            }
-            let khong_ghi = std::env::args().any(|a| a == "--khong-ghi");
-            let kiem_tra_dpi = std::env::args().any(|a| a == "--dpi");
-            let kiem_tra_ky = std::env::args().any(|a| a == "--kyso");
-            std::process::exit(chay_dong_lenh(&thu_muc, kiem_tra_dpi, kiem_tra_ky, khong_ghi));
+            let kt = license::KiemTra::mac_dinh();
+            kt.mo_app();
+            let ma = if thu_muc == "--tach" {
+                chay_tach(&kt, &std::env::args().skip(2).collect::<Vec<_>>())
+            } else {
+                let khong_ghi = std::env::args().any(|a| a == "--khong-ghi");
+                let kiem_tra_dpi = std::env::args().any(|a| a == "--dpi");
+                let kiem_tra_ky = std::env::args().any(|a| a == "--kyso");
+                chay_dong_lenh(&kt, &thu_muc, kiem_tra_dpi, kiem_tra_ky, khong_ghi)
+            };
+            // Chờ luồng gửi ghi lượt / thống kê lên trạm trước khi thoát (Ctrl+C: đặt chỗ còn trên đĩa, lần sau tính)
+            let _ = kt.moc().recv_timeout(std::time::Duration::from_secs(20));
+            std::process::exit(ma);
         }
         None => {
             if let Err(e) = gui::chay() {
@@ -52,7 +59,23 @@ fn main() {
     }
 }
 
-fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_ghi: bool) -> i32 {
+/// Hết lượt: in lý do + cách liên hệ + mã máy, mã thoát 3.
+fn bat_dau_luot(kt: &license::KiemTra, cn: license::ChucNang) -> Result<license::LanChay, i32> {
+    kt.bat_dau(cn).map_err(|qd| {
+        let ten = if cn == license::ChucNang::Dem { "Đếm" } else { "Tách" };
+        eprintln!("Số lần {ten} còn lại (0). Liên hệ với Sao Mai để được hỗ trợ: {} · {} · Mã máy: {}", hop_license::DIEN_THOAI, hop_license::EMAIL, kt.ma_may());
+        if matches!(qd, license::QuyetDinh::HetLuotOffline(_)) {
+            eprintln!("Chưa kết nối được máy chủ — kết nối mạng rồi chạy lại.");
+        }
+        3
+    })
+}
+
+fn chay_dong_lenh(kt: &license::KiemTra, thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_ghi: bool) -> i32 {
+    let lan = match bat_dau_luot(kt, license::ChucNang::Dem) {
+        Ok(l) => l,
+        Err(ma) => return ma,
+    };
     let bat_dau = std::time::Instant::now();
     let (gui, nhan) = mpsc::channel();
     dem_pdf::dem_thu_muc(thu_muc, cau_hinh::doc().quy_tac(), kiem_tra_dpi, kiem_tra_ky, &AtomicBool::new(false), &gui);
@@ -66,6 +89,8 @@ fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_gh
             _ => {}
         }
     }
+    // Có kết quả là tính lượt (cả khi chỉ in, --khong-ghi); không đếm được file nào → hoàn lượt
+    kt.ket_thuc(&lan, ket_qua.as_ref().is_some_and(|k| !k.dong_tong_hop.is_empty()));
     let Some(kq) = ket_qua else {
         eprintln!("Không có kết quả đếm");
         return 1;
@@ -78,13 +103,8 @@ fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_gh
     match dem_pdf::luu_ket_qua(&kq, &duong_dan) {
         Ok(chi_tiet) => {
             println!("Kết quả đếm ghi tại file:\n {}\n {}", duong_dan.display(), chi_tiet.display());
-            if let Some(kho) = tram::kho_that() {
-                use tram::KhoLicense;
-                match kho.thong_ke(&tram::ThongTinMay::hien_tai(), "thong_ke_dem", tram::so_lieu_dem(thu_muc, &kq, bat_dau.elapsed())) {
-                    Ok(()) => println!("Đã gửi thống kê"),
-                    Err(e) => eprintln!("Không gửi được thống kê: {e}"),
-                }
-            }
+            let so_lieu = tram::so_lieu_dem(thu_muc, &kq, bat_dau.elapsed());
+            kt.thong_ke("thong_ke_dem", move |_| so_lieu);
             0
         }
         Err(e) => {
@@ -96,7 +116,7 @@ fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_gh
 
 /// `--tach <thư mục pdf> [--nhan <file>] [--ra <thư mục cha>]`: cắt theo nhãn có sẵn (không phân tích).
 /// Nhãn mặc định `index_and_blank.txt`, góc xoay `xoay_trang.txt` (nếu có) trong thư mục dữ liệu ẩn của `<thư mục>`.
-fn chay_tach(tham_so: &[String]) -> i32 {
+fn chay_tach(kt: &license::KiemTra, tham_so: &[String]) -> i32 {
     use std::path::{Path, PathBuf};
     use tach_vb::{nhan, tach};
     let mut thu_muc: Option<PathBuf> = None;
@@ -156,8 +176,14 @@ fn chay_tach(tham_so: &[String]) -> i32 {
         Ok(r) => r,
         Err(e) => { eprintln!("{e}"); return 2; }
     };
+    let lan = match bat_dau_luot(kt, license::ChucNang::Tach) {
+        Ok(l) => l,
+        Err(ma) => return ma,
+    };
     let bat_dau = std::time::Instant::now();
-    let kq = match tach::tach_thu_muc(&thu_muc, &ra, &ho_so, tach::MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}) {
+    let kq = tach::tach_thu_muc(&thu_muc, &ra, &ho_so, tach::MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {});
+    kt.ket_thuc(&lan, kq.as_ref().is_ok_and(|k| !k.dong.is_empty()));
+    let kq = match kq {
         Ok(k) => k,
         Err(e) => { eprintln!("{e}"); return 2; }
     };
@@ -176,12 +202,54 @@ fn chay_tach(tham_so: &[String]) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::chay_tach;
+    use super::{chay_dong_lenh, chay_tach};
+    use crate::license::KiemTra;
+    use crate::tram::KhoGia;
+    use std::sync::Arc;
+
+    fn kt() -> Arc<KiemTra> {
+        KiemTra::mac_dinh()
+    }
+
+    /// Hạn mức đã biết từ trạm (giả): mở app → đọc trạng thái ký.
+    fn kt_han(dem: u32, tach: u32) -> Arc<KiemTra> {
+        let kt = KiemTra::gia(Arc::new(KhoGia::moi(dem, tach)));
+        kt.mo_app();
+        kt.moc().recv().unwrap();
+        kt
+    }
+
+    #[test]
+    fn dem_khong_ghi_van_tinh_luot() {
+        let goc = std::env::temp_dir().join(format!("dema4_cli_luot_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        std::fs::create_dir_all(&goc).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 1);
+        let kt = kt_han(2, 2);
+        let tm = goc.to_string_lossy().into_owned();
+        assert_eq!(chay_dong_lenh(&kt, &tm, false, false, true), 0);
+        assert_eq!(chay_dong_lenh(&kt, &tm, false, false, true), 0);
+        assert_eq!(chay_dong_lenh(&kt, &tm, false, false, true), 3, "hạn 2 → lần 3 bị chặn");
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    #[test]
+    fn tach_het_luot_khong_ghi_ket_qua() {
+        let goc = std::env::temp_dir().join(format!("dema4_cli_het_luot_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let nguon = goc.join("nguon");
+        std::fs::create_dir_all(&nguon).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&nguon.join("c.pdf"), 2);
+        assert_eq!(chay_tach(&kt_han(5, 0), &[nguon.to_string_lossy().into_owned()]), 3);
+        assert!(!goc.join("nguon_vanban").exists(), "hết lượt: không tạo thư mục kết quả");
+        let _ = std::fs::remove_dir_all(crate::tach_vb::phien::thu_muc_an(&nguon));
+        let _ = std::fs::remove_dir_all(&goc);
+    }
 
     #[test]
     fn tach_thieu_thu_muc_bao_loi() {
-        assert_eq!(chay_tach(&[]), 2);
-        assert_eq!(chay_tach(&["/khong/co/thu/muc/nay".to_string()]), 2);
+        assert_eq!(chay_tach(&kt(), &[]), 2);
+        assert_eq!(chay_tach(&kt(), &["/khong/co/thu/muc/nay".to_string()]), 2);
     }
 
     #[test]
@@ -194,8 +262,8 @@ mod tests {
         std::fs::write(nguon.join(".sm-dema4/index_and_blank.txt"), "a.pdf;2;index\n").unwrap();
         std::fs::write(nguon.join(".sm-dema4/xoay_trang.txt"), "a.pdf;4;180\n").unwrap();
         // Chỉ file nhãn không tồn tại → mã thoát 2
-        assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned(), "--nhan".into(), "/khong/co.txt".into()]), 2);
-        assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned()]), 0);
+        assert_eq!(chay_tach(&kt(), &[nguon.to_string_lossy().into_owned(), "--nhan".into(), "/khong/co.txt".into()]), 2);
+        assert_eq!(chay_tach(&kt(), &[nguon.to_string_lossy().into_owned()]), 0);
         let ra = goc.join("ho so_vanban").join("a");
         let doc = mupdf::pdf::PdfDocument::open(ra.join("a.2.pdf").to_str().unwrap()).unwrap();
         assert_eq!(doc.page_count().unwrap(), 2);
@@ -216,7 +284,7 @@ mod tests {
         let nguon = goc.join("nguon");
         std::fs::create_dir_all(&nguon).unwrap();
         crate::tach_vb::tach::tests::tao_pdf(&nguon.join("b.pdf"), 3);
-        assert_eq!(chay_tach(&[nguon.to_string_lossy().into_owned()]), 0);
+        assert_eq!(chay_tach(&kt(), &[nguon.to_string_lossy().into_owned()]), 0);
         let an = crate::tach_vb::phien::thu_muc_an(&nguon);
         let nhan = std::fs::read_to_string(an.join("index_and_blank.txt")).unwrap();
         assert_eq!(nhan.lines().count(), 3, "3 trang chữ nhỏ → blank: {nhan}");

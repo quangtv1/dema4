@@ -1,7 +1,11 @@
 //! License giới hạn số lần Đếm / Tách — phần lõi không gọi mạng: mã máy, quyết định cho chạy / chặn,
 //! sổ lượt trên đĩa (đặt chỗ trước khi chạy, lần chạy chờ trạm xác nhận, câu trả lời có chữ ký gần nhất).
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+
+use crate::tram::{KetQuaTram, KhoLicense, ThongTinMay};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChucNang {
@@ -199,6 +203,7 @@ impl NoiDung {
 }
 
 impl SoLuot {
+    #[cfg(test)]
     pub fn moi(noi: Vec<PathBuf>) -> Self {
         Self { noi }
     }
@@ -309,6 +314,188 @@ impl SoLuot {
 
     pub fn tra_loi(&self) -> Option<TraLoiKy> {
         self.doc().tra_loi
+    }
+}
+
+/// Việc của luồng gửi (1 luồng / app: không có 2 lời gọi trạm cùng lúc).
+enum Viec {
+    /// Ghi các lần chờ lên trạm (không có thì `kiem_tra`) rồi cập nhật câu trả lời ký.
+    DongBo(Option<String>),
+    ThongKe(&'static str, Box<dyn FnOnce(&ThongTinMay) -> serde_json::Value + Send>),
+    /// Mốc: báo khi mọi việc trước đó đã xong.
+    Moc(std::sync::mpsc::Sender<()>),
+}
+
+type LayIp = Box<dyn Fn() -> (String, String) + Send + Sync>;
+
+struct Chung {
+    kho: Option<Arc<dyn KhoLicense>>,
+    so: SoLuot,
+    ma: String,
+    ten: String,
+    mac: String,
+    lay_ip: LayIp,
+    da_ky: Mutex<Option<TrangThaiMay>>,
+    /// Đặt chỗ của chính app này đang chạy (không gửi trạm khi chưa xong).
+    dang_chay: Mutex<HashSet<String>>,
+}
+
+impl Chung {
+    /// Tên máy / MAC đọc 1 lần; IP đọc lại mỗi lời gọi (máy có thể đã chuyển mạng).
+    fn may(&self) -> ThongTinMay {
+        let (ip_noi_bo, ip_public) = (self.lay_ip)();
+        ThongTinMay { ma: self.ma.clone(), ten: self.ten.clone(), mac: self.mac.clone(), ip_noi_bo, ip_public, phien_ban: env!("CARGO_PKG_VERSION").into() }
+    }
+
+    fn nhan(&self, kq: &KetQuaTram) {
+        self.so.luu_tra_loi(&kq.ky);
+        *self.da_ky.lock().unwrap() = Some(kq.may);
+        self.so.da_xac_nhan(&kq.da_ghi);
+    }
+
+    /// Lỗi → giữ nguyên sổ, lần sau gửi lại (trạm chống trùng theo mã lần).
+    fn dong_bo(&self, ma_vua_chay: Option<&str>) {
+        let Some(kho) = &self.kho else { return };
+        let may = self.may();
+        let dang = self.dang_chay.lock().unwrap().clone();
+        let cho: Vec<LanChay> = self.so.cho_ghi().into_iter().filter(|l| l.trang_thai == TrangThaiLan::DaChay || !dang.contains(&l.ma)).collect();
+        if cho.is_empty() {
+            if let Ok(kq) = kho.kiem_tra(&may) {
+                self.nhan(&kq);
+            }
+            return;
+        }
+        for phan in cho.chunks(TOI_DA_LAN_MOI_LOI_GOI) {
+            match kho.ghi_lan(&may, phan, ma_vua_chay) {
+                Ok(kq) => self.nhan(&kq),
+                Err(_) => return,
+            }
+        }
+    }
+}
+
+/// Trạm nhận tối đa 3 lần mỗi lời gọi (1 vừa chạy + bù offline).
+const TOI_DA_LAN_MOI_LOI_GOI: usize = 3;
+
+/// License của app: quyết định tức thì (không chờ mạng) + 1 luồng gửi lên trạm.
+pub struct KiemTra {
+    chung: Arc<Chung>,
+    viec: Mutex<std::sync::mpsc::Sender<Viec>>,
+}
+
+impl KiemTra {
+    pub fn moi(kho: Option<Arc<dyn KhoLicense>>, so: SoLuot, ma: String, ten: String, mac: String, lay_ip: LayIp) -> Self {
+        let da_ky = so.tra_loi().zip(kho.as_ref()).and_then(|(tl, k)| k.doc_da_luu(&tl, &ma));
+        let chung = Arc::new(Chung { kho, so, ma, ten, mac, lay_ip, da_ky: Mutex::new(da_ky), dang_chay: Mutex::default() });
+        let (gui, nhan) = std::sync::mpsc::channel::<Viec>();
+        let c = Arc::clone(&chung);
+        std::thread::spawn(move || {
+            for v in nhan {
+                match v {
+                    Viec::DongBo(ma) => c.dong_bo(ma.as_deref()),
+                    Viec::ThongKe(hd, soan) => {
+                        if let Some(kho) = &c.kho {
+                            let may = c.may();
+                            let _ = kho.thong_ke(&may, hd, soan(&may));
+                        }
+                    }
+                    Viec::Moc(xong) => {
+                        let _ = xong.send(());
+                    }
+                }
+            }
+        });
+        KiemTra { chung, viec: Mutex::new(gui) }
+    }
+
+    /// Trạm thật + sổ lượt thật, dùng chung cả app.
+    fn that() -> Arc<KiemTra> {
+        static KT: OnceLock<Arc<KiemTra>> = OnceLock::new();
+        KT.get_or_init(|| {
+            let kho = crate::tram::KhoTram::moi().map(|k| Arc::new(k) as Arc<dyn KhoLicense>);
+            use crate::telegram::{dia_chi_mac, ip_noi_bo, ip_public, ten_pc};
+            Arc::new(KiemTra::moi(kho, SoLuot::mac_dinh(), ma_may(), ten_pc(), dia_chi_mac(), Box::new(|| (ip_noi_bo(), ip_public()))))
+        })
+        .clone()
+    }
+
+    /// Kho giả hạn mức lớn + sổ lượt trong thư mục tạm riêng: test không gọi trạm thật, không đụng sổ thật.
+    #[cfg(test)]
+    pub fn gia(kho: Arc<crate::tram::KhoGia>) -> Arc<KiemTra> {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static DEM: AtomicUsize = AtomicUsize::new(0);
+        let d = std::env::temp_dir().join(format!("dema4_kiem_tra_{}_{}", std::process::id(), DEM.fetch_add(1, Ordering::SeqCst)));
+        let _ = std::fs::remove_dir_all(&d);
+        Arc::new(KiemTra::moi(Some(kho), SoLuot::moi(vec![d]), "SM-0000-0000-0001".into(), "PC-TEST".into(), "AA:BB".into(), Box::new(|| ("?".into(), "?".into()))))
+    }
+
+    /// Mặc định của giao diện: app thật dùng trạm thật; test dùng kho giả hạn mức lớn.
+    pub fn mac_dinh() -> Arc<KiemTra> {
+        #[cfg(test)]
+        return KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(1_000_000, 1_000_000)));
+        #[cfg(not(test))]
+        KiemTra::that()
+    }
+
+    pub fn ma_may(&self) -> &str {
+        &self.chung.ma
+    }
+
+    fn gui(&self, v: Viec) {
+        let _ = self.viec.lock().unwrap().send(v);
+    }
+
+    /// Quyết định tức thì trên câu trả lời ký gần nhất + sổ lượt (không gọi mạng).
+    pub fn quyet_dinh(&self, cn: ChucNang) -> QuyetDinh {
+        quyet_dinh(self.chung.da_ky.lock().unwrap().as_ref(), &self.chung.so.cho_ghi(), cn)
+    }
+
+    /// Được chạy → ghi đặt chỗ lên đĩa **trước khi** chạy; hết lượt → lý do để hiện popup.
+    pub fn bat_dau(&self, cn: ChucNang) -> Result<LanChay, QuyetDinh> {
+        match self.quyet_dinh(cn) {
+            QuyetDinh::Cho => {
+                let lan = self.chung.so.dat_cho(cn);
+                self.chung.dang_chay.lock().unwrap().insert(lan.ma.clone());
+                Ok(lan)
+            }
+            qd => Err(qd),
+        }
+    }
+
+    /// Chạy xong: có kết quả → tính lượt + ghi lên trạm ở luồng nền; không có → hoàn lượt.
+    pub fn ket_thuc(&self, lan: &LanChay, co_ket_qua: bool) {
+        self.chung.so.xong(&lan.ma, co_ket_qua);
+        self.chung.dang_chay.lock().unwrap().remove(&lan.ma);
+        if co_ket_qua {
+            self.gui(Viec::DongBo(Some(lan.ma.clone())));
+        }
+    }
+
+    /// Mở app: hỏi trạm + ghi bù các lần chạy offline.
+    pub fn mo_app(&self) {
+        self.gui(Viec::DongBo(None));
+    }
+
+    /// Nút Kiểm tra lại: hỏi trạm; nhận tín hiệu khi xong (nơi gọi chờ tối đa 8 s rồi `quyet_dinh` lại).
+    pub fn kiem_tra_lai(&self) -> std::sync::mpsc::Receiver<()> {
+        self.gui(Viec::DongBo(None));
+        self.moc()
+    }
+
+    /// Báo khi mọi việc đã xếp trước đó xong (dòng lệnh chờ ghi trạm trước khi thoát).
+    pub fn moc(&self) -> std::sync::mpsc::Receiver<()> {
+        let (gui, nhan) = std::sync::mpsc::channel();
+        self.gui(Viec::Moc(gui));
+        nhan
+    }
+
+    /// Gửi số liệu thống kê ở luồng gửi; false khi chưa có trạm (popup không hiện dòng "đã ghi lại").
+    pub fn thong_ke(&self, hanh_dong: &'static str, soan: impl FnOnce(&ThongTinMay) -> serde_json::Value + Send + 'static) -> bool {
+        if self.chung.kho.is_none() {
+            return false;
+        }
+        self.gui(Viec::ThongKe(hanh_dong, Box::new(soan)));
+        true
     }
 }
 
@@ -438,5 +625,168 @@ mod tests {
         assert_eq!(trang_thai_tu_ma("khoa"), TrangThai::Khoa);
         assert_eq!(trang_thai_tu_ma("abc"), TrangThai::Khoa);
         assert_eq!(trang_thai_tu_ma(""), TrangThai::Khoa);
+    }
+
+    mod kiem_tra {
+        use super::super::*;
+        use crate::tram::KhoGia;
+        use std::sync::atomic::Ordering::SeqCst;
+        use std::time::{Duration, Instant};
+
+        fn cho(kt: &KiemTra) {
+            kt.moc().recv_timeout(Duration::from_secs(5)).unwrap();
+        }
+
+        fn chay(kt: &KiemTra, cn: ChucNang) -> bool {
+            match kt.bat_dau(cn) {
+                Ok(l) => {
+                    kt.ket_thuc(&l, true);
+                    cho(kt);
+                    true
+                }
+                Err(_) => false,
+            }
+        }
+
+        #[test]
+        fn may_moi_cho_2_lan_roi_chan() {
+            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kt = KiemTra::gia(kho.clone());
+            kt.mo_app();
+            cho(&kt);
+            assert!(chay(&kt, ChucNang::Dem) && chay(&kt, ChucNang::Dem));
+            assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuot(ChucNang::Dem));
+            assert!(chay(&kt, ChucNang::Tach), "Tách tính riêng");
+            assert_eq!(kho.da_dung(), HanMuc { dem: 2, tach: 1 });
+        }
+
+        #[test]
+        fn quyet_dinh_khong_goi_mang() {
+            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kt = KiemTra::gia(kho.clone());
+            let t = Instant::now();
+            for _ in 0..100 {
+                assert_eq!(kt.quyet_dinh(ChucNang::Dem), QuyetDinh::Cho);
+            }
+            assert_eq!(kho.so_goi.load(SeqCst), 0);
+            assert!(t.elapsed() < Duration::from_millis(200), "{:?}", t.elapsed());
+        }
+
+        #[test]
+        fn thoat_giua_chung_van_bi_tinh() {
+            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kt = KiemTra::gia(kho.clone());
+            kho.mat_mang.store(true, SeqCst);
+            let _bo_do = kt.bat_dau(ChucNang::Tach).unwrap(); // app chết giữa chừng: không ket_thuc
+            let kt2 = KiemTra::moi(Some(kho.clone()), SoLuot::moi(kt.chung.so.noi.clone()), kt.chung.ma.clone(), "PC".into(), "AA".into(), Box::new(|| ("?".into(), "?".into())));
+            assert_eq!(kt2.chung.so.cho_ghi().len(), 1);
+            kho.mat_mang.store(false, SeqCst);
+            kt2.mo_app();
+            cho(&kt2);
+            assert_eq!(kho.da_dung().tach, 1, "lần bỏ dở gửi trạm khi mở lại");
+            assert!(kt2.chung.so.cho_ghi().is_empty());
+        }
+
+        #[test]
+        fn dung_khong_co_ket_qua_hoan_luot() {
+            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kt = KiemTra::gia(kho.clone());
+            for _ in 0..5 {
+                let l = kt.bat_dau(ChucNang::Dem).unwrap();
+                kt.ket_thuc(&l, false);
+            }
+            cho(&kt);
+            assert_eq!((kho.da_dung().dem, kho.so_goi.load(SeqCst)), (0, 0));
+        }
+
+        #[test]
+        fn dung_co_ket_qua_tinh_luot() {
+            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kt = KiemTra::gia(kho.clone());
+            assert!(chay(&kt, ChucNang::Tach));
+            assert_eq!(kho.da_dung().tach, 1);
+            assert!(kt.chung.so.cho_ghi().is_empty(), "trạm xác nhận → xoá khỏi sổ");
+        }
+
+        #[test]
+        fn timeout_khong_dem_trung() {
+            let kho = Arc::new(KhoGia::moi(5, 5));
+            let kt = KiemTra::gia(kho.clone());
+            kho.loi_sau_ghi.store(true, SeqCst);
+            assert!(chay(&kt, ChucNang::Dem));
+            assert_eq!(kt.chung.so.cho_ghi().len(), 1, "lỗi → giữ lại để gửi lại");
+            kt.mo_app();
+            cho(&kt);
+            assert_eq!(kho.da_dung().dem, 1, "gửi lại cùng mã lần không cộng thêm");
+            assert!(kt.chung.so.cho_ghi().is_empty());
+        }
+
+        #[test]
+        fn mot_luong_gui() {
+            let mut k = KhoGia::moi(100, 100);
+            k.cho = Duration::from_millis(30);
+            let kho = Arc::new(k);
+            let kt = KiemTra::gia(kho.clone());
+            // Chưa được trạm xác nhận thì tối đa 2 lần liên tiếp (luật offline)
+            for _ in 0..2 {
+                let l = kt.bat_dau(ChucNang::Dem).unwrap();
+                kt.ket_thuc(&l, true);
+            }
+            kt.mo_app();
+            kt.thong_ke("thong_ke_dem", |_| serde_json::json!({}));
+            cho(&kt);
+            assert_eq!(kho.dong_thoi_toi_da.load(SeqCst), 1);
+            assert_eq!(kho.da_dung().dem, 2);
+            assert_eq!(kt.quyet_dinh(ChucNang::Dem), QuyetDinh::Cho, "đã xác nhận → chạy tiếp được");
+            assert_eq!(*kho.thong_ke_da_gui.lock().unwrap(), ["thong_ke_dem"]);
+        }
+
+        #[test]
+        fn ip_doc_lai_moi_loi_goi() {
+            use std::sync::atomic::AtomicUsize;
+            let kho = Arc::new(KhoGia::moi(9, 9));
+            let n = Arc::new(AtomicUsize::new(0));
+            let n2 = n.clone();
+            let d = std::env::temp_dir().join(format!("dema4_kiem_tra_ip_{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&d);
+            let kt = KiemTra::moi(Some(kho.clone()), SoLuot::moi(vec![d]), "SM-0000-0000-0002".into(), "PC".into(), "AA".into(), Box::new(move || (format!("10.0.0.{}", n2.fetch_add(1, SeqCst) + 1), "?".into())));
+            kt.mo_app();
+            kt.mo_app();
+            cho(&kt);
+            assert_eq!(*kho.ip.lock().unwrap(), ["10.0.0.1", "10.0.0.2"]);
+        }
+
+        #[test]
+        fn khoa_sau_lan_chay_ke() {
+            let kho = Arc::new(KhoGia::moi(100, 100));
+            let kt = KiemTra::gia(kho.clone());
+            *kho.trang_thai.lock().unwrap() = "khoa";
+            assert!(chay(&kt, ChucNang::Dem), "chưa biết bị khoá → lần này vẫn chạy");
+            assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuot(ChucNang::Dem));
+        }
+
+        #[test]
+        fn khoa_offline_van_khoa() {
+            let kho = Arc::new(KhoGia::moi(100, 100));
+            let kt = KiemTra::gia(kho.clone());
+            *kho.trang_thai.lock().unwrap() = "khoa";
+            kt.mo_app();
+            cho(&kt);
+            kho.mat_mang.store(true, SeqCst);
+            let kt2 = KiemTra::moi(Some(kho.clone()), SoLuot::moi(kt.chung.so.noi.clone()), kt.chung.ma.clone(), "PC".into(), "AA".into(), Box::new(|| ("?".into(), "?".into())));
+            kt2.mo_app();
+            cho(&kt2);
+            assert_eq!(kt2.quyet_dinh(ChucNang::Tach), QuyetDinh::HetLuot(ChucNang::Tach), "trả lời ký Khoá lưu đĩa, mất mạng vẫn chặn");
+        }
+
+        #[test]
+        fn khong_co_tram_chi_2_lan() {
+            let d = std::env::temp_dir().join(format!("dema4_kiem_tra_khong_tram_{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&d);
+            let kt = KiemTra::moi(None, SoLuot::moi(vec![d]), "SM-0000-0000-0003".into(), "PC".into(), "AA".into(), Box::new(|| ("?".into(), "?".into())));
+            assert!(chay(&kt, ChucNang::Dem) && chay(&kt, ChucNang::Dem));
+            assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuotOffline(ChucNang::Dem));
+            assert!(!kt.thong_ke("thong_ke_dem", |_| serde_json::json!({})));
+        }
     }
 }
