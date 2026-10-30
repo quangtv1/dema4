@@ -2105,7 +2105,8 @@
   function batDauTach(dungO) {
     var tong = TEN.length, xong = 0, batDau = Date.now();
     var tongTrang = DT_TRANG.reduce(function (a, b) { return a + b; }, 0), tongVB = DT_VB.reduce(function (a, b) { return a + b; }, 0);
-    var ghi = { vb: 0, trang: 0, mb: 0 }, vbTrongHs = 0;
+    // ghi = mọi thứ đã ghi ra đĩa (kể cả hồ sơ đang dở — dùng ước thời gian); tron = chỉ các hồ sơ đã tách trọn (dòng "Đã xong")
+    var ghi = { vb: 0, trang: 0, mb: 0 }, tron = { trang: 0, mb: 0 }, vbTrongHs = 0;
     function veDangTach() {
       var tg = Date.now() - batDau;
       // Thanh tiến độ theo văn bản đã ghi (mịn hơn theo hồ sơ vì hồ sơ dài ngắn khác nhau)
@@ -2113,7 +2114,7 @@
       $('dtChu').textContent = Math.min(xong + 1, tong) + '/' + tong + ' hồ sơ · ' + soVN(ghi.vb) + '/' + soVN(tongVB) + ' văn bản · ' + Math.round(ghi.vb * 100 / tongVB) + '%';
       // Tên file văn bản đang ghi theo mẫu Cấu hình ({hoso}.{n})
       $('dtTen').textContent = xong < tong ? tenVanBan(xong, vbTrongHs + 1) : '—';
-      $('dtGhi').textContent = xong + ' hồ sơ · ' + soVN(ghi.trang) + ' trang · ' + soVN(ghi.mb) + ' MB';
+      $('dtGhi').textContent = xong + ' hồ sơ · ' + soVN(tron.trang) + ' trang · ' + soVN(tron.mb) + ' MB';
       var con = 'đang tính…';
       if (ghi.trang > 0) {
         var conMs = tg / ghi.trang * (tongTrang - ghi.trang), xongLuc = new Date(Date.now() + conMs);
@@ -2129,7 +2130,7 @@
     function buoc() {
       ghi.vb++; vbTrongHs++;
       ghi.trang += DT_TRANG[xong] / DT_VB[xong]; ghi.mb += DT_MB[xong] / DT_VB[xong];
-      if (vbTrongHs >= DT_VB[xong]) { ghi.trang = Math.round(ghi.trang); ghi.mb = Math.round(ghi.mb); xong++; vbTrongHs = 0; }
+      if (vbTrongHs >= DT_VB[xong]) { tron.trang += DT_TRANG[xong]; tron.mb += DT_MB[xong]; ghi.trang = tron.trang; ghi.mb = tron.mb; xong++; vbTrongHs = 0; }
       if (xong >= tong || xong === dungO) { veDangTach(); ketThucTach(xong < tong); return; }
       tachHenGio = setTimeout(buoc, 20);
     }
@@ -2185,7 +2186,7 @@
     s.daPT = true; ve(); batDauTach(99); clearTimeout(tachHenGio); clearInterval(tachDongHo);
     $('dtVach').style.width = '54%'; $('dtChu').textContent = '2/2 hồ sơ · 115/211 văn bản · 54%';
     $('dtTen').textContent = tenVanBan(1, 8);
-    $('dtGhi').textContent = '1 hồ sơ · 524 trang · 284 MB'; $('dtTg').innerHTML = 'Đã chạy <b>00:00:21</b> · còn ~00:00:17 (xong 08:42)'; $('dtToc').textContent = '23 trang/giây · 12,8 MB/giây';
+    $('dtGhi').textContent = '1 hồ sơ · 491 trang · 268 MB'; $('dtTg').innerHTML = 'Đã chạy <b>00:00:21</b> · còn ~00:00:17 (xong 08:42)'; $('dtToc').textContent = '23 trang/giây · 12,8 MB/giây';
   }
   if (location.hash === '#phan-tich-lai') $('nutPhanTich').onclick();
   if (location.hash === '#xem-1-trang') { s.daPT = true; s.che = 'vanban'; s.vb = 3; s.xemVB = 'mot'; ve(); }
