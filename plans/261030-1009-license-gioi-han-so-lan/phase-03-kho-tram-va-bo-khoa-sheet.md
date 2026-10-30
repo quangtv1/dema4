@@ -7,60 +7,54 @@ dependencies: [1, 2]
 effort: "1 ngày"
 ---
 
-# Phase 3: Kho license qua trạm + bỏ khoá service account khỏi exe
+# Phase 3: Kho trạm + bỏ khoá service account và token khỏi app
 
 ## Overview
-Phía app: trait `KhoLicense` với bản thật gọi trạm (HTTPS + kiểm chữ ký RSA) và bản giả cho test. Chuyển ghi thống kê Ngưỡng trắng **và gửi Telegram** sang trạm, rồi **xoá khoá service account và token Telegram khỏi app** (`build.rs`, CI secret, `google_sheet.rs`, phần gửi trong `telegram.rs`, `telegram.txt`).
+Phía app: trait `KhoLicense` (bản thật gọi trạm + kiểm chữ ký RSA; bản giả cho test). Gửi thống kê (Ngưỡng trắng + Telegram, cả GUI và CLI) qua trạm. Xoá khoá service account và token Telegram khỏi app — **không đổi tên `telegram.rs`** (giữ `SoLieuTach`, hàm thông tin máy, cờ hiển thị dòng công khai). <!-- Red Team: chỗ gọi bị sót -->
 
 ## Requirements
-- Mọi câu trả lời license phải qua kiểm chữ ký bằng khoá công khai nhúng sẵn; sai chữ ký / sai mã máy / sai nonce / thời điểm lệch > 10 phút → coi như không có mạng (luật offline), không tin dữ liệu.
-- Timeout 4 s mỗi lời gọi; lỗi trả `Err`, không panic.
-- Sau phase này exe không còn chứa khoá ghi Sheet nào và không còn token Telegram.
+- Câu trả lời chỉ được tin khi: `ok:true`, JSON hợp lệ, chữ ký đúng (khoá công khai nhúng), `ma_may` đúng, `nonce` đúng lời gọi. Mọi thứ khác (HTML, không phải JSON, `ok:false`) = lỗi → luật offline.
+- Timeout 8 s cho lời gọi nền (trạm chờ khoá ≤ 2,5 s); nút Kiểm tra lại chờ ≤ 8 s có hiển thị.
+- Sau phase này exe không chứa khoá ghi Sheet, không chứa token Telegram.
 
 ## Architecture
 ```rust
 pub trait KhoLicense: Send + Sync {
-    fn kiem_tra(&self, may: &ThongTinMay) -> Result<TrangThaiMay, String>;                    // trạm tự đăng ký máy mới
-    fn ghi_lan(&self, may: &ThongTinMay, cn: ChucNang, bu_offline: u32) -> Result<TrangThaiMay, String>; // 0 = online
+    fn kiem_tra(&self, may: &ThongTinMay) -> Result<TraLoiKy, String>;
+    fn ghi_lan(&self, may: &ThongTinMay, lan: &[LanChay]) -> Result<TraLoiKy, String>;   // TraLoiKy gồm da_ghi:[ma_lan]
+    fn thong_ke_dem(&self, may: &ThongTinMay, kq: &KetQuaDemTomTat) -> Result<(), String>;
+    fn thong_ke_tach(&self, may: &ThongTinMay, so_lieu: &SoLieuTach, nguong: Option<&ThongKeNguong>) -> Result<(), String>;
 }
-pub struct KhoTram { url: &'static str, khoa_cong_khai: rsa::RsaPublicKey }
-#[cfg(test)] pub struct KhoGia { … }   // trạng thái trong bộ nhớ, đếm số lần bị gọi, có thể chậm / lỗi giả
+pub struct KhoTram { url: &'static str, khoa_cong_khai: RsaPublicKey }
+#[cfg(test)] pub struct KhoGia { … }
 ```
-- `KhoTram`: tạo nonce ngẫu nhiên 16 byte / lời gọi; POST JSON; parse `{du_lieu, chu_ky}`; `VerifyingKey::<Sha256>::verify(du_lieu, chu_ky)`; parse `du_lieu`, đối chiếu `ma_may`, `nonce`, `luc`.
-- Khoá công khai `dema4_rs/assets/license_pub.pem` (nằm trong repo, công khai được) qua `include_str!`; URL trạm là hằng.
-- Thống kê: `gui_thong_ke` (nut_tach.rs) gọi trạm `thong_ke_tach`; Đếm xong (`gui.rs` chỗ `telegram::gui_tin`) gọi trạm `thong_ke_dem`; gửi số liệu có cấu trúc (struct `SoLieuDem` / `SoLieuTach` / `ThongKeNguong` đã có), chạy ngầm, im lặng khi lỗi như hiện nay.
-- `telegram.rs` chỉ giữ hàm lấy thông tin máy (`ten_pc`, `dia_chi_mac`, `ip_noi_bo`, `ip_public`) — đổi tên module thành `may.rs` cho đúng nghĩa; xoá `doc_cau_hinh`, `gui_tin`, `gui_file`, token nhúng, hỗ trợ `telegram.txt`.
-- Popup "Thông tin … đã được ghi lại" giữ nguyên (dòng công khai việc gửi thống kê).
-- Xoá: phần nhúng khoá trong `build.rs`, env `SM_DEMA4_SHEET_KEY_JSON` + secret `SHEET_KEY_JSON` trong `build.yml`, `google_sheet.rs` (JWT, token) nếu không còn ai dùng; giữ `dema4_rs/bi_mat/` trong `.gitignore`.
+- Nonce 16 byte từ `getrandom` mỗi lời gọi. ureq 3 tự theo chuyển hướng 302 của Apps Script (đã kiểm `ureq-proto` redirect).
+- `KetQuaDemTomTat`: rút từ `KetQuaDem` (số file, trang, quy A4, cảnh báo, lỗi, thời gian) — **không có `SoLieuDem`**.
+- Các chỗ gửi Telegram / Sheet phải chuyển (đủ danh sách): `gui.rs:524` (đếm GUI, đặt `co_telegram`), `main.rs:80-82` (đếm CLI), `nut_tach.rs:162-190` (`gui_thong_ke`: tin, CSV, Sheet), test `google_sheet.rs:182`.
+- `co_telegram`: = "đã gửi được số liệu lên trạm" (giữ dòng "Thông tin … đã được ghi lại").
+- Xoá: `build.rs` phần khoá Sheet, env `SM_DEMA4_SHEET_KEY_JSON` + secret trong `build.yml`, `google_sheet.rs`, trong `telegram.rs` các hàm `doc_cau_hinh`, `gui_tin`, `gui_file`, token nhúng, đọc `telegram.txt`.
 
 ## Related Code Files
-- Create: `dema4_rs/src/license/kho.rs` (hoặc gộp `license.rs`), `dema4_rs/assets/license_pub.pem`
-- Modify: `dema4_rs/src/gui_tach/nut_tach.rs` (thống kê qua trạm), `dema4_rs/src/gui.rs` (tin Đếm qua trạm), `dema4_rs/build.rs`, `.github/workflows/build.yml`, `dema4_rs/src/main.rs`, `.gitignore` (bỏ dòng telegram.txt nếu không còn dùng)
-- Rename: `dema4_rs/src/telegram.rs` → `dema4_rs/src/may.rs` (chỉ còn thông tin máy)
-- Delete: `dema4_rs/src/google_sheet.rs` (khi không còn tham chiếu)
+- Modify: `dema4_rs/src/license.rs` (hoặc `license/kho.rs`), `dema4_rs/src/telegram.rs`, `dema4_rs/src/gui.rs`, `dema4_rs/src/main.rs`, `dema4_rs/src/gui_tach/nut_tach.rs`, `dema4_rs/build.rs`, `.github/workflows/build.yml`, `.gitignore`
+- Create: `dema4_rs/assets/license_pub.pem`
+- Delete: `dema4_rs/src/google_sheet.rs`
 
 ## Tests trước
-1. `chu_ky_hop_le_duoc_chap_nhan`: tạo cặp khoá RSA trong test, ký `du_lieu` mẫu → `kiem_tra_tra_loi` trả trạng thái đúng.
-2. `chu_ky_sai_bi_tu_choi`: đổi 1 ký tự trong `du_lieu` → Err; chữ ký của máy khác (sai `ma_may`) → Err; sai `nonce` → Err; `luc` lệch 1 giờ → Err.
-3. `chu_ky_tu_apps_script_kiem_duoc`: hằng `du_lieu` + `chu_ky` chụp từ trạm thử (phase 2) + khoá công khai thật → Ok (chứng minh Apps Script và Rust tương thích).
-4. `kho_gia_hanh_vi`: đăng ký, ghi lần, ghi bù, chậm, lỗi.
-5. `#[ignore]` `kho_tram_that`: gọi trạm thật với mã thử, nhận trạng thái hợp lệ.
-6. `exe_khong_con_khoa_sheet`: build không đọc `bi_mat/sheet_key.json`; chuỗi `"private_key"` không có trong mã nguồn được build (grep trong test).
-7. `khong_con_token_telegram`: mã nguồn không còn mẫu token `\d{8,}:[A-Za-z0-9_-]{30,}` và không đọc `telegram.txt`.
-8. `so_lieu_gui_tram_dung_dang`: JSON gửi cho `thong_ke_dem` / `thong_ke_tach` có đủ trường, không có trường chữ tự do.
+1. `chu_ky_hop_le`, `chu_ky_sai_bi_tu_choi` (sửa 1 ký tự, sai ma_may, sai nonce), `tra_loi_html_la_loi`, `ok_false_la_loi`.
+2. `chu_ky_tu_apps_script_kiem_duoc`: cặp du_lieu / chu_ky thật lấy từ trạm thử (sau phase 5) + khoá công khai thật.
+3. `khong_con_khoa_va_token`: mã nguồn không còn `private_key`, không còn mẫu token `\d{8,}:[A-Za-z0-9_-]{30,}`, không đọc `telegram.txt`.
+4. `so_lieu_gui_tram_du_truong`: JSON thống kê đếm / tách đủ trường, không có chữ tự do ngoài tên thư mục.
+5. `#[ignore]` `kho_tram_that`.
 
 ## Implementation Steps
-1. Viết test 1–4, 6 (đỏ) → code `KhoTram` (parse + verify), `KhoGia`.
-2. Lấy 1 cặp `du_lieu` / `chu_ky` thật từ trạm thử, viết test 3 → xanh.
-3. Chuyển thống kê sang trạm; xoá phần khoá service account; `cargo test --release` xanh; build CI không cần secret Sheet.
+1. Test 1, 3, 4 (đỏ) → `KhoTram`, `KhoGia` → xanh.
+2. Chuyển 4 chỗ gọi; xoá khoá / token; `cargo test --release` xanh; CI build không cần secret Sheet.
+3. Sau phase 5: test 2, 5.
 
 ## Success Criteria
-- [ ] Test 1–4, 6 xanh; test 3 xanh với dữ liệu thật từ Apps Script.
-- [ ] `strings dema4_saomai | grep -c "BEGIN PRIVATE KEY"` = 0; không còn chuỗi dạng token bot Telegram.
-- [ ] Đếm / Tách xong: tin + CSV vẫn tới nhóm Telegram (qua trạm).
-- [ ] Tách xong vẫn có hàng mới ở tab Ngưỡng trắng (qua trạm).
+- [ ] Test xanh; `strings` exe không có `BEGIN PRIVATE KEY` / chuỗi dạng token bot.
+- [ ] Đếm (GUI + CLI) / Tách xong: tin + CSV tới nhóm, hàng Ngưỡng trắng có trên Sheet (qua trạm).
 
 ## Risk Assessment
-- Khác biệt định dạng chữ ký Apps Script ↔ crate `rsa` → test 3 bắt sớm.
-- Đồng hồ máy khách sai > 10 phút → mọi câu trả lời bị từ chối → máy rơi về luật offline. Giảm nhẹ: không so `luc` với đồng hồ máy mà so nonce (đủ chống phát lại); `luc` chỉ để ghi log. Chốt khi code: **dùng nonce, bỏ kiểm `luc`**.
-- Đổi mẫu tin: phải sửa ở trạm (JS), không ở app — ghi chú trong `apps-script/README.md`.
+- Định dạng chữ ký Apps Script ↔ crate `rsa` → test 2 bắt sớm.
+- Đổi mẫu tin phải sửa ở trạm (JS) — ghi trong README apps-script.

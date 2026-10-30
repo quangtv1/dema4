@@ -10,56 +10,52 @@ effort: "1.5 ngày"
 # Phase 4: Gắn license vào giao diện và dòng lệnh
 
 ## Overview
-Bấm Đếm / Tách quyết định **tức thì** trên bản sao license trong bộ nhớ (không gọi mạng); được thì chạy, không thì popup chặn. Mọi gọi trạm chạy ở luồng ngầm. Áp cho cả CLI.
+Bấm Đếm / Tách: quyết định **tức thì** trên câu trả lời ký gần nhất (đọc từ đĩa) + sổ lượt; được thì **đặt chỗ** rồi chạy; xong có kết quả thì ghi lên trạm ở luồng nền. Áp cho GUI và CLI (cả `--khong-ghi`).
 
 ## Requirements
-- Bấm Đếm / Tách không chờ mạng; chỉ nút **Kiểm tra lại** trên popup mới chờ (hiện "Đang kiểm tra…", bỏ cuộc sau 4 s).
-- Gọi trạm chỉ ở 3 thời điểm: lúc mở app, sau mỗi lần chạy xong (`ghi_lan` trả luôn trạng thái mới), khi bấm Kiểm tra lại. **Không hẹn giờ làm mới.**
-- Popup chặn: **logo Sao Mai** (~64 px, giữa, bấm mở saomaiso.com, dùng lại `tro_giup::logo`) trên cùng; **icon ổ khoá** (nét mảnh, màu đỏ, ~30 px) **bên trái** 2 dòng lý do; icon nằm trên cột nhãn, 2 dòng lý do cân trái thẳng cột giá trị của bảng Mã máy / Điện thoại / Email bên dưới; lý do **một mẫu chung, 2 dòng**: `Lý do: Số lần Đếm còn lại (0)` / `Liên hệ với Sao Mai để được hỗ trợ.` (Đếm / Tách theo nút vừa bấm; máy bị Khoá cũng hiện còn lại 0, không nói là bị khoá; hết lượt offline thêm dòng nhỏ "Chưa kết nối được máy chủ — kết nối mạng rồi bấm Kiểm tra lại."); mã máy + Copy; SĐT **0979824615** (Copy); email **hotro@saomaiso.com** (bấm mở `mailto:` kèm mã máy trong tiêu đề, Copy); web **saomaiso.com**; nút **Kiểm tra lại**, **Đóng**.
-- Dòng lệnh: chặn → in thông báo + mã máy, mã thoát 3.
-- Hộp Thông tin hiện mã máy (có Copy).
+- Bấm Đếm / Tách không chờ mạng; chỉ **Kiểm tra lại** chờ (≤ 8 s, hiện "Đang kiểm tra…").
+- Gọi trạm chỉ ở: mở app (`kiem_tra` + ghi bù lần chờ), sau mỗi lần chạy xong, Kiểm tra lại. **Không hẹn giờ làm mới.**
+- **Một luồng gửi duy nhất** (hàng việc trong `KiemTra`): không có 2 lời gọi trạm cùng lúc từ 1 app; câu trả lời chỉ xoá đúng các `ma_lan` trạm báo đã ghi. <!-- Red Team: tranh chấp luồng -->
+- **Có kết quả là tính** (kể cả Dừng hoặc lỗi giữa chừng): Đếm có ≥ 1 file đếm được, Tách có ≥ 1 văn bản ghi ra; không có gì → hoàn lượt. <!-- Quyết định chủ sản phẩm 2026-10-30 -->
+- Popup chặn theo prototype `#het-luot`: logo Sao Mai giữa (bấm mở saomaiso.com), icon ổ khoá đỏ bên trái 2 dòng lý do `Lý do: Số lần Đếm còn lại (0)` / `Liên hệ với Sao Mai để được hỗ trợ.` (Khoá cũng hiện còn lại 0; offline thêm dòng "Chưa kết nối được máy chủ — kết nối mạng rồi bấm Kiểm tra lại."), mã máy, SĐT 0979824615, email hotro@saomaiso.com (mailto kèm mã máy), saomaiso.com — mỗi dòng có Copy; nút Kiểm tra lại, Đóng.
+- CLI: chặn → in lý do + mã máy, mã thoát 3. Hộp Thông tin hiện mã máy.
 
 ## Architecture
-- `license::KiemTra` (chia sẻ qua `Arc`, trạng thái trong `Mutex`):
-  - `ban_sao: Option<TrangThaiMay>` (chỉ nhận từ câu trả lời đã kiểm chữ ký); `chay_tu_ban_sao: HanMuc`.
-  - `quyet_dinh(cn)` **thuần, không mạng**: có bản sao → `quyet_dinh(Some(ban_sao + chay_tu_ban_sao), offline, cn)`; chưa có → luật offline.
-  - `lam_moi_ngam()`: thread `kiem_tra` → thay bản sao, `chay_tu_ban_sao = 0`; có lần offline chờ → `ghi_lan(.., bu_offline = n)` rồi `xoa`. Chỉ gọi lúc mở app.
-  - `da_chay(cn)`: tăng `chay_tu_ban_sao` ngay rồi thread `ghi_lan` (có kèm ghi bù offline nếu đang chờ); lỗi → `BoDemOffline::cong(cn)`; được → thay bản sao bằng trạng thái trạm trả về, `chay_tu_ban_sao = 0`.
-  - `kiem_tra_lai() -> Receiver<QuyetDinh>` cho nút Kiểm tra lại.
-- GUI: `UngDungChinh` giữ `Arc<KiemTra>`; `quyet_dinh` ở đầu `gui.rs::bat_dau_dem` và `nut_tach.rs::bat_dau_tach`; Cho → chạy như cũ, khác → `HopLicense`.
-- Hằng liên hệ trong `hop_license.rs`: `SDT = "0979824615"`, `EMAIL = "hotro@saomaiso.com"`, `WEB = gioi_thieu::WEB`.
-- Điểm "chạy xong có kết quả": Đếm — `luu_va_thong_bao` khi có ≥ 1 file; Tách — `nhan_ket_qua_tach` khi `kq.dong` không rỗng.
-- CLI: đọc đồng bộ 1 lần (timeout 4 s) → `quyet_dinh`; `da_chay` ghi đồng bộ trước khi thoát.
-- Test GUI cũ: `UngDungChinh` tạo `KiemTra` với `KhoGia` hạn mức lớn qua `#[cfg(test)]`.
+- `license::KiemTra` (`Arc`): giữ `Arc<dyn KhoLicense>`, `SoLuot`, `ThongTinMay`, 1 thread gửi + kênh việc.
+  - `quyet_dinh(cn)` thuần.
+  - `bat_dau(cn) -> Option<LanChay>`: quyết định + `SoLuot::dat_cho` (ghi đĩa) **trước khi** chạy.
+  - `ket_thuc(lan, co_ket_qua)`: `SoLuot::xong`; có kết quả → đẩy việc `ghi_lan(cho_ghi())` vào thread gửi.
+  - Thread gửi: `ghi_lan` → `luu_tra_loi` + `da_xac_nhan(da_ghi)`; lỗi → giữ nguyên, lần sau gửi lại (trạm chống trùng nhờ `ma_lan`).
+  - `mo_app()`: đẩy `kiem_tra` + ghi bù; `kiem_tra_lai() -> Receiver<QuyetDinh>`.
+- **Nơi gắn** (đúng chủ sở hữu hàm): `KiemTra` truyền vào `UngDung` (Đếm: `bat_dau_dem` gui.rs:685, `luu_va_thong_bao` gui.rs:837) và `ManTach` (Tách: `bat_dau_tach`, `nhan_ket_qua_tach` trong nut_tach.rs), tạo ở `gui::chay()`; `chay_tach` / `chay_dong_lenh` (main.rs) nhận tham số `&KiemTra`, tạo ở `main()`. <!-- Red Team: đặt sai chỗ -->
+- `Default` của `UngDung` / `ManTach` / `UngDungChinh` dưới `#[cfg(test)]` dùng `KhoGia` hạn mức lớn + `SoLuot` trong thư mục tạm → `cargo test` không gọi trạm thật, không đụng sổ lượt thật. Test CLI (`main.rs` tests) truyền `KiemTra` giả.
+- CLI `--khong-ghi`: vẫn đặt chỗ + tính khi in kết quả. CLI ghi lên trạm đồng bộ trước khi thoát; Ctrl+C → đặt chỗ còn trên đĩa, lần chạy sau tính.
 
 ## Related Code Files
 - Create: `dema4_rs/src/hop_license.rs`
-- Modify: `dema4_rs/src/license.rs`, `dema4_rs/src/gui.rs`, `dema4_rs/src/gui_tach/nut_tach.rs`, `dema4_rs/src/gui_tach.rs`, `dema4_rs/src/main.rs`, `dema4_rs/src/tro_giup.rs`
+- Modify: `dema4_rs/src/license.rs`, `dema4_rs/src/gui.rs`, `dema4_rs/src/gui_tach.rs`, `dema4_rs/src/gui_tach/nut_tach.rs`, `dema4_rs/src/main.rs`, `dema4_rs/src/tro_giup.rs`
 
 ## Tests trước
-1. `may_moi_cho_2_lan_roi_chan`: KhoGia rỗng → `lam_moi_ngam` → lần 1, 2 Cho (`da_chay`), lần 3 HetLuot.
-2. `quyet_dinh_khong_goi_mang`: 100 lần `quyet_dinh` → kho bị gọi 0 lần; mỗi lần < 1 ms.
-3. `khong_chay_lo_khi_chua_ghi_kip`: KhoGia chậm 1 s; hạn 2, đã dùng 1 → `da_chay` → `quyet_dinh` ngay → HetLuot.
-4. `mat_mang_dung_offline`: KhoGia lỗi → 2 Cho, lần 3 HetLuotOffline; kho lành + `lam_moi_ngam` → ghi bù 2, bộ đếm về 0.
-5. `khoa_sau_lan_chay_ke`: bản sao còn lượt; kho đặt Khoá; lần kế vẫn Cho; `da_chay` (kho trả Khoá) → lần sau nữa Khoa.
-5b. `khong_goi_tram_khi_ranh`: mở app (1 lời gọi), 100 lần `quyet_dinh` không chạy → kho bị gọi đúng 1 lần.
-5c. `tram_qua_tai_khong_mat_luot`: kho trả lỗi 503 khi `da_chay` → bộ đếm offline +1; lần `da_chay` sau thành công → ghi kèm bù 1.
-6. GUI (kittest): Đếm khi hết lượt → popup có mã máy ngay khung hình đó, không đếm; Kiểm tra lại sau khi kho nâng hạn mức → popup đóng, đếm chạy.
-7. GUI: Tách hết lượt → popup, không có luồng tách.
-8. CLI: `chay_tach` hết lượt → mã thoát 3, không ghi file.
-9. Ảnh chụp popup (`chup_hop`: `het_luot`) — kiểm có logo giữa, icon ổ khoá, 2 dòng lý do, SĐT 0979824615, email hotro@saomaiso.com, mã máy.
+1. `may_moi_cho_2_lan_roi_chan`.
+2. `quyet_dinh_khong_goi_mang` (100 lần → kho gọi 0 lần, < 1 ms / lần).
+3. `thoat_giua_chung_van_bi_tinh`: `bat_dau` rồi bỏ (không `ket_thuc`) → KiemTra mới đọc sổ → lần đó trong `cho_ghi`, quyết định tính nó.
+4. `dung_khong_co_ket_qua_hoan_luot` / `dung_co_ket_qua_tinh_luot`.
+5. `timeout_khong_dem_trung`: KhoGia ghi xong nhưng trả lỗi (giả timeout) → gửi lại cùng `ma_lan` → đã dùng chỉ +1.
+6. `mot_luong_gui`: 3 việc liên tiếp → kho thấy tối đa 1 lời gọi cùng lúc, thứ tự đúng.
+7. `khoa_sau_lan_chay_ke`; `khoa_offline_van_khoa` (trả lời ký Khoá lưu đĩa, kho lỗi → chặn).
+8. GUI (kittest): Đếm hết lượt → popup đúng nội dung; Kiểm tra lại sau khi kho nâng hạn → đếm chạy. Tách hết lượt → popup, không có luồng tách.
+9. CLI: `chay_tach` hết lượt → mã 3, không ghi file; `chay_dong_lenh --khong-ghi` 3 lần với hạn 2 → lần 3 mã 3.
+10. Ảnh chụp popup (`chup_hop`: `het_luot`, `het_luot_offline`) khớp prototype.
 
 ## Implementation Steps
-1. Test 1–5 (đỏ) → code `KiemTra` → xanh.
-2. Test 6–8 (đỏ) → `hop_license.rs`, gắn `quyet_dinh` / `da_chay` / `lam_moi_ngam`, sửa CLI, harness test cũ.
-3. `cargo test --release` xanh; chụp ảnh popup.
+1. Test 1–7 (đỏ) → `KiemTra` → xanh.
+2. Test 8–9 (đỏ) → `hop_license.rs`, gắn vào `UngDung` / `ManTach` / CLI, `Default` test → xanh; test cũ không vỡ.
+3. Ảnh chụp popup.
 
 ## Success Criteria
-- [ ] Test 1–8 xanh; test cũ không vỡ.
-- [ ] Bấm Đếm / Tách chạy ngay kể cả mạng chậm / rút cáp.
-- [ ] Hộp Thông tin hiện mã máy.
+- [ ] Test 1–9 xanh, test cũ xanh, `cargo test` không có lưu lượng mạng tới trạm.
+- [ ] Bấm Đếm / Tách chạy ngay kể cả rút cáp.
 
 ## Risk Assessment
-- Không làm mới định kỳ: Khoá / giảm hạn mức có hiệu lực sau tối đa 1 lần chạy (hoặc khi mở lại app); nâng hạn mức có hiệu lực ngay khi bấm Kiểm tra lại.
-- Nhiều cửa sổ app cùng lúc: có thể lố tối đa (số cửa sổ − 1) lần; chấp nhận.
-- Ghi lần dùng lỗi sau khi chạy → bộ đếm offline, ghi bù sau; không mất lượt.
+- Nhiều cửa sổ app: sổ lượt chung trên đĩa (khoá file) nên không lố; mỗi cửa sổ 1 thread gửi, trạm chống trùng.
+- Khoá / giảm hạn mức có hiệu lực sau tối đa 1 lần chạy (hoặc khi mở lại app).
