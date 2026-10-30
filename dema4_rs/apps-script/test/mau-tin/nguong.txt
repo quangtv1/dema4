@@ -1,3 +1,0 @@
-
-- Ngưỡng: <b>1,00 % / 3,20 %</b>; Trắng tự động: <b>120</b> (sửa <b>2</b>); Nghi trắng: <b>30</b> → Trắng <b>25</b> · giữ <b>5</b>; Trắng lọt: <b>1</b>
-- Đề xuất lô: <b>0,90 / 3,40</b>; Xoay: xác nhận <b>7</b> · chỉnh <b>1</b> · 0° <b>2</b>

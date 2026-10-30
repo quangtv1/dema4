@@ -1,4 +1,0 @@
-Tên PC: <b>ABC</b>; Địa chỉ Mac: <b>AA:BB:CC:DD:EE:FF</b>
-- Thư mục đếm: <b>/Users/quangtv/Documents</b>;
-- File PDF: <b>4</b>; Số trang: <b>78</b>; Quy ra A4: <b>128</b>; Cảnh báo: <b>0</b>; File lỗi: <b>0</b>
-- Thời điểm đếm: <b>26.10.2026, 19:05:30</b>  (1 phút, 5,4 giây)

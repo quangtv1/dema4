@@ -1,6 +1,6 @@
 // Logic trạm license dema4 — hàm thuần, không gọi SpreadsheetApp / UrlFetchApp trực tiếp, để chạy được cả trong
 // Apps Script (license.gs nối với Sheet thật) và Node (test/loi.test.js). Mọi chữ do máy khách gửi đều không đáng tin:
-// kiểm mẫu, bỏ ký tự điều khiển, cắt độ dài, ghi ô dạng chữ thuần, escape HTML khi soạn tin Telegram.
+// kiểm mẫu, bỏ ký tự điều khiển (tin Telegram không bị chèn dòng giả), cắt độ dài, ghi ô dạng chữ thuần.
 
 var MAU_MA_MAY = /^SM-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/;
 var MAU_MA_LAN = /^[0-9a-f]{32}$/;
@@ -9,7 +9,7 @@ var TOI_DA_LAN_MOI_LOI_GOI = 3;
 var GIOI_HAN_DANG_KY_MOI_GIO = 30;
 var GIOI_HAN_LOI_GOI_MOI_PHUT = 120;
 var TOI_DA_HANG_DOI = 2000;
-var HAN_MAC_DINH = 2;
+var HAN_MAC_DINH = 10; // lượt dùng thử mỗi chức năng khi ô Hạn mức trống
 // Cột tab license (1-based)
 var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7, LAN_CUOI: 8, DUNG_DEM: 9, DUNG_TACH: 10, HAN_DEM: 11, HAN_TACH: 12, TRANG_THAI: 13, MA_LAN: 16 };
 var SO_COT_MAY = 16;
@@ -124,6 +124,7 @@ function xuLy(yc, kho, bayGio) {
     if (!kho.choPhep('dang_ky', GIOI_HAN_DANG_KY_MOI_GIO, 3600)) return { ok: false, loi: 'ban' };
     kho.themMay([yc.ma_may, may.ten, may.mac, may.ip_noi_bo, may.ip_public, may.phien_ban, luc, luc, 0, 0, '', '', 'Dùng thử', '', '', '']);
     tim = kho.timMay(yc.ma_may);
+    xepThongBao(kho, tinMayMoi(yc.ma_may, may, thoiDiemTin(bayGio)));
   }
   var d = tim.giaTri;
   var cot = {};
@@ -135,6 +136,7 @@ function xuLy(yc, kho, bayGio) {
   var daGhi = [];
   var dungDem = soKhongAm(d[COT.DUNG_DEM - 1]);
   var dungTach = soKhongAm(d[COT.DUNG_TACH - 1]);
+  var truoc = { dem: dungDem, tach: dungTach };
   // Chống trùng: mã lần đã ghi nằm ở cột ẩn "Mã lần gần đây" của chính dòng máy
   var daCo = String(d[COT.MA_LAN - 1] || '').split(',').filter(Boolean);
   var them = 0;
@@ -155,18 +157,20 @@ function xuLy(yc, kho, bayGio) {
   d[COT.DUNG_TACH - 1] = dungTach;
 
   var tt = trangThaiDong(d);
+  // Lần chạy này làm chạm hạn mức → báo 1 lần (gửi lại / kiểm tra lại không báo thêm)
+  [['dem', truoc.dem, tt.da_dung_dem, tt.han_dem], ['tach', truoc.tach, tt.da_dung_tach, tt.han_tach]].forEach(function (x) {
+    if (x[1] < x[3] && x[2] >= x[3]) xepThongBao(kho, tinHetLuot(yc.ma_may, may, x[0], x[2], x[3], tt.trang_thai, thoiDiemTin(bayGio)));
+  });
   return { ok: true, du_lieu: { ma_may: yc.ma_may, nonce: nonce, han_dem: tt.han_dem, han_tach: tt.han_tach, da_dung_dem: tt.da_dung_dem, da_dung_tach: tt.da_dung_tach, trang_thai: tt.trang_thai, da_ghi: daGhi } };
 }
 
 function thongKe(hd, yc, may, kho, bayGio) {
   if (kho.soTinCho() >= TOI_DA_HANG_DOI) return { ok: false, loi: 'hang_doi_day' };
   var sl = yc.so_lieu || {};
-  var mayTin = { ten: may.ten, mac: may.mac };
-  var tin = hd === 'thong_ke_dem' ? soanTinDem(mayTin, sl, thoiDiemTin(bayGio)) : soanTinTach(mayTin, sl, thoiDiemTin(bayGio));
-  var hang = { ma: maNgauNhien(), luc: 0, trang_thai: 'cho', so_lan_thu: 0, noi_dung: tin, ten_csv: '', csv: '' };
   var ng = yc.nguong;
+  var tin = hd === 'thong_ke_dem' ? tinDem(yc.ma_may, may, sl, thoiDiemTin(bayGio)) : tinTach(yc.ma_may, may, sl, ng, thoiDiemTin(bayGio));
+  var hang = { ma: maNgauNhien(), luc: 0, trang_thai: 'cho', so_lan_thu: 0, noi_dung: tin, ten_csv: '', csv: '' };
   if (hd === 'thong_ke_tach' && ng) {
-    hang.noi_dung += dongNguong(ng.tk || {}, soKhongAm(ng.t1), soKhongAm(ng.t2));
     var csv = String(ng.csv || '');
     if (csv.length > 0 && csv.length <= 20000) {
       hang.csv = csv;
@@ -185,12 +189,51 @@ function thongKe(hd, yc, may, kho, bayGio) {
   return { ok: true };
 }
 
-// ---- Soạn tin Telegram (giống hệt mẫu Rust cũ trong telegram.rs) ----
+// ---- Thông báo sự kiện license (máy mới, hết lượt) ----
 
-function escHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** Xếp 1 tin chữ vào hàng đợi; hàng đợi đầy thì bỏ (không làm hỏng lời gọi license). */
+function xepThongBao(kho, noiDung) {
+  if (kho.soTinCho() >= TOI_DA_HANG_DOI) return;
+  kho.xepTin({ ma: maNgauNhien(), luc: 0, trang_thai: 'cho', so_lan_thu: 0, noi_dung: noiDung, ten_csv: '', csv: '' });
 }
-function dam(s) { return '<b>' + escHtml(s) + '</b>'; }
+
+// ---- Soạn tin Telegram: chữ thường (không HTML), 2 phần gạch đầu dòng — máy tính / chức năng ----
+
+var GACH = '-----------------';
+
+/** Khung chung: tiêu đề, phần máy tính (lấy theo lời gọi), đường gạch, phần chức năng. */
+function soanTin(tieuDe, maMay, may, dongChucNang) {
+  return tieuDe + '\n\n' +
+    'Thông tin máy tính\n' +
+    '- Mã máy: ' + maMay + '\n' +
+    '- Tên PC: ' + may.ten + '\n' +
+    '- Địa chỉ MAC: ' + may.mac + '\n' +
+    '- IP nội bộ: ' + may.ip_noi_bo + '\n' +
+    '- IP public: ' + may.ip_public + '\n' +
+    '- Phiên bản: ' + may.phien_ban + '\n' +
+    GACH + '\n' +
+    'Thông tin chức năng\n' +
+    dongChucNang.map(function (d) { return '- ' + d; }).join('\n');
+}
+
+function tinMayMoi(maMay, may, luc) {
+  return soanTin('🆕 MÁY MỚI ĐĂNG KÝ', maMay, may, [
+    'Dùng thử: ' + HAN_MAC_DINH + ' lần Đếm · ' + HAN_MAC_DINH + ' lần Tách',
+    'Thời điểm: ' + luc,
+  ]);
+}
+
+function tinHetLuot(maMay, may, cn, daDung, han, trangThai, luc) {
+  var tenTT = { dung_thu: 'Dùng thử', da_cap: 'Đã cấp', khoa: 'Khoá' }[trangThai] || trangThai;
+  return soanTin('⛔ HẾT LƯỢT ' + TEN_CN[cn].toUpperCase(), maMay, may, [
+    'Chức năng: ' + TEN_CN[cn],
+    'Đã dùng: ' + daDung + '/' + han,
+    'Trạng thái: ' + tenTT,
+    'Thời điểm: ' + luc,
+    'Cấp thêm: tab 1_license → sửa Hạn mức ' + TEN_CN[cn] + ' (tổng mới) + Trạng thái Đã cấp',
+  ]);
+}
+
 function soNguyen(n) {
   var s = String(Math.floor(soKhongAm(n)));
   return s.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -210,30 +253,49 @@ function thuMucGon(s) {
   return s.length > 1000 ? '…' + s.slice(-1000) : s;
 }
 
-function soanTinDem(may, sl, luc) {
-  return 'Tên PC: ' + dam(may.ten) + '; Địa chỉ Mac: ' + dam(may.mac) + '\n' +
-    '- Thư mục đếm: ' + dam(thuMucGon(sl.thu_muc)) + ';\n' +
-    '- File PDF: ' + dam(soNguyen(sl.so_file)) + '; Số trang: ' + dam(soNguyen(sl.so_trang)) + '; Quy ra A4: ' + dam(soThuc(sl.quy_a4)) +
-    '; Cảnh báo: ' + dam(soNguyen(sl.canh_bao)) + '; File lỗi: ' + dam(soNguyen(sl.file_loi)) + '\n' +
-    '- Thời điểm đếm: ' + dam(luc) + '  (' + phutGiay(sl.thoi_gian_ms) + ')';
+function tinDem(maMay, may, sl, luc) {
+  return soanTin('📊 ĐẾM TRANG A4', maMay, may, [
+    'Thư mục: ' + thuMucGon(sl.thu_muc),
+    'File PDF: ' + soNguyen(sl.so_file),
+    'Số trang: ' + soNguyen(sl.so_trang),
+    'Quy ra A4: ' + soThuc(sl.quy_a4),
+    'Cảnh báo: ' + soNguyen(sl.canh_bao),
+    'File lỗi: ' + soNguyen(sl.file_loi),
+    'Thời điểm: ' + luc,
+    'Thời gian chạy: ' + phutGiay(sl.thoi_gian_ms),
+  ]);
 }
 
-function soanTinTach(may, sl, luc) {
-  var n = function (x) { return dam(soNguyen(x)); };
-  return 'Tên PC: ' + dam(may.ten) + '; Địa chỉ Mac: ' + dam(may.mac) + '\n' +
-    '- Thư mục tách: ' + dam(thuMucGon(sl.thu_muc)) + ';\n' +
-    '- Hồ sơ: ' + n(sl.ho_so) + '; Văn bản: ' + n(sl.van_ban) + '; Số trang: ' + n(sl.so_trang) + '; Bỏ index: ' + n(sl.bo_index) +
-    '; Bỏ trắng: ' + n(sl.bo_trang) + '; Split: ' + n(sl.split) + '; Sao nguyên: ' + n(sl.sao_nguyen) + '; Hồ sơ lỗi: ' + n(sl.ho_so_loi) + '\n' +
-    '- Thời điểm tách: ' + dam(luc) + '  (' + phutGiay(sl.thoi_gian_ms) + ')';
-}
-
-function dongNguong(tk, t1, t2) {
-  var n = function (x) { return dam(soNguyen(x)); };
-  var pt = function (x) { return soKhongAm(x).toFixed(2).replace('.', ','); };
-  var deXuat = Array.isArray(tk.de_xuat) && tk.de_xuat.length === 2 ? pt(tk.de_xuat[0]) + ' / ' + pt(tk.de_xuat[1]) : 'chưa đủ dữ liệu';
-  return '\n- Ngưỡng: ' + dam(pt(t1) + ' % / ' + pt(t2) + ' %') + '; Trắng tự động: ' + n(tk.trang_tu_dong) + ' (sửa ' + n(tk.trang_tu_dong_sua) +
-    '); Nghi trắng: ' + n(tk.nghi) + ' → Trắng ' + n(tk.nghi_thanh_trang) + ' · giữ ' + n(tk.nghi_giu) + '; Trắng lọt: ' + n(tk.trang_lot) +
-    '\n- Đề xuất lô: ' + dam(deXuat) + '; Xoay: xác nhận ' + n(tk.xoay_xac_nhan) + ' · chỉnh ' + n(tk.xoay_chinh) + ' · 0° ' + n(tk.xoay_0);
+/** `ng`: thống kê ngưỡng trắng app gửi kèm ({tk, t1, t2}); không có → bỏ phần ngưỡng. */
+function tinTach(maMay, may, sl, ng, luc) {
+  var d = [
+    'Thư mục: ' + thuMucGon(sl.thu_muc),
+    'Hồ sơ: ' + soNguyen(sl.ho_so),
+    'Văn bản: ' + soNguyen(sl.van_ban),
+    'Số trang: ' + soNguyen(sl.so_trang),
+    'Bỏ index: ' + soNguyen(sl.bo_index),
+    'Bỏ trắng: ' + soNguyen(sl.bo_trang),
+    'Split: ' + soNguyen(sl.split),
+    'Sao nguyên: ' + soNguyen(sl.sao_nguyen),
+    'Hồ sơ lỗi: ' + soNguyen(sl.ho_so_loi),
+    'Thời điểm: ' + luc,
+    'Thời gian chạy: ' + phutGiay(sl.thoi_gian_ms),
+  ];
+  if (ng) {
+    var tk = ng.tk || {};
+    var n = function (x) { return soNguyen(x); };
+    var pt = function (x) { return soKhongAm(x).toFixed(2).replace('.', ','); };
+    var deXuat = Array.isArray(tk.de_xuat) && tk.de_xuat.length === 2 ? pt(tk.de_xuat[0]) + ' / ' + pt(tk.de_xuat[1]) : 'chưa đủ dữ liệu';
+    d.push(
+      'Ngưỡng trắng / nghi: ' + pt(ng.t1) + ' % / ' + pt(ng.t2) + ' %',
+      'Trắng tự động: ' + n(tk.trang_tu_dong) + ' (sửa ' + n(tk.trang_tu_dong_sua) + ')',
+      'Nghi trắng: ' + n(tk.nghi) + ' → Trắng ' + n(tk.nghi_thanh_trang) + ' · giữ ' + n(tk.nghi_giu),
+      'Trắng lọt: ' + n(tk.trang_lot),
+      'Đề xuất lô: ' + deXuat,
+      'Xoay: xác nhận ' + n(tk.xoay_xac_nhan) + ' · chỉnh ' + n(tk.xoay_chinh) + ' · 0° ' + n(tk.xoay_0)
+    );
+  }
+  return soanTin('✂️ TÁCH VĂN BẢN', maMay, may, d);
 }
 
 // ---- Hàng đợi Telegram ----
@@ -259,5 +321,5 @@ function chonGui(ds, bayGioMs, nganSach) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { GIU_MA_LAN: GIU_MA_LAN, xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, soanTinDem: soanTinDem, soanTinTach: soanTinTach, dongNguong: dongNguong, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
+  module.exports = { GIU_MA_LAN: GIU_MA_LAN, xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, tinDem: tinDem, tinTach: tinTach, tinMayMoi: tinMayMoi, tinHetLuot: tinHetLuot, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
 }

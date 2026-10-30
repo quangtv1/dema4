@@ -1,8 +1,6 @@
 // Test logic trạm license (hàm thuần trong loi.js) bằng Node: node --test dema4_rs/apps-script/test
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const L = require('../loi.js');
 
 const MAY = { ten: 'PC-1', mac: 'AA:BB:CC:DD:EE:FF', ip_noi_bo: '192.168.1.5', ip_public: '117.5.1.1', phien_ban: '0.6.0' };
@@ -28,7 +26,7 @@ test('dang_ky_may_moi', () => {
   const k = khoGia();
   const r = goi(k, { hanh_dong: 'kiem_tra' });
   assert.equal(r.ok, true);
-  assert.deepEqual([r.du_lieu.han_dem, r.du_lieu.han_tach, r.du_lieu.da_dung_dem, r.du_lieu.da_dung_tach, r.du_lieu.trang_thai], [2, 2, 0, 0, 'dung_thu']);
+  assert.deepEqual([r.du_lieu.han_dem, r.du_lieu.han_tach, r.du_lieu.da_dung_dem, r.du_lieu.da_dung_tach, r.du_lieu.trang_thai], [10, 10, 0, 0, 'dung_thu']);
   assert.equal(r.du_lieu.ma_may, MA); assert.equal(r.du_lieu.nonce, 'n1');
   goi(k, { hanh_dong: 'kiem_tra', may: Object.assign({}, MAY, { ten: 'TEN-MOI', ip_public: '1.2.3.4' }) });
   assert.equal(k.may.length, 1, 'không tạo dòng thứ 2');
@@ -72,7 +70,7 @@ test('han_muc_va_trang_thai_tu_sheet', () => {
   goi(k, { hanh_dong: 'kiem_tra' });
   k.may[0][10] = 200; k.may[0][11] = ''; k.may[0][12] = 'Đã cấp';
   let r = goi(k, { hanh_dong: 'kiem_tra' });
-  assert.deepEqual([r.du_lieu.han_dem, r.du_lieu.han_tach, r.du_lieu.trang_thai], [200, 2, 'da_cap']);
+  assert.deepEqual([r.du_lieu.han_dem, r.du_lieu.han_tach, r.du_lieu.trang_thai], [200, 10, 'da_cap']);
   for (const [o, ma] of [['Khoá', 'khoa'], ['Khóa', 'khoa'], ['Dùng thử', 'dung_thu'], ['', 'dung_thu'], ['abc', 'khoa'], ['đã cấp', 'khoa']]) {
     k.may[0][12] = o;
     assert.equal(goi(k, { hanh_dong: 'kiem_tra' }).du_lieu.trang_thai, ma, `"${o}"`);
@@ -94,16 +92,33 @@ test('kiem_dau_vao', () => {
   assert.equal(L.oChu('+1'), "'+1"); assert.equal(L.oChu('-x'), "'-x"); assert.equal(L.oChu('@a'), "'@a"); assert.equal(L.oChu('abc'), 'abc');
 });
 
-test('soan_tin_khop_mau_rust', () => {
-  const mau = (t) => fs.readFileSync(path.join(__dirname, 'mau-tin', t), 'utf8');
-  const may = { ten: 'ABC', mac: 'AA:BB:CC:DD:EE:FF' };
-  assert.equal(L.soanTinDem(may, { thu_muc: '/Users/quangtv/Documents', so_file: 4, so_trang: 78, quy_a4: 128, canh_bao: 0, file_loi: 0, thoi_gian_ms: 65400 }, '26.10.2026, 19:05:30'), mau('dem.txt'));
-  assert.equal(L.soanTinTach({ ten: 'ABC', mac: 'AA:BB' }, { thu_muc: '/a/<b>', ho_so: 2, van_ban: 211, so_trang: 476, bo_index: 209, bo_trang: 1, split: 0, sao_nguyen: 0, ho_so_loi: 0, thoi_gian_ms: 1200 }, '29.10.2026, 11:30:00'), mau('tach.txt'));
-  assert.equal(L.dongNguong({ trang_tu_dong: 120, trang_tu_dong_sua: 2, nghi: 30, nghi_thanh_trang: 25, nghi_giu: 5, trang_lot: 1, de_xuat: [0.9, 3.4], xoay_xac_nhan: 7, xoay_chinh: 1, xoay_0: 2 }, 1.0, 3.2), mau('nguong.txt'));
-  assert.ok(L.dongNguong({}, 1, 3.2).includes('<b>chưa đủ dữ liệu</b>'));
+const MAY_TIN = { ten: 'ABC', mac: 'AA:BB:CC:DD:EE:FF', ip_noi_bo: '192.168.1.5', ip_public: '117.5.1.1', phien_ban: '1.0.0' };
+const PHAN_MAY = 'Thông tin máy tính\n- Mã máy: ' + MA + '\n- Tên PC: ABC\n- Địa chỉ MAC: AA:BB:CC:DD:EE:FF\n- IP nội bộ: 192.168.1.5\n- IP public: 117.5.1.1\n- Phiên bản: 1.0.0\n-----------------\nThông tin chức năng\n';
+
+test('tin_dem_chu_thuong_hai_phan', () => {
+  assert.equal(L.tinDem(MA, MAY_TIN, { thu_muc: '/Users/quangtv/Documents', so_file: 4, so_trang: 78, quy_a4: 128.5, canh_bao: 0, file_loi: 1, thoi_gian_ms: 65400 }, '26.10.2026, 19:05:30'),
+    '📊 ĐẾM TRANG A4\n\n' + PHAN_MAY +
+    '- Thư mục: /Users/quangtv/Documents\n- File PDF: 4\n- Số trang: 78\n- Quy ra A4: 128,5\n- Cảnh báo: 0\n- File lỗi: 1\n- Thời điểm: 26.10.2026, 19:05:30\n- Thời gian chạy: 1 phút, 5,4 giây');
+});
+
+test('tin_tach_chu_thuong_hai_phan', () => {
+  const sl = { thu_muc: '/a/<b>', ho_so: 2, van_ban: 1211, so_trang: 476, bo_index: 209, bo_trang: 1, split: 0, sao_nguyen: 0, ho_so_loi: 0, thoi_gian_ms: 1200 };
+  const tk = { trang_tu_dong: 120, trang_tu_dong_sua: 2, nghi: 30, nghi_thanh_trang: 25, nghi_giu: 5, trang_lot: 1, de_xuat: [0.9, 3.4], xoay_xac_nhan: 7, xoay_chinh: 1, xoay_0: 2 };
+  assert.equal(L.tinTach(MA, MAY_TIN, sl, { tk: tk, t1: 1, t2: 3.2 }, '29.10.2026, 11:30:00'),
+    '✂️ TÁCH VĂN BẢN\n\n' + PHAN_MAY +
+    '- Thư mục: /a/<b>\n- Hồ sơ: 2\n- Văn bản: 1.211\n- Số trang: 476\n- Bỏ index: 209\n- Bỏ trắng: 1\n- Split: 0\n- Sao nguyên: 0\n- Hồ sơ lỗi: 0\n' +
+    '- Thời điểm: 29.10.2026, 11:30:00\n- Thời gian chạy: 0 phút, 1,2 giây\n' +
+    '- Ngưỡng trắng / nghi: 1,00 % / 3,20 %\n- Trắng tự động: 120 (sửa 2)\n- Nghi trắng: 30 → Trắng 25 · giữ 5\n- Trắng lọt: 1\n- Đề xuất lô: 0,90 / 3,40\n- Xoay: xác nhận 7 · chỉnh 1 · 0° 2');
+  assert.ok(!L.tinTach(MA, MAY_TIN, sl, null, 't').includes('Ngưỡng'), 'không có thống kê ngưỡng → bỏ phần ngưỡng');
+  assert.ok(L.tinTach(MA, MAY_TIN, sl, { tk: {}, t1: 1, t2: 3 }, 't').includes('- Đề xuất lô: chưa đủ dữ liệu'));
   assert.equal(L.soNguyen(1234567), '1.234.567'); assert.equal(L.soThuc(885.5), '885,5'); assert.equal(L.soThuc(885), '885');
-  const tin = L.soanTinDem(may, { thu_muc: '<a href="http://x">bấm</a>', so_file: 1, so_trang: 1, quy_a4: 1, canh_bao: 0, file_loi: 0, thoi_gian_ms: 0 }, 't');
-  assert.ok(!tin.includes('<a '), 'HTML trong tên thư mục bị escape');
+});
+
+test('tin_may_moi_va_het_luot', () => {
+  assert.equal(L.tinMayMoi(MA, MAY_TIN, '30.10.2026, 20:00:00'),
+    '🆕 MÁY MỚI ĐĂNG KÝ\n\n' + PHAN_MAY + '- Dùng thử: 10 lần Đếm · 10 lần Tách\n- Thời điểm: 30.10.2026, 20:00:00');
+  assert.equal(L.tinHetLuot(MA, MAY_TIN, 'tach', 10, 10, 'dung_thu', '30.10.2026, 20:05:00'),
+    '⛔ HẾT LƯỢT TÁCH\n\n' + PHAN_MAY + '- Chức năng: Tách\n- Đã dùng: 10/10\n- Trạng thái: Dùng thử\n- Thời điểm: 30.10.2026, 20:05:00\n- Cấp thêm: tab 1_license → sửa Hạn mức Tách (tổng mới) + Trạng thái Đã cấp');
 });
 
 test('thong_ke_xep_hang_doi', () => {
@@ -142,4 +157,38 @@ test('hang_doi_ngan_sach', () => {
   assert.ok(soLoiGoi <= 15, `ngân sách ${soLoiGoi}`);
   assert.equal(chon.gui.length, 7, '7 tin Tách × 2 lời gọi = 14');
   assert.ok(chon.gui.every((r) => r.ma.startsWith('m')));
+});
+
+test('bao_may_moi_mot_lan', () => {
+  const k = khoGia();
+  goi(k, { hanh_dong: 'kiem_tra' });
+  goi(k, { hanh_dong: 'kiem_tra' });
+  const moi = k.hangDoi.filter((h) => h.noi_dung.includes('MÁY MỚI'));
+  assert.equal(moi.length, 1, 'chỉ báo lần đăng ký đầu');
+  assert.ok(moi[0].noi_dung.includes(MA) && moi[0].noi_dung.includes('PC-1') && moi[0].noi_dung.includes('10 lần Đếm · 10 lần Tách'), moi[0].noi_dung);
+});
+
+test('bao_het_luot_khi_cham_han', () => {
+  const k = khoGia();
+  goi(k, { hanh_dong: 'kiem_tra' });
+  k.may[0][10] = 2; // Hạn mức Đếm = 2
+  const het = () => k.hangDoi.filter((h) => h.noi_dung.includes('HẾT LƯỢT'));
+  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(301), cn: 'dem', nguon: 'online' }] });
+  assert.equal(het().length, 0, 'còn 1 lượt → chưa báo');
+  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(302), cn: 'dem', nguon: 'online' }] });
+  assert.equal(het().length, 1);
+  assert.ok(het()[0].noi_dung.includes('HẾT LƯỢT ĐẾM') && het()[0].noi_dung.includes('2/2') && het()[0].noi_dung.includes(MA), het()[0].noi_dung);
+  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(302), cn: 'dem', nguon: 'online' }] });
+  goi(k, { hanh_dong: 'kiem_tra' });
+  assert.equal(het().length, 1, 'gửi lại / kiểm tra lại không báo thêm');
+  for (let i = 0; i < 10; i++) goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(400 + i), cn: 'tach', nguon: 'online' }] });
+  assert.equal(het().filter((h) => h.noi_dung.includes('HẾT LƯỢT TÁCH')).length, 1, 'Tách hết ở lần thứ 10 (mặc định)');
+});
+
+test('tin_dem_tach_co_tieu_de_rieng', () => {
+  const k = khoGia();
+  goi(k, { hanh_dong: 'thong_ke_dem', so_lieu: { thu_muc: '/x', so_file: 1, so_trang: 2, quy_a4: 2, canh_bao: 0, file_loi: 0, thoi_gian_ms: 1000 } });
+  goi(k, { hanh_dong: 'thong_ke_tach', so_lieu: { thu_muc: '/y', ho_so: 1, van_ban: 2, so_trang: 3, bo_index: 0, bo_trang: 0, split: 0, sao_nguyen: 0, ho_so_loi: 0, thoi_gian_ms: 500 } });
+  assert.ok(k.hangDoi[0].noi_dung.startsWith('📊 ĐẾM TRANG A4\n\nThông tin máy tính\n- Mã máy: ' + MA), k.hangDoi[0].noi_dung);
+  assert.ok(k.hangDoi[1].noi_dung.startsWith('✂️ TÁCH VĂN BẢN\n\nThông tin máy tính\n- Mã máy: ' + MA), k.hangDoi[1].noi_dung);
 });

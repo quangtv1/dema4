@@ -29,8 +29,8 @@ var GHI_CHU = {
     'Lần gần nhất máy gọi trạm (trạm ghi).',
     'Tổng số lần Đếm đã dùng; +1 mỗi lần chạy có kết quả. Chữ đỏ = hết lượt. Không sửa tay.',
     'Tổng số lần Tách đã dùng; +1 mỗi lần chạy có kết quả. Chữ đỏ = hết lượt. Không sửa tay.',
-    'TỔNG số lần Đếm được phép (không phải số cộng thêm). Trống = 2 (dùng thử). Sao Mai sửa.',
-    'TỔNG số lần Tách được phép (không phải số cộng thêm). Trống = 2 (dùng thử). Sao Mai sửa.',
+    'TỔNG số lần Đếm được phép (không phải số cộng thêm). Trống = 10 (dùng thử). Sao Mai sửa.',
+    'TỔNG số lần Tách được phép (không phải số cộng thêm). Trống = 10 (dùng thử). Sao Mai sửa.',
     'Dùng thử / Đã cấp / Khoá — chọn trong danh sách. Giá trị khác bị coi là Khoá. Sao Mai sửa.',
     'Tự do: đơn vị sử dụng. Sao Mai sửa.',
     'Tự do: số hợp đồng, ngày cấp… Sao Mai sửa.',
@@ -39,7 +39,7 @@ var GHI_CHU = {
   HANG_DOI: [
     'Mã dòng (trạm tạo). Tab ẩn: tin Telegram chờ gửi, trigger gửi mỗi phút (tối đa 15 lời gọi/lượt), tự dọn sau 7 ngày. ' +
       'Token + id nhóm ở Apps Script › Project Settings › Script Properties: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.',
-    'Lúc xếp tin.', 'Nội dung tin (HTML Telegram).', 'Tên file CSV gửi kèm (lần Tách).', 'Nội dung CSV histogram ngưỡng trắng.',
+    'Lúc xếp tin.', 'Nội dung tin (chữ thường).', 'Tên file CSV gửi kèm (lần Tách).', 'Nội dung CSV histogram ngưỡng trắng.',
     'Số lần gửi lỗi (5 lần → loi).', 'cho · dang_gui · da_gui · loi', 'Lúc đánh dấu đang gửi (ms).',
   ],
 };
@@ -211,7 +211,7 @@ function donHangDoi(sh, hien) {
 
 function guiTelegram(token, chat, r) {
   var goc = 'https://api.telegram.org/bot' + token + '/';
-  var tin = UrlFetchApp.fetch(goc + 'sendMessage', { method: 'post', muteHttpExceptions: true, payload: { chat_id: chat, text: r.noi_dung, parse_mode: 'HTML', disable_web_page_preview: 'true' } });
+  var tin = UrlFetchApp.fetch(goc + 'sendMessage', { method: 'post', muteHttpExceptions: true, payload: { chat_id: chat, text: r.noi_dung, disable_web_page_preview: 'true' } });
   if (tin.getResponseCode() !== 200 || !r.ten_csv) return tin.getResponseCode();
   var tep = UrlFetchApp.fetch(goc + 'sendDocument', { method: 'post', muteHttpExceptions: true, payload: { chat_id: chat, document: Utilities.newBlob(r.csv, 'text/csv', r.ten_csv) } });
   return tep.getResponseCode();

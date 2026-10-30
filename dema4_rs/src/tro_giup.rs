@@ -171,7 +171,7 @@ pub enum Khoi {
 
 /// Mục "Lượt dùng" chung cho tab Đếm và Tách.
 const LUOT_DUNG: Khoi = Khoi::Bang(&[
-    ("Dùng thử", "Mỗi máy *2 lần Đếm* và *2 lần Tách*. Chỉ lần chạy có kết quả mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt."),
+    ("Dùng thử", "Mỗi máy *10 lần Đếm* và *10 lần Tách*. Chỉ lần chạy có kết quả mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt."),
     ("Hết lượt", "Popup *Liên hệ Sao Mai*: mã máy, điện thoại, email. Sao Mai cấp thêm lượt → bấm *Kiểm tra lại*."),
     ("Mất mạng", "Chạy được tối đa 2 lần chưa được máy chủ xác nhận; có mạng lại app tự ghi bù."),
     ("Mã máy", "Xem ở *Trợ giúp › Thông tin*; không đổi khi đổi tên máy."),

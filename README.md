@@ -7,7 +7,7 @@
 
 Tải bản mới nhất ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
 
-Mỗi máy dùng thử **2 lần Đếm** và **2 lần Tách**; cần thêm lượt liên hệ Sao Mai — xem [Lượt dùng](#lượt-dùng-license).
+Mỗi máy dùng thử **10 lần Đếm** và **10 lần Tách**; cần thêm lượt liên hệ Sao Mai — xem [Lượt dùng](#lượt-dùng-license).
 
 File chạy chưa ký số với Apple / Microsoft nên lần đầu mở hệ điều hành sẽ cảnh báo:
 
@@ -132,7 +132,8 @@ Hệ số và ranh giới khổ đọc từ `sm-dema4.cfg` (không có file → 
 
 ## Lượt dùng (license)
 
-- Mỗi máy được **2 lần Đếm** và **2 lần Tách** dùng thử. Chỉ lần chạy **có kết quả** mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt. Áp dụng cho cả giao diện và dòng lệnh (hết lượt: in lý do + mã máy, mã thoát `3`).
+- Mỗi máy được **10 lần Đếm** và **10 lần Tách** dùng thử. Chỉ lần chạy **có kết quả** mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt. Áp dụng cho cả giao diện và dòng lệnh (hết lượt: in lý do + mã máy, mã thoát `3`).
+- Nhóm Telegram nhận thông báo khi có **máy mới đăng ký**, sau mỗi lần **Đếm / Tách**, và khi máy **hết lượt** một chức năng (mỗi loại một mẫu tin riêng).
 - Hết lượt → popup **Liên hệ Sao Mai** (mã máy, điện thoại **0979824615**, email **hotro@saomaiso.com**, saomaiso.com). Sao Mai cấp thêm lượt trên Sheet → bấm **Kiểm tra lại**.
 - **Mã máy** `SM-XXXX-XXXX-XXXX` lấy từ ID hệ điều hành (không đổi khi đổi tên máy), xem ở **Trợ giúp › Thông tin**.
 - Bấm Đếm / Tách quyết định ngay, không chờ mạng. Mất mạng: chạy được tối đa 2 lần chưa được máy chủ xác nhận, có mạng lại app tự ghi bù. Bị **Khoá** thì mất mạng vẫn khoá.
