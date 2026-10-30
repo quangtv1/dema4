@@ -1,10 +1,10 @@
 ---
 phase: 1
-title: "Loi license"
-status: pending
+title: Loi license
+status: completed
 priority: P1
 dependencies: []
-effort: "1 ngày"
+effort: 1 ngày
 ---
 
 # Phase 1: Lõi license (thuần logic, không mạng)

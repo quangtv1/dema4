@@ -14,7 +14,7 @@ mod cau_hinh;
 mod dem_pdf;
 mod gioi_thieu;
 mod license;
-mod google_sheet;
+mod tram;
 mod gui;
 #[allow(dead_code)] // nối dần vào giao diện
 mod gui_tach;
@@ -78,10 +78,10 @@ fn chay_dong_lenh(thu_muc: &str, kiem_tra_dpi: bool, kiem_tra_ky: bool, khong_gh
     match dem_pdf::luu_ket_qua(&kq, &duong_dan) {
         Ok(chi_tiet) => {
             println!("Kết quả đếm ghi tại file:\n {}\n {}", duong_dan.display(), chi_tiet.display());
-            if let Some(cau_hinh) = telegram::doc_cau_hinh() {
-                let tin = telegram::noi_dung_thong_ke(thu_muc, &kq, bat_dau.elapsed());
-                match telegram::gui_tin(&cau_hinh, &tin) {
-                    Ok(()) => println!("Đã gửi thống kê về Telegram"),
+            if let Some(kho) = tram::kho_that() {
+                use tram::KhoLicense;
+                match kho.thong_ke(&tram::ThongTinMay::hien_tai(), "thong_ke_dem", tram::so_lieu_dem(thu_muc, &kq, bat_dau.elapsed())) {
+                    Ok(()) => println!("Đã gửi thống kê"),
                     Err(e) => eprintln!("Không gửi được thống kê: {e}"),
                 }
             }

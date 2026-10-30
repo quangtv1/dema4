@@ -11,7 +11,6 @@ use eframe::egui::{self, Align, Color32, CornerRadius, Layout, Margin, RichText,
 use egui_extras::{Column, TableBuilder};
 
 use crate::dem_pdf::{self, KetQuaDem, SuKien, KHO};
-use crate::telegram;
 
 const TIEU_DE: &str = "Đếm trang A4 (Giải pháp số Sao Mai)";
 /// Số sự kiện xử lý tối đa mỗi khung hình để giao diện không bị đơ khi đếm nhanh
@@ -494,7 +493,7 @@ struct UngDung {
     kiem_tra_dpi: bool,
     /// Ô "Check chữ ký": mặc định tắt
     kiem_tra_ky: bool,
-    /// Có file telegram.txt cạnh file chạy (đọc lúc mở app); quyết định có hiện dòng báo trong popup không
+    /// Đã gửi số liệu lên trạm (có trạm); quyết định có hiện dòng báo trong popup không
     co_telegram: bool,
 }
 
@@ -521,7 +520,7 @@ impl Default for UngDung {
             da_chep_luc: None,
             kiem_tra_dpi: false,
             kiem_tra_ky: true,
-            co_telegram: telegram::doc_cau_hinh().is_some(),
+            co_telegram: false,
         }
     }
 }
@@ -845,16 +844,10 @@ impl UngDung {
                 Err(format!("Không ghi được file kết quả: {e}"))
             }
         };
-        // Gửi thống kê về Telegram ở luồng riêng (đọc lại cấu hình mỗi lần để sửa file không cần mở lại app).
-        // Chạy ngầm, không hiện trạng thái gửi trên giao diện; popup có dòng báo app gửi thống kê.
-        // Test (kể cả chụp ảnh màn hình) không gửi tin thật
-        if let Some(cau_hinh) = telegram::doc_cau_hinh().filter(|_| !cfg!(test)) {
-            let tin = telegram::noi_dung_thong_ke(&xong.thu_muc, kq, xong.thoi_gian);
-            std::thread::spawn(move || {
-                let _ = telegram::gui_tin(&cau_hinh, &tin);
-            });
-            self.co_telegram = true;
-        }
+        // Gửi số liệu lên trạm ở luồng riêng (trạm ghi Sheet + xếp tin Telegram); chạy ngầm, im lặng khi lỗi.
+        // Popup có dòng báo app gửi thống kê. Test (kể cả chụp ảnh màn hình) không gọi trạm thật
+        let so_lieu = crate::tram::so_lieu_dem(&xong.thu_muc, kq, xong.thoi_gian);
+        self.co_telegram = crate::tram::gui_thong_ke_nen("thong_ke_dem", move |_| so_lieu);
         let ten_thu_muc = Path::new(xong.thu_muc.trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or(xong.thu_muc);
         self.thong_bao = Some(ThongBaoXong {
             ten_thu_muc,

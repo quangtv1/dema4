@@ -1,14 +1,20 @@
 ---
-title: "License gioi han so lan Dem va Tach qua Google Sheet"
-description: "Mỗi máy 2 lần Đếm + 2 lần Tách dùng thử; hạn mức / trạng thái trên tab license Google Sheet qua trạm Apps Script ký RSA; exe không còn khoá Sheet; offline tối đa 2 lần; repo giữ công khai."
+title: License gioi han so lan Dem va Tach qua Google Sheet
+description: >-
+  Mỗi máy 2 lần Đếm + 2 lần Tách dùng thử; hạn mức / trạng thái trên tab license
+  Google Sheet qua trạm Apps Script ký RSA; exe không còn khoá Sheet; offline
+  tối đa 2 lần; repo giữ công khai.
 status: pending
 priority: P2
-branch: "main"
-tags: [license, google-sheet, tdd]
+branch: main
+tags:
+  - license
+  - google-sheet
+  - tdd
 blockedBy: []
 blocks: []
-created: "2026-10-30T03:31:55.957Z"
-createdBy: "ck:plan"
+created: '2026-10-30T03:31:55.957Z'
+createdBy: 'ck:plan'
 source: skill
 ---
 
@@ -38,8 +44,8 @@ Brainstorm: `plans/reports/brainstorm-261030-1009-license-gioi-han-so-lan-report
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Lõi license](./phase-01-loi-license.md) | Pending |
-| 2 | [Trạm Apps Script](./phase-02-tram-apps-script.md) | Pending |
+| 1 | [Lõi license](./phase-01-loi-license.md) | Completed |
+| 2 | [Trạm Apps Script](./phase-02-tram-apps-script.md) | Completed |
 | 3 | [Kho trạm + bỏ khoá Sheet khỏi exe](./phase-03-kho-tram-va-bo-khoa-sheet.md) | Pending |
 | 4 | [Gắn license vào GUI và dòng lệnh](./phase-04-gan-license-gui-va-dong-lenh.md) | Pending |
 | 5 | [Triển khai trạm lên Sheet thật](./phase-05-trien-khai-tram.md) | Pending |
@@ -77,8 +83,8 @@ Không.
 
 | # | Finding | Severity | Disposition | Applied To |
 |---|---------|----------|-------------|------------|
-| 1 | Đếm trùng lượt khi app hết giờ chờ nhưng trạm vẫn ghi | Critical | Accept | Phase 1, 2, 4 (mã lần chạy, 1 luồng gửi, khoá trạm 2,5 s < chờ app 8 s) |
-| 2 | Thoát app / Ctrl+C / CLI song song / `--khong-ghi` không bị tính | Critical | Accept | Phase 1, 4 (đặt chỗ trên đĩa trước khi chạy) |
+| 1 | Đếm trùng lượt khi app hết giờ chờ nhưng trạm vẫn ghi | Critical | Accept | Completed |
+| 2 | Thoát app / Ctrl+C / CLI song song / `--khong-ghi` không bị tính | Critical | Accept | Completed |
 | 3 | Token Telegram công khai trên repo; khoá service account trong exe v0.5.x; thu hồi sau khi tạo tab license | Critical | Accept | Phase 5 bước 0 (làm ngay), plan.md |
 | 4 | Mã máy từ tên máy + MAC | High | Accept | Phase 1 |
 | 5 | Bộ kiểm license đặt sai struct; test gọi trạm thật | High | Accept | Phase 4 (`UngDung`, `ManTach`, CLI; Default test dùng kho giả) |

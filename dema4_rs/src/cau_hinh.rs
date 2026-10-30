@@ -1,4 +1,4 @@
-//! Cấu hình người dùng `sm-dema4.cfg` (dạng `khoá=giá trị` như `telegram.txt`): hệ số quy A4, ranh giới khổ,
+//! Cấu hình người dùng `sm-dema4.cfg` (dạng `khoá=giá trị`, mỗi dòng 1 khoá): hệ số quy A4, ranh giới khổ,
 //! tuỳ chọn Tách PDF và trạng thái giao diện.
 //!
 //! Đặt cạnh file chạy; thư mục đó không ghi được → thư mục người dùng (`%APPDATA%\sm-dema4\`,

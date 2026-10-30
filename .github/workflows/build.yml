@@ -59,9 +59,6 @@ jobs:
 
       - name: Build release
         run: cargo build --release
-        env:
-          # Khoá service account ghi Google Sheet (secret của repo) — nhúng vào exe, không có trong mã nguồn
-          SM_DEMA4_SHEET_KEY_JSON: ${{ secrets.SHEET_KEY_JSON }}
 
       # Test phần tách văn bản: chạy thật zxing-cpp (C++) và ONNX Runtime liên kết tĩnh trên từng hệ điều hành
       - name: Test tách văn bản

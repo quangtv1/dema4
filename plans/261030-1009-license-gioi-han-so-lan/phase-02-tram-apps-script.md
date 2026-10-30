@@ -1,10 +1,10 @@
 ---
 phase: 2
-title: "Tram Apps Script"
-status: pending
+title: Tram Apps Script
+status: completed
 priority: P1
 dependencies: []
-effort: "2.5 ngày"
+effort: 2.5 ngày
 ---
 
 # Phase 2: Trạm Apps Script (bên duy nhất ghi Sheet)

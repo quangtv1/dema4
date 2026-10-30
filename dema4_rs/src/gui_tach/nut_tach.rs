@@ -152,45 +152,9 @@ pub fn thong_ke_lo(phien: &PhienPhanTich, b: &BangTrang, cfg: &CauHinh) -> Optio
     Some(thong_ke_nguong::thong_ke(&trang, &xoay))
 }
 
-/// Gửi thống kê tách: tin chữ (+ 2 dòng ngưỡng), file CSV histogram, 1 hàng tab "nguong" Google Sheet. Luồng nền, im lặng khi lỗi.
+/// Gửi thống kê tách lên trạm ở luồng nền (trạm soạn tin + CSV Telegram, ghi 1 hàng tab "Ngưỡng trắng"), im lặng khi lỗi.
 fn gui_thong_ke(thu_muc: String, so_lieu: telegram::SoLieuTach, thoi_gian: Duration, thong_ke: Option<ThongKeNguong>, nguong: (f32, f32)) -> bool {
-    let ch = telegram::doc_cau_hinh().filter(|_| !cfg!(test));
-    let sheet = crate::google_sheet::co_khoa() && !cfg!(test);
-    if ch.is_none() && !sheet {
-        return false;
-    }
-    std::thread::spawn(move || {
-        let bay_gio = chrono::Local::now();
-        let ten = Path::new(thu_muc.trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-        if let Some(ch) = &ch {
-            let mut tin = telegram::noi_dung_tach(&thu_muc, &so_lieu, thoi_gian);
-            if let Some(tk) = &thong_ke {
-                tin += &telegram::dong_nguong(tk, nguong.0, nguong.1);
-            }
-            let _ = telegram::gui_tin(ch, &tin);
-        }
-        let Some(tk) = thong_ke else { return };
-        let dau = [
-            bay_gio.format("%Y-%m-%d %H:%M:%S").to_string(),
-            telegram::ten_pc(),
-            telegram::dia_chi_mac(),
-            telegram::ip_noi_bo(),
-            telegram::ip_public(),
-            ten.clone(),
-            env!("CARGO_PKG_VERSION").to_string(),
-            format!("{:.2}", nguong.0),
-            format!("{:.2}", nguong.1),
-        ];
-        if let Some(ch) = &ch {
-            let csv = thong_ke_nguong::csv(&tk, &thong_ke_nguong::KHOA_CSV.iter().copied().zip(dau.iter().cloned()).collect::<Vec<_>>());
-            let _ = telegram::gui_file(ch, &format!("nguong_{ten}_{}.csv", bay_gio.format("%Y%m%d-%H%M%S")), csv.as_bytes());
-        }
-        if sheet {
-            let mo_ta = Some((thong_ke_nguong::TAB_MO_TA, thong_ke_nguong::mo_ta_sheet()));
-            let _ = crate::google_sheet::ghi_dong(thong_ke_nguong::TAB_SHEET, &thong_ke_nguong::tieu_de_sheet(), thong_ke_nguong::dong_sheet(&tk, dau), mo_ta);
-        }
-    });
-    true
+    crate::tram::gui_thong_ke_nen("thong_ke_tach", move |may| crate::tram::so_lieu_tach(may, &thu_muc, &so_lieu, thoi_gian, thong_ke.as_ref(), nguong))
 }
 
 impl ManTach {
@@ -332,7 +296,7 @@ impl ManTach {
         so_lieu.sao_nguyen = kq.sao_nguyen;
         so_lieu.ho_so_loi = kq.loi.len();
         let thoi_gian = t.bat_dau.elapsed();
-        // Test không gửi tin thật (cấu hình Telegram được nhúng sẵn trong file chạy)
+        // Test không gọi trạm thật (xem tram::kho_that)
         let co_telegram = gui_thong_ke(self.thu_muc.trim().to_string(), so_lieu.clone(), thoi_gian, t.thong_ke, t.nguong);
         let ten_thu_muc = Path::new(self.thu_muc.trim().trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         self.xong_tach = Some(XongTach { ten_thu_muc, so_lieu, ra: t.ra, log, thoi_gian, da_dung: t.dung.load(Ordering::Relaxed), khong_xoa: kq.khong_xoa, loi, so_canh_bao: kq.canh_bao.len(), co_telegram });

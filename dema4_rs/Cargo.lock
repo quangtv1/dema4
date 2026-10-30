@@ -955,6 +955,7 @@ dependencies = [
  "mac_address",
  "mupdf",
  "ort",
+ "rand_core",
  "rayon",
  "rfd",
  "rsa",
