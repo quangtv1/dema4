@@ -481,6 +481,10 @@
   /* ---- Màn Sinh mục lục hồ sơ ---- */
   #manMucLuc .hang > label.nhanml { width:104px; flex-shrink:0; }
   #manMucLuc .hang > .nut { width:80px; }
+  /* Link "Lưu mẫu" gắn ở đuôi ô chọn mẫu, trước mũi tên */
+  #manMucLuc .o-mau { position:relative; display:flex; }
+  #manMucLuc .luu-mau { position:absolute; right:30px; top:50%; transform:translateY(-50%); font-size:12px; color:var(--cobalt); text-decoration:underline; cursor:pointer; padding:0 6px; border-left:1px solid var(--vien-nhat); line-height:16px; }
+  #manMucLuc .luu-mau:hover { color:#0A5FC2; }
   #manMucLuc select, .ghep-ml select { -webkit-appearance:none; appearance:none; height:26px; border:1px solid var(--vien); border-radius:3px; font-size:12px; padding:0 30px 0 8px; background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center; cursor:pointer; }
   #manMucLuc select:hover, .ghep-ml select:hover { border-color:#9A9A9A; }
   #manMucLuc .daytrai .nut { height:22px; padding:0 10px; font-size:12px; flex-shrink:0; }
@@ -799,9 +803,12 @@
     </div>
     <div class="hang">
       <label class="nhanml" for="mlMau">Mẫu mục lục:</label>
-      <select id="mlMau" style="flex:1"><option>Mẫu 01 – Quảng Trị</option><option>Mẫu 02 – Quảng Ninh</option><option>Mẫu 03 – Đống Đa</option><option>Mẫu 04 – Vĩnh Phúc</option><option>Mẫu riêng: MucLuc_DonVi.docx</option></select>
+      <div class="o-mau" style="flex:1">
+        <select id="mlMau" style="width:100%;padding-right:92px"><option>Mẫu 01 – Quảng Trị</option><option>Mẫu 02 – Quảng Ninh</option><option>Mẫu 03 – Đống Đa</option><option>Mẫu 04 – Vĩnh Phúc</option><option>Mẫu riêng: MucLuc_DonVi.docx</option></select>
+        <a class="luu-mau" id="mlLuuMau" title="Lưu mẫu đang chọn ra file DOCX — sửa trong Word rồi bấm Chọn để dùng làm mẫu riêng">Lưu mẫu</a>
+      </div>
       <button class="nut" id="mlChonMau">Chọn</button>
-      <div class="phaiml"><button class="nut" id="mlLuuMau" style="width:110px" title="Lưu mẫu đang chọn ra file DOCX — sửa trong Word rồi bấm Chọn để dùng làm mẫu riêng">Lưu mẫu…</button><button class="nut" id="mlNutGhep" style="flex:1" title="Chọn nguồn dữ liệu cho từng biến của mẫu">Ghép biến…</button></div>
+      <div class="phaiml"><button class="nut" id="mlNutGhep" style="flex:1" title="Chọn nguồn dữ liệu cho từng biến của mẫu">Ghép biến…</button></div>
     </div>
     <div class="bangdem">
       <div class="tabkho" id="mlTab"><span data-mltab="mau">Mẫu</span><span data-mltab="ketqua">Kết quả</span><div class="canhtab" id="mlCanh"></div></div>
