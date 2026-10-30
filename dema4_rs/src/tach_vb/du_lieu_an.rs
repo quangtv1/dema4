@@ -53,7 +53,7 @@ fn bam(s: &str) -> u64 {
 }
 
 /// `<thư mục app>/.sm-dema4` (ẩn); không ghi được → thư mục người dùng, rồi thư mục tạm.
-fn goc_du_lieu() -> &'static Path {
+pub(crate) fn goc_du_lieu() -> &'static Path {
     static GOC: OnceLock<PathBuf> = OnceLock::new();
     GOC.get_or_init(|| {
         let cho = [

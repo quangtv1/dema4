@@ -13,6 +13,7 @@
 mod cau_hinh;
 mod dem_pdf;
 mod gioi_thieu;
+mod license;
 mod google_sheet;
 mod gui;
 #[allow(dead_code)] // nối dần vào giao diện
