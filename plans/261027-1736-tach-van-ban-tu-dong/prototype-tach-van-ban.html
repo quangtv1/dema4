@@ -503,8 +503,7 @@
   .bangbien { display:grid; grid-template-columns:118px minmax(0,1fr) 22px; font-size:12px; }
   .bangbien .tieude-cot { position:sticky; top:0; background:#EBEBEB; border-bottom:1px solid var(--vien-nhat); padding:6px 6px; color:var(--chu-phu); z-index:1; }
   .bangbien .vbdong > span.lay { padding:2px 2px; overflow:visible; cursor:default; }
-  .bangbien .oml { height:26px; padding:0 6px; font-weight:normal; } .bangbien .tag.cot { display:none; }
-  .bangbien .oml .ten { color:var(--chu-phu); } .bangbien .oml.thieu .ten { color:#B85F00; }
+  .bangbien .oml { height:26px; padding:0 6px; font-weight:normal; }
   .bangbien .vbdong.chon > span { background:var(--chon-nen); }
   .bangbien .dsml { position:static; grid-column:1 / -1; margin:2px 6px 8px; max-height:260px; }
   .bangbien .vbdong > span { padding:6px; border-bottom:1px solid #F0F0F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
@@ -544,10 +543,13 @@
   .ghep-ml input { height:28px; box-sizing:border-box; border:1px solid var(--vien); border-radius:3px; font-size:12.5px; width:100%; background:#fff; padding:0 6px; }
   .ghep-ml td.lay { position:relative; }
   .oml { height:28px; box-sizing:border-box; display:flex; align-items:center; gap:6px; padding:0 8px; border:1px solid transparent; border-radius:3px; cursor:pointer; white-space:nowrap; overflow:hidden; }
-  .oml:hover, .oml.mo { border-color:var(--vien); background:#fff; }
+  .oml:hover { border-color:var(--vien); }
   .oml.mo { border-color:var(--chon-vien); box-shadow:0 0 0 2px rgba(47,123,217,.18); }
   .oml .ten { flex:1; overflow:hidden; text-overflow:ellipsis; }
-  .oml .tag { font-size:10.5px; color:#666; border:1px solid #DADADA; border-radius:3px; padding:0 4px; line-height:16px; flex-shrink:0; }
+  .oml.cot { background:#EAF1FB; color:#1F4E99; }
+  .oml.tach { background:#EFEAF8; color:#5B3E96; }
+  .oml.hang { background:#fff; border-color:var(--vien); color:var(--chu); }
+  .oml.cot:hover, .oml.tach:hover { border-color:#A9C2E6; }
   .oml svg { width:10px; height:6px; flex-shrink:0; margin-left:auto; opacity:0; } .oml:hover svg, .oml.mo svg { opacity:1; }
   .oml.thieu .ten { color:#B85F00; font-style:italic; } .oml.thieu { border-color:#E8C77A; background:#FFFBEF; }
   .dsml { position:absolute; left:12px; right:12px; top:36px; z-index:5; background:#fff; border:1px solid var(--vien); border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.18); padding:6px; max-height:236px; overflow-y:auto; }
@@ -2545,11 +2547,9 @@
   // Ô "Lấy từ": hiển thị gọn; bấm để mở danh sách cột, hoặc gõ thẳng giá trị cố định rồi Enter.
   // Dùng chung cho bảng biến ở sidebar (ml.moTrai) và hộp Ghép biến (ml.mo).
   function oNguon(b, i, mo) {
-    var nhan = b[1] === 'cot' ? '<span class="tag cot">Cột</span><span class="ten">' + b[2] + '</span>'
-      : b[1] === 'hang' ? '<span class="tag">Giá trị</span><span class="ten">' + b[2] + '</span>'
-      : b[1] === 'tach' ? '<span class="tag">Tách</span><span class="ten">Từ kết quả Tách</span>'
-      : '<span class="ten">Chọn cột / nhập giá trị</span>';
-    return '<div class="oml' + (b[1] === 'thieu' ? ' thieu' : '') + (mo === i ? ' mo' : '') + '" data-mloml="' + i + '" tabindex="0" role="combobox" aria-expanded="' + (mo === i) + '">' + nhan + MUI_TEN + '</div>';
+    // Giá trị cố định trông như ô nhập; nguồn là cột Excel / kết quả Tách tô nền riêng
+    var nhan = '<span class="ten">' + (b[1] === 'cot' || b[1] === 'hang' ? b[2] : b[1] === 'tach' ? 'Từ kết quả Tách' : 'Chọn cột / nhập giá trị') + '</span>';
+    return '<div class="oml ' + b[1] + (mo === i ? ' mo' : '') + '" data-mloml="' + i + '" tabindex="0" role="combobox" aria-expanded="' + (mo === i) + '">' + nhan + MUI_TEN + '</div>';
   }
   function dsNguon(b) {
     return '<input class="mlgo" placeholder="Gõ giá trị cố định rồi Enter, hoặc chọn…" value="' + (b[1] === 'hang' ? b[2] : '') + '">' +
