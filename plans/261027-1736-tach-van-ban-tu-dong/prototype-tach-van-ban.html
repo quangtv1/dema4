@@ -508,7 +508,7 @@
   .bangbien .tieude-cot { position:sticky; top:0; background:#EBEBEB; border-bottom:1px solid var(--vien-nhat); padding:6px 6px; color:var(--chu-phu); z-index:1; }
   .bangbien .vbdong > span.lay { padding:2px 2px; overflow:visible; cursor:default; }
   .bangbien .oml { height:26px; padding:0 6px; font-weight:normal; }
-  .bangbien .vbdong.sang > span { background:#FFF3C4; }
+  .bangbien .vbdong.sang > span { background:#E6F0FB; } /* dòng đang định vị: xanh nhạt; chip trên trang mẫu: vàng */
   .bangbien .vbdong.chon > span { background:var(--chon-nen); }
   .bangbien .dsml { position:static; grid-column:1 / -1; margin:2px 6px 8px; max-height:260px; }
   .bangbien .vbdong > span { padding:6px; border-bottom:1px solid #F0F0F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
@@ -517,12 +517,10 @@
   .bangbien .vbdong > span.canhml { justify-content:center; }
   .bangbien .vbdong > span.lay > .oml { flex:1; min-width:0; }
   .bangbien .vbdong > span > code { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-  /* Đang định vị: chip biến ở sidebar vàng giống chip trên trang mẫu */
-  .bangbien .vbdong.sang code { background:#FFE066; color:#3A2E00; }
   .bangbien .nhombien { grid-column:1 / -1; padding:5px 6px; font-size:11px; font-weight:bold; border-bottom:1px solid #EFEFEF; }
   .nhom-ttin, .nhom-bang, .nhom-tudong { background:#FAFAFA; color:var(--chu-phu); }
   /* Tên biến hiển thị như chip biến trên trang mẫu: cùng nền, cùng màu chữ theo trạng thái */
-  .bangbien code, .ghep-ml code { font-family:Consolas, Menlo, monospace; font-size:11.5px; padding:1px 5px; border-radius:3px; background:var(--tk-nen); color:var(--tk-chu); }
+  .bangbien code, .ghep-ml code { font-family:Consolas, Menlo, monospace; font-size:11.5px; padding:3px 6px; border-radius:3px; line-height:1.3; background:var(--tk-nen); color:var(--tk-chu); }
   .xemml { flex:1; min-height:0; display:flex; flex-direction:column; }
   .xemml .vungxem { flex:1; min-height:0; overflow:auto; background:#E6E6E6; display:flex; flex-direction:column; align-items:center; padding:18px 0; gap:10px; }
   .xemml .baoml { width:420px; box-sizing:border-box; background:#FFF6E0; border:1px solid #E8C77A; color:#6B4A00; font-size:12px; padding:7px 10px; }
@@ -540,7 +538,7 @@
   /* Màu nguồn biến (sidebar, hộp Ghép biến, trang mẫu) — một tông slate, chỉ "chưa ghép" dùng màu nhấn */
   #manMucLuc, .ghep-ml { --ml-cot:#EDF1F6; --ml-cot-chu:#2C3E55; --ml-tudong:#F4F5F7; --ml-tudong-chu:#7A8594; --ml-vien-nhe:#C9D3DF; --ml-chan:#F4F6F9; --ml-nhom:#E1E8F0;
     --tk-nen:#DAE4F0; --tk-chu:#2C3E55; --tk-bang-nen:#D8ECDE; --tk-bang-chu:#2F5440; --tk-thieu-nen:#FFE9C2; --tk-thieu-chu:#8A5A00; --tk-tudong-nen:#EEF0F2; --tk-tudong-chu:#7A8594; }
-  .trangml .tk { font-family:Consolas, Menlo, monospace; font-size:7.5px; padding:0 2px; border-radius:2px; background:var(--tk-nen); color:var(--tk-chu); white-space:nowrap; cursor:pointer; }
+  .trangml .tk { font-family:Consolas, Menlo, monospace; font-size:7.5px; padding:1.5px 3px; border-radius:2px; line-height:1.6; background:var(--tk-nen); color:var(--tk-chu); white-space:nowrap; cursor:pointer; }
   /* Chip biến (sidebar, hộp Ghép biến, trang mẫu) tô theo loại: Thông tin hồ sơ (slate) · Bảng văn bản (xanh rêu) · Tự động (xám); chưa ghép luôn vàng cam */
   .bangbien code.bang, .ghep-ml code.bang, .trangml .tk.bang { background:var(--tk-bang-nen); color:var(--tk-bang-chu); }
   .bangbien code.tudong, .ghep-ml code.tudong, .trangml .tk.tudong { background:var(--tk-tudong-nen); color:var(--tk-tudong-chu); }
