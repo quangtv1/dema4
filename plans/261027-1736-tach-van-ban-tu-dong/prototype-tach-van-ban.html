@@ -1167,7 +1167,12 @@
     $('chuaPT').classList.toggle('an', s.daPT || dangPT);
     $('cheTrang').classList.toggle('an', !(s.daPT || dangPT) || s.che !== 'trang');
     $('cheVanBan').classList.toggle('an', !s.daPT || s.che !== 'vanban');
-    if (!dangPT) { $('vachTD').style.width = '0'; $('nhanTD').textContent = s.daPT ? 'Phân tích xong (' + gioPhutGiay(tgPhanTich) + ')' : ''; $('nhanTD').className = 'nhantd' + (s.daPT ? ' xong' : ''); }
+    // Nhãn trạng thái góc phải: đang / đã tách thay cho "Phân tích xong" (không có vạch tiến độ khi tách — tiến độ ở popup)
+    if (!dangPT) {
+      $('vachTD').style.width = '0';
+      if (trangThaiTach) { $('nhanTD').textContent = trangThaiTach.chu; $('nhanTD').className = 'nhantd' + trangThaiTach.lop; }
+      else { $('nhanTD').textContent = s.daPT ? 'Phân tích xong (' + gioPhutGiay(tgPhanTich) + ')' : ''; $('nhanTD').className = 'nhantd' + (s.daPT ? ' xong' : ''); }
+    }
     if (s.daPT || dangPT) {
       veLuoi();
       // Menu lọc nhớ mục đã chọn (s.locMenu): đang lọc Điểm cắt thì nút menu vẫn ghi mục đó (không sáng), bấm là quay lại
@@ -1672,7 +1677,7 @@
     nhan = JSON.parse(nhanTuDong); nghi = JSON.parse(nghiTuDong); goiy = JSON.parse(goiyTuDong); daThu = {}; daXoa = TEN.map(function () { return {}; }); xoay = TEN.map(function () { return {}; }); s.chonVB = {}; lichSu = {}; lichLai = {}; dangGhi = null;
     s.chonDs = {}; s.neo = ''; s.vb = 0; s.loc = 'tat'; s.locMenu = 'tat'; chuaLuu = false; s.daPT = false; s.che = 'trang'; ve();
     var nut = $('nutPhanTich'), i = 0, batDau = Date.now();
-    dangPT = true; dungPT = false; $('nutCauHinh').disabled = true; $('nutMenu').disabled = true; nut.textContent = 'Dừng'; // Dừng vẫn bấm được; khoá Cấu hình + Chức năng
+    dangPT = true; dungPT = false; trangThaiTach = null; $('nutCauHinh').disabled = true; $('nutMenu').disabled = true; nut.textContent = 'Dừng'; // Dừng vẫn bấm được; khoá Cấu hình + Chức năng
     ve(); $('luoi').scrollTop = 0;
     var t = setInterval(function () {
       i += 0.5; $('vachTD').style.width = Math.min(i, 100) + '%';
@@ -2100,7 +2105,7 @@
   // Số liệu mô phỏng từng hồ sơ (như mẫu 1): số trang, số văn bản, dung lượng ghi ra
   var DT_TRANG = [491, 405], DT_VB = [108, 103], DT_MB = [268, 203];
   function soVN(n) { return String(n).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
-  var tachHenGio = null, tachDongHo = null;
+  var tachHenGio = null, tachDongHo = null, trangThaiTach = null, tachBatDau = 0;
   function hhmmss(ms) { var g = Math.max(0, Math.round(ms / 1000)); return [Math.floor(g / 3600), Math.floor(g % 3600 / 60), g % 60].map(function (x) { return (x < 10 ? '0' : '') + x; }).join(':'); }
   function batDauTach(dungO) {
     var tong = TEN.length, xong = 0, batDau = Date.now();
@@ -2124,6 +2129,7 @@
       $('dtTg').innerHTML = 'Đã chạy <b>' + hhmmss(tg) + '</b> · còn ' + con;
     }
     $('dtLoi').textContent = '0';
+    tachBatDau = batDau; trangThaiTach = { chu: 'Đang tách…', lop: '' }; ve();
     veDangTach(); $('phuDangTach').classList.add('mo');
     tachDongHo = setInterval(veDangTach, 200);
     // Mỗi văn bản ~20 ms; hết văn bản của hồ sơ thì cộng trang / MB của hồ sơ đó
@@ -2139,6 +2145,8 @@
   function ketThucTach(daDung) {
     clearTimeout(tachHenGio); tachHenGio = null; clearInterval(tachDongHo); tachDongHo = null;
     $('phuDangTach').classList.remove('mo');
+    var tg = gioPhutGiay(Date.now() - tachBatDau);
+    trangThaiTach = daDung ? { chu: 'Đã dừng tách (' + tg + ')', lop: ' dung' } : { chu: 'Đã tách xong (' + tg + ')', lop: ' xong' }; ve();
     document.querySelector('#phu .dau').innerHTML = (daDung ? 'Đã dừng tách ' : 'Đã tách xong ') + '<b>pdf_goc</b>';
     $('phu').classList.add('mo');
   }
@@ -2180,7 +2188,7 @@
   if (location.hash === '#huong-dan') moTroGiup('huongdan');
   if (location.hash === '#huong-dan-dem') { moTroGiup('huongdan'); moTabHD('dem'); }
   if (location.hash === '#thong-tin') moTroGiup('thongtin');
-  if (location.hash === '#tach-xong') { s.daPT = true; nghi = TEN.map(function () { return {}; }); goiy = TEN.map(function () { return {}; }); ve(); $('nutTach').onclick(); }
+  if (location.hash === '#tach-xong') { s.daPT = true; nghi = TEN.map(function () { return {}; }); goiy = TEN.map(function () { return {}; }); ve(); tachBatDau = Date.now() - 21000; ketThucTach(false); }
   if (location.hash === '#tach-chua-duyet') { s.daPT = true; ve(); $('nutTach').onclick(); }
   if (location.hash === '#dang-tach') {
     s.daPT = true; ve(); batDauTach(99); clearTimeout(tachHenGio); clearInterval(tachDongHo);
