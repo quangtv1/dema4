@@ -15,7 +15,7 @@ Bấm Đếm / Tách quyết định **tức thì** trên bản sao license tron
 ## Requirements
 - Bấm Đếm / Tách không chờ mạng; chỉ nút **Kiểm tra lại** trên popup mới chờ (hiện "Đang kiểm tra…", bỏ cuộc sau 4 s).
 - Gọi trạm chỉ ở 3 thời điểm: lúc mở app, sau mỗi lần chạy xong (`ghi_lan` trả luôn trạng thái mới), khi bấm Kiểm tra lại. **Không hẹn giờ làm mới.**
-- Popup chặn: lý do (hết lượt Đếm / Tách, máy bị khoá, hết 2 lần offline), mã máy + Copy, saomaiso.com, SĐT, email, **Kiểm tra lại**, **Đóng**.
+- Popup chặn: **logo Sao Mai nhỏ** (~56 px, dùng lại `tro_giup::logo`, bấm mở saomaiso.com) ở đầu; lý do (hết lượt Đếm / Tách, máy bị khoá, hết 2 lần offline); mã máy + Copy; SĐT **0979824615** (Copy); email **hotro@saomaiso.com** (bấm mở `mailto:` kèm mã máy trong tiêu đề, Copy); web **saomaiso.com**; nút **Kiểm tra lại**, **Đóng**.
 - Dòng lệnh: chặn → in thông báo + mã máy, mã thoát 3.
 - Hộp Thông tin hiện mã máy (có Copy).
 
@@ -27,6 +27,7 @@ Bấm Đếm / Tách quyết định **tức thì** trên bản sao license tron
   - `da_chay(cn)`: tăng `chay_tu_ban_sao` ngay rồi thread `ghi_lan` (có kèm ghi bù offline nếu đang chờ); lỗi → `BoDemOffline::cong(cn)`; được → thay bản sao bằng trạng thái trạm trả về, `chay_tu_ban_sao = 0`.
   - `kiem_tra_lai() -> Receiver<QuyetDinh>` cho nút Kiểm tra lại.
 - GUI: `UngDungChinh` giữ `Arc<KiemTra>`; `quyet_dinh` ở đầu `gui.rs::bat_dau_dem` và `nut_tach.rs::bat_dau_tach`; Cho → chạy như cũ, khác → `HopLicense`.
+- Hằng liên hệ trong `hop_license.rs`: `SDT = "0979824615"`, `EMAIL = "hotro@saomaiso.com"`, `WEB = gioi_thieu::WEB`.
 - Điểm "chạy xong có kết quả": Đếm — `luu_va_thong_bao` khi có ≥ 1 file; Tách — `nhan_ket_qua_tach` khi `kq.dong` không rỗng.
 - CLI: đọc đồng bộ 1 lần (timeout 4 s) → `quyet_dinh`; `da_chay` ghi đồng bộ trước khi thoát.
 - Test GUI cũ: `UngDungChinh` tạo `KiemTra` với `KhoGia` hạn mức lớn qua `#[cfg(test)]`.
@@ -46,7 +47,7 @@ Bấm Đếm / Tách quyết định **tức thì** trên bản sao license tron
 6. GUI (kittest): Đếm khi hết lượt → popup có mã máy ngay khung hình đó, không đếm; Kiểm tra lại sau khi kho nâng hạn mức → popup đóng, đếm chạy.
 7. GUI: Tách hết lượt → popup, không có luồng tách.
 8. CLI: `chay_tach` hết lượt → mã thoát 3, không ghi file.
-9. Ảnh chụp popup (`chup_hop`: `het_luot`).
+9. Ảnh chụp popup (`chup_hop`: `het_luot`) — kiểm có logo, SĐT 0979824615, email hotro@saomaiso.com, mã máy.
 
 ## Implementation Steps
 1. Test 1–5 (đỏ) → code `KiemTra` → xanh.
