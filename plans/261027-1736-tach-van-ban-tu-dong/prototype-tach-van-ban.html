@@ -95,8 +95,10 @@
   .phai { flex:1; min-width:0; display:flex; flex-direction:column; }
   .trong { flex:1; display:flex; align-items:center; justify-content:center; color:var(--chu-phu); }
   /* Màn mở mặc định (chưa có dữ liệu): logo nhỏ + giới thiệu ngắn chức năng, 3 bước có màu */
+  /* Khối giới thiệu đặt cao (cách mép trên ~56px), logo nhỏ ở góc dưới phải vùng trống */
+  .mo-dau { align-items:flex-start; padding-top:56px; position:relative; }
   .gioithieu { text-align:center; color:var(--chu); max-width:560px; }
-  .gioithieu img { width:72px; height:auto; }
+  .logo-goc { position:absolute; right:20px; bottom:16px; width:64px; height:auto; opacity:.9; }
   .gioithieu h2 { font-size:17px; font-weight:bold; margin:8px 0 4px; }
   .gioithieu p { font-size:12px; color:var(--chu-phu); margin:0 0 16px; line-height:1.5; }
   .buoc { display:flex; gap:14px; justify-content:center; }
@@ -516,9 +518,9 @@
         </div>
         <div class="keo" id="keo" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng cột trái" tabindex="0"></div>
         <div class="phai">
-          <div class="trong" id="chuaPT">
+          <div class="trong mo-dau" id="chuaPT">
+            <img alt="" class="logo-gt logo-goc">
             <div class="gioithieu">
-              <img alt="" class="logo-gt">
               <h2>Tách văn bản</h2>
               <p>Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng và gợi ý trang bị xoay. Nhãn do máy đoán, người duyệt lại trước khi tách — file PDF gốc không bị sửa.</p>
               <div class="buoc">
@@ -646,9 +648,9 @@
 
   <!-- Màn Đếm trang A4 (giữ nguyên) -->
   <!-- Màn Ký văn bản: giữ chỗ, chưa có chức năng -->
-  <div class="man an" id="manKy" style="align-items:center;justify-content:center">
+  <div class="man an mo-dau" id="manKy" style="align-items:center">
+    <img alt="" class="logo-gt logo-goc">
     <div class="gioithieu">
-      <img alt="" class="logo-gt">
       <h2>Ký văn bản</h2>
       <p>Ký số hàng loạt các văn bản PDF đã tách bằng chứng thư số của đơn vị; chèn hình chữ ký, kiểm tra file đã ký. <b>Chức năng đang phát triển.</b></p>
       <div class="buoc">
@@ -671,9 +673,9 @@
     </div>
     <div class="bangdem">
       <div class="tabkho"><span class="chon">Tất cả (896)</span><span>A0 (0)</span><span>A1 (0)</span><span>A2 (0)</span><span>A3 (0)</span><span>A4 (896)</span><span>A5 (0)</span><span>A6 (0)</span><span>A7 (0)</span></div>
-      <div class="trong">
+      <div class="trong mo-dau">
+        <img alt="" class="logo-gt logo-goc">
         <div class="gioithieu">
-          <img alt="" class="logo-gt">
           <h2>Đếm trang A4</h2>
           <p>Đếm số trang của mọi PDF trong thư mục (cả thư mục con), phân loại khổ giấy và quy đổi ra số trang A4 theo hệ số; cảnh báo trang sát ngưỡng khổ, DPI bất thường, file đã ký số.</p>
           <div class="buoc">
