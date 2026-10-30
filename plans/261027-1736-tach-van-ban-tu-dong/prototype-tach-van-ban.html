@@ -836,13 +836,14 @@
     <div class="popup" role="dialog" aria-label="Đang tách">
       <div class="dau">Đang tách <b>pdf_goc</b></div>
       <div class="than" style="display:block;padding-bottom:6px">
-        <div class="tiendo" style="padding:0;height:24px"><div style="height:22px"><b id="dtVach" style="width:0"></b><span id="dtChu">L1_05_13.pdf · 0 / 211 văn bản · 0%</span></div></div>
+        <div class="tiendo" style="padding:0;height:24px"><div style="height:22px"><b id="dtVach" style="width:0"></b><span id="dtChu">0 / 211 văn bản (0%)</span></div></div>
       </div>
       <div class="than" style="padding-top:4px">
-        <span>Đã ghi</span><b id="dtGhi">0 / 2 hồ sơ · 0 trang · 0 MB</b>
+        <span>Hồ sơ đang tách</span><b id="dtTen">L1_05_13.pdf <span style="font-weight:normal;color:var(--chu-phu)">(1/2) · văn bản 1 / 108</span></b>
+        <span>Đã xong</span><b id="dtGhi">0 hồ sơ · 0 trang · 0 MB</b>
         <span>Lỗi</span><b id="dtLoi">0</b>
-        <span>Thời gian</span><b id="dtTg">00:00:00</b>
-        <span>Còn lại (ước)</span><b id="dtCon" style="font-weight:normal">đang tính…</b>
+        <span>Đã chạy</span><b id="dtTg">00:00:00</b>
+        <span>Còn khoảng</span><b id="dtCon" style="font-weight:normal">đang tính…</b>
         <span>Tốc độ</span><b id="dtToc" style="font-weight:normal">—</b>
       </div>
       <div class="cuoi"><button class="nut do" id="dtDung">Dừng</button></div>
@@ -2110,13 +2111,13 @@
       var tg = Date.now() - batDau;
       // Thanh tiến độ theo văn bản đã ghi (mịn hơn theo hồ sơ vì hồ sơ dài ngắn khác nhau)
       $('dtVach').style.width = Math.round(ghi.vb * 100 / tongVB) + '%';
-      // Trên thanh: hồ sơ đang tách · văn bản đã ghi / tổng · %
-      $('dtChu').textContent = (xong < tong ? TEN[xong] + ' · ' : '') + soVN(ghi.vb) + ' / ' + soVN(tongVB) + ' văn bản · ' + Math.round(ghi.vb * 100 / tongVB) + '%';
-      $('dtGhi').textContent = xong + ' / ' + tong + ' hồ sơ · ' + soVN(ghi.trang) + ' trang · ' + soVN(ghi.mb) + ' MB';
+      $('dtChu').textContent = soVN(ghi.vb) + ' / ' + soVN(tongVB) + ' văn bản (' + Math.round(ghi.vb * 100 / tongVB) + '%)';
+      $('dtTen').innerHTML = xong < tong ? TEN[xong] + ' <span style="font-weight:normal;color:var(--chu-phu)">(' + (xong + 1) + '/' + tong + ') · văn bản ' + (vbTrongHs + 1) + ' / ' + DT_VB[xong] + '</span>' : '—';
+      $('dtGhi').textContent = xong + ' hồ sơ · ' + soVN(ghi.trang) + ' trang · ' + soVN(ghi.mb) + ' MB';
       $('dtTg').textContent = hhmmss(tg);
       if (ghi.trang > 0) {
         var conMs = tg / ghi.trang * (tongTrang - ghi.trang), xongLuc = new Date(Date.now() + conMs);
-        $('dtCon').textContent = '~' + hhmmss(conMs) + ' · xong lúc ' + (xongLuc.getHours() < 10 ? '0' : '') + xongLuc.getHours() + ':' + (xongLuc.getMinutes() < 10 ? '0' : '') + xongLuc.getMinutes();
+        $('dtCon').textContent = hhmmss(conMs) + ' · dự kiến xong lúc ' + (xongLuc.getHours() < 10 ? '0' : '') + xongLuc.getHours() + ':' + (xongLuc.getMinutes() < 10 ? '0' : '') + xongLuc.getMinutes();
         $('dtToc').textContent = Math.round(ghi.trang / (tg / 1000)) + ' trang/giây · ' + (ghi.mb / (tg / 1000)).toFixed(1) + ' MB/giây';
       } else { $('dtCon').textContent = 'đang tính…'; $('dtToc').textContent = '—'; }
     }
@@ -2181,8 +2182,9 @@
   if (location.hash === '#tach-chua-duyet') { s.daPT = true; ve(); $('nutTach').onclick(); }
   if (location.hash === '#dang-tach') {
     s.daPT = true; ve(); batDauTach(99); clearTimeout(tachHenGio); clearInterval(tachDongHo);
-    $('dtVach').style.width = '54%'; $('dtChu').textContent = 'L1_06_14.pdf · 115 / 211 văn bản · 54%';
-    $('dtGhi').textContent = '1 / 2 hồ sơ · 524 trang · 284 MB'; $('dtTg').textContent = '00:00:21'; $('dtCon').textContent = '~00:00:17 · xong lúc 08:42'; $('dtToc').textContent = '23 trang/giây · 12,8 MB/giây';
+    $('dtVach').style.width = '54%'; $('dtChu').textContent = '115 / 211 văn bản (54%)';
+    $('dtTen').innerHTML = 'L1_06_14.pdf <span style="font-weight:normal;color:var(--chu-phu)">(2/2) · văn bản 8 / 103</span>';
+    $('dtGhi').textContent = '1 hồ sơ · 524 trang · 284 MB'; $('dtTg').textContent = '00:00:21'; $('dtCon').textContent = '00:00:17 · dự kiến xong lúc 08:42'; $('dtToc').textContent = '23 trang/giây · 12,8 MB/giây';
   }
   if (location.hash === '#phan-tich-lai') $('nutPhanTich').onclick();
   if (location.hash === '#xem-1-trang') { s.daPT = true; s.che = 'vanban'; s.vb = 3; s.xemVB = 'mot'; ve(); }
