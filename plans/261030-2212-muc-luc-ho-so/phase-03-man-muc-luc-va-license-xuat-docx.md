@@ -1,26 +1,26 @@
 ---
 phase: 3
 title: "Man Muc luc va license xuat DOCX"
-status: pending
+status: in-progress
 priority: P1
 dependencies: [1, 2]
 effort: "4 ngày"
 ---
 
-# Phase 3: Màn Mục lục + license, xuất DOCX (phát hành được)
+# Phase 3: Màn Sinh mục lục + license, xuất DOCX (phát hành được)
 
 ## Overview
 Màn egui theo prototype đã duyệt, nối lõi phase 2; tính lượt license chức năng `muc_luc`; xuất DOCX. Phát hành bản mới sau phase này.
 
 ## Requirements
-- `Man::MucLuc` (mục 4 menu Chức năng, tiêu đề cửa sổ "Mục lục hồ sơ (Giải pháp số Sao Mai)"); chưa có dữ liệu → `gioi_thieu::MUC_LUC` 3 bước.
-- Dòng Dữ liệu: ô đường dẫn + Chọn (rfd, nhớ thư mục, **đánh thức UI** như fix Tách), Sheet ▾ (mỗi lần 1 sheet), Header dòng; dòng Mẫu: 4 mẫu nhúng ▾ + Chọn DOCX.
-- Cột trái Hồ sơ (`cot_trai`): #, tên (khoá nhóm), số VB, ✓/⚠ (lỗi từ kiểm tra); ô Tìm; Tất cả.
-- Tab Ghép biến: bảng biến theo thứ tự xuất hiện trong mẫu, Nguồn ▾ (Cột…/Hằng), ô Hằng, giá trị của hồ sơ đang chọn; Cột gom nhóm ▾; tự khớp khi đổi file/mẫu; Kiểm tra dữ liệu (luồng nền).
-- Dòng đáy: Số hồ sơ; Số văn bản; Biến thiếu + **Tạo mục lục** (khoá khi lỗi). Popup tiến độ + kết quả (Mở thư mục).
-- Cấu hình › tab Mục lục: thư mục ra (trống = mặc định `goc_du_lieu()/muc_luc/<tên file dữ liệu không đuôi>/`, tức `.sm-dema4` cạnh exe; gõ đường dẫn để ghi nơi khác), mẫu tên, Ghi đè; lưu ở `.dema4_saomai.cfg` (khoá mới, mặc định khi thiếu). Popup kết quả có **Mở thư mục** (thư mục ẩn nên bắt buộc có nút này).
-- Nhớ lựa chọn gần nhất (file, sheet, mẫu, ràng buộc biến theo mẫu) trong cấu hình.
-- **License**: `ChucNang::MucLuc` (`ma()` = "muc_luc"); trạm: cột Đã dùng / Hạn mức Mục lục (thêm cột cuối, không xê dịch cột cũ), `thong_ke_muc_luc` + tin `📑 MỤC LỤC HỒ SƠ (x/y)` (Thông tin máy / ----- / chức năng: Dữ liệu, Mẫu, Số hồ sơ, Số văn bản, DOCX, PDF, Lỗi, Thời gian), tin hết lượt Mục lục. App cũ không gửi `muc_luc` → không ảnh hưởng.
+- `Man::MucLuc`: mục 4 menu Chức năng **Sinh mục lục**; tiêu đề cửa sổ "Sinh mục lục hồ sơ (Giải pháp số Sao Mai)".
+- **Bố cục đúng prototype đã duyệt** (phase 1 › "Bố cục đã duyệt"): 2 dòng đầu vào, tab Mẫu/Kết quả + cảnh báo đầu khung, sidebar kéo được, sửa nguồn biến tại chỗ, Nhóm theo ở chân sidebar, dòng đáy + Sinh mục lục, popup tiến độ / kết quả, hộp Ghép biến.
+- Chọn file: rfd, nhớ thư mục, **đánh thức UI** (`request_repaint`) như fix Tách; mỗi lần 1 sheet; đọc bảng + đếm giá trị khác nhau mỗi cột ở luồng nền.
+- Tự khớp biến ↔ cột khi đổi file/mẫu (bỏ dấu, chữ thường, `_`/khoảng trắng); kiểm tra dữ liệu chạy tự động sau mỗi thay đổi (không có nút Kiểm tra).
+- Phase 3 chưa có xem trước thật (phase 4): khung phải hiển thị bảng văn bản của hồ sơ / danh sách biến của mẫu dạng bảng thường + ghi chú "xem trước bản in ở bản sau"; zoom ẩn.
+- Cấu hình › tab **Sinh mục lục**: thư mục ra (trống = `goc_du_lieu()/muc_luc/<tên file dữ liệu không đuôi>/`), mẫu tên, Kèm PDF (khoá khi chưa có PDF), Ghi đè/Bỏ qua; lưu ở `.dema4_saomai.cfg` (khoá mới, mặc định khi thiếu). Popup kết quả có **Mở thư mục** (thư mục ẩn).
+- Nhớ lựa chọn gần nhất (file, sheet, dòng tiêu đề, mẫu, nhóm theo, ràng buộc biến theo mẫu) trong cấu hình.
+- **License**: `ChucNang::MucLuc` (`ma()` = "muc_luc"); trạm: cột Đã dùng / Hạn mức Mục lục (thêm cột cuối, không xê dịch cột cũ), `thong_ke_muc_luc` + tin `📑 SINH MỤC LỤC (x/y)` (Thông tin máy / ----- / chức năng: Dữ liệu, Mẫu, Số hồ sơ, Số văn bản, DOCX, PDF, Lỗi, Thời gian), tin hết lượt Mục lục. App cũ không gửi `muc_luc` → không ảnh hưởng.
 - 1 lượt = 1 lần Tạo có ≥ 1 DOCX ra; hết lượt → popup Liên hệ Sao Mai (đã có, thêm tên chức năng).
 - CLI: `--muc-luc <excel> --mau <docx|01..04> [--ra <thư mục>]` (tuỳ chọn, cùng luật license, mã thoát 3 khi hết lượt).
 
@@ -30,8 +30,8 @@ Màn egui theo prototype đã duyệt, nối lõi phase 2; tính lượt license
 - Modify: `dema4_rs/apps-script/loi.js`, `license.gs` (cột hạn mức + tin), `test/loi.test.js`; README
 
 ## Tests trước
-1. `license::quyet_dinh` cho `MucLuc` độc lập Đếm/Tách; trạm Node: `ghi_lan` cn=`muc_luc`, hạn mặc định 10, cột mới, tin `MỤC LỤC HỒ SƠ (x/y)`, hết lượt Mục lục.
-2. kittest: chưa chọn → giới thiệu; chọn fixture → cột trái N hồ sơ, bảng biến tự khớp; đổi Nguồn sang Hằng → giá trị cập nhật; Tạo → popup kết quả, DOCX có trên đĩa; hết lượt → popup license, không ghi file.
+1. `license::quyet_dinh` cho `MucLuc` độc lập Đếm/Tách; trạm Node: `ghi_lan` cn=`muc_luc`, hạn mặc định 10, cột mới, tin `SINH MỤC LỤC (x/y)`, hết lượt Mục lục.
+2. kittest: chưa chọn → giới thiệu + sidebar trống; chọn fixture → tab Mẫu liệt kê biến tự khớp, tab Kết quả N hồ sơ; nhập giá trị cố định cho 1 biến → hết cảnh báo chưa ghép; đổi Nhóm theo → số hồ sơ đổi; Sinh → popup kết quả, DOCX có trên đĩa; hết lượt → popup license, không ghi file.
 3. `cau_hinh` khu hồi khoá mới; thiếu khoá → mặc định.
 4. Ảnh chụp `chup_man_muc_luc` (giới thiệu, ghép, popup) khớp prototype.
 
