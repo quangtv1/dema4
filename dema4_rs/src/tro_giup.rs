@@ -15,7 +15,7 @@ pub const PHIEN_BAN: &str = env!("CARGO_PKG_VERSION");
 pub const WEBSITE: &str = "https://saomaiso.com";
 
 /// Logo Sao Mai (PNG nhúng trong exe), nạp texture 1 lần rồi giữ trong bộ nhớ egui.
-fn logo(ctx: &egui::Context) -> egui::TextureHandle {
+pub(crate) fn logo(ctx: &egui::Context) -> egui::TextureHandle {
     let id = egui::Id::unique("logo_sao_mai");
     if let Some(t) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
         return t;

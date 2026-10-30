@@ -275,7 +275,7 @@ impl eframe::App for UngDungChinh {
             }
             Man::Ky => {
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN)).show(ui, |ui| {
-                    ui.centered_and_justified(|ui| ui.label(RichText::new("Ký văn bản — Chức năng đang phát triển").color(CHU_PHU)));
+                    crate::gioi_thieu::ve(ui, &crate::gioi_thieu::KY);
                 });
             }
         }
@@ -1044,16 +1044,17 @@ impl UngDung {
             self.thanh_tab_loc(ui);
             ui.add_space(-ui.spacing().item_spacing.y);
             if self.dong.is_empty() {
-                ui.allocate_ui_with_layout(ui.available_size(), Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
-                    let goi_y = if self.dang_dem.is_some() {
-                        "Đang đọc file…"
-                    } else if !self.thu_muc.trim().is_empty() {
-                        "Click nút Đếm để thực hiện"
-                    } else {
-                        "Chọn thư mục chứa PDF rồi bấm Đếm"
-                    };
-                    ui.label(RichText::new(goi_y).color(CHU_PHU));
-                });
+                if self.dang_dem.is_some() {
+                    ui.allocate_ui_with_layout(ui.available_size(), Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
+                        ui.label(RichText::new("Đang đọc file…").color(CHU_PHU));
+                    });
+                } else if crate::gioi_thieu::ve(ui, &crate::gioi_thieu::DEM) == Some(crate::gioi_thieu::Bam::Chon) {
+                    // Link "Chọn" trong giới thiệu = nút Chọn
+                    if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục chứa PDF").pick_folder() {
+                        self.thu_muc = p.display().to_string();
+                        self.xoa_ket_qua();
+                    }
+                }
                 return;
             }
             let bo_loc = self.bo_loc;
@@ -1483,7 +1484,7 @@ mod tests {
         h.get_by_label_contains("Ký văn bản").click();
         h.run();
         assert_eq!(h.state().man, Man::Ky);
-        h.get_by_label("Ký văn bản — Chức năng đang phát triển");
+        h.get_by_label_contains("Chức năng đang phát triển");
         h.key_press(egui::Key::F1);
         h.run();
         assert!(matches!(h.state().tro_giup, Some(crate::tro_giup::HopTroGiup::HuongDan(crate::tro_giup::TabHuongDan::Dem))));
@@ -1615,6 +1616,7 @@ mod tests {
             app
         });
         harness.run_steps(2);
+        harness.render().unwrap().save(thu_muc_anh.join("dem_mo_dau.png")).unwrap();
         let ctx = harness.ctx.clone();
         harness.state_mut().dem.bat_dau_dem(&ctx);
         let bat_dau = Instant::now();
@@ -1824,6 +1826,14 @@ mod tests {
             });
             h.run_steps(4);
             h.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
+        }
+        {
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_pixels_per_point(1.5).build_eframe(|cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                UngDungChinh { man: Man::Ky, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() }
+            });
+            h.run_steps(4);
+            h.render().unwrap().save(thu_muc_anh.join("ky_mo_dau.png")).unwrap();
         }
         for ten in ["chua_tach", "phan_tich_lai", "dang_tach", "tach_xong"] {
             let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_pixels_per_point(1.5).build_eframe(|cc| {

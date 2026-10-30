@@ -1596,6 +1596,14 @@ impl ManTach {
 
     fn luoi(&mut self, ui: &mut egui::Ui, cfg: &CauHinh, viec: &mut Vec<Viec>) {
         let Some(b) = &self.bang else {
+            // Chưa phân tích: giới thiệu chức năng; link Chọn / Phân tích làm đúng việc của nút
+            if self.chay.is_none() {
+                match crate::gioi_thieu::ve(ui, &crate::gioi_thieu::TACH) {
+                    Some(crate::gioi_thieu::Bam::Chon) if self.chon_tm.is_none() => self.chon_tm = Some(chon_thu_muc_nen(&self.thu_muc)),
+                    Some(crate::gioi_thieu::Bam::PhanTich) => self.bam_phan_tich(&cfg.cau_hinh_phan_tich()),
+                    _ => {}
+                }
+            }
             return;
         };
         let co = co_vua_khung(cfg.co_anh_hs, ui.available_width());
