@@ -8,7 +8,7 @@ var TAB = {
   HANG_DOI: '3_hang_doi_telegram',
 };
 var TIEU_DE = {
-  MAY: ['Mã máy', 'Tên máy', 'MAC', 'IP nội bộ', 'IP public', 'Phiên bản', 'Ngày đăng ký', 'Lần dùng cuối', 'Đã dùng Đếm', 'Đã dùng Tách', 'Hạn mức Đếm', 'Hạn mức Tách', 'Trạng thái', 'Đơn vị', 'Ghi chú', 'Mã lần gần đây'],
+  MAY: ['Mã máy', 'Tên máy', 'MAC', 'IP nội bộ', 'IP public', 'Phiên bản', 'Ngày đăng ký', 'Lần dùng cuối', 'Đã dùng Đếm', 'Đã dùng Tách', 'Hạn mức Đếm', 'Hạn mức Tách', 'Trạng thái', 'Đơn vị', 'Ghi chú', 'Mã lần gần đây', 'Đã dùng Mục lục', 'Hạn mức Mục lục'],
   HANG_DOI: ['Mã', 'Thời điểm', 'Nội dung', 'Tên CSV', 'CSV', 'Số lần thử', 'Trạng thái', 'Lúc đánh dấu'],
 };
 /** Ghi chú (note) ô tiêu đề — thay cho tab mô tả. Ô A1 tab license kèm hướng dẫn cấp lượt. */
@@ -35,6 +35,8 @@ var GHI_CHU = {
     'Tự do: đơn vị sử dụng. Sao Mai sửa.',
     'Tự do: số hợp đồng, ngày cấp… Sao Mai sửa.',
     '20 mã lần chạy gần nhất — trạm dùng để không cộng trùng khi app gửi lại. Cột ẩn, không sửa tay.',
+    'Tổng số lần Sinh mục lục đã dùng; +1 mỗi lần có file ra. Không sửa tay.',
+    'TỔNG số lần Sinh mục lục được phép (không phải số cộng thêm). Trống = 10 (dùng thử). Sao Mai sửa.',
   ],
   HANG_DOI: [
     'Mã dòng (trạm tạo). Tab ẩn: tin Telegram chờ gửi, trigger gửi mỗi phút (tối đa 15 lời gọi/lượt), tự dọn sau 7 ngày. ' +
@@ -63,10 +65,27 @@ function bang(ten, tieuDe, ghiChu) {
       sh.getRange('K1:O1').setBackground('#BF8F00');
       sh.getRange('A1:J1').setBackground('#1F4E79');
       sh.hideColumns(16);
+      tomCotMucLuc(sh);
     }
     if (ten === TAB.HANG_DOI) sh.hideSheet();
   }
   return sh;
+}
+
+/** Màu tiêu đề 2 cột Sinh mục lục: Q do trạm ghi (xanh), R do Sao Mai sửa (vàng) — như các cột Đếm/Tách. */
+function tomCotMucLuc(sh) {
+  sh.getRange(1, 17).setBackground('#1F4E79');
+  sh.getRange(1, 18).setBackground('#BF8F00');
+}
+
+/** Tab license tạo bởi trạm cũ (16 cột) → thêm tiêu đề + ghi chú cột Q/R (dữ liệu cũ giữ nguyên, ô trống = mặc định). */
+function damBaoCotMucLuc(sh) {
+  if (sh.getMaxColumns() < SO_COT_MAY) sh.insertColumnsAfter(sh.getMaxColumns(), SO_COT_MAY - sh.getMaxColumns());
+  if (String(sh.getRange(1, 17).getValue()) !== '') return;
+  // Định dạng tiêu đề chép từ cột cùng loại của Đếm (I = Đã dùng, K = Hạn mức) để khớp cách trình bày hiện có
+  sh.getRange(1, COT.DUNG_DEM).copyFormatToRange(sh, 17, 17, 1, 1);
+  sh.getRange(1, COT.HAN_DEM).copyFormatToRange(sh, 18, 18, 1, 1);
+  sh.getRange(1, 17, 1, 2).setValues([TIEU_DE.MAY.slice(16, 18)]).setNotes([GHI_CHU.MAY.slice(16, 18)]);
 }
 
 /** Ghi chú tiêu đề tab Ngưỡng trắng từ mô tả app gửi kèm: [Cột, Ý nghĩa, Cách đọc]. */
@@ -88,6 +107,7 @@ function themDong(sh, rows) {
 function khoSheet() {
   var cache = CacheService.getScriptCache();
   var may = bang(TAB.MAY, TIEU_DE.MAY, GHI_CHU.MAY);
+  damBaoCotMucLuc(may);
   var hangDoi = bang(TAB.HANG_DOI, TIEU_DE.HANG_DOI, GHI_CHU.HANG_DOI);
   return {
     timMay: function (ma) {

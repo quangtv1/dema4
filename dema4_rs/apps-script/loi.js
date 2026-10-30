@@ -11,11 +11,18 @@ var GIOI_HAN_LOI_GOI_MOI_PHUT = 120;
 var TOI_DA_HANG_DOI = 2000;
 var HAN_MAC_DINH = 10; // lượt dùng thử mỗi chức năng khi ô Hạn mức trống
 // Cột tab license (1-based)
-var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7, LAN_CUOI: 8, DUNG_DEM: 9, DUNG_TACH: 10, HAN_DEM: 11, HAN_TACH: 12, TRANG_THAI: 13, MA_LAN: 16 };
-var SO_COT_MAY = 16;
+var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7, LAN_CUOI: 8, DUNG_DEM: 9, DUNG_TACH: 10, HAN_DEM: 11, HAN_TACH: 12, TRANG_THAI: 13, MA_LAN: 16, DUNG_MUC_LUC: 17, HAN_MUC_LUC: 18 };
+// Cột Mục lục thêm SAU cột ẩn Mã lần (P) để không xê dịch cột cũ; dòng do trạm cũ tạo có thể thiếu → mặc định
+var SO_COT_MAY = 18;
 // Số mã lần gần nhất giữ trong dòng máy để chống trùng (app gửi lại tối đa vài lần chưa được xác nhận)
 var GIU_MA_LAN = 20;
-var TEN_CN = { dem: 'Đếm', tach: 'Tách' };
+var TEN_CN = { dem: 'Đếm', tach: 'Tách', muc_luc: 'Mục lục' };
+// Cột Đã dùng / Hạn mức + khoá trong dữ liệu ký theo từng chức năng
+var CN = {
+  dem: { dung: COT.DUNG_DEM, han: COT.HAN_DEM },
+  tach: { dung: COT.DUNG_TACH, han: COT.HAN_TACH },
+  muc_luc: { dung: COT.DUNG_MUC_LUC, han: COT.HAN_MUC_LUC },
+};
 
 /** Bỏ ký tự điều khiển, cắt `toiDa` ký tự. */
 function sachChu(s, toiDa) {
@@ -84,13 +91,12 @@ function maNgauNhien() {
 
 /** Trạng thái license của 1 dòng (mảng 15 ô). */
 function trangThaiDong(d) {
-  return {
-    han_dem: hanMuc(d[COT.HAN_DEM - 1]),
-    han_tach: hanMuc(d[COT.HAN_TACH - 1]),
-    da_dung_dem: soKhongAm(d[COT.DUNG_DEM - 1]),
-    da_dung_tach: soKhongAm(d[COT.DUNG_TACH - 1]),
-    trang_thai: maTrangThai(d[COT.TRANG_THAI - 1]),
-  };
+  var tt = { trang_thai: maTrangThai(d[COT.TRANG_THAI - 1]) };
+  Object.keys(CN).forEach(function (cn) {
+    tt['han_' + cn] = hanMuc(d[CN[cn].han - 1]);
+    tt['da_dung_' + cn] = soKhongAm(d[CN[cn].dung - 1]);
+  });
+  return tt;
 }
 
 /**
@@ -100,14 +106,14 @@ function trangThaiDong(d) {
 function xuLy(yc, kho, bayGio) {
   yc = yc || {};
   var hd = yc.hanh_dong;
-  if (['kiem_tra', 'ghi_lan', 'thong_ke_dem', 'thong_ke_tach'].indexOf(hd) < 0) return { ok: false, loi: 'hanh_dong' };
+  if (['kiem_tra', 'ghi_lan', 'thong_ke_dem', 'thong_ke_tach', 'thong_ke_muc_luc'].indexOf(hd) < 0) return { ok: false, loi: 'hanh_dong' };
   if (!MAU_MA_MAY.test(String(yc.ma_may))) return { ok: false, loi: 'ma_may' };
   var nonce = sachChu(yc.nonce, 64);
   if (!kho.choPhep('goi', GIOI_HAN_LOI_GOI_MOI_PHUT, 60)) return { ok: false, loi: 'ban' };
   var may = sachMay(yc.may);
   var luc = thoiDiem(bayGio);
 
-  if (hd === 'thong_ke_dem' || hd === 'thong_ke_tach') return thongKe(hd, yc, may, kho, bayGio);
+  if (hd.indexOf('thong_ke_') === 0) return thongKe(hd, yc, may, kho, bayGio);
 
   var lan = [];
   if (hd === 'ghi_lan') {
@@ -122,7 +128,7 @@ function xuLy(yc, kho, bayGio) {
   var tim = kho.timMay(yc.ma_may);
   if (!tim) {
     if (!kho.choPhep('dang_ky', GIOI_HAN_DANG_KY_MOI_GIO, 3600)) return { ok: false, loi: 'ban' };
-    kho.themMay([yc.ma_may, may.ten, may.mac, may.ip_noi_bo, may.ip_public, may.phien_ban, luc, luc, 0, 0, '', '', 'Dùng thử', '', '', '']);
+    kho.themMay([yc.ma_may, may.ten, may.mac, may.ip_noi_bo, may.ip_public, may.phien_ban, luc, luc, 0, 0, '', '', 'Dùng thử', '', '', '', 0, '']);
     tim = kho.timMay(yc.ma_may);
     xepThongBao(kho, tinMayMoi(yc.ma_may, may, thoiDiemTin(bayGio)));
   }
@@ -134,34 +140,34 @@ function xuLy(yc, kho, bayGio) {
   cot[COT.LAN_CUOI] = luc;
 
   var daGhi = [];
-  var dungDem = soKhongAm(d[COT.DUNG_DEM - 1]);
-  var dungTach = soKhongAm(d[COT.DUNG_TACH - 1]);
-  var truoc = { dem: dungDem, tach: dungTach };
+  var truoc = {}, dung = {};
+  Object.keys(CN).forEach(function (cn) { truoc[cn] = dung[cn] = soKhongAm(d[CN[cn].dung - 1]); });
   // Chống trùng: mã lần đã ghi nằm ở cột ẩn "Mã lần gần đây" của chính dòng máy
   var daCo = String(d[COT.MA_LAN - 1] || '').split(',').filter(Boolean);
   var them = 0;
   lan.forEach(function (l) {
     daGhi.push(l.ma_lan);
     if (daCo.indexOf(l.ma_lan) >= 0) return;
-    if (l.cn === 'dem') dungDem++; else dungTach++;
+    dung[l.cn]++;
     daCo.push(l.ma_lan);
     them++;
   });
   if (them) {
-    cot[COT.DUNG_DEM] = dungDem;
-    cot[COT.DUNG_TACH] = dungTach;
+    Object.keys(CN).forEach(function (cn) { if (dung[cn] !== truoc[cn]) cot[CN[cn].dung] = dung[cn]; });
     cot[COT.MA_LAN] = daCo.slice(-GIU_MA_LAN).join(',');
   }
   kho.capNhatMay(tim.hang, cot);
-  d[COT.DUNG_DEM - 1] = dungDem;
-  d[COT.DUNG_TACH - 1] = dungTach;
+  Object.keys(CN).forEach(function (cn) { d[CN[cn].dung - 1] = dung[cn]; });
 
   var tt = trangThaiDong(d);
   // Lần chạy này làm chạm hạn mức → báo 1 lần (gửi lại / kiểm tra lại không báo thêm)
-  [['dem', truoc.dem, tt.da_dung_dem, tt.han_dem], ['tach', truoc.tach, tt.da_dung_tach, tt.han_tach]].forEach(function (x) {
-    if (x[1] < x[3] && x[2] >= x[3]) xepThongBao(kho, tinHetLuot(yc.ma_may, may, x[0], x[2], x[3], tt.trang_thai, thoiDiemTin(bayGio)));
+  Object.keys(CN).forEach(function (cn) {
+    var han = tt['han_' + cn];
+    if (truoc[cn] < han && dung[cn] >= han) xepThongBao(kho, tinHetLuot(yc.ma_may, may, cn, dung[cn], han, tt.trang_thai, thoiDiemTin(bayGio)));
   });
-  return { ok: true, du_lieu: { ma_may: yc.ma_may, nonce: nonce, han_dem: tt.han_dem, han_tach: tt.han_tach, da_dung_dem: tt.da_dung_dem, da_dung_tach: tt.da_dung_tach, trang_thai: tt.trang_thai, da_ghi: daGhi } };
+  var du = { ma_may: yc.ma_may, nonce: nonce, trang_thai: tt.trang_thai, da_ghi: daGhi };
+  Object.keys(CN).forEach(function (cn) { du['han_' + cn] = tt['han_' + cn]; du['da_dung_' + cn] = tt['da_dung_' + cn]; });
+  return { ok: true, du_lieu: du };
 }
 
 function thongKe(hd, yc, may, kho, bayGio) {
@@ -172,9 +178,13 @@ function thongKe(hd, yc, may, kho, bayGio) {
   var tim = kho.timMay(yc.ma_may), luot = null;
   if (tim) {
     var tt = trangThaiDong(tim.giaTri);
-    luot = hd === 'thong_ke_dem' ? { da_dung: tt.da_dung_dem, han: tt.han_dem } : { da_dung: tt.da_dung_tach, han: tt.han_tach };
+    var cn = hd.slice('thong_ke_'.length);
+    luot = { da_dung: tt['da_dung_' + cn], han: tt['han_' + cn] };
   }
-  var tin = hd === 'thong_ke_dem' ? tinDem(yc.ma_may, may, sl, thoiDiemTin(bayGio), luot) : tinTach(yc.ma_may, may, sl, ng, thoiDiemTin(bayGio), luot);
+  var luc = thoiDiemTin(bayGio);
+  var tin = hd === 'thong_ke_dem' ? tinDem(yc.ma_may, may, sl, luc, luot)
+    : hd === 'thong_ke_muc_luc' ? tinMucLuc(yc.ma_may, may, sl, luc, luot)
+    : tinTach(yc.ma_may, may, sl, ng, luc, luot);
   var hang = { ma: maNgauNhien(), luc: 0, trang_thai: 'cho', so_lan_thu: 0, noi_dung: tin, ten_csv: '', csv: '' };
   if (hd === 'thong_ke_tach' && ng) {
     var csv = String(ng.csv || '');
@@ -224,7 +234,7 @@ function soanTin(tieuDe, maMay, may, dongChucNang) {
 
 function tinMayMoi(maMay, may, luc) {
   return soanTin('🆕 MÁY MỚI ĐĂNG KÝ', maMay, may, [
-    'Dùng thử: ' + HAN_MAC_DINH + ' lần Đếm · ' + HAN_MAC_DINH + ' lần Tách',
+    'Dùng thử: ' + HAN_MAC_DINH + ' lần Đếm · ' + HAN_MAC_DINH + ' lần Tách · ' + HAN_MAC_DINH + ' lần Sinh mục lục',
     'Thời điểm: ' + luc,
   ]);
 }
@@ -309,6 +319,19 @@ function tinTach(maMay, may, sl, ng, luc, luot) {
   return soanTin(kemLuot('✂️ TÁCH VĂN BẢN', luot), maMay, may, d);
 }
 
+function tinMucLuc(maMay, may, sl, luc, luot) {
+  return soanTin(kemLuot('📑 SINH MỤC LỤC', luot), maMay, may, [
+    'Dữ liệu: ' + thuMucGon(sl.du_lieu),
+    'Mẫu: ' + sachChu(sl.mau, 200),
+    'Hồ sơ: ' + soNguyen(sl.ho_so),
+    'Văn bản: ' + soNguyen(sl.van_ban),
+    'File ra: ' + soNguyen(sl.docx) + ' DOCX · ' + soNguyen(sl.pdf) + ' PDF',
+    'Lỗi: ' + soNguyen(sl.loi),
+    'Thời điểm: ' + luc,
+    'Thời gian chạy: ' + phutGiay(sl.thoi_gian_ms),
+  ]);
+}
+
 // ---- Hàng đợi Telegram ----
 
 /**
@@ -332,5 +355,5 @@ function chonGui(ds, bayGioMs, nganSach) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { GIU_MA_LAN: GIU_MA_LAN, xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, tinDem: tinDem, tinTach: tinTach, tinMayMoi: tinMayMoi, tinHetLuot: tinHetLuot, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
+  module.exports = { GIU_MA_LAN: GIU_MA_LAN, xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, tinDem: tinDem, tinTach: tinTach, tinMucLuc: tinMucLuc, tinMayMoi: tinMayMoi, tinHetLuot: tinHetLuot, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
 }

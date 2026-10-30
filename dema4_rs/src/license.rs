@@ -1,4 +1,4 @@
-//! License giới hạn số lần Đếm / Tách — phần lõi không gọi mạng: mã máy, quyết định cho chạy / chặn,
+//! License giới hạn số lần Đếm / Tách / Sinh mục lục — phần lõi không gọi mạng: mã máy, quyết định cho chạy / chặn,
 //! sổ lượt trên đĩa (đặt chỗ trước khi chạy, lần chạy chờ trạm xác nhận, câu trả lời có chữ ký gần nhất).
 
 use std::collections::HashSet;
@@ -11,6 +11,7 @@ use crate::tram::{KetQuaTram, KhoLicense, ThongTinMay};
 pub enum ChucNang {
     Dem,
     Tach,
+    MucLuc,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,6 +25,7 @@ pub enum TrangThai {
 pub struct HanMuc {
     pub dem: u32,
     pub tach: u32,
+    pub muc_luc: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,12 +77,22 @@ impl ChucNang {
         match self {
             ChucNang::Dem => "dem",
             ChucNang::Tach => "tach",
+            ChucNang::MucLuc => "muc_luc",
+        }
+    }
+    /// Tên hiển thị trong popup / thông báo hết lượt.
+    pub fn ten(self) -> &'static str {
+        match self {
+            ChucNang::Dem => "Đếm",
+            ChucNang::Tach => "Tách",
+            ChucNang::MucLuc => "Sinh mục lục",
         }
     }
     fn tu_ma(s: &str) -> Option<Self> {
         match s {
             "dem" => Some(ChucNang::Dem),
             "tach" => Some(ChucNang::Tach),
+            "muc_luc" => Some(ChucNang::MucLuc),
             _ => None,
         }
     }
@@ -88,6 +100,7 @@ impl ChucNang {
         match self {
             ChucNang::Dem => h.dem,
             ChucNang::Tach => h.tach,
+            ChucNang::MucLuc => h.muc_luc,
         }
     }
 }
@@ -552,7 +565,7 @@ mod tests {
     }
 
     fn may(han: (u32, u32), dung: (u32, u32), tt: TrangThai) -> TrangThaiMay {
-        TrangThaiMay { han: HanMuc { dem: han.0, tach: han.1 }, da_dung: HanMuc { dem: dung.0, tach: dung.1 }, trang_thai: tt }
+        TrangThaiMay { han: HanMuc { dem: han.0, tach: han.1, muc_luc: han.1 }, da_dung: HanMuc { dem: dung.0, tach: dung.1, muc_luc: 0 }, trang_thai: tt }
     }
 
     fn lan(cn: ChucNang) -> LanChay {
@@ -578,6 +591,10 @@ mod tests {
         assert_eq!(quyet_dinh(Some(&may((2, 2), (1, 0), TrangThai::DungThu)), &[], Dem), QuyetDinh::Cho);
         assert_eq!(quyet_dinh(Some(&may((2, 2), (2, 0), TrangThai::DungThu)), &[], Dem), QuyetDinh::HetLuot(Dem));
         assert_eq!(quyet_dinh(Some(&may((2, 2), (2, 0), TrangThai::DungThu)), &[], Tach), QuyetDinh::Cho, "Đếm, Tách tính riêng");
+        let ml = TrangThaiMay { han: HanMuc { dem: 9, tach: 9, muc_luc: 1 }, da_dung: HanMuc { dem: 0, tach: 0, muc_luc: 1 }, trang_thai: TrangThai::DungThu };
+        assert_eq!(quyet_dinh(Some(&ml), &[], MucLuc), QuyetDinh::HetLuot(MucLuc), "Sinh mục lục tính riêng");
+        assert_eq!((quyet_dinh(Some(&ml), &[], Dem), quyet_dinh(Some(&ml), &[], Tach)), (QuyetDinh::Cho, QuyetDinh::Cho));
+        assert_eq!(quyet_dinh(None, &[lan(MucLuc), lan(MucLuc)], MucLuc), QuyetDinh::HetLuotOffline(MucLuc));
         assert_eq!(quyet_dinh(Some(&may((100, 100), (0, 0), TrangThai::Khoa)), &[], Dem), QuyetDinh::HetLuot(Dem), "Khoá còn lượt vẫn chặn");
         assert_eq!(quyet_dinh(Some(&may((2, 2), (1, 0), TrangThai::DungThu)), &[lan(Dem)], Dem), QuyetDinh::HetLuot(Dem), "lần chờ ghi cộng vào đã dùng");
         assert_eq!(quyet_dinh(Some(&may((100, 2), (5, 0), TrangThai::DaCap)), &[lan(Dem)], Dem), QuyetDinh::Cho);
@@ -681,7 +698,7 @@ mod tests {
             assert!(chay(&kt, ChucNang::Dem) && chay(&kt, ChucNang::Dem));
             assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuot(ChucNang::Dem));
             assert!(chay(&kt, ChucNang::Tach), "Tách tính riêng");
-            assert_eq!(kho.da_dung(), HanMuc { dem: 2, tach: 1 });
+            assert_eq!(kho.da_dung(), HanMuc { dem: 2, tach: 1, muc_luc: 0 });
         }
 
         #[test]

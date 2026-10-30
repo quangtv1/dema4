@@ -1512,7 +1512,7 @@ mod tests {
         h.get_by_label(&ma);
         h.get_by_label(crate::hop_license::DIEN_THOAI);
         assert!(h.state().dem.dang_dem.is_none(), "hết lượt: không chạy đếm");
-        *kho.han.lock().unwrap() = crate::license::HanMuc { dem: 5, tach: 5 };
+        *kho.han.lock().unwrap() = crate::license::HanMuc { dem: 5, tach: 5, muc_luc: 5 };
         h.get_by_label("Kiểm tra lại").click();
         let bat_dau = Instant::now();
         while h.state().dem.hop_license.is_some() {

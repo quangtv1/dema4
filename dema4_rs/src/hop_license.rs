@@ -61,7 +61,7 @@ impl HopLicense {
             self.da_chep = None;
         }
         let ma = kt.ma_may().to_string();
-        let ten_cn = if self.chuc_nang() == ChucNang::Dem { "Đếm" } else { "Tách" };
+        let ten_cn = self.chuc_nang().ten();
         let mut kq = KetQuaHop::Mo;
         let phan_hoi = kh::hop(ctx, "hop_license", RONG, "Liên hệ Sao Mai", |ui| {
             egui::Frame::new().inner_margin(Margin { left: 16, right: 16, top: 14, bottom: 0 }).show(ui, |ui| {

@@ -132,6 +132,9 @@ pub fn doc_tra_loi(tl: &TraLoiKy, khoa: &rsa::RsaPublicKey, ma_may: &str, nonce:
     giai_du_lieu(tl, ma_may, nonce)
 }
 
+/// Lượt dùng thử Sinh mục lục khi trạm chưa gửi trường này (khớp `HAN_MAC_DINH` của trạm).
+const HAN_MUC_LUC_MAC_DINH: u32 = 10;
+
 /// Phần dữ liệu (đã kiểm chữ ký) → trạng thái máy; sai mã máy / nonce → lỗi.
 fn giai_du_lieu(tl: &TraLoiKy, ma_may: &str, nonce: Option<&str>) -> Result<KetQuaTram, String> {
     let v: Value = serde_json::from_str(&tl.du_lieu).map_err(|_| "dữ liệu ký không phải JSON".to_string())?;
@@ -142,9 +145,11 @@ fn giai_du_lieu(tl: &TraLoiKy, ma_may: &str, nonce: Option<&str>) -> Result<KetQ
         return Err("câu trả lời không khớp lời gọi".into());
     }
     let so = |k: &str| v[k].as_u64().map(|x| x.min(u32::MAX as u64) as u32).ok_or_else(|| format!("thiếu {k}"));
+    // Trạm cũ chưa có trường Sinh mục lục → hạn mức dùng thử mặc định, chưa dùng lần nào
+    let so_hoac = |k: &str, md: u32| v[k].as_u64().map_or(md, |x| x.min(u32::MAX as u64) as u32);
     let may = TrangThaiMay {
-        han: HanMuc { dem: so("han_dem")?, tach: so("han_tach")? },
-        da_dung: HanMuc { dem: so("da_dung_dem")?, tach: so("da_dung_tach")? },
+        han: HanMuc { dem: so("han_dem")?, tach: so("han_tach")?, muc_luc: so_hoac("han_muc_luc", HAN_MUC_LUC_MAC_DINH) },
+        da_dung: HanMuc { dem: so("da_dung_dem")?, tach: so("da_dung_tach")?, muc_luc: so_hoac("da_dung_muc_luc", 0) },
         trang_thai: crate::license::trang_thai_tu_ma(v["trang_thai"].as_str().unwrap_or("")),
     };
     let da_ghi = v["da_ghi"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
@@ -233,7 +238,7 @@ pub struct KhoGia {
 impl KhoGia {
     pub fn moi(dem: u32, tach: u32) -> Self {
         KhoGia {
-            han: std::sync::Mutex::new(HanMuc { dem, tach }),
+            han: std::sync::Mutex::new(HanMuc { dem, tach, muc_luc: tach }),
             trang_thai: std::sync::Mutex::new("dung_thu"),
             mat_mang: Default::default(),
             loi_sau_ghi: Default::default(),
@@ -266,7 +271,7 @@ impl KhoGia {
 
     fn tra_loi(&self, may: &ThongTinMay, da_ghi: Vec<String>) -> KetQuaTram {
         let (han, dung) = (*self.han.lock().unwrap(), self.da_dung());
-        let du_lieu = json!({ "ma_may": may.ma, "nonce": "", "han_dem": han.dem, "han_tach": han.tach, "da_dung_dem": dung.dem, "da_dung_tach": dung.tach, "trang_thai": *self.trang_thai.lock().unwrap(), "da_ghi": da_ghi });
+        let du_lieu = json!({ "ma_may": may.ma, "nonce": "", "han_dem": han.dem, "han_tach": han.tach, "da_dung_dem": dung.dem, "da_dung_tach": dung.tach, "han_muc_luc": han.muc_luc, "da_dung_muc_luc": dung.muc_luc, "trang_thai": *self.trang_thai.lock().unwrap(), "da_ghi": da_ghi });
         giai_du_lieu(&TraLoiKy { du_lieu: du_lieu.to_string(), chu_ky: "gia".into() }, &may.ma, None).unwrap()
     }
 }
@@ -286,6 +291,7 @@ impl KhoLicense for KhoGia {
                     match l.cn {
                         crate::license::ChucNang::Dem => d.dem += 1,
                         crate::license::ChucNang::Tach => d.tach += 1,
+                        crate::license::ChucNang::MucLuc => d.muc_luc += 1,
                     }
                 }
                 ghi.push(l.ma.clone());
@@ -335,6 +341,10 @@ mod tests {
         let kq = doc_tra_loi(&ky(&k, DL), &pk, "SM-2145-6787-A9FB", Some("n1")).unwrap();
         assert_eq!((kq.may.han.dem, kq.may.han.tach, kq.may.da_dung.dem, kq.may.da_dung.tach, kq.may.trang_thai), (200, 2, 37, 1, TrangThai::DaCap));
         assert_eq!(kq.da_ghi, ["0000000000000000000000000000000a"]);
+        assert_eq!((kq.may.han.muc_luc, kq.may.da_dung.muc_luc), (10, 0), "trạm cũ chưa gửi Sinh mục lục → mặc định");
+        let moi = DL.replace("\"trang_thai\"", "\"han_muc_luc\":50,\"da_dung_muc_luc\":7,\"trang_thai\"");
+        let kq = doc_tra_loi(&ky(&k, &moi), &pk, "SM-2145-6787-A9FB", Some("n1")).unwrap();
+        assert_eq!((kq.may.han.muc_luc, kq.may.da_dung.muc_luc), (50, 7));
         assert!(doc_tra_loi(&ky(&k, DL), &pk, "SM-2145-6787-A9FB", None).is_ok(), "đọc lại từ đĩa: không kiểm nonce");
     }
 

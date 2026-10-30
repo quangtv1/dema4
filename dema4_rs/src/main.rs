@@ -64,7 +64,7 @@ fn main() {
 /// Hết lượt: in lý do + cách liên hệ + mã máy, mã thoát 3.
 fn bat_dau_luot(kt: &license::KiemTra, cn: license::ChucNang) -> Result<license::LanChay, i32> {
     kt.bat_dau(cn).map_err(|qd| {
-        let ten = if cn == license::ChucNang::Dem { "Đếm" } else { "Tách" };
+        let ten = cn.ten();
         eprintln!("Số lần {ten} còn lại (0). Liên hệ với Sao Mai để được hỗ trợ: {} · {} · Mã máy: {}", hop_license::DIEN_THOAI, hop_license::EMAIL, kt.ma_may());
         if matches!(qd, license::QuyetDinh::HetLuotOffline(_)) {
             eprintln!("Chưa kết nối được máy chủ — kết nối mạng rồi chạy lại.");

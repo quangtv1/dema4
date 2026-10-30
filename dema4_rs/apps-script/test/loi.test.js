@@ -117,7 +117,7 @@ test('tin_tach_chu_thuong_hai_phan', () => {
 
 test('tin_may_moi_va_het_luot', () => {
   assert.equal(L.tinMayMoi(MA, MAY_TIN, '30.10.2026, 20:00:00'),
-    '🆕 MÁY MỚI ĐĂNG KÝ\n\n' + PHAN_MAY + '- Dùng thử: 10 lần Đếm · 10 lần Tách\n- Thời điểm: 30.10.2026, 20:00:00');
+    '🆕 MÁY MỚI ĐĂNG KÝ\n\n' + PHAN_MAY + '- Dùng thử: 10 lần Đếm · 10 lần Tách · 10 lần Sinh mục lục\n- Thời điểm: 30.10.2026, 20:00:00');
   assert.equal(L.tinHetLuot(MA, MAY_TIN, 'tach', 10, 10, 'dung_thu', '30.10.2026, 20:05:00'),
     '⛔ HẾT LƯỢT TÁCH\n\n' + PHAN_MAY + '- Chức năng: Tách\n- Đã dùng: 10/10\n- Trạng thái: Dùng thử\n- Thời điểm: 30.10.2026, 20:05:00\n- Cấp thêm: tab 1_license → sửa Hạn mức Tách (tổng mới) + Trạng thái Đã cấp');
 });
@@ -198,4 +198,39 @@ test('tin_dem_tach_co_tieu_de_rieng', () => {
   goi(k, { hanh_dong: 'thong_ke_tach', so_lieu: { thu_muc: '/y', ho_so: 1, van_ban: 2, so_trang: 3, bo_index: 0, bo_trang: 0, split: 0, sao_nguyen: 0, ho_so_loi: 0, thoi_gian_ms: 500 } });
   const cuoi = k.hangDoi.slice(-2).map((h) => h.noi_dung.split('\n')[0]);
   assert.deepEqual(cuoi, ['📊 ĐẾM TRANG A4 (1/50)', '✂️ TÁCH VĂN BẢN (0/10)'], 'đã dùng / hạn mức lấy từ dòng máy');
+});
+
+test('muc_luc_tinh_rieng_cot_moi', () => {
+  const k = khoGia();
+  let r = goi(k, { hanh_dong: 'kiem_tra' });
+  assert.deepEqual([r.du_lieu.han_muc_luc, r.du_lieu.da_dung_muc_luc], [10, 0], 'mặc định 10 lượt Sinh mục lục');
+  assert.equal(k.may[0].length, 18, 'dòng máy mới đủ cột Q (Đã dùng Mục lục) / R (Hạn mức Mục lục)');
+  r = goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(900), cn: 'muc_luc', nguon: 'online' }] });
+  assert.deepEqual([r.du_lieu.da_dung_muc_luc, r.du_lieu.da_dung_dem, r.du_lieu.da_dung_tach], [1, 0, 0], 'tính riêng, không đụng Đếm/Tách');
+  assert.equal(k.may[0][16], 1, 'cột Q = Đã dùng Mục lục');
+  assert.equal(k.may[0][15], ML(900), 'cột ẩn P (Mã lần) giữ nguyên vị trí');
+  k.may[0][17] = 50;
+  assert.equal(goi(k, { hanh_dong: 'kiem_tra' }).du_lieu.han_muc_luc, 50, 'cột R = Hạn mức Mục lục');
+});
+
+test('muc_luc_dong_cu_thieu_cot', () => {
+  const k = khoGia();
+  goi(k, { hanh_dong: 'kiem_tra' });
+  k.may[0] = k.may[0].slice(0, 16); // dòng tạo bởi trạm cũ: chưa có Q/R
+  const r = goi(k, { hanh_dong: 'kiem_tra' });
+  assert.deepEqual([r.du_lieu.han_muc_luc, r.du_lieu.da_dung_muc_luc], [10, 0]);
+});
+
+test('muc_luc_tin_thong_ke_va_het_luot', () => {
+  const k = khoGia();
+  goi(k, { hanh_dong: 'kiem_tra' });
+  k.may[0][17] = 1;
+  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(901), cn: 'muc_luc', nguon: 'online' }] });
+  assert.equal(k.hangDoi.slice(-1)[0].noi_dung.split('\n')[0], '⛔ HẾT LƯỢT MỤC LỤC');
+  const tk = goi(k, { hanh_dong: 'thong_ke_muc_luc', so_lieu: { du_lieu: '/a/Bien_muc.xlsx', mau: 'Mẫu 01 – Quảng Trị', ho_so: 22, van_ban: 326, docx: 22, pdf: 0, loi: 1, thoi_gian_ms: 16000 } });
+  assert.equal(tk.ok, true);
+  const tin = k.hangDoi.slice(-1)[0].noi_dung;
+  assert.equal(tin.split('\n')[0], '📑 SINH MỤC LỤC (1/1)');
+  for (const d of ['- Dữ liệu: /a/Bien_muc.xlsx', '- Mẫu: Mẫu 01 – Quảng Trị', '- Hồ sơ: 22', '- Văn bản: 326', '- File ra: 22 DOCX · 0 PDF', '- Lỗi: 1']) assert.ok(tin.includes(d), d);
+  assert.ok(L.tinMayMoi(MA, MAY, 'x').includes('10 lần Sinh mục lục'));
 });
