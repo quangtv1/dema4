@@ -508,7 +508,7 @@
   .bangbien .tieude-cot { position:sticky; top:0; background:#EBEBEB; border-bottom:1px solid var(--vien-nhat); padding:6px 6px; color:var(--chu-phu); z-index:1; }
   .bangbien .vbdong > span.lay { padding:2px 2px; overflow:visible; cursor:default; }
   .bangbien .oml { height:26px; padding:0 6px; font-weight:normal; }
-  .bangbien .vbdong[data-ten]:hover > span { background:#F3F6FA; }
+  .bangbien .vbdong.sang > span { background:#FFF3C4; }
   .bangbien .vbdong.chon > span { background:var(--chon-nen); }
   .bangbien .dsml { position:static; grid-column:1 / -1; margin:2px 6px 8px; max-height:260px; }
   .bangbien .vbdong > span { padding:6px; border-bottom:1px solid #F0F0F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
@@ -538,7 +538,7 @@
   .bangbien code.bang, .ghep-ml code.bang, .trangml .tk.bang { background:var(--tk-bang-nen); color:var(--tk-bang-chu); }
   .bangbien code.tudong, .ghep-ml code.tudong, .trangml .tk.tudong { background:var(--tk-tudong-nen); color:var(--tk-tudong-chu); }
   .bangbien code.thieu, .ghep-ml code.thieu, .trangml .tk.thieu { background:var(--tk-thieu-nen); color:var(--tk-thieu-chu); }
-  .trangml .tk.sang, .trangml .tk.sang.thieu, .trangml .tk.sang.tudong, .trangml .tk.sang.bang { background:var(--chon-vien); color:#fff; box-shadow:0 0 0 2px rgba(47,123,217,.35); } /* định vị khi rê chuột trên dòng biến ở sidebar */
+  .trangml .tk.sang, .trangml .tk.sang.thieu, .trangml .tk.sang.tudong, .trangml .tk.sang.bang { background:#FFE066; color:#3A2E00; } /* định vị khi rê chuột trên dòng biến ở sidebar */
   .trangml tr.hangmau td { background:#F5F9FF; }
   /* Hộp Ghép biến */
   .popup.ghep-ml { width:920px; }
@@ -825,7 +825,7 @@
             <span id="mlDieuHuong" style="display:contents">
               <button class="nutma" id="mlTruoc" aria-label="Hồ sơ trước"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
               <input id="mlSo" type="number" min="1" value="1" aria-label="Số hồ sơ">
-              <span class="tong">/ 22</span>
+              <span class="tong" id="mlTong">/ 22</span>
               <button class="nutma" id="mlSau" aria-label="Hồ sơ sau"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
             </span>
             <span class="tt" id="mlXemTT"></span>
@@ -1122,7 +1122,7 @@
       <div class="dau">Ghép biến — <b>Mẫu 01 – Quảng Trị</b></div>
       <div class="dongnhom"><span title="Nhóm các dòng liền nhau có cùng giá trị ở cột này thành 1 hồ sơ; (số) = số giá trị khác nhau trong cột">Nhóm theo</span> <select id="mlNhom" class="mlnhom" title="Nhóm các dòng liền nhau có cùng giá trị ở cột này thành 1 hồ sơ; (số) = số giá trị khác nhau trong cột"></select>
         <span style="color:var(--chu-phu)">(dòng liền nhau cùng giá trị = 1 hồ sơ)</span>
-        <span class="goiy"><b>22</b> hồ sơ · <b>326</b> văn bản · đã ghép <b id="mlGhepSo">12/13</b> biến</span></div>
+        <span class="goiy"><b id="mlGhepTong">22</b> hồ sơ · <b>326</b> văn bản · đã ghép <b id="mlGhepSo">12/13</b> biến</span></div>
       <div class="bang"><table>
         <colgroup><col style="width:34px"><col style="width:190px"><col style="width:380px"><col></colgroup>
         <thead><tr><th></th><th>Biến trong mẫu</th><th>Lấy từ</th><th>Giá trị — hồ sơ <span id="mlGhepHs">HS-01</span></th></tr></thead>
@@ -2547,14 +2547,32 @@
   if (location.hash === '#tip') { s.daPT = true; ve(); document.querySelectorAll('.tip')[1].classList.add('hien'); document.querySelector('.tip.tren').classList.add('hien'); }
   // ---- Màn Sinh mục lục hồ sơ (dữ liệu giả theo Mẫu 01 – Quảng Trị) ----
   var ml = { coDuLieu: false, hs: 0, tab: 'mau', chay: 0, mo: -1, moTrai: -1, zoom: 100 };
-  var ML_HS = []; for (var k = 0; k < 22; k++) ML_HS.push(['HS-' + ('0' + (k + 1)).slice(-2), [14, 65, 9, 21, 12, 18, 7, 30, 11, 16, 8, 19, 13, 10, 22, 6, 15, 9, 12, 8, 14, 7][k]]);
-  ML_HS[16].push('dòng 241 trống cột Trích yếu nội dung VB — ô để trống trong mục lục');
+  var ML_HS = [], TONG_DONG = 326;
+  // Dựng danh sách hồ sơ theo cột "Nhóm theo" (giả lập: số hồ sơ = số giá trị khác nhau của cột)
+  function taoHoSo(iCot) {
+    var n = COT_DUY_NHAT[iCot], mau = [14, 65, 9, 21, 12, 18, 7, 30, 11, 16, 8, 19, 13, 10, 22, 6, 15, 9, 12, 8, 14, 7];
+    ML_HS = [];
+    for (var k = 0; k < n; k++) {
+      var so = n === 22 ? mau[k] : Math.floor(TONG_DONG / n) + (k < TONG_DONG % n ? 1 : 0);
+      ML_HS.push([iCot === 0 ? 'HS-' + ('0' + (k + 1)).slice(-2) : COT[iCot] + ' #' + (k + 1), so]);
+    }
+    if (n > 16) ML_HS[16].push('dòng 241 trống cột Trích yếu nội dung VB — ô để trống trong mục lục');
+    ml.hs = Math.min(ml.hs, n - 1);
+  }
   var ML_VB = [['01/QĐ-UBND', '05/01/2015', 'UBND xã', 'Quyết định thành lập tổ công tác', 'Bản gốc'], ['15/TTr-UBND', '12/02/2015', 'UBND xã', 'Tờ trình phê duyệt kế hoạch', 'Bản sao'],
     ['22/BC-UBND', '30/03/2015', 'UBND xã', 'Báo cáo kết quả thực hiện quý I', 'Bản gốc'], ['07/CV-UBND', '14/04/2015', 'UBND huyện', 'Công văn hướng dẫn triển khai', 'Bản gốc'],
     ['31/QĐ-UBND', '20/05/2015', 'UBND xã', 'Quyết định phê duyệt danh sách', 'Bản sao']];
   var COT = ['Tiêu đề hồ sơ', 'STT', 'Số, ký hiệu văn bản', 'Ngày tháng văn bản', 'Tác giả', 'Trích yếu nội dung VB', 'Tờ số', 'Ghi chú'];
   var COT_DUY_NHAT = [22, 65, 318, 241, 14, 309, 98, 3]; // số giá trị khác nhau mỗi cột, không tính dòng tiêu đề
-  document.querySelectorAll('.mlnhom').forEach(function (sel) { sel.innerHTML = COT.map(function (c, i) { return '<option>' + c + ' (' + COT_DUY_NHAT[i] + ')</option>'; }).join(''); });
+  document.querySelectorAll('.mlnhom').forEach(function (sel) {
+    sel.innerHTML = COT.map(function (c, i) { return '<option value="' + i + '">' + c + ' (' + COT_DUY_NHAT[i] + ')</option>'; }).join('');
+    // Đổi "Nhóm theo" ở sidebar hoặc hộp Ghép biến → đồng bộ hai ô, dựng lại danh sách hồ sơ
+    sel.addEventListener('change', function () {
+      document.querySelectorAll('.mlnhom').forEach(function (o) { o.value = sel.value; });
+      taoHoSo(+sel.value); veMucLuc(); if ($('phuMLGhep').classList.contains('mo')) veGhep();
+    });
+  });
+  taoHoSo(0);
   // [biến, nguồn: 'cot' | 'hang' | 'thieu', giá trị nguồn, giá trị của hồ sơ đang xem]
   var NHOM_BANG = ['Bảng văn bản (mỗi văn bản một dòng)'];
   var ML_BIEN = [
@@ -2661,12 +2679,16 @@
     var tabs = $('mlTab').children; tabs[0].classList.toggle('chon', co && mau); tabs[1].classList.toggle('chon', co && !mau);
     var dsb = ML_BIEN.filter(function (b) { return b.length > 1; }), thieu = dsb.filter(function (b) { return b[1] === 'thieu'; }).length;
     tabs[0].textContent = 'Mẫu' + (co ? ' (' + (dsb.length + 2 - thieu) + '/' + (dsb.length + 2) + ' biến)' : '');
-    tabs[1].textContent = 'Kết quả' + (co ? ' (22)' : '');
-    $('mlCanh').innerHTML = co ? '⚠ ' + (thieu ? thieu + ' biến chưa ghép · ' : '') + loi.length + ' hồ sơ cần xem (' + loi.map(function (h) { return h[0]; }).join(', ') + ')' : '';
+    tabs[1].textContent = 'Kết quả' + (co ? ' (' + ML_HS.length + ')' : '');
+    $('mlTong').textContent = '/ ' + ML_HS.length; $('mlGhepTong').textContent = ML_HS.length;
+    var canh = [];
+    if (thieu) canh.push(thieu + ' biến chưa ghép');
+    if (loi.length) canh.push(loi.length + ' hồ sơ cần xem (' + loi.map(function (h) { return h[0]; }).join(', ') + ')');
+    $('mlCanh').innerHTML = co && canh.length ? '⚠ ' + canh.join(' · ') : '';
     var icon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
-    $('mlChan').innerHTML = !co ? '' : icon + (ml.chay === 1 ? 'Đang sinh <b>13/22</b> hồ sơ (59%) · MLHS_HS-14.docx · còn ~00:00:07'
-      : ml.chay === 2 ? 'Đã sinh <b>22/22</b> hồ sơ · 22 DOCX, 22 PDF · 16 giây'
-      : 'Hồ sơ: <b>22</b>; Văn bản: <b>326</b>');
+    $('mlChan').innerHTML = !co ? '' : icon + (ml.chay === 1 ? 'Đang sinh <b>13/' + ML_HS.length + '</b> hồ sơ · MLHS_HS-14.docx · còn ~00:00:07'
+      : ml.chay === 2 ? 'Đã sinh <b>' + ML_HS.length + '/' + ML_HS.length + '</b> hồ sơ · ' + ML_HS.length + ' DOCX, ' + ML_HS.length + ' PDF'
+      : 'Hồ sơ: <b>' + ML_HS.length + '</b>; Văn bản: <b>' + TONG_DONG + '</b>');
     if (!co) return;
     $('mlDieuHuong').style.display = mau ? 'none' : 'contents';
     $('mlTim').parentNode.style.display = mau ? 'none' : ''; $('mlNhomTrai').style.display = mau ? '' : 'none'
@@ -2717,9 +2739,15 @@
   if (h === '#muc-luc-mau-ro') sangBien('so_ky_hieu');
   ganNguon($('mlBien'), 'mo'); ganNguon($('mlTrai'), 'moTrai');
   // Rê chuột vào dòng biến ở sidebar → làm sáng các chỗ biến đó xuất hiện trên trang mẫu
-  function sangBien(ten) { $('mlVungXem').querySelectorAll('.tk').forEach(function (t) { t.classList.toggle('sang', t.getAttribute('data-ten') === ten); }); }
+  // Định vị hai chiều: sáng vàng cả chip trên trang mẫu lẫn dòng biến ở sidebar
+  function sangBien(ten) {
+    $('mlVungXem').querySelectorAll('.tk').forEach(function (t) { t.classList.toggle('sang', t.getAttribute('data-ten') === ten); });
+    $('mlTrai').querySelectorAll('.vbdong[data-ten]').forEach(function (r) { r.classList.toggle('sang', r.getAttribute('data-ten') === ten); });
+  }
   $('mlTrai').addEventListener('mouseover', function (e) { var r = e.target.closest('.bangbien .vbdong[data-ten]'); sangBien(r ? r.getAttribute('data-ten') : ''); });
   $('mlTrai').addEventListener('mouseleave', function () { sangBien(''); });
+  $('mlVungXem').addEventListener('mouseover', function (e) { var t = e.target.closest('.tk[data-ten]'); sangBien(t ? t.getAttribute('data-ten') : ''); });
+  $('mlVungXem').addEventListener('mouseleave', function () { sangBien(''); });
   ganKeo($('mlKeo'), $('mlTrai'), 'smdema4.rongTraiML', 220, 600, function (w) { $('manMucLuc').style.setProperty('--rong-trai', w + 'px'); });
   // Bấm ra ngoài ô / danh sách nguồn thì đóng danh sách đang mở
   document.addEventListener('click', function (e) {
