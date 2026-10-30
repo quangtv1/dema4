@@ -167,7 +167,7 @@ impl UngDungChinh {
         }
     }
 
-    /// Áp Cấu hình mới cho cả 2 màn (`ghi` = ghi `sm-dema4.cfg`).
+    /// Áp Cấu hình mới cho cả 2 màn (`ghi` = ghi `.dema4_saomai.cfg`).
     fn ap_cau_hinh(&mut self, moi: crate::cau_hinh::CauHinh, ghi: bool) {
         self.tach.ap_cau_hinh(&self.cfg, &moi);
         self.dem.quy_tac = moi.quy_tac();
@@ -1521,6 +1521,31 @@ mod tests {
             h.run();
         }
         assert!(h.state().dem.dang_dem.is_some() || h.state().dem.thong_bao.is_some(), "được cấp lượt → đếm chạy luôn");
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Màn Tách: chưa chọn thư mục → giới thiệu; chọn thư mục → bỏ giới thiệu, hiện số hồ sơ + nút Phân tích.
+    #[test]
+    fn chon_thu_muc_tach_bo_gioi_thieu() {
+        use egui_kittest::kittest::Queryable;
+        let goc = std::env::temp_dir().join(format!("dema4_bo_gioi_thieu_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        std::fs::create_dir_all(goc.join("con")).unwrap();
+        for f in ["a.pdf", "b.pdf", "con/c.pdf"] {
+            std::fs::write(goc.join(f), b"%PDF-1.4").unwrap();
+        }
+        let mut h = harness_chinh(Man::Tach);
+        h.run();
+        h.get_by_label("Duyệt nhãn");
+        h.state_mut().tach.thu_muc = goc.display().to_string();
+        let bat_dau = Instant::now();
+        while h.query_by_label("3 hồ sơ PDF — bấm Phân tích để xem trang và gắn nhãn").is_none() {
+            assert!(bat_dau.elapsed() < Duration::from_secs(5), "không hiện số hồ sơ");
+            std::thread::sleep(Duration::from_millis(20));
+            h.run_steps(2); // đang đọc danh sách: app tự vẽ lại liên tục
+        }
+        assert!(h.query_by_label("Duyệt nhãn").is_none(), "đã chọn thư mục → bỏ màn giới thiệu");
+        assert_eq!(h.get_all_by_label("Phân tích").count(), 2, "nút Phân tích ở thanh thư mục + ở khung gợi ý");
         let _ = std::fs::remove_dir_all(&goc);
     }
 

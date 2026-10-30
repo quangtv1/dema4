@@ -1,4 +1,4 @@
-//! Cấu hình người dùng `sm-dema4.cfg` (dạng `khoá=giá trị`, mỗi dòng 1 khoá): hệ số quy A4, ranh giới khổ,
+//! Cấu hình người dùng `.dema4_saomai.cfg` (file ẩn; dạng `khoá=giá trị`, mỗi dòng 1 khoá): hệ số quy A4, ranh giới khổ,
 //! tuỳ chọn Tách PDF và trạng thái giao diện.
 //!
 //! Đặt cạnh file chạy; thư mục đó không ghi được → thư mục người dùng (`%APPDATA%\sm-dema4\`,
@@ -8,7 +8,10 @@ use crate::dem_pdf::HE_SO_MAC_DINH;
 use crate::tach_vb::tach::MAU_TEN_MAC_DINH;
 use std::path::{Path, PathBuf};
 
-pub const TEN_FILE: &str = "sm-dema4.cfg";
+/// Cùng tên ứng dụng, ẩn: dấu chấm đầu (macOS / Linux) + thuộc tính Hidden khi ghi (Windows).
+pub const TEN_FILE: &str = ".dema4_saomai.cfg";
+/// Tên cũ (≤ v1.0.0 bản đầu): vẫn đọc nếu chưa có file mới; lần ghi sau chuyển sang tên mới và xoá file cũ.
+const TEN_FILE_CU: &str = "sm-dema4.cfg";
 /// Ranh giới khổ mặc định (mm, cạnh dài): điểm giữa 2 khổ liền kề A0|A1 … A6|A7.
 pub const RANH_GIOI_MAC_DINH: [f64; 7] = [1015.0, 717.5, 507.0, 358.5, 253.5, 179.0, 126.5];
 /// Cạnh dài chuẩn (mm) A0 … A7.
@@ -301,16 +304,19 @@ impl CauHinh {
     }
 }
 
-/// Chỗ đặt file theo thứ tự ưu tiên: cạnh file chạy, rồi thư mục người dùng.
+/// Thư mục đặt file theo thứ tự ưu tiên: cạnh file chạy, rồi thư mục người dùng.
+fn thu_muc_dat_file() -> Vec<PathBuf> {
+    std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)).into_iter().chain(thu_muc_nguoi_dung()).collect()
+}
+
+/// Chỗ đặt file (tên mới) theo thứ tự ưu tiên.
 pub fn cho_dat_file() -> Vec<PathBuf> {
-    let mut ds = Vec::new();
-    if let Some(p) = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join(TEN_FILE))) {
-        ds.push(p);
-    }
-    if let Some(d) = thu_muc_nguoi_dung() {
-        ds.push(d.join(TEN_FILE));
-    }
-    ds
+    thu_muc_dat_file().into_iter().map(|d| d.join(TEN_FILE)).collect()
+}
+
+/// Chỗ đọc: tên mới trước, rồi tên cũ.
+fn cho_doc(thu_muc: &[PathBuf]) -> Vec<PathBuf> {
+    thu_muc.iter().map(|d| d.join(TEN_FILE)).chain(thu_muc.iter().map(|d| d.join(TEN_FILE_CU))).collect()
 }
 
 pub(crate) fn thu_muc_nguoi_dung() -> Option<PathBuf> {
@@ -330,7 +336,7 @@ pub fn doc_tu(cho: &[PathBuf]) -> CauHinh {
 }
 
 pub fn doc() -> CauHinh {
-    doc_tu(&cho_dat_file())
+    doc_tu(&cho_doc(&thu_muc_dat_file()))
 }
 
 fn ghi_file(p: &Path, noi_dung: &str) -> std::io::Result<()> {
@@ -339,10 +345,30 @@ fn ghi_file(p: &Path, noi_dung: &str) -> std::io::Result<()> {
     }
     let tam = p.with_extension("cfg.tmp");
     std::fs::write(&tam, noi_dung)?;
+    an_hien(p, false); // Windows không cho thay file đang ẩn → bỏ ẩn bản cũ trước khi đổi tên đè
     std::fs::rename(&tam, p).inspect_err(|_| {
         let _ = std::fs::remove_file(&tam);
-    })
+    })?;
+    an_hien(p, true);
+    Ok(())
 }
+
+/// Bật / tắt thuộc tính Hidden (chỉ Windows; macOS / Linux ẩn nhờ dấu chấm đầu tên). Lỗi bỏ qua.
+#[cfg(windows)]
+fn an_hien(p: &Path, an: bool) {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{GetFileAttributesW, SetFileAttributesW, FILE_ATTRIBUTE_HIDDEN, INVALID_FILE_ATTRIBUTES};
+    let ten: Vec<u16> = p.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    unsafe {
+        let tt = GetFileAttributesW(ten.as_ptr());
+        if tt != INVALID_FILE_ATTRIBUTES {
+            SetFileAttributesW(ten.as_ptr(), if an { tt | FILE_ATTRIBUTE_HIDDEN } else { tt & !FILE_ATTRIBUTE_HIDDEN });
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn an_hien(_p: &Path, _an: bool) {}
 
 /// Ghi vào chỗ đầu tiên ghi được; trả đường dẫn đã ghi. Ghi được chỗ sau thì xoá bản cũ ở chỗ trước
 /// (nếu xoá được) để lần đọc sau không lấy nhầm bản cũ.
@@ -364,7 +390,16 @@ pub fn ghi_vao(c: &CauHinh, cho: &[PathBuf]) -> std::io::Result<PathBuf> {
 }
 
 pub fn ghi(c: &CauHinh) -> std::io::Result<PathBuf> {
-    ghi_vao(c, &cho_dat_file())
+    ghi_trong(c, &thu_muc_dat_file())
+}
+
+/// Ghi tên mới; ghi được thì xoá file tên cũ ở mọi chỗ (lần đọc sau không lấy nhầm bản cũ).
+fn ghi_trong(c: &CauHinh, thu_muc: &[PathBuf]) -> std::io::Result<PathBuf> {
+    let p = ghi_vao(c, &thu_muc.iter().map(|d| d.join(TEN_FILE)).collect::<Vec<_>>())?;
+    for d in thu_muc {
+        let _ = std::fs::remove_file(d.join(TEN_FILE_CU));
+    }
+    Ok(p)
 }
 
 #[cfg(test)]
@@ -468,6 +503,25 @@ mod tests {
         ghi_vao(&CauHinh::default(), &cho2).unwrap();
         assert_eq!(doc_tu(&cho2), CauHinh::default());
         assert!(!d.join("canh_exe.cfg.tmp").exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn file_an_ten_ung_dung_va_chuyen_tu_ten_cu() {
+        assert!(TEN_FILE.starts_with('.') && TEN_FILE.contains("dema4_saomai"), "ẩn trên macOS / Linux, cùng tên ứng dụng");
+        let d = tam("ten_moi");
+        let (exe, nd) = (d.join("canh_exe"), d.join("nguoi_dung"));
+        std::fs::create_dir_all(&exe).unwrap();
+        let cu = CauHinh { rong_cot_trai: 321.0, ..Default::default() };
+        std::fs::write(exe.join(TEN_FILE_CU), cu.noi_dung()).unwrap();
+        let thu_muc = vec![exe.clone(), nd];
+        assert_eq!(doc_tu(&cho_doc(&thu_muc)), cu, "chưa có file mới → đọc file tên cũ");
+        let moi = CauHinh { rong_cot_trai: 222.0, ..cu.clone() };
+        assert_eq!(ghi_trong(&moi, &thu_muc).unwrap(), exe.join(TEN_FILE));
+        assert!(!exe.join(TEN_FILE_CU).exists(), "ghi xong xoá file tên cũ");
+        assert_eq!(doc_tu(&cho_doc(&thu_muc)), moi);
+        ghi_trong(&cu, &thu_muc).unwrap(); // ghi đè file đã có (Windows: file đang ẩn)
+        assert_eq!(doc_tu(&cho_doc(&thu_muc)), cu);
         let _ = std::fs::remove_dir_all(&d);
     }
 

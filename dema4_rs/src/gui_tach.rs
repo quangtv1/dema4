@@ -174,7 +174,7 @@ pub struct ManTach {
     tong_tt: Option<(u64, crate::dem_pdf::QuyTac, van_ban::TongVanBan)>,
     /// Ảnh cần render trong khung này (gom từ lưới, xem trang, hộp phóng to rồi gửi 1 lần).
     yeu_cau_anh: Vec<YeuCau>,
-    /// Cấu hình đổi trong màn (độ rộng cột, cỡ ảnh…) → app ghi `sm-dema4.cfg`.
+    /// Cấu hình đổi trong màn (độ rộng cột, cỡ ảnh…) → app ghi `.dema4_saomai.cfg`.
     pub cfg_doi: bool,
     /// Lúc bấm Phân tích (tính tổng thời gian cả bước đọc thư mục).
     bat_dau_pt: Option<Instant>,
@@ -286,15 +286,18 @@ impl Default for ManTach {
 
 /// Hộp chọn thư mục: Windows chạy ở luồng riêng để cửa sổ app không đứng hình lúc hộp thoại mở / duyệt ổ mạng;
 /// macOS bắt buộc mở trên luồng chính (rfd) nên mở trực tiếp.
-fn chon_thu_muc_nen(hien_tai: &str) -> Receiver<Option<PathBuf>> {
+fn chon_thu_muc_nen(hien_tai: &str, ctx: &egui::Context) -> Receiver<Option<PathBuf>> {
     let (gui, nhan) = mpsc::channel();
     let dau = PathBuf::from(hien_tai.trim());
+    let ctx = ctx.clone();
     let mo = move || {
         let mut hop = rfd::FileDialog::new();
         if dau.is_dir() {
             hop = hop.set_directory(&dau);
         }
         let _ = gui.send(hop.pick_folder());
+        // Hộp chọn chạy ở luồng riêng (Windows): đánh thức giao diện để nhận thư mục ngay, không chờ người dùng di chuột
+        ctx.request_repaint();
     };
     if cfg!(target_os = "windows") {
         std::thread::spawn(mo);
@@ -1027,6 +1030,10 @@ impl ManTach {
         if self.dang_chay() {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
+        // Đang chờ hộp chọn thư mục / đọc danh sách PDF + số trang ở luồng nền: tự vẽ lại để kết quả hiện ngay
+        if self.chon_tm.is_some() || self.xem_truoc.nhan.is_some() {
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
         if self.bao.as_ref().is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(3)) {
             self.bao = None;
         }
@@ -1091,7 +1098,7 @@ impl ManTach {
             // Gõ xong (rời ô / Enter) mới quét, tránh quét cả ổ khi đang gõ dở "G:\"
             self.dang_go_tm = r.has_focus();
             if ui.add_enabled(!khoa && self.chon_tm.is_none(), nut("Chọn")).clicked() {
-                self.chon_tm = Some(chon_thu_muc_nen(&self.thu_muc));
+                self.chon_tm = Some(chon_thu_muc_nen(&self.thu_muc, ui.ctx()));
             }
             let (chu, mau) = if dang_chay {
                 ("Dừng", DO)
@@ -1599,12 +1606,39 @@ impl ManTach {
         });
     }
 
+    /// Khung phải khi đã chọn thư mục nhưng chưa Phân tích: số hồ sơ đọc được + nút Phân tích.
+    fn goi_y_phan_tich(&mut self, ui: &mut egui::Ui, cfg: &CauHinh) {
+        let x = &self.xem_truoc;
+        let (chu, co_nut) = if x.nhan.is_some() && !x.da_duyet {
+            (format!("Đang đọc danh sách PDF… {} hồ sơ", so_nguyen(x.pdf.len())), false)
+        } else if x.pdf.is_empty() {
+            ("Thư mục không có file PDF nào".to_string(), false)
+        } else {
+            (format!("{} hồ sơ PDF — bấm Phân tích để xem trang và gắn nhãn", so_nguyen(x.pdf.len())), true)
+        };
+        ui.add_space((ui.available_height() * 0.4).max(24.0));
+        ui.vertical_centered(|ui| {
+            ui.label(RichText::new(chu).color(CHU_PHU));
+            if co_nut {
+                ui.add_space(10.0);
+                if ui.add(nut_mau("Phân tích", XANH_LA).min_size(egui::vec2(110.0, 28.0))).clicked() {
+                    self.bam_phan_tich(&cfg.cau_hinh_phan_tich());
+                }
+            }
+        });
+    }
+
     fn luoi(&mut self, ui: &mut egui::Ui, cfg: &CauHinh, viec: &mut Vec<Viec>) {
         let Some(b) = &self.bang else {
             // Chưa phân tích: giới thiệu chức năng; link Chọn / Phân tích làm đúng việc của nút
             if self.chay.is_none() {
+                // Đã chọn thư mục: bỏ màn giới thiệu, nhắc bước tiếp (danh sách PDF hiện ở cột trái)
+                if !self.xem_truoc.thu_muc.is_empty() {
+                    self.goi_y_phan_tich(ui, cfg);
+                    return;
+                }
                 match crate::gioi_thieu::ve(ui, &crate::gioi_thieu::TACH) {
-                    Some(crate::gioi_thieu::Bam::Chon) if self.chon_tm.is_none() => self.chon_tm = Some(chon_thu_muc_nen(&self.thu_muc)),
+                    Some(crate::gioi_thieu::Bam::Chon) if self.chon_tm.is_none() => self.chon_tm = Some(chon_thu_muc_nen(&self.thu_muc, ui.ctx())),
                     Some(crate::gioi_thieu::Bam::PhanTich) => self.bam_phan_tich(&cfg.cau_hinh_phan_tich()),
                     _ => {}
                 }

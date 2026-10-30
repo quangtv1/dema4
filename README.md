@@ -16,9 +16,9 @@ File chạy chưa ký số với Apple / Microsoft nên lần đầu mở hệ �
 
 `dema4_rs/` — mã nguồn Rust (giao diện egui + chế độ dòng lệnh), build qua GitHub Actions. Bản gốc Python (PyQt5 + PyMuPDF) giữ cục bộ trong `temp/`, không đưa lên repo.
 
-Mỗi chức năng khi chưa có dữ liệu hiện màn giới thiệu 3 bước; link **Chọn** / **Phân tích** trong đó làm đúng việc của nút, logo góc dưới phải mở [saomaiso.com](https://saomaiso.com).
+Mỗi chức năng khi chưa có dữ liệu hiện màn giới thiệu 3 bước; link **Chọn** / **Phân tích** trong đó làm đúng việc của nút, logo góc dưới phải mở [saomaiso.com](https://saomaiso.com). Màn Tách: chọn thư mục xong thì tên hồ sơ hiện ngay ở cột trái, khung phải thay giới thiệu bằng số hồ sơ + nút **Phân tích**.
 
-![Màn mở đầu Tách văn bản](docs/anh/tach-mo-dau.png)
+![Tách văn bản: chọn thư mục xong](docs/anh/tach-mo-dau.png)
 
 ## Đếm trang A4
 
@@ -85,9 +85,9 @@ dema4_saomai --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư 
 
 Không có file nhãn → tự phân tích (Cấu hình mặc định), ghi `index_and_blank.txt` rồi tách. Mã thoát: 0 xong, 1 có hồ sơ lỗi, 2 sai tham số.
 
-## Cấu hình (`sm-dema4.cfg`)
+## Cấu hình (`.dema4_saomai.cfg`)
 
-Menu **Cấu hình** (2 tab Đếm trang A4 / Tách PDF) ghi file `sm-dema4.cfg` cạnh file chạy (không ghi được → thư mục người dùng như trên). Thiếu khoá / sai → giá trị mặc định.
+Menu **Cấu hình** (2 tab Đếm trang A4 / Tách PDF) ghi file **ẩn** `.dema4_saomai.cfg` cạnh file chạy (không ghi được → thư mục người dùng như trên). Thiếu khoá / sai → giá trị mặc định. File tên cũ `sm-dema4.cfg` vẫn được đọc và tự chuyển sang tên mới ở lần lưu đầu tiên.
 
 ![Cấu hình Tách PDF](docs/anh/cau-hinh-tach.png)
 
@@ -114,7 +114,7 @@ dema4_saomai <thư mục> --kyso      # kiểm tra file đã ký số (AcroForm)
 dema4_saomai <thư mục> --khong-ghi # chỉ in kết quả, không ghi file, không gửi thống kê
 ```
 
-Hệ số và ranh giới khổ đọc từ `sm-dema4.cfg` (không có file → mặc định).
+Hệ số và ranh giới khổ đọc từ `.dema4_saomai.cfg` (không có file → mặc định).
 
 ## Ký văn bản
 

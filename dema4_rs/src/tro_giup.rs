@@ -196,7 +196,7 @@ const HD_DEM: &[Khoi] = &[
         ("Hệ số quy A4", "A0–A7, mặc định 16 · 8 · 4 · 2 · 1 · 0,5 · 0,25 · 0,125."),
         ("Lớn hơn A0", "Cạnh dài > 1399 mm: ~theo diện tích ÷ A4~ (vd 1500×900 mm ≈ 21,64) hoặc ~hệ số cố định~ ≥ hệ số A0."),
         ("Ranh giới khổ", "Kéo vạch trên thước (mặc định ở giữa 2 khổ, vd A3|A4 = 358,5 mm). Gõ *Thử cạnh dài* để xem trang thuộc khổ nào."),
-        ("Lưu · Mặc định", "Áp cho lần Đếm sau (`sm-dema4.cfg` cạnh file chạy). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
+        ("Lưu · Mặc định", "Áp cho lần Đếm sau (file ẩn `.dema4_saomai.cfg` cạnh file chạy). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
     ]),
     Khoi::Muc("Lượt dùng"),
     LUOT_DUNG,
