@@ -504,7 +504,7 @@
   #manMucLuc .canhtab:hover { text-decoration:underline; }
   #manMucLuc .tabkho > span { cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
   #manMucLuc .tabkho > span:not(.chon):hover { background:#EFEFEF; }
-  .bangbien { display:grid; grid-template-columns:118px minmax(0,1fr) 22px; font-size:12px; }
+  .bangbien { display:grid; grid-template-columns:128px minmax(0,1fr) 22px; font-size:12px; }
   .bangbien .tieude-cot { position:sticky; top:0; background:#EBEBEB; border-bottom:1px solid var(--vien-nhat); padding:6px 6px; color:var(--chu-phu); z-index:1; }
   .bangbien .vbdong > span.lay { padding:2px 2px; overflow:visible; cursor:default; }
   .bangbien .oml { height:26px; padding:0 6px; font-weight:normal; }
@@ -512,7 +512,10 @@
   .bangbien .dsml { position:static; grid-column:1 / -1; margin:2px 6px 8px; max-height:260px; }
   .bangbien .vbdong > span { padding:6px; border-bottom:1px solid #F0F0F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
   .bangbien .nhombien { grid-column:1 / -1; padding:5px 6px; background:#FAFAFA; color:var(--chu-phu); font-size:11px; font-weight:bold; border-bottom:1px solid #EFEFEF; }
-  .bangbien code, .ghep-ml code { font-family:Consolas, Menlo, monospace; font-size:11.5px; color:var(--cobalt); }
+  /* Tên biến hiển thị như chip biến trên trang mẫu: cùng nền, cùng màu chữ theo trạng thái */
+  .bangbien code, .ghep-ml code { font-family:Consolas, Menlo, monospace; font-size:11.5px; padding:1px 5px; border-radius:3px; background:var(--tk-nen); color:var(--tk-chu); }
+  .bangbien code.thieu, .ghep-ml code.thieu { background:var(--tk-thieu-nen); color:var(--tk-thieu-chu); }
+  .bangbien code.tudong, .ghep-ml code.tudong { background:var(--tk-tudong-nen); color:var(--tk-tudong-chu); }
   .xemml { flex:1; min-height:0; display:flex; flex-direction:column; }
   .xemml .vungxem { flex:1; min-height:0; overflow:auto; background:#E6E6E6; display:flex; flex-direction:column; align-items:center; padding:18px 0; gap:10px; }
   .xemml .baoml { width:420px; box-sizing:border-box; background:#FFF6E0; border:1px solid #E8C77A; color:#6B4A00; font-size:12px; padding:7px 10px; }
@@ -528,10 +531,11 @@
   .trangml .ky { display:flex; justify-content:flex-end; margin-top:14px; text-align:center; font-size:8.5px; }
   .trangml .so-trang { text-align:center; margin-top:16px; font-size:8px; color:#555; }
   /* Màu nguồn biến (sidebar, hộp Ghép biến, trang mẫu) — một tông slate, chỉ "chưa ghép" dùng màu nhấn */
-  #manMucLuc, .ghep-ml { --ml-cot:#EDF1F6; --ml-cot-chu:#2C3E55; --ml-tudong:#F4F5F7; --ml-tudong-chu:#7A8594; --ml-vien-nhe:#C9D3DF; --ml-chan:#F4F6F9; --ml-nhom:#E1E8F0; }
-  .trangml .tk { font-family:Consolas, Menlo, monospace; font-size:7.5px; padding:0 2px; border-radius:2px; background:#E1E8F0; color:#2C3E55; white-space:nowrap; cursor:pointer; }
-  .trangml .tk.thieu { background:#FFE9C2; color:#8A5A00; }
-  .trangml .tk.tudong { background:#EEF0F2; color:#7A8594; }
+  #manMucLuc, .ghep-ml { --ml-cot:#EDF1F6; --ml-cot-chu:#2C3E55; --ml-tudong:#F4F5F7; --ml-tudong-chu:#7A8594; --ml-vien-nhe:#C9D3DF; --ml-chan:#F4F6F9; --ml-nhom:#E1E8F0;
+    --tk-nen:#E1E8F0; --tk-chu:#2C3E55; --tk-thieu-nen:#FFE9C2; --tk-thieu-chu:#8A5A00; --tk-tudong-nen:#EEF0F2; --tk-tudong-chu:#7A8594; }
+  .trangml .tk { font-family:Consolas, Menlo, monospace; font-size:7.5px; padding:0 2px; border-radius:2px; background:var(--tk-nen); color:var(--tk-chu); white-space:nowrap; cursor:pointer; }
+  .trangml .tk.thieu { background:var(--tk-thieu-nen); color:var(--tk-thieu-chu); }
+  .trangml .tk.tudong { background:var(--tk-tudong-nen); color:var(--tk-tudong-chu); }
   .trangml tr.hangmau td { background:#F5F9FF; }
   /* Hộp Ghép biến */
   .popup.ghep-ml { width:920px; }
@@ -558,7 +562,7 @@
   .oml.cot:hover, .oml.tach:hover, .oml.hang:hover { border-color:#9FB0C4; }
   .oml.tudong { background:var(--ml-tudong); color:var(--ml-tudong-chu); cursor:default; } .oml.tudong:hover { border-color:transparent; }
   /* Hàng "Nhóm theo" ở chân sidebar: cùng lưới cột với bảng biến, nền riêng, ô chọn không viền */
-  .nhomtrai { flex:1; align-self:stretch; display:grid; grid-template-columns:118px minmax(0,1fr) 22px; align-items:center; background:var(--ml-chan); border-top:1px solid var(--vien-nhat); font-size:12px; color:var(--ml-cot-chu); font-weight:bold; }
+  .nhomtrai { flex:1; align-self:stretch; display:grid; grid-template-columns:128px minmax(0,1fr) 22px; align-items:center; background:var(--ml-chan); border-top:1px solid var(--vien-nhat); font-size:12px; color:var(--ml-cot-chu); font-weight:bold; }
   .nhomtrai > span { padding-left:6px; }
   #mlThan .daytrai { padding:0; width:0; min-width:100%; box-sizing:border-box; } /* không nới rộng cột trái theo nội dung chân */ #mlThan .timtrai { margin:0 6px; }
   #manMucLuc .nhomtrai select { grid-column:2 / 4; width:calc(100% - 6px); min-width:0; height:26px; margin:0 2px; border-color:transparent; font-weight:normal; color:var(--ml-cot-chu);
@@ -1120,7 +1124,7 @@
         <colgroup><col style="width:34px"><col style="width:190px"><col style="width:380px"><col></colgroup>
         <thead><tr><th></th><th>Biến trong mẫu</th><th>Lấy từ</th><th>Giá trị — hồ sơ <span id="mlGhepHs">HS-01</span></th></tr></thead>
         <tbody id="mlBien"></tbody></table></div>
-      <div class="ghi">Tự động, không cần ghép: <code>{trang_so}</code> <code>{tong_so_trang}</code> — Word tự tính khi in. Biến chưa ghép giữ nguyên <code>{…}</code> trong file kết quả.</div>
+      <div class="ghi">Tự động, không cần ghép: <code class="tudong">{trang_so}</code> <code class="tudong">{tong_so_trang}</code> — Word tự tính khi in. Biến chưa ghép giữ nguyên <code>{…}</code> trong file kết quả.</div>
       <div class="cuoi"><button class="nut sang-trai" id="mlTuKhop">Tự khớp lại</button><button class="nut" data-dong="phuMLGhep">Huỷ</button><button class="nut xanh" data-dong="phuMLGhep">Lưu</button></div>
     </div>
   </div>
@@ -2618,7 +2622,7 @@
       if (b.length === 1) return '<tr class="nhom"><td colspan="4">' + b[0] + '</td></tr>';
       var gt = giaTri(b, hs), i = ML_BIEN.indexOf(b);
       return '<tr' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '><td class="tt">' + (gt ? '' : '<span class="canhml">!</span>') +
-        '</td><td><code>{' + b[0] + '}</code></td><td class="lay">' + chonNguon(b, i) + '</td><td><div class="gt' + (gt ? '' : ' thieu') + '" title="' + gt + '">' + (gt || 'chưa ghép — để nguyên {' + b[0] + '}') + '</div></td></tr>';
+        '</td><td><code' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '>{' + b[0] + '}</code></td><td class="lay">' + chonNguon(b, i) + '</td><td><div class="gt' + (gt ? '' : ' thieu') + '" title="' + gt + '">' + (gt || 'chưa ghép — để nguyên {' + b[0] + '}') + '</div></td></tr>';
     }).join('');
   }
   function moGhep() { veGhep(); $('phuMLGhep').classList.add('mo'); }
@@ -2664,11 +2668,11 @@
         ML_BIEN.map(function (b) {
           if (b.length === 1) return '<span class="nhombien">' + b[0].replace(/ \(.*/, '') + '</span>';
           var i = ML_BIEN.indexOf(b);
-          return '<div class="vbdong' + (ml.moTrai === i ? ' chon' : '') + '" role="row"><span><code>{' + b[0] + '}</code></span><span class="lay">' + oNguon(b, i, ml.moTrai) + '</span>' +
+          return '<div class="vbdong' + (ml.moTrai === i ? ' chon' : '') + '" role="row"><span><code' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '>{' + b[0] + '}</code></span><span class="lay">' + oNguon(b, i, ml.moTrai) + '</span>' +
             (b[1] === 'thieu' ? '<span class="canhml" title="Chưa ghép">!</span>' : '<span></span>') + '</div>' +
             (ml.moTrai === i ? '<div class="dsml">' + dsNguon(b) + '</div>' : '');
-        }).join('') + '<span class="nhombien">Tự động</span><div class="vbdong"><span><code>{trang_so}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">số trang</span></div></span><span></span></div>' +
-        '<div class="vbdong"><span><code>{tong_so_trang}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">tổng số trang</span></div></span><span></span></div></div>';
+        }).join('') + '<span class="nhombien">Tự động</span><div class="vbdong"><span><code class="tudong">{trang_so}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">số trang</span></div></span><span></span></div>' +
+        '<div class="vbdong"><span><code class="tudong">{tong_so_trang}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">tổng số trang</span></div></span><span></span></div></div>';
       $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:#E1E8F0"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#EEF0F2"></i>tự động</span></span>';
       $('mlVungXem').innerHTML = trangMau(); datZoom(ml.zoom);
     } else {
