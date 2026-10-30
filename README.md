@@ -14,9 +14,15 @@ File chạy chưa ký số với Apple / Microsoft nên lần đầu mở hệ �
 
 `dema4_rs/` — mã nguồn Rust (giao diện egui + chế độ dòng lệnh), build qua GitHub Actions. Bản gốc Python (PyQt5 + PyMuPDF) giữ cục bộ trong `temp/`, không đưa lên repo.
 
+Mỗi chức năng khi chưa có dữ liệu hiện màn giới thiệu 3 bước; link **Chọn** / **Phân tích** trong đó làm đúng việc của nút, logo góc dưới phải mở [saomaiso.com](https://saomaiso.com).
+
+![Màn mở đầu Tách văn bản](docs/anh/tach-mo-dau.png)
+
 ## Đếm trang A4
 
 Chọn thư mục (quét cả thư mục con) → **Đếm**. Bảng kết quả lọc theo khổ (tab A0–A7), bấm tên file để mở. Tuỳ chọn **Check ký số** (AcroForm) và **Check DPI** (chậm hơn). Xong: tự lưu `<thư mục>_dem.txt` và `_dem_chitiet.txt`; popup có **Mở kết quả** · **Copy dữ liệu** (dán thẳng vào Excel).
+
+![Màn mở đầu Đếm](docs/anh/dem-mo-dau.png)
 
 ![Đếm trang A4](docs/anh/dem-trang-a4.png)
 
@@ -32,17 +38,21 @@ Menu **Chức năng › Tách văn bản** (chi tiết trong **Trợ giúp › H
 
 ![Tab Hồ sơ](docs/anh/tach-ho-so.png)
 
-**3. Duyệt Nghi trắng và Nghi xoay** (menu lọc) — bắt buộc trước khi tách. Nghi trắng: bấm B / C / I / S để chọn nhãn thật (mặc định Trắng) rồi Enter; Nghi xoay: Enter xoay thử, Enter lần nữa xác nhận. Xong tự sang trang nghi kế, phóng to 1 trang vẫn duyệt được như vậy.
+**3. Duyệt Nghi trắng và Nghi xoay** (menu lọc) — bắt buộc trước khi tách. Nghi trắng: bấm B / C / I / S để chọn nhãn thật (mặc định Trắng) rồi Enter; Nghi xoay: Enter xoay thử, Enter lần nữa xác nhận. Xong tự sang trang nghi kế. Phóng to 1 trang vẫn có thanh duyệt, cùng phím tắt, Hoàn tác / Làm lại (Ctrl+Z / Ctrl+Y).
 
 ![Duyệt Nghi trắng](docs/anh/tach-duyet-nghi-trang.png)
 
-![Phóng to 1 trang](docs/anh/tach-phong-to-index.png)
+![Duyệt trong hộp phóng to](docs/anh/tach-phong-to-nghi.png)
 
-**4. Tab Văn bản: xem trước từng văn bản** sẽ sinh ra (Lưới · 1 trang · 2 trang), xoay hoặc **Bỏ khỏi văn bản** nếu cần. Tên file theo mẫu trong Cấu hình (mặc định `{hoso}.{n}`).
+![Phóng to tờ index](docs/anh/tach-phong-to-index.png)
+
+**4. Tab Văn bản: xem trước từng văn bản** sẽ sinh ra (Lưới · 1 trang · 2 trang), xoay hoặc **Bỏ khỏi văn bản** nếu cần. Tên file theo mẫu trong Cấu hình (mặc định `{hoso}.{n}`; `{n7}` → `0000001`).
 
 ![Tab Văn bản](docs/anh/tach-van-ban.png)
 
-**5. Tách** → `<thư mục gốc>_vanban/…/<hồ sơ>/<hồ sơ>.1.pdf …`, giữ nguyên cấu trúc thư mục con. Hồ sơ không có nhãn và không xoay được chép nguyên từng byte (giữ chữ ký số). Mỗi văn bản ghi qua file tạm rồi mới đổi tên, nên tắt máy giữa chừng không để lại PDF cụt. Popup báo số liệu, lỗi từng hồ sơ (nếu có) và nút **Mở thư mục** · **Mở log**.
+**5. Tách** → `<thư mục gốc>_vanban/…/<hồ sơ>/<hồ sơ>.1.pdf …`, giữ nguyên cấu trúc thư mục con. Hồ sơ không có nhãn và không xoay được chép nguyên từng byte (giữ chữ ký số). Mỗi văn bản ghi qua file tạm rồi mới đổi tên, nên tắt máy giữa chừng không để lại PDF cụt. Trong lúc tách, popup hiện tiến độ theo văn bản, văn bản đang tạo, số đã xong, thời gian đã chạy / còn lại / giờ xong dự kiến, tốc độ và nút **Dừng**; xong thì báo số liệu, lỗi từng hồ sơ (nếu có) và nút **Mở thư mục** · **Mở log**.
+
+![Đang tách](docs/anh/tach-dang-tach.png)
 
 ![Tách xong](docs/anh/tach-xong.png)
 
@@ -103,6 +113,12 @@ dema4_saomai <thư mục> --khong-ghi # chỉ in kết quả, không ghi file, k
 ```
 
 Hệ số và ranh giới khổ đọc từ `sm-dema4.cfg` (không có file → mặc định).
+
+## Ký văn bản
+
+Đang phát triển: ký số hàng loạt văn bản đã tách bằng chứng thư của đơn vị. Hiện mới có màn giới thiệu.
+
+![Ký văn bản](docs/anh/ky-van-ban.png)
 
 ## Trợ giúp
 
