@@ -340,6 +340,8 @@ struct Chung {
     dang_chay: Mutex<HashSet<String>>,
     /// Lần chạy xong trong phiên này (ghi trạm với nguồn "online"; còn lại là bù offline).
     xong_phien: Mutex<HashSet<String>>,
+    /// Phiên này đã hỏi trạm ít nhất 1 lần (thành công hay lỗi).
+    da_thu_tram: std::sync::atomic::AtomicBool,
 }
 
 impl Chung {
@@ -357,6 +359,11 @@ impl Chung {
 
     /// Lỗi → giữ nguyên sổ, lần sau gửi lại (trạm chống trùng theo mã lần).
     fn dong_bo(&self) {
+        self.dong_bo_trong();
+        self.da_thu_tram.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn dong_bo_trong(&self) {
         let Some(kho) = &self.kho else { return };
         let may = self.may();
         // Đọc sổ dưới khoá `dang_chay`: đặt chỗ vừa ghi đĩa luôn đã nằm trong `dang_chay` (xem `bat_dau`)
@@ -392,7 +399,7 @@ pub struct KiemTra {
 impl KiemTra {
     pub fn moi(kho: Option<Arc<dyn KhoLicense>>, so: SoLuot, ma: String, ten: String, mac: String, lay_ip: LayIp) -> Self {
         let da_ky = so.tra_loi().zip(kho.as_ref()).and_then(|(tl, k)| k.doc_da_luu(&tl, &ma));
-        let chung = Arc::new(Chung { kho, so, ma, ten, mac, lay_ip, da_ky: Mutex::new(da_ky), dang_chay: Mutex::default(), xong_phien: Mutex::default() });
+        let chung = Arc::new(Chung { kho, so, ma, ten, mac, lay_ip, da_ky: Mutex::new(da_ky), dang_chay: Mutex::default(), xong_phien: Mutex::default(), da_thu_tram: Default::default() });
         let (gui, nhan) = std::sync::mpsc::channel::<Viec>();
         let c = Arc::clone(&chung);
         std::thread::spawn(move || {
@@ -458,6 +465,14 @@ impl KiemTra {
 
     /// Được chạy → ghi đặt chỗ lên đĩa **trước khi** chạy; hết lượt → lý do để hiện popup.
     pub fn bat_dau(&self, cn: ChucNang) -> Result<LanChay, QuyetDinh> {
+        // Chưa có trả lời ký hợp lệ (máy mới, hoặc file trên đĩa bị xoá / sửa) mà phiên này chưa hỏi trạm:
+        // chờ trạm rồi mới quyết định, để xoá file không mở thêm lượt. Mất mạng thật → luật offline.
+        // Thường không phải chờ: mở app đã hỏi trạm (`mo_app`).
+        let c = &self.chung;
+        if c.kho.is_some() && !c.da_thu_tram.load(std::sync::atomic::Ordering::SeqCst) && c.da_ky.lock().unwrap().is_none() {
+            self.gui(Viec::DongBo);
+            let _ = self.moc().recv_timeout(std::time::Duration::from_secs(20));
+        }
         match self.quyet_dinh(cn) {
             QuyetDinh::Cho => {
                 // Ghi đĩa + đánh dấu đang chạy cùng 1 khoá: luồng gửi không thấy đặt chỗ này như lần bỏ dở
@@ -705,7 +720,7 @@ mod tests {
                 kt.ket_thuc(&l, false);
             }
             cho(&kt);
-            assert_eq!((kho.da_dung().dem, kho.so_goi.load(SeqCst)), (0, 0));
+            assert_eq!((kho.da_dung().dem, kho.so_goi.load(SeqCst)), (0, 1), "chỉ 1 lần hỏi trạm (chưa có trả lời ký), không ghi lượt nào");
         }
 
         #[test]
@@ -769,7 +784,9 @@ mod tests {
         fn khoa_sau_lan_chay_ke() {
             let kho = Arc::new(KhoGia::moi(100, 100));
             let kt = KiemTra::gia(kho.clone());
-            *kho.trang_thai.lock().unwrap() = "khoa";
+            kt.mo_app();
+            cho(&kt);
+            *kho.trang_thai.lock().unwrap() = "khoa"; // Sao Mai khoá sau khi app đã hỏi trạm
             assert!(chay(&kt, ChucNang::Dem), "chưa biết bị khoá → lần này vẫn chạy");
             assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuot(ChucNang::Dem));
         }
@@ -786,6 +803,27 @@ mod tests {
             kt2.mo_app();
             cho(&kt2);
             assert_eq!(kt2.quyet_dinh(ChucNang::Tach), QuyetDinh::HetLuot(ChucNang::Tach), "trả lời ký Khoá lưu đĩa, mất mạng vẫn chặn");
+        }
+
+        /// Xoá / sửa câu trả lời ký trên đĩa không mở thêm lượt: có trạm thì hỏi trạm trước khi quyết định.
+        #[test]
+        fn xoa_tra_loi_tren_dia_khong_vuot_han() {
+            let kho = Arc::new(KhoGia::moi(0, 0));
+            let kt = KiemTra::gia(kho.clone());
+            assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuot(ChucNang::Dem));
+            assert_eq!(kho.so_goi.load(SeqCst), 1, "hỏi trạm đúng 1 lần, lần sau dùng trả lời đã có");
+            assert!(kt.bat_dau(ChucNang::Tach).is_err());
+            assert_eq!(kho.so_goi.load(SeqCst), 1);
+        }
+
+        /// Mất mạng thật: không có trả lời ký → luật offline (máy mới vẫn dùng thử được 2 lần).
+        #[test]
+        fn mat_mang_khong_co_tra_loi_van_cho_2_lan() {
+            let kho = Arc::new(KhoGia::moi(0, 0));
+            kho.mat_mang.store(true, SeqCst);
+            let kt = KiemTra::gia(kho.clone());
+            assert!(chay(&kt, ChucNang::Dem) && chay(&kt, ChucNang::Dem));
+            assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuotOffline(ChucNang::Dem));
         }
 
         #[test]

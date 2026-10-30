@@ -128,9 +128,19 @@ Hệ số và ranh giới khổ đọc từ `sm-dema4.cfg` (không có file → 
 
 ![Thông tin](docs/anh/thong-tin.png)
 
+## Lượt dùng (license)
+
+- Mỗi máy được **2 lần Đếm** và **2 lần Tách** dùng thử. Chỉ lần chạy **có kết quả** mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt. Áp dụng cho cả giao diện và dòng lệnh (hết lượt: in lý do + mã máy, mã thoát `3`).
+- Hết lượt → popup **Liên hệ Sao Mai** (mã máy, điện thoại **0979824615**, email **hotro@saomaiso.com**, saomaiso.com). Sao Mai cấp thêm lượt trên Sheet → bấm **Kiểm tra lại**.
+- **Mã máy** `SM-XXXX-XXXX-XXXX` lấy từ ID hệ điều hành (không đổi khi đổi tên máy), xem ở **Trợ giúp › Thông tin**.
+- Bấm Đếm / Tách quyết định ngay, không chờ mạng. Mất mạng: chạy được tối đa 2 lần chưa được máy chủ xác nhận, có mạng lại app tự ghi bù. Bị **Khoá** thì mất mạng vẫn khoá.
+- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `license` / `license_nhat_ky`; câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `license` → sửa **Hạn mức Đếm / Tách** + Trạng thái **Đã cấp** (xem tab `Mô tả license`).
+
+![Liên hệ Sao Mai](docs/anh/het-luot.png)
+
 ## Gửi thống kê
 
-Sau mỗi lần đếm / tách xong, app gửi thống kê (tên máy, địa chỉ MAC, IP nội bộ và IP public, thư mục, số liệu — không gửi nội dung PDF) và báo công khai trong popup "Thông tin … đã được ghi lại".
+Sau mỗi lần đếm / tách xong, app gửi thống kê (mã máy, tên máy, địa chỉ MAC, IP nội bộ và IP public, thư mục, số liệu — không gửi nội dung PDF) và báo công khai trong popup "Thông tin … đã được ghi lại".
 
 App gửi số liệu tới **trạm license** (Google Apps Script gắn vào Sheet "Monitor_dema4", mã nguồn `dema4_rs/apps-script/`); app không giữ token Telegram hay khoá ghi Sheet. Trạm:
 

@@ -1,6 +1,6 @@
 [package]
 name = "dema4_rs"
-version = "0.5.2"
+version = "1.0.0"
 edition = "2021"
 description = "Đếm trang A4 và tách văn bản PDF scan (Giải pháp số Sao Mai)"
 

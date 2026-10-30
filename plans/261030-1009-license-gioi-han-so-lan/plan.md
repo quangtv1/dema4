@@ -4,7 +4,7 @@ description: >-
   Mỗi máy 2 lần Đếm + 2 lần Tách dùng thử; hạn mức / trạng thái trên tab license
   Google Sheet qua trạm Apps Script ký RSA; exe không còn khoá Sheet; offline
   tối đa 2 lần; repo giữ công khai.
-status: pending
+status: completed
 priority: P2
 branch: main
 tags:
@@ -48,8 +48,8 @@ Brainstorm: `plans/reports/brainstorm-261030-1009-license-gioi-han-so-lan-report
 | 2 | [Trạm Apps Script](./phase-02-tram-apps-script.md) | Completed |
 | 3 | [Kho trạm + bỏ khoá Sheet khỏi exe](./phase-03-kho-tram-va-bo-khoa-sheet.md) | Completed |
 | 4 | [Gắn license vào GUI và dòng lệnh](./phase-04-gan-license-gui-va-dong-lenh.md) | Completed |
-| 5 | [Triển khai trạm lên Sheet thật](./phase-05-trien-khai-tram.md) | Pending |
-| 6 | [Kiểm thử tổng và phát hành](./phase-06-kiem-thu-tong-va-phat-hanh.md) | Pending |
+| 5 | [Triển khai trạm lên Sheet thật](./phase-05-trien-khai-tram.md) | Completed |
+| 6 | [Kiểm thử tổng và phát hành](./phase-06-kiem-thu-tong-va-phat-hanh.md) | Completed |
 
 Thứ tự: phase 5 bước 0 (thu hồi bí mật) làm **ngay**; 1 và 2 song song → 3 → 4; 5 (các bước còn lại) sau 2; 6 cuối. Ước tính tổng ~7,5 ngày (1 + 2,5 + 1 + 1,5 + 0,5 + 1).
 
@@ -87,8 +87,8 @@ Không.
 | 2 | Thoát app / Ctrl+C / CLI song song / `--khong-ghi` không bị tính | Critical | Accept | Completed |
 | 3 | Token Telegram công khai trên repo; khoá service account trong exe v0.5.x; thu hồi sau khi tạo tab license | Critical | Accept | Completed |
 | 4 | Mã máy từ tên máy + MAC | High | Accept | Completed |
-| 5 | Bộ kiểm license đặt sai struct; test gọi trạm thật | High | Accept | Phase 4 (`UngDung`, `ManTach`, CLI; Default test dùng kho giả) |
-| 6 | Offline bỏ qua trạng thái đã biết (Khoá, hết lượt) | High | Accept | Phase 1, 4 (lưu câu trả lời ký trên đĩa) |
+| 5 | Bộ kiểm license đặt sai struct; test gọi trạm thật | High | Accept | Completed |
+| 6 | Offline bỏ qua trạng thái đã biết (Khoá, hết lượt) | High | Accept | Completed |
 | 7 | Trạm chậm dần, đăng ký rác, giới hạn theo mã máy vô tác dụng, đốt quota máy khác | High | Accept | Phase 2 (tổng trong dòng, giới hạn toàn cục, ≤ 3 lần / lời gọi) |
 | 8 | Apps Script không trả 503; curl thiếu `-L` | High | Accept | Phase 2, 3, 5 |
 | 9 | Tiếng Việt làm hỏng chữ ký / trạng thái Khoá | High | Accept | Phase 1, 2 (mã ASCII, UTF-8, thả xuống, lạ → Khoá) |

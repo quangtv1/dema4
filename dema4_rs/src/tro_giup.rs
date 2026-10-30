@@ -169,6 +169,14 @@ pub enum Khoi {
     Ghi(&'static str),
 }
 
+/// Mục "Lượt dùng" chung cho tab Đếm và Tách.
+const LUOT_DUNG: Khoi = Khoi::Bang(&[
+    ("Dùng thử", "Mỗi máy *2 lần Đếm* và *2 lần Tách*. Chỉ lần chạy có kết quả mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt."),
+    ("Hết lượt", "Popup *Liên hệ Sao Mai*: mã máy, điện thoại, email. Sao Mai cấp thêm lượt → bấm *Kiểm tra lại*."),
+    ("Mất mạng", "Chạy được tối đa 2 lần chưa được máy chủ xác nhận; có mạng lại app tự ghi bù."),
+    ("Mã máy", "Xem ở *Trợ giúp › Thông tin*; không đổi khi đổi tên máy."),
+]);
+
 const HD_DEM: &[Khoi] = &[
     Khoi::Muc("Các bước"),
     Khoi::Buoc(&[
@@ -190,6 +198,8 @@ const HD_DEM: &[Khoi] = &[
         ("Ranh giới khổ", "Kéo vạch trên thước (mặc định ở giữa 2 khổ, vd A3|A4 = 358,5 mm). Gõ *Thử cạnh dài* để xem trang thuộc khổ nào."),
         ("Lưu · Mặc định", "Áp cho lần Đếm sau (`sm-dema4.cfg` cạnh file chạy). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
     ]),
+    Khoi::Muc("Lượt dùng"),
+    LUOT_DUNG,
 ];
 
 const HD_TACH: &[Khoi] = &[
@@ -227,6 +237,8 @@ const HD_TACH: &[Khoi] = &[
         ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc nút − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước/sau · [F1] hướng dẫn"),
     ]),
     Khoi::Ghi("Nhãn, góc xoay, log và cache lưu trong thư mục ẩn `.sm-dema4` cạnh file ứng dụng (mỗi thư mục đầu vào 1 thư mục con riêng); thư mục đầu vào và file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
+    Khoi::Muc("Lượt dùng"),
+    LUOT_DUNG,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

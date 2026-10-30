@@ -1,10 +1,11 @@
 ---
 phase: 5
-title: "Trien khai tram va Sheet that"
-status: pending
+title: Trien khai tram va Sheet that
+status: completed
 priority: P1
-dependencies: [2]
-effort: "0.5 ngày (thao tác của chủ Sheet)"
+dependencies:
+  - 2
+effort: 0.5 ngày (thao tác của chủ Sheet)
 ---
 
 # Phase 5: Triển khai trạm lên Sheet thật

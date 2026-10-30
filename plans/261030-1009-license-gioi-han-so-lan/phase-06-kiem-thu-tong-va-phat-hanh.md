@@ -1,13 +1,16 @@
 ---
 phase: 6
-title: "Kiem thu tong va phat hanh"
-status: pending
+title: Kiem thu tong va phat hanh
+status: completed
 priority: P1
-dependencies: [3, 4, 5]
-effort: "1 ngày"
+dependencies:
+  - 3
+  - 4
+  - 5
+effort: 1 ngày
 ---
 
-# Phase 6: Kiểm thử tổng và phát hành v0.6.0
+# Phase 6: Kiểm thử tổng và phát hành v1.0.0
 
 ## Overview
 Chạy thật với trạm Apps Script trên Mac + Windows theo ma trận tình huống; cập nhật tài liệu; phát hành v0.6.0; sau khi đã thu hồi bí mật cũ (phase 5 bước 0).
