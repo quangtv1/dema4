@@ -136,7 +136,7 @@ Hệ số và ranh giới khổ đọc từ `sm-dema4.cfg` (không có file → 
 - Hết lượt → popup **Liên hệ Sao Mai** (mã máy, điện thoại **0979824615**, email **hotro@saomaiso.com**, saomaiso.com). Sao Mai cấp thêm lượt trên Sheet → bấm **Kiểm tra lại**.
 - **Mã máy** `SM-XXXX-XXXX-XXXX` lấy từ ID hệ điều hành (không đổi khi đổi tên máy), xem ở **Trợ giúp › Thông tin**.
 - Bấm Đếm / Tách quyết định ngay, không chờ mạng. Mất mạng: chạy được tối đa 2 lần chưa được máy chủ xác nhận, có mạng lại app tự ghi bù. Bị **Khoá** thì mất mạng vẫn khoá.
-- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `license` / `license_nhat_ky`; câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `license` → sửa **Hạn mức Đếm / Tách** + Trạng thái **Đã cấp** (xem tab `Mô tả license`).
+- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `license` (mỗi máy 1 dòng, cộng dồn lượt đã dùng); câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `license` → sửa **Hạn mức Đếm / Tách** + Trạng thái **Đã cấp** (xem tab `Mô tả license`).
 
 ![Liên hệ Sao Mai](docs/anh/het-luot.png)
 

@@ -11,12 +11,10 @@ const ML = (n) => n.toString(16).padStart(32, '0');
 
 // Kho giả trong bộ nhớ, cùng giao diện với lớp Sheet thật trong license.gs
 function khoGia() {
-  const k = { may: [], nhatKy: [], hangDoi: [], nguong: [], dem: {}, soLanGoi: 0 };
+  const k = { may: [], hangDoi: [], nguong: [], dem: {}, soLanGoi: 0 };
   k.timMay = (ma) => { const i = k.may.findIndex((r) => r[0] === ma); return i < 0 ? null : { hang: i, giaTri: k.may[i].slice() }; };
   k.themMay = (r) => { k.may.push(r.slice()); };
   k.capNhatMay = (hang, cot) => { for (const [c, v] of Object.entries(cot)) k.may[hang][Number(c) - 1] = v; };
-  k.daCoMaLan = (m) => k.nhatKy.some((r) => r[2] === m);
-  k.themNhatKy = (rows) => { k.nhatKy.push(...rows); };
   k.choPhep = (khoa, gioiHan) => { k.dem[khoa] = (k.dem[khoa] || 0) + 1; return k.dem[khoa] <= gioiHan; };
   k.soTinCho = () => k.hangDoi.filter((r) => r.trang_thai === 'cho').length;
   k.xepTin = (r) => { k.hangDoi.push(r); };
@@ -48,18 +46,25 @@ test('ghi_lan_chong_trung', () => {
   assert.deepEqual(r.du_lieu.da_ghi, [ML(1)], 'mã đã ghi vẫn báo để app xoá khỏi sổ');
   const bon = [2, 3, 4, 5].map((i) => ({ ma_lan: ML(i), cn: 'tach', nguon: 'bu_offline' }));
   assert.equal(goi(k, { hanh_dong: 'ghi_lan', lan: bon }).ok, false, 'quá 3 lần / lời gọi bị từ chối');
-  assert.equal(k.nhatKy.length, 1);
-  assert.deepEqual(k.nhatKy[0].slice(1, 6), [MA, ML(1), 'Đếm', 'online', '0.6.0']);
-  assert.deepEqual(k.nhatKy[0].slice(6), ['192.168.1.5', '117.5.1.1'], 'nhật ký có IP của lời gọi');
+  assert.equal(k.may[0][15], ML(1), 'mã lần lưu ở cột ẩn của dòng máy');
 });
 
 test('tong_luu_trong_dong', () => {
   const k = khoGia();
   for (let i = 0; i < 10; i++) goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(100 + i), cn: 'tach', nguon: 'online' }] });
-  k.daCoMaLan = (m) => k.nhatKy.some((r) => r[2] === m); // vẫn dùng nhật ký chỉ để chống trùng
   assert.equal(k.may[0][9], 10, 'cột Đã dùng Tách = 10');
   const r = goi(k, { hanh_dong: 'kiem_tra' });
   assert.equal(r.du_lieu.da_dung_tach, 10);
+});
+
+test('chi_giu_ma_lan_gan_nhat', () => {
+  const k = khoGia();
+  for (let i = 0; i < L.GIU_MA_LAN + 5; i++) goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(200 + i), cn: 'dem', nguon: 'online' }] });
+  const giu = k.may[0][15].split(',');
+  assert.equal(giu.length, L.GIU_MA_LAN, 'ô không phình mãi');
+  assert.equal(giu[giu.length - 1], ML(200 + L.GIU_MA_LAN + 4));
+  const r = goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(200 + L.GIU_MA_LAN + 4), cn: 'dem', nguon: 'online' }] });
+  assert.equal(r.du_lieu.da_dung_dem, L.GIU_MA_LAN + 5, 'gửi lại lần gần nhất không cộng');
 });
 
 test('han_muc_va_trang_thai_tu_sheet', () => {

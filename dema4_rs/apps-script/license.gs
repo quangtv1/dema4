@@ -4,15 +4,13 @@
 
 var TAB = {
   MAY: 'license',
-  NHAT_KY: 'license_nhat_ky',
   HANG_DOI: 'Hàng đợi Telegram',
   MO_TA: 'Mô tả license',
   NGUONG: 'Ngưỡng trắng',
   MO_TA_NGUONG: 'Mô tả ngưỡng trắng',
 };
 var TIEU_DE = {
-  MAY: ['Mã máy', 'Tên máy', 'MAC', 'IP nội bộ', 'IP public', 'Phiên bản', 'Ngày đăng ký', 'Lần dùng cuối', 'Đã dùng Đếm', 'Đã dùng Tách', 'Hạn mức Đếm', 'Hạn mức Tách', 'Trạng thái', 'Đơn vị', 'Ghi chú'],
-  NHAT_KY: ['Thời điểm', 'Mã máy', 'Mã lần', 'Chức năng', 'Nguồn', 'Phiên bản', 'IP nội bộ', 'IP public'],
+  MAY: ['Mã máy', 'Tên máy', 'MAC', 'IP nội bộ', 'IP public', 'Phiên bản', 'Ngày đăng ký', 'Lần dùng cuối', 'Đã dùng Đếm', 'Đã dùng Tách', 'Hạn mức Đếm', 'Hạn mức Tách', 'Trạng thái', 'Đơn vị', 'Ghi chú', 'Mã lần gần đây'],
   HANG_DOI: ['Mã', 'Thời điểm', 'Nội dung', 'Tên CSV', 'CSV', 'Số lần thử', 'Trạng thái', 'Lúc đánh dấu'],
 };
 var MO_TA_LICENSE = [
@@ -20,7 +18,8 @@ var MO_TA_LICENSE = [
   ['Mã máy', 'Băm từ ID hệ điều hành (không đổi khi đổi tên máy / card mạng). Khách đọc mã trên popup "Liên hệ Sao Mai" (có nút Copy).', 'Trạm'],
   ['Tên máy · MAC · IP · Phiên bản', 'Thông tin máy ở lần liên lạc gần nhất.', 'Trạm'],
   ['Ngày đăng ký · Lần dùng cuối', 'Lần đầu và lần gần nhất máy gọi trạm.', 'Trạm'],
-  ['Đã dùng Đếm / Tách', 'Tổng số lần đã dùng; trạm cộng +1 mỗi lần chạy có kết quả (chống trùng theo mã lần). Chữ đỏ = đã hết lượt.', 'Trạm — không sửa tay'],
+  ['Đã dùng Đếm / Tách', 'Tổng số lần đã dùng; trạm cộng +1 mỗi lần chạy có kết quả. Chữ đỏ = đã hết lượt.', 'Trạm — không sửa tay'],
+  ['Mã lần gần đây (cột ẩn P)', '20 mã lần chạy gần nhất — trạm dùng để không cộng trùng khi app gửi lại.', 'Trạm — không sửa tay'],
   ['Hạn mức Đếm / Tách', 'TỔNG số lần được phép (không phải số cộng thêm). Trống = 2 (dùng thử).', 'Sao Mai'],
   ['Trạng thái', 'Dùng thử / Đã cấp / Khoá — chọn trong danh sách. Giá trị khác bị coi là Khoá.', 'Sao Mai'],
   ['Đơn vị · Ghi chú', 'Tự do (đơn vị, số hợp đồng, ngày cấp…).', 'Sao Mai'],
@@ -29,13 +28,13 @@ var MO_TA_LICENSE = [
   ['Khoá máy', 'Trạng thái = Khoá → máy chạy được tối đa thêm 1 lần rồi bị chặn (mở lại app hoặc mất mạng vẫn chặn). Mở khoá: chọn lại Đã cấp / Dùng thử.', 'Sao Mai'],
   ['Đưa về dùng thử', 'Xoá trống Hạn mức, chọn Dùng thử (Đã dùng không về 0 — đã dùng ≥ 2 thì vẫn hết lượt).', 'Sao Mai'],
   ['Máy nội bộ / dev', 'Hạn mức 100000, Trạng thái Đã cấp.', 'Sao Mai'],
-  ['Không được', 'Xoá dòng máy (máy đăng ký lại từ 0) · sửa cột Đã dùng (bị ghi đè, lệch nhật ký) · gõ trạng thái ngoài danh sách.', ''],
+  ['Không được', 'Xoá dòng máy (máy đăng ký lại từ 0) · sửa cột Đã dùng / Mã lần gần đây · gõ trạng thái ngoài danh sách.', ''],
   ['', '', ''],
-  ['Tab khác', 'license_nhat_ky: mỗi lần chạy 1 dòng (nguồn online / bù offline). Ngưỡng trắng: mỗi lần Tách 1 dòng. Hàng đợi Telegram (tab ẩn — chuột phải thanh tab › Hiện): tin chờ gửi, trigger mỗi phút, tự dọn sau 7 ngày.', ''],
+  ['Tab khác', 'Ngưỡng trắng: mỗi lần Tách 1 dòng. Hàng đợi Telegram (tab ẩn — chuột phải thanh tab › Hiện): tin chờ gửi, trigger mỗi phút, tự dọn sau 7 ngày.', ''],
   ['Telegram', 'Token + id nhóm ở Apps Script › Project Settings › Script Properties: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID. Đổi nhóm / token: sửa ở đó, không cần cài lại app.', ''],
 ];
 /** Cột lưu dạng chữ (không để Sheets đổi "0.6.0" thành ngày, mã hex thành số). */
-var COT_CHU = ['Mã máy', 'Phiên bản', 'Mã lần', 'Mã', 'MAC', 'Địa chỉ MAC', 'IP nội bộ', 'IP public'];
+var COT_CHU = ['Mã máy', 'Phiên bản', 'Mã lần gần đây', 'Mã', 'MAC', 'Địa chỉ MAC', 'IP nội bộ', 'IP public'];
 
 function bang(ten, tieuDe, moTa) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -73,24 +72,15 @@ function themDong(sh, rows) {
 function khoSheet() {
   var cache = CacheService.getScriptCache();
   var may = bang(TAB.MAY, TIEU_DE.MAY);
-  var nhatKy = bang(TAB.NHAT_KY, TIEU_DE.NHAT_KY);
   var hangDoi = bang(TAB.HANG_DOI, TIEU_DE.HANG_DOI);
   return {
     timMay: function (ma) {
       var o = may.getRange('A:A').createTextFinder(ma).matchEntireCell(true).findNext();
       if (!o) return null;
-      return { hang: o.getRow(), giaTri: may.getRange(o.getRow(), 1, 1, 15).getValues()[0] };
+      return { hang: o.getRow(), giaTri: may.getRange(o.getRow(), 1, 1, SO_COT_MAY).getValues()[0] };
     },
     themMay: function (r) { themDong(may, [r]); },
     capNhatMay: function (hang, cot) { Object.keys(cot).forEach(function (c) { may.getRange(hang, Number(c)).setValue(cot[c]); }); },
-    daCoMaLan: function (ma) {
-      if (cache.get('lan_' + ma)) return true;
-      return !!nhatKy.getRange('C:C').createTextFinder(ma).matchEntireCell(true).findNext();
-    },
-    themNhatKy: function (rows) {
-      themDong(nhatKy, rows);
-      rows.forEach(function (r) { cache.put('lan_' + r[2], '1', 21600); });
-    },
     choPhep: function (khoa, gioiHan, giay) {
       var k = 'dem_' + khoa + '_' + Math.floor(Date.now() / 1000 / giay);
       var n = Number(cache.get(k) || 0) + 1;

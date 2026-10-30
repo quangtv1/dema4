@@ -11,7 +11,10 @@ var GIOI_HAN_LOI_GOI_MOI_PHUT = 120;
 var TOI_DA_HANG_DOI = 2000;
 var HAN_MAC_DINH = 2;
 // Cột tab license (1-based)
-var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7, LAN_CUOI: 8, DUNG_DEM: 9, DUNG_TACH: 10, HAN_DEM: 11, HAN_TACH: 12, TRANG_THAI: 13 };
+var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7, LAN_CUOI: 8, DUNG_DEM: 9, DUNG_TACH: 10, HAN_DEM: 11, HAN_TACH: 12, TRANG_THAI: 13, MA_LAN: 16 };
+var SO_COT_MAY = 16;
+// Số mã lần gần nhất giữ trong dòng máy để chống trùng (app gửi lại tối đa vài lần chưa được xác nhận)
+var GIU_MA_LAN = 20;
 var TEN_CN = { dem: 'Đếm', tach: 'Tách' };
 
 /** Bỏ ký tự điều khiển, cắt `toiDa` ký tự. */
@@ -119,7 +122,7 @@ function xuLy(yc, kho, bayGio) {
   var tim = kho.timMay(yc.ma_may);
   if (!tim) {
     if (!kho.choPhep('dang_ky', GIOI_HAN_DANG_KY_MOI_GIO, 3600)) return { ok: false, loi: 'ban' };
-    kho.themMay([yc.ma_may, may.ten, may.mac, may.ip_noi_bo, may.ip_public, may.phien_ban, luc, luc, 0, 0, '', '', 'Dùng thử', '', '']);
+    kho.themMay([yc.ma_may, may.ten, may.mac, may.ip_noi_bo, may.ip_public, may.phien_ban, luc, luc, 0, 0, '', '', 'Dùng thử', '', '', '']);
     tim = kho.timMay(yc.ma_may);
   }
   var d = tim.giaTri;
@@ -132,17 +135,20 @@ function xuLy(yc, kho, bayGio) {
   var daGhi = [];
   var dungDem = soKhongAm(d[COT.DUNG_DEM - 1]);
   var dungTach = soKhongAm(d[COT.DUNG_TACH - 1]);
-  var moi = [];
+  // Chống trùng: mã lần đã ghi nằm ở cột ẩn "Mã lần gần đây" của chính dòng máy
+  var daCo = String(d[COT.MA_LAN - 1] || '').split(',').filter(Boolean);
+  var them = 0;
   lan.forEach(function (l) {
     daGhi.push(l.ma_lan);
-    if (kho.daCoMaLan(l.ma_lan) || moi.some(function (r) { return r[2] === l.ma_lan; })) return; // chống trùng
+    if (daCo.indexOf(l.ma_lan) >= 0) return;
     if (l.cn === 'dem') dungDem++; else dungTach++;
-    moi.push([luc, yc.ma_may, l.ma_lan, TEN_CN[l.cn], l.nguon, may.phien_ban, may.ip_noi_bo, may.ip_public]);
+    daCo.push(l.ma_lan);
+    them++;
   });
-  if (moi.length) {
-    kho.themNhatKy(moi);
+  if (them) {
     cot[COT.DUNG_DEM] = dungDem;
     cot[COT.DUNG_TACH] = dungTach;
+    cot[COT.MA_LAN] = daCo.slice(-GIU_MA_LAN).join(',');
   }
   kho.capNhatMay(tim.hang, cot);
   d[COT.DUNG_DEM - 1] = dungDem;
@@ -253,5 +259,5 @@ function chonGui(ds, bayGioMs, nganSach) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, soanTinDem: soanTinDem, soanTinTach: soanTinTach, dongNguong: dongNguong, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
+  module.exports = { GIU_MA_LAN: GIU_MA_LAN, xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, soanTinDem: soanTinDem, soanTinTach: soanTinTach, dongNguong: dongNguong, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
 }
