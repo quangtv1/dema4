@@ -10,7 +10,7 @@ effort: "1 ngày"
 # Phase 6: Kiểm thử tổng và phát hành v0.6.0
 
 ## Overview
-Chạy thật với trạm Apps Script trên Mac + Windows theo ma trận tình huống; cập nhật tài liệu; phát hành v0.6.0; sau đó thu hồi service account cũ (phase 5 bước 7).
+Chạy thật với trạm Apps Script trên Mac + Windows theo ma trận tình huống; cập nhật tài liệu; phát hành v0.6.0; sau đó thu hồi service account cũ, đổi token bot (phase 5 bước 8–10).
 
 ## Requirements
 - Mọi tiêu chí trong `plan.md` đạt trên máy thật.
