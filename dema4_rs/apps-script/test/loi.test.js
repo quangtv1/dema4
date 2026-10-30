@@ -96,20 +96,21 @@ const MAY_TIN = { ten: 'ABC', mac: 'AA:BB:CC:DD:EE:FF', ip_noi_bo: '192.168.1.5'
 const PHAN_MAY = 'Thông tin máy tính\n- Mã máy: ' + MA + '\n- Tên PC: ABC\n- Địa chỉ MAC: AA:BB:CC:DD:EE:FF\n- IP nội bộ: 192.168.1.5\n- IP public: 117.5.1.1\n- Phiên bản: 1.0.0\n-----------------\nThông tin chức năng\n';
 
 test('tin_dem_chu_thuong_hai_phan', () => {
-  assert.equal(L.tinDem(MA, MAY_TIN, { thu_muc: '/Users/quangtv/Documents', so_file: 4, so_trang: 78, quy_a4: 128.5, canh_bao: 0, file_loi: 1, thoi_gian_ms: 65400 }, '26.10.2026, 19:05:30'),
-    '📊 ĐẾM TRANG A4\n\n' + PHAN_MAY +
+  assert.equal(L.tinDem(MA, MAY_TIN, { thu_muc: '/Users/quangtv/Documents', so_file: 4, so_trang: 78, quy_a4: 128.5, canh_bao: 0, file_loi: 1, thoi_gian_ms: 65400 }, '26.10.2026, 19:05:30', { da_dung: 3, han: 10 }),
+    '📊 ĐẾM TRANG A4 (3/10)\n\n' + PHAN_MAY +
     '- Thư mục: /Users/quangtv/Documents\n- File PDF: 4\n- Số trang: 78\n- Quy ra A4: 128,5\n- Cảnh báo: 0\n- File lỗi: 1\n- Thời điểm: 26.10.2026, 19:05:30\n- Thời gian chạy: 1 phút, 5,4 giây');
 });
 
 test('tin_tach_chu_thuong_hai_phan', () => {
   const sl = { thu_muc: '/a/<b>', ho_so: 2, van_ban: 1211, so_trang: 476, bo_index: 209, bo_trang: 1, split: 0, sao_nguyen: 0, ho_so_loi: 0, thoi_gian_ms: 1200 };
   const tk = { trang_tu_dong: 120, trang_tu_dong_sua: 2, nghi: 30, nghi_thanh_trang: 25, nghi_giu: 5, trang_lot: 1, de_xuat: [0.9, 3.4], xoay_xac_nhan: 7, xoay_chinh: 1, xoay_0: 2 };
-  assert.equal(L.tinTach(MA, MAY_TIN, sl, { tk: tk, t1: 1, t2: 3.2 }, '29.10.2026, 11:30:00'),
-    '✂️ TÁCH VĂN BẢN\n\n' + PHAN_MAY +
+  assert.equal(L.tinTach(MA, MAY_TIN, sl, { tk: tk, t1: 1, t2: 3.2 }, '29.10.2026, 11:30:00', { da_dung: 7, han: 100 }),
+    '✂️ TÁCH VĂN BẢN (7/100)\n\n' + PHAN_MAY +
     '- Thư mục: /a/<b>\n- Hồ sơ: 2\n- Văn bản: 1.211\n- Số trang: 476\n- Bỏ index: 209\n- Bỏ trắng: 1\n- Split: 0\n- Sao nguyên: 0\n- Hồ sơ lỗi: 0\n' +
     '- Thời điểm: 29.10.2026, 11:30:00\n- Thời gian chạy: 0 phút, 1,2 giây\n' +
     '- Ngưỡng trắng / nghi: 1,00 % / 3,20 %\n- Trắng tự động: 120 (sửa 2)\n- Nghi trắng: 30 → Trắng 25 · giữ 5\n- Trắng lọt: 1\n- Đề xuất lô: 0,90 / 3,40\n- Xoay: xác nhận 7 · chỉnh 1 · 0° 2');
   assert.ok(!L.tinTach(MA, MAY_TIN, sl, null, 't').includes('Ngưỡng'), 'không có thống kê ngưỡng → bỏ phần ngưỡng');
+  assert.ok(L.tinTach(MA, MAY_TIN, sl, null, 't').startsWith('✂️ TÁCH VĂN BẢN\n'), 'không có dòng máy → tiêu đề không kèm (x/y)');
   assert.ok(L.tinTach(MA, MAY_TIN, sl, { tk: {}, t1: 1, t2: 3 }, 't').includes('- Đề xuất lô: chưa đủ dữ liệu'));
   assert.equal(L.soNguyen(1234567), '1.234.567'); assert.equal(L.soThuc(885.5), '885,5'); assert.equal(L.soThuc(885), '885');
 });
@@ -189,6 +190,12 @@ test('tin_dem_tach_co_tieu_de_rieng', () => {
   const k = khoGia();
   goi(k, { hanh_dong: 'thong_ke_dem', so_lieu: { thu_muc: '/x', so_file: 1, so_trang: 2, quy_a4: 2, canh_bao: 0, file_loi: 0, thoi_gian_ms: 1000 } });
   goi(k, { hanh_dong: 'thong_ke_tach', so_lieu: { thu_muc: '/y', ho_so: 1, van_ban: 2, so_trang: 3, bo_index: 0, bo_trang: 0, split: 0, sao_nguyen: 0, ho_so_loi: 0, thoi_gian_ms: 500 } });
-  assert.ok(k.hangDoi[0].noi_dung.startsWith('📊 ĐẾM TRANG A4\n\nThông tin máy tính\n- Mã máy: ' + MA), k.hangDoi[0].noi_dung);
+  assert.ok(k.hangDoi[0].noi_dung.startsWith('📊 ĐẾM TRANG A4\n\nThông tin máy tính\n- Mã máy: ' + MA), 'máy chưa đăng ký → không có (x/y)');
   assert.ok(k.hangDoi[1].noi_dung.startsWith('✂️ TÁCH VĂN BẢN\n\nThông tin máy tính\n- Mã máy: ' + MA), k.hangDoi[1].noi_dung);
+  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(501), cn: 'dem', nguon: 'online' }] });
+  k.may[0][10] = 50;
+  goi(k, { hanh_dong: 'thong_ke_dem', so_lieu: { thu_muc: '/x', so_file: 1, so_trang: 2, quy_a4: 2, canh_bao: 0, file_loi: 0, thoi_gian_ms: 1000 } });
+  goi(k, { hanh_dong: 'thong_ke_tach', so_lieu: { thu_muc: '/y', ho_so: 1, van_ban: 2, so_trang: 3, bo_index: 0, bo_trang: 0, split: 0, sao_nguyen: 0, ho_so_loi: 0, thoi_gian_ms: 500 } });
+  const cuoi = k.hangDoi.slice(-2).map((h) => h.noi_dung.split('\n')[0]);
+  assert.deepEqual(cuoi, ['📊 ĐẾM TRANG A4 (1/50)', '✂️ TÁCH VĂN BẢN (0/10)'], 'đã dùng / hạn mức lấy từ dòng máy');
 });

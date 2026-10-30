@@ -168,7 +168,13 @@ function thongKe(hd, yc, may, kho, bayGio) {
   if (kho.soTinCho() >= TOI_DA_HANG_DOI) return { ok: false, loi: 'hang_doi_day' };
   var sl = yc.so_lieu || {};
   var ng = yc.nguong;
-  var tin = hd === 'thong_ke_dem' ? tinDem(yc.ma_may, may, sl, thoiDiemTin(bayGio)) : tinTach(yc.ma_may, may, sl, ng, thoiDiemTin(bayGio));
+  // (đã dùng / hạn mức) cho tiêu đề: app ghi lượt lên trạm trước rồi mới gửi thống kê, nên số đã gồm lần này
+  var tim = kho.timMay(yc.ma_may), luot = null;
+  if (tim) {
+    var tt = trangThaiDong(tim.giaTri);
+    luot = hd === 'thong_ke_dem' ? { da_dung: tt.da_dung_dem, han: tt.han_dem } : { da_dung: tt.da_dung_tach, han: tt.han_tach };
+  }
+  var tin = hd === 'thong_ke_dem' ? tinDem(yc.ma_may, may, sl, thoiDiemTin(bayGio), luot) : tinTach(yc.ma_may, may, sl, ng, thoiDiemTin(bayGio), luot);
   var hang = { ma: maNgauNhien(), luc: 0, trang_thai: 'cho', so_lan_thu: 0, noi_dung: tin, ten_csv: '', csv: '' };
   if (hd === 'thong_ke_tach' && ng) {
     var csv = String(ng.csv || '');
@@ -253,8 +259,13 @@ function thuMucGon(s) {
   return s.length > 1000 ? '…' + s.slice(-1000) : s;
 }
 
-function tinDem(maMay, may, sl, luc) {
-  return soanTin('📊 ĐẾM TRANG A4', maMay, may, [
+/** Tiêu đề kèm (đã dùng/hạn mức) khi biết dòng máy. */
+function kemLuot(tieuDe, luot) {
+  return luot ? tieuDe + ' (' + luot.da_dung + '/' + luot.han + ')' : tieuDe;
+}
+
+function tinDem(maMay, may, sl, luc, luot) {
+  return soanTin(kemLuot('📊 ĐẾM TRANG A4', luot), maMay, may, [
     'Thư mục: ' + thuMucGon(sl.thu_muc),
     'File PDF: ' + soNguyen(sl.so_file),
     'Số trang: ' + soNguyen(sl.so_trang),
@@ -267,7 +278,7 @@ function tinDem(maMay, may, sl, luc) {
 }
 
 /** `ng`: thống kê ngưỡng trắng app gửi kèm ({tk, t1, t2}); không có → bỏ phần ngưỡng. */
-function tinTach(maMay, may, sl, ng, luc) {
+function tinTach(maMay, may, sl, ng, luc, luot) {
   var d = [
     'Thư mục: ' + thuMucGon(sl.thu_muc),
     'Hồ sơ: ' + soNguyen(sl.ho_so),
@@ -295,7 +306,7 @@ function tinTach(maMay, may, sl, ng, luc) {
       'Xoay: xác nhận ' + n(tk.xoay_xac_nhan) + ' · chỉnh ' + n(tk.xoay_chinh) + ' · 0° ' + n(tk.xoay_0)
     );
   }
-  return soanTin('✂️ TÁCH VĂN BẢN', maMay, may, d);
+  return soanTin(kemLuot('✂️ TÁCH VĂN BẢN', luot), maMay, may, d);
 }
 
 // ---- Hàng đợi Telegram ----
