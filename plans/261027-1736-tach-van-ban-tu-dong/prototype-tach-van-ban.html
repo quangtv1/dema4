@@ -513,12 +513,9 @@
   .bangbien .dsml { position:static; grid-column:1 / -1; margin:2px 6px 8px; max-height:260px; }
   .bangbien .vbdong > span { padding:6px; border-bottom:1px solid #F0F0F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
   .bangbien .nhombien { grid-column:1 / -1; padding:5px 6px; font-size:11px; font-weight:bold; border-bottom:1px solid #EFEFEF; }
-  /* 3 nhóm biến: Thông tin hồ sơ (xanh slate) · Bảng văn bản (xanh rêu) · Tự động (xám) — cùng độ nhạt cho hài hoà */
-  .nhom-ttin { background:#E9EFF6; color:#2C3E55; } .nhom-bang { background:#EAF2EC; color:#2F5440; } .nhom-tudong { background:#F1F1F1; color:#6B7480; }
+  .nhom-ttin, .nhom-bang, .nhom-tudong { background:#FAFAFA; color:var(--chu-phu); }
   /* Tên biến hiển thị như chip biến trên trang mẫu: cùng nền, cùng màu chữ theo trạng thái */
   .bangbien code, .ghep-ml code { font-family:Consolas, Menlo, monospace; font-size:11.5px; padding:1px 5px; border-radius:3px; background:var(--tk-nen); color:var(--tk-chu); }
-  .bangbien code.thieu, .ghep-ml code.thieu { background:var(--tk-thieu-nen); color:var(--tk-thieu-chu); }
-  .bangbien code.tudong, .ghep-ml code.tudong { background:var(--tk-tudong-nen); color:var(--tk-tudong-chu); }
   .xemml { flex:1; min-height:0; display:flex; flex-direction:column; }
   .xemml .vungxem { flex:1; min-height:0; overflow:auto; background:#E6E6E6; display:flex; flex-direction:column; align-items:center; padding:18px 0; gap:10px; }
   .xemml .baoml { width:420px; box-sizing:border-box; background:#FFF6E0; border:1px solid #E8C77A; color:#6B4A00; font-size:12px; padding:7px 10px; }
@@ -535,11 +532,13 @@
   .trangml .so-trang { text-align:center; margin-top:16px; font-size:8px; color:#555; }
   /* Màu nguồn biến (sidebar, hộp Ghép biến, trang mẫu) — một tông slate, chỉ "chưa ghép" dùng màu nhấn */
   #manMucLuc, .ghep-ml { --ml-cot:#EDF1F6; --ml-cot-chu:#2C3E55; --ml-tudong:#F4F5F7; --ml-tudong-chu:#7A8594; --ml-vien-nhe:#C9D3DF; --ml-chan:#F4F6F9; --ml-nhom:#E1E8F0;
-    --tk-nen:#E1E8F0; --tk-chu:#2C3E55; --tk-thieu-nen:#FFE9C2; --tk-thieu-chu:#8A5A00; --tk-tudong-nen:#EEF0F2; --tk-tudong-chu:#7A8594; }
+    --tk-nen:#DAE4F0; --tk-chu:#2C3E55; --tk-bang-nen:#D8ECDE; --tk-bang-chu:#2F5440; --tk-thieu-nen:#FFE9C2; --tk-thieu-chu:#8A5A00; --tk-tudong-nen:#EEF0F2; --tk-tudong-chu:#7A8594; }
   .trangml .tk { font-family:Consolas, Menlo, monospace; font-size:7.5px; padding:0 2px; border-radius:2px; background:var(--tk-nen); color:var(--tk-chu); white-space:nowrap; cursor:pointer; }
-  .trangml .tk.thieu { background:var(--tk-thieu-nen); color:var(--tk-thieu-chu); }
-  .trangml .tk.sang { background:var(--chon-vien); color:#fff; box-shadow:0 0 0 2px rgba(47,123,217,.35); } /* định vị khi rê chuột trên dòng biến ở sidebar */
-  .trangml .tk.tudong { background:var(--tk-tudong-nen); color:var(--tk-tudong-chu); }
+  /* Chip biến (sidebar, hộp Ghép biến, trang mẫu) tô theo loại: Thông tin hồ sơ (slate) · Bảng văn bản (xanh rêu) · Tự động (xám); chưa ghép luôn vàng cam */
+  .bangbien code.bang, .ghep-ml code.bang, .trangml .tk.bang { background:var(--tk-bang-nen); color:var(--tk-bang-chu); }
+  .bangbien code.tudong, .ghep-ml code.tudong, .trangml .tk.tudong { background:var(--tk-tudong-nen); color:var(--tk-tudong-chu); }
+  .bangbien code.thieu, .ghep-ml code.thieu, .trangml .tk.thieu { background:var(--tk-thieu-nen); color:var(--tk-thieu-chu); }
+  .trangml .tk.sang, .trangml .tk.sang.thieu, .trangml .tk.sang.tudong, .trangml .tk.sang.bang { background:var(--chon-vien); color:#fff; box-shadow:0 0 0 2px rgba(47,123,217,.35); } /* định vị khi rê chuột trên dòng biến ở sidebar */
   .trangml tr.hangmau td { background:#F5F9FF; }
   /* Hộp Ghép biến */
   .popup.ghep-ml { width:920px; }
@@ -2557,13 +2556,14 @@
   var COT_DUY_NHAT = [22, 65, 318, 241, 14, 309, 98, 3]; // số giá trị khác nhau mỗi cột, không tính dòng tiêu đề
   document.querySelectorAll('.mlnhom').forEach(function (sel) { sel.innerHTML = COT.map(function (c, i) { return '<option>' + c + ' (' + COT_DUY_NHAT[i] + ')</option>'; }).join(''); });
   // [biến, nguồn: 'cot' | 'hang' | 'thieu', giá trị nguồn, giá trị của hồ sơ đang xem]
+  var NHOM_BANG = ['Bảng văn bản (mỗi văn bản một dòng)'];
   var ML_BIEN = [
     ['Thông tin hồ sơ (in một lần)'],
     ['so_ho_so', 'cot', 'Tiêu đề hồ sơ'],
     ['don_vi', 'hang', 'VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI'],
     ['chi_nhanh', 'hang', 'CHI NHÁNH THÀNH PHỐ ĐÔNG HÀ'],
     ['nguoi_lap', 'thieu', ''],
-    ['Bảng văn bản (mỗi văn bản một dòng)'],
+    NHOM_BANG,
     ['stt', 'cot', 'STT'],
     ['so_ky_hieu', 'cot', 'Số, ký hiệu văn bản'],
     ['ngay_thang', 'cot', 'Ngày tháng văn bản'],
@@ -2574,11 +2574,13 @@
   ];
   function bien(ten) { for (var i = 0; i < ML_BIEN.length; i++) if (ML_BIEN[i][0] === ten) return ML_BIEN[i]; }
   function tk(ten) {
-    var b = bien(ten), lop = !b ? 'tudong' : b[1] === 'thieu' ? 'thieu' : '';
+    var b = bien(ten), lop = !b ? 'tudong' : lopBien(b);
     return '<span class="tk ' + lop + '" data-ten="' + ten + '"' + (b ? ' data-mlbien="' + ML_BIEN.indexOf(b) + '"' : '') + ' title="Bấm để sửa nguồn">{' + ten + '}</span>';
   }
   var MUI_TEN = '<svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="#666" stroke-width="1.4" stroke-linecap="round"/></svg>';
   function lopNhom(ten) { return ten.indexOf('Thông tin') === 0 ? 'nhom-ttin' : 'nhom-bang'; }
+  // Lớp màu chip của biến: theo loại (thông tin hồ sơ / bảng văn bản), chưa ghép thì 'thieu'
+  function lopBien(b) { if (b[1] === 'thieu') return 'thieu'; return ML_BIEN.indexOf(b) > ML_BIEN.indexOf(NHOM_BANG) ? 'bang' : 'ttin'; }
   function giaTri(b, hs) {
     if (b[1] === 'hang') return b[2];
     if (b[1] === 'tach') return 'theo thứ tự kết quả Tách';
@@ -2627,7 +2629,7 @@
       if (b.length === 1) return '<tr class="nhom"><td colspan="4" class="' + lopNhom(b[0]) + '">' + b[0] + '</td></tr>';
       var gt = giaTri(b, hs), i = ML_BIEN.indexOf(b);
       return '<tr' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '><td class="tt">' + (gt ? '' : '<span class="canhml">!</span>') +
-        '</td><td><code' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '>{' + b[0] + '}</code></td><td class="lay">' + chonNguon(b, i) + '</td><td><div class="gt' + (gt ? '' : ' thieu') + '" title="' + gt + '">' + (gt || 'chưa ghép — để nguyên {' + b[0] + '}') + '</div></td></tr>';
+        '</td><td><code class="' + lopBien(b) + '">{' + b[0] + '}</code></td><td class="lay">' + chonNguon(b, i) + '</td><td><div class="gt' + (gt ? '' : ' thieu') + '" title="' + gt + '">' + (gt || 'chưa ghép — để nguyên {' + b[0] + '}') + '</div></td></tr>';
     }).join('');
   }
   function moGhep() { veGhep(); $('phuMLGhep').classList.add('mo'); }
@@ -2673,12 +2675,12 @@
         ML_BIEN.map(function (b) {
           if (b.length === 1) return '<span class="nhombien ' + lopNhom(b[0]) + '">' + b[0].replace(/ \(.*/, '') + '</span>';
           var i = ML_BIEN.indexOf(b);
-          return '<div class="vbdong' + (ml.moTrai === i ? ' chon' : '') + '" data-ten="' + b[0] + '" role="row"><span><code' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '>{' + b[0] + '}</code></span><span class="lay">' + oNguon(b, i, ml.moTrai) + '</span>' +
+          return '<div class="vbdong' + (ml.moTrai === i ? ' chon' : '') + '" data-ten="' + b[0] + '" role="row"><span><code class="' + lopBien(b) + '">{' + b[0] + '}</code></span><span class="lay">' + oNguon(b, i, ml.moTrai) + '</span>' +
             (b[1] === 'thieu' ? '<span class="canhml" title="Chưa ghép">!</span>' : '<span></span>') + '</div>' +
             (ml.moTrai === i ? '<div class="dsml">' + dsNguon(b) + '</div>' : '');
         }).join('') + '<span class="nhombien nhom-tudong">Tự động</span><div class="vbdong" data-ten="trang_so"><span><code class="tudong">{trang_so}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">số trang</span></div></span><span></span></div>' +
         '<div class="vbdong" data-ten="tong_so_trang"><span><code class="tudong">{tong_so_trang}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">tổng số trang</span></div></span><span></span></div></div>';
-      $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:#E1E8F0"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#EEF0F2"></i>tự động</span></span>';
+      $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:var(--tk-nen)"></i>thông tin hồ sơ</span><span><i style="background:var(--tk-bang-nen)"></i>bảng văn bản</span><span><i style="background:var(--tk-tudong-nen)"></i>tự động</span><span><i style="background:var(--tk-thieu-nen)"></i>chưa ghép</span></span>';
       $('mlVungXem').innerHTML = trangMau(); datZoom(ml.zoom);
     } else {
       $('mlTrai').innerHTML = '<div class="banghs" role="grid" style="grid-template-columns:24px minmax(72px,1fr) 64px 28px"><span class="tieude-cot so">#</span><span class="tieude-cot">Hồ sơ</span><span class="tieude-cot so">Số dòng</span><span class="tieude-cot"></span>' +
