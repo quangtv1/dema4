@@ -98,11 +98,13 @@
   /* Khối giới thiệu đặt cao (cách mép trên ~56px), logo nhỏ ở góc dưới phải vùng trống */
   .mo-dau { align-items:flex-start; padding-top:56px; position:relative; }
   .gioithieu { text-align:center; color:var(--chu); max-width:560px; }
-  .logo-goc { position:absolute; right:20px; bottom:16px; width:64px; height:auto; opacity:.9; }
+  .logo-goc { position:absolute; right:20px; bottom:16px; width:64px; opacity:.9; cursor:pointer; } .logo-goc img { width:100%; height:auto; display:block; }
+  .gioithieu a.lk { color:var(--cobalt); text-decoration:underline; cursor:pointer; }
+  .nhay { box-shadow:0 0 0 2px var(--chon-vien) !important; }
   .gioithieu h2 { font-size:17px; font-weight:bold; margin:8px 0 4px; }
   .gioithieu p { font-size:12px; color:var(--chu-phu); margin:0 0 16px; line-height:1.5; }
   .buoc { display:flex; gap:14px; justify-content:center; }
-  .buoc div { width:160px; background:#fff; border:1px solid var(--vien); border-top:3px solid var(--cobalt); padding:10px 10px 12px; font-size:12px; line-height:1.45; color:var(--chu); text-align:left; }
+  .buoc div { width:160px; background:#fff; border:1px solid var(--vien); border-top:2px solid var(--cobalt); padding:10px 10px 12px; font-size:12px; line-height:1.45; color:var(--chu); text-align:left; }
   .buoc b { display:inline-block; min-width:22px; height:22px; line-height:22px; text-align:center; background:var(--nen); border:1px solid var(--vien); color:var(--chu-phu); font-size:12px; margin-bottom:6px; }
   .buoc span { display:block; font-weight:bold; margin-bottom:2px; }
   .kho { display:flex; gap:4px; justify-content:center; margin-top:14px; }
@@ -494,7 +496,7 @@
     <div class="hang" id="hangTM">
       <label for="tm">Thư mục hồ sơ PDF:</label>
       <input id="tm" type="text" value="G:\SoHoa\Lo_L1\pdf_goc" readonly>
-      <button class="nut">Chọn</button>
+      <button class="nut" id="nutChonTM">Chọn</button>
       <button class="nut xanh" id="nutPhanTich">Phân tích</button>
     </div>
 
@@ -519,12 +521,12 @@
         <div class="keo" id="keo" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng cột trái" tabindex="0"></div>
         <div class="phai">
           <div class="trong mo-dau" id="chuaPT">
-            <img alt="" class="logo-gt logo-goc">
+            <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
             <div class="gioithieu">
               <h2>Tách văn bản</h2>
               <p>Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng và gợi ý trang bị xoay. Nhãn do máy đoán, người duyệt lại trước khi tách — file PDF gốc không bị sửa.</p>
               <div class="buoc">
-                <div><b>1</b><span>Chọn thư mục</span>Bấm <u>Chọn</u> rồi <u>Phân tích</u>; tên hồ sơ hiện ngay ở cột trái.</div>
+                <div><b>1</b><span>Chọn thư mục</span>Bấm <a class="lk" data-chon="tm">Chọn</a> rồi <a class="lk" data-pt="1">Phân tích</a>; tên hồ sơ hiện ngay ở cột trái.</div>
                 <div><b>2</b><span>Duyệt nhãn</span>Kiểm tra Index · Trắng · Split; duyệt hết Nghi trắng, Nghi xoay.</div>
                 <div><b>3</b><span>Tách</span>Mỗi hồ sơ một thư mục, văn bản đặt tên theo mẫu, có log kết quả.</div>
               </div>
@@ -649,7 +651,7 @@
   <!-- Màn Đếm trang A4 (giữ nguyên) -->
   <!-- Màn Ký văn bản: giữ chỗ, chưa có chức năng -->
   <div class="man an mo-dau" id="manKy" style="align-items:center">
-    <img alt="" class="logo-gt logo-goc">
+    <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
     <div class="gioithieu">
       <h2>Ký văn bản</h2>
       <p>Ký số hàng loạt các văn bản PDF đã tách bằng chứng thư số của đơn vị; chèn hình chữ ký, kiểm tra file đã ký. <b>Chức năng đang phát triển.</b></p>
@@ -665,7 +667,7 @@
     <div class="hang">
       <label for="tmd">Chọn thư mục pdf:</label>
       <input id="tmd" type="text" value="G:\SoHoa\Lo_L1\pdf_goc" readonly>
-      <button class="nut">Chọn</button><button class="nut xanh">Đếm</button>
+      <button class="nut" id="nutChonDem">Chọn</button><button class="nut xanh">Đếm</button>
     </div>
     <div class="tomtat">
       <span>File PDF: <b>2</b></span><span>Số trang: <b>896</b></span><span>Quy ra A4: <b>896</b></span>
@@ -674,12 +676,12 @@
     <div class="bangdem">
       <div class="tabkho"><span class="chon">Tất cả (896)</span><span>A0 (0)</span><span>A1 (0)</span><span>A2 (0)</span><span>A3 (0)</span><span>A4 (896)</span><span>A5 (0)</span><span>A6 (0)</span><span>A7 (0)</span></div>
       <div class="trong mo-dau">
-        <img alt="" class="logo-gt logo-goc">
+        <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
         <div class="gioithieu">
           <h2>Đếm trang A4</h2>
           <p>Đếm số trang của mọi PDF trong thư mục (cả thư mục con), phân loại khổ giấy và quy đổi ra số trang A4 theo hệ số; cảnh báo trang sát ngưỡng khổ, DPI bất thường, file đã ký số.</p>
           <div class="buoc">
-            <div><b>1</b><span>Chọn thư mục</span>Bấm <u>Chọn</u>; tuỳ chọn Check ký số, Check DPI.</div>
+            <div><b>1</b><span>Chọn thư mục</span>Bấm <a class="lk" data-chon="tmd">Chọn</a>; tuỳ chọn Check ký số, Check DPI.</div>
             <div><b>2</b><span>Đếm</span>Bảng chi tiết từng trang, lọc theo khổ, bấm tên file để mở.</div>
             <div><b>3</b><span>Lấy kết quả</span>Tự lưu <u>_dem.txt</u> · Mở kết quả · Copy dán vào Excel.</div>
           </div>
@@ -966,6 +968,13 @@
   // chonDs/neo dùng khoá trang 'hs.p' vì lưới gộp trang của mọi hồ sơ; locHS = -1: tất cả hồ sơ
   // Logo màn mở mặc định dùng lại ảnh của hộp Thông tin (không nhúng base64 2 lần)
   var logoGT = document.querySelector('.logott img').src; document.querySelectorAll('.logo-gt').forEach(function (i) { i.src = logoGT; });
+  // Chọn thư mục (prototype không mở hộp thoại thật): nháy ô đường dẫn. Link "Chọn" / "Phân tích" trong giới thiệu = bấm nút tương ứng
+  function chonThuMuc(id) { var o = $(id); o.focus(); o.classList.add('nhay'); setTimeout(function () { o.classList.remove('nhay'); }, 700); }
+  $('nutChonTM').onclick = function () { chonThuMuc('tm'); };
+  $('nutChonDem').onclick = function () { chonThuMuc('tmd'); };
+  document.querySelectorAll('.gioithieu a.lk').forEach(function (a) {
+    a.onclick = function (e) { e.preventDefault(); if (a.dataset.chon) chonThuMuc(a.dataset.chon); else if (a.dataset.pt) $('nutPhanTich').click(); };
+  });
   var s = { tdHS: '', tdVB: '', chonVB: {}, neoVB: '', locMenu: 'tat', xemVB: 'luoi', man: 'tach', hoSo: 0, locHS: -1, loc: 'tat', daPT: false, che: 'trang', vb: 0, sap: 'trang', chonDs: {}, neo: '' };
   var daXoa = TEN.map(function () { return {}; });
   var dangPT = false;
