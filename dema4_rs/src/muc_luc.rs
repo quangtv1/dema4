@@ -8,6 +8,7 @@ pub mod gom_nhom;
 pub mod khop;
 pub mod kiem_tra;
 pub mod mau;
+pub mod mo_phong;
 pub mod sinh;
 pub mod ten_file;
 pub mod token;
