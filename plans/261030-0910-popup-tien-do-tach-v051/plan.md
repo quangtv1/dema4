@@ -10,3 +10,6 @@ status: completed
 
 ## Kiểm thử
 - `bao_tien_do_tung_van_ban_va_ho_so`, test tên `{n7}`, trạng thái "Đã tách xong" trong test tách GUI; ảnh `dang_tach.png` (chup_hop). 141 test.
+
+## Bổ sung → v0.5.2
+4. Màn mở mặc định của Đếm / Tách / Ký: tiêu đề, mô tả, 3 thẻ bước vuông, link Chọn / Phân tích làm việc của nút, logo góc dưới phải mở saomaiso.com (`gioi_thieu.rs`).
