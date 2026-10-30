@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn dinh_dang_o_nhu_ban_goc() {
-        assert_eq!(so(42300.0), "42300");
+        assert_eq!(so(12345.0), "12345");
         assert_eq!(so(1.5), "1.5");
         let d = |v, m1904| calamine::ExcelDateTime::new(v, calamine::ExcelDateTimeType::DateTime, m1904);
         assert_eq!(o_excel(&Data::DateTime(d(41556.0, false))), "09/10/2013");
