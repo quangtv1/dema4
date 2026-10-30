@@ -17,18 +17,25 @@ var TIEU_DE = {
   CAU_HINH: ['Khoá', 'Giá trị'],
 };
 var MO_TA_LICENSE = [
-  ['Cột', 'Ý nghĩa', 'Ai sửa'],
-  ['Mã máy', 'Băm từ ID hệ điều hành của máy (không đổi khi đổi tên máy / card mạng). Khách đọc mã này trên popup.', 'Trạm'],
-  ['Tên máy · MAC · IP', 'Thông tin máy ở lần liên lạc gần nhất.', 'Trạm'],
-  ['Đã dùng Đếm / Tách', 'Tổng số lần đã dùng; trạm cộng +1 mỗi lần (chống trùng theo mã lần chạy).', 'Trạm — không sửa tay'],
-  ['Hạn mức Đếm / Tách', 'TỔNG số lần được phép. Trống = 2 (dùng thử).', 'Sao Mai'],
-  ['Trạng thái', 'Dùng thử / Đã cấp / Khoá (chọn trong danh sách). Giá trị khác bị coi là Khoá.', 'Sao Mai'],
-  ['Đơn vị · Ghi chú', 'Tự do (hợp đồng, ngày cấp…).', 'Sao Mai'],
+  ['Cột (tab license)', 'Ý nghĩa', 'Ai sửa'],
+  ['Mã máy', 'Băm từ ID hệ điều hành (không đổi khi đổi tên máy / card mạng). Khách đọc mã trên popup "Liên hệ Sao Mai" (có nút Copy).', 'Trạm'],
+  ['Tên máy · MAC · IP · Phiên bản', 'Thông tin máy ở lần liên lạc gần nhất.', 'Trạm'],
+  ['Ngày đăng ký · Lần dùng cuối', 'Lần đầu và lần gần nhất máy gọi trạm.', 'Trạm'],
+  ['Đã dùng Đếm / Tách', 'Tổng số lần đã dùng; trạm cộng +1 mỗi lần chạy có kết quả (chống trùng theo mã lần). Chữ đỏ = đã hết lượt.', 'Trạm — không sửa tay'],
+  ['Hạn mức Đếm / Tách', 'TỔNG số lần được phép (không phải số cộng thêm). Trống = 2 (dùng thử).', 'Sao Mai'],
+  ['Trạng thái', 'Dùng thử / Đã cấp / Khoá — chọn trong danh sách. Giá trị khác bị coi là Khoá.', 'Sao Mai'],
+  ['Đơn vị · Ghi chú', 'Tự do (đơn vị, số hợp đồng, ngày cấp…).', 'Sao Mai'],
   ['', '', ''],
-  ['Nâng lượt', 'Tìm mã máy → sửa Hạn mức thành tổng mới (vd đã dùng 37, cho thêm 100 → 137) → Trạng thái Đã cấp → khách bấm Kiểm tra lại.', ''],
-  ['Khoá máy', 'Trạng thái = Khoá → máy chạy được tối đa thêm 1 lần rồi bị chặn.', ''],
-  ['Không được', 'Xoá dòng máy (máy đăng ký lại từ 0) · sửa cột Đã dùng · gõ trạng thái ngoài danh sách.', ''],
+  ['Cấp thêm lượt', '1. Khách gửi mã máy. 2. Tab license → Ctrl/Cmd+F tìm mã. 3. Sửa Hạn mức thành tổng mới (vd đã dùng 37, cho thêm 100 → 137). 4. Trạng thái = Đã cấp. 5. Khách bấm "Kiểm tra lại" — dùng được ngay.', 'Sao Mai'],
+  ['Khoá máy', 'Trạng thái = Khoá → máy chạy được tối đa thêm 1 lần rồi bị chặn (mở lại app hoặc mất mạng vẫn chặn). Mở khoá: chọn lại Đã cấp / Dùng thử.', 'Sao Mai'],
+  ['Đưa về dùng thử', 'Xoá trống Hạn mức, chọn Dùng thử (Đã dùng không về 0 — đã dùng ≥ 2 thì vẫn hết lượt).', 'Sao Mai'],
+  ['Máy nội bộ / dev', 'Hạn mức 100000, Trạng thái Đã cấp.', 'Sao Mai'],
+  ['Không được', 'Xoá dòng máy (máy đăng ký lại từ 0) · sửa cột Đã dùng (bị ghi đè, lệch nhật ký) · gõ trạng thái ngoài danh sách.', ''],
+  ['', '', ''],
+  ['Tab khác', 'license_nhat_ky: mỗi lần chạy 1 dòng (nguồn online / bù offline). Ngưỡng trắng: mỗi lần Tách 1 dòng. Hàng đợi Telegram: tin chờ gửi (trigger mỗi phút, tự dọn sau 7 ngày). Cấu hình: token + id nhóm Telegram.', ''],
 ];
+/** Cột lưu dạng chữ (không để Sheets đổi "0.6.0" thành ngày, mã hex thành số). */
+var COT_CHU = ['Mã máy', 'Phiên bản', 'Mã lần', 'Mã', 'MAC', 'Địa chỉ MAC', 'IP nội bộ', 'IP public'];
 
 function bang(ten, tieuDe, moTa) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -38,6 +45,7 @@ function bang(ten, tieuDe, moTa) {
     if (tieuDe && tieuDe.length) {
       sh.getRange(1, 1, 1, tieuDe.length).setValues([tieuDe]).setFontWeight('bold');
       sh.setFrozenRows(1);
+      tieuDe.forEach(function (t, i) { if (COT_CHU.indexOf(t) >= 0) sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat('@'); });
     }
     if (ten === TAB.MAY) {
       var quyTac = SpreadsheetApp.newDataValidation().requireValueInList(['Dùng thử', 'Đã cấp', 'Khoá'], true).setAllowInvalid(false).build();
@@ -56,6 +64,9 @@ function bang(ten, tieuDe, moTa) {
 
 function themDong(sh, rows) {
   if (!rows.length) return;
+  // Hết dòng trống thì nới lưới (getRange ngoài lưới báo lỗi); dòng mới chép định dạng dòng trên (cột chữ giữ dạng chữ)
+  var thieu = sh.getLastRow() + rows.length - sh.getMaxRows();
+  if (thieu > 0) sh.insertRowsAfter(sh.getMaxRows(), thieu + 500);
   sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
 }
 
