@@ -45,13 +45,11 @@ impl RangBuoc {
     }
 
     /// Đọc dạng JSON `{"nhom": "...", "bien": {"x": {"cot": ".."} | {"hang": ".."} | {"tu_dong": true}}}`
-    /// (cùng định dạng chương trình đối chứng C# dùng).
-    #[cfg(test)]
-    pub fn tu_json(s: &str) -> Self {
-        let v: serde_json::Value = serde_json::from_str(s).unwrap();
+    /// (cùng định dạng chương trình đối chứng C# dùng; app lưu lựa chọn gần nhất trong cấu hình). Sai → `None`.
+    pub fn doc_json(s: &str) -> Option<Self> {
+        let v: serde_json::Value = serde_json::from_str(s).ok()?;
         let bien = v["bien"]
-            .as_object()
-            .unwrap()
+            .as_object()?
             .iter()
             .map(|(k, n)| {
                 let nguon = if let Some(c) = n["cot"].as_str() {
@@ -64,6 +62,44 @@ impl RangBuoc {
                 (k.clone(), nguon)
             })
             .collect();
-        RangBuoc { cot_nhom: v["nhom"].as_str().unwrap().into(), bien }
+        Some(RangBuoc { cot_nhom: v["nhom"].as_str()?.into(), bien })
+    }
+
+    /// JSON một dòng (ngược với `doc_json`).
+    pub fn json(&self) -> String {
+        let bien: serde_json::Map<String, serde_json::Value> = self
+            .bien
+            .iter()
+            .map(|(b, n)| {
+                let v = match n {
+                    Nguon::Cot(c) => serde_json::json!({ "cot": c }),
+                    Nguon::Hang(h) => serde_json::json!({ "hang": h }),
+                    Nguon::TuDong => serde_json::json!({ "tu_dong": true }),
+                };
+                (b.clone(), v)
+            })
+            .collect();
+        serde_json::json!({ "nhom": self.cot_nhom, "bien": bien }).to_string()
+    }
+
+    #[cfg(test)]
+    pub fn tu_json(s: &str) -> Self {
+        Self::doc_json(s).expect("JSON ràng buộc hợp lệ")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rang_buoc_json_khu_hoi() {
+        let rb = RangBuoc { cot_nhom: "Số HS".into(), bien: vec![("a".into(), Nguon::Cot("C=1|x".into())), ("b".into(), Nguon::Hang("Đơn vị \"A\"\n2".into())), ("trang_so".into(), Nguon::TuDong)] };
+        let mut doc = RangBuoc::doc_json(&rb.json()).unwrap();
+        doc.bien.sort_by(|x, y| x.0.cmp(&y.0));
+        assert_eq!(doc, rb);
+        assert!(!rb.json().contains('\n'), "một dòng (lưu được trong file cấu hình)");
+        assert_eq!(RangBuoc::doc_json("rác"), None);
+        assert_eq!(RangBuoc::doc_json(r#"{"bien":{}}"#), None, "thiếu nhom");
     }
 }

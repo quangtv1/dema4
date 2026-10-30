@@ -83,6 +83,44 @@ pub struct CauHinh {
     pub ty_le_vb: u16,
     pub che_do_vb: CheDoVb,
     pub an_dong_thu_muc: bool,
+    pub muc_luc: CauHinhMucLuc,
+}
+
+/// Cấu hình + lựa chọn gần nhất của màn Sinh mục lục (khoá `ml_*` trong file).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CauHinhMucLuc {
+    /// Thư mục ra; trống = `.sm-dema4/muc_luc/<tên file dữ liệu>` cạnh file chạy.
+    pub thu_muc_ra: String,
+    pub mau_ten: String,
+    /// File đã có: ghi đè (`true`) hay bỏ qua.
+    pub ghi_de: bool,
+    pub rong_trai: f32,
+    pub file: String,
+    pub sheet: String,
+    /// Số dòng vật lý (1-based) của hàng tiêu đề.
+    pub dong_tieu_de: u32,
+    /// "1".."4" = mẫu nhúng sẵn; còn lại = đường dẫn DOCX riêng.
+    pub mau: String,
+    /// Ràng buộc biến gần nhất (JSON một dòng, xem `RangBuoc::json`) của mẫu `mau`.
+    pub bien: String,
+}
+
+pub const RONG_TRAI_ML: (f32, f32) = (220.0, 600.0);
+
+impl Default for CauHinhMucLuc {
+    fn default() -> Self {
+        Self {
+            thu_muc_ra: String::new(),
+            mau_ten: crate::muc_luc::ten_file::MAU_MAC_DINH.into(),
+            ghi_de: true,
+            rong_trai: 290.0,
+            file: String::new(),
+            sheet: String::new(),
+            dong_tieu_de: 1,
+            mau: "1".into(),
+            bien: String::new(),
+        }
+    }
 }
 
 impl Default for CauHinh {
@@ -110,6 +148,7 @@ impl Default for CauHinh {
             ty_le_vb: 100,
             che_do_vb: CheDoVb::Luoi,
             an_dong_thu_muc: false,
+            muc_luc: CauHinhMucLuc::default(),
         }
     }
 }
@@ -124,6 +163,7 @@ pub enum LoiCauHinh {
     Nguong,
     TinCay,
     MauTen,
+    MauTenMucLuc,
 }
 
 impl CauHinh {
@@ -153,6 +193,9 @@ impl CauHinh {
         }
         if crate::tach_vb::tach::kiem_mau_ten(&self.mau_ten).is_err() {
             loi.push(LoiCauHinh::MauTen);
+        }
+        if self.muc_luc.mau_ten.trim().is_empty() {
+            loi.push(LoiCauHinh::MauTenMucLuc);
         }
         loi
     }
@@ -220,6 +263,15 @@ impl CauHinh {
                     _ => {}
                 },
                 "an_dong_thu_muc" => c.an_dong_thu_muc = bool_().unwrap_or(c.an_dong_thu_muc),
+                "ml_thu_muc_ra" => c.muc_luc.thu_muc_ra = v.to_string(),
+                "ml_mau_ten" => c.muc_luc.mau_ten = v.to_string(),
+                "ml_ghi_de" => c.muc_luc.ghi_de = bool_().unwrap_or(c.muc_luc.ghi_de),
+                "ml_rong_trai" => c.muc_luc.rong_trai = so().map_or(c.muc_luc.rong_trai, |x| (x as f32).clamp(RONG_TRAI_ML.0, RONG_TRAI_ML.1)),
+                "ml_file" => c.muc_luc.file = v.to_string(),
+                "ml_sheet" => c.muc_luc.sheet = v.to_string(),
+                "ml_dong_tieu_de" => c.muc_luc.dong_tieu_de = so().filter(|x| (1.0..=100_000.0).contains(x)).map_or(c.muc_luc.dong_tieu_de, |x| x as u32),
+                "ml_mau" => c.muc_luc.mau = v.to_string(),
+                "ml_bien" => c.muc_luc.bien = v.to_string(),
                 _ => {}
             }
         }
@@ -231,6 +283,7 @@ impl CauHinh {
                 LoiCauHinh::Nguong => (c.nguong_trang, c.nguong_nghi) = (md.nguong_trang, md.nguong_nghi),
                 LoiCauHinh::TinCay => c.tin_cay_xoay = md.tin_cay_xoay,
                 LoiCauHinh::MauTen => c.mau_ten = md.mau_ten.clone(),
+                LoiCauHinh::MauTenMucLuc => c.muc_luc.mau_ten = md.muc_luc.mau_ten.clone(),
                 LoiCauHinh::A0LonHeSo => {}
             }
         }
@@ -273,6 +326,9 @@ impl CauHinh {
             }
         );
         s += &format!("an_dong_thu_muc={}\n", bool_(self.an_dong_thu_muc));
+        let m = &self.muc_luc;
+        s += &format!("ml_thu_muc_ra={}\nml_mau_ten={}\nml_ghi_de={}\nml_rong_trai={}\n", m.thu_muc_ra, m.mau_ten, bool_(m.ghi_de), m.rong_trai);
+        s += &format!("ml_file={}\nml_sheet={}\nml_dong_tieu_de={}\nml_mau={}\nml_bien={}\n", m.file, m.sheet, m.dong_tieu_de, m.mau, m.bien);
         s
     }
 
@@ -446,6 +502,17 @@ mod tests {
             ty_le_vb: 150,
             che_do_vb: CheDoVb::HaiTrang,
             an_dong_thu_muc: true,
+            muc_luc: CauHinhMucLuc {
+                thu_muc_ra: r"E:\Mục lục".into(),
+                mau_ten: "ML-{so_ho_so}".into(),
+                ghi_de: false,
+                rong_trai: 412.0,
+                file: r"G:\Biên mục=1.xlsx".into(),
+                sheet: "Sheet 2".into(),
+                dong_tieu_de: 4,
+                mau: r"D:\Mẫu riêng.docx".into(),
+                bien: crate::muc_luc::RangBuoc { cot_nhom: "Số HS".into(), bien: vec![("a".into(), crate::muc_luc::Nguon::Hang("x=y".into()))] }.json(),
+            },
         };
         assert!(c.kiem_tra().is_empty(), "{:?}", c.kiem_tra());
         assert_eq!(CauHinh::phan_tich(&c.noi_dung()), c);
@@ -468,6 +535,9 @@ mod tests {
         let kiem = |c: CauHinh| c.kiem_tra();
         let md = CauHinh::default;
         assert_eq!(kiem(CauHinh { mau_ten: "{hoso}".into(), ..md() }), [LoiCauHinh::MauTen]);
+        assert_eq!(kiem(CauHinh { muc_luc: CauHinhMucLuc { mau_ten: " ".into(), ..Default::default() }, ..md() }), [LoiCauHinh::MauTenMucLuc]);
+        let ml = CauHinh::phan_tich("ml_mau_ten=\nml_rong_trai=9999\nml_dong_tieu_de=0\nml_ghi_de=x").muc_luc;
+        assert_eq!(ml, CauHinhMucLuc { rong_trai: RONG_TRAI_ML.1, ..Default::default() }, "mẫu tên trống / dòng 0 / bool sai → mặc định; độ rộng kẹp");
         assert_eq!(kiem(CauHinh { nguong_trang: 3.5, ..md() }), [LoiCauHinh::Nguong]);
         assert_eq!(kiem(CauHinh { nguong_nghi: 10.5, ..md() }), [LoiCauHinh::Nguong]);
         assert_eq!(kiem(CauHinh { nguong_trang: -0.1, ..md() }), [LoiCauHinh::Nguong]);
