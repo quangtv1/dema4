@@ -1,4 +1,4 @@
-//! Màn mở mặc định (chưa có dữ liệu) của Đếm trang A4 / Tách văn bản / Ký văn bản: tên chức năng, mô tả ngắn,
+//! Màn mở mặc định (chưa có dữ liệu) của Đếm trang A4 / Tách văn bản / Sinh mục lục / Ký văn bản: tên chức năng, mô tả ngắn,
 //! 3 bước trong 3 thẻ vuông (vạch xanh mảnh mép trên, số thứ tự ô xám); logo nhỏ góc dưới phải mở saomaiso.com.
 //! Link trong lời giới thiệu ("Chọn", "Phân tích") trả về `Bam` để màn gọi đúng việc như bấm nút.
 
@@ -52,6 +52,17 @@ pub const DEM: GioiThieu = GioiThieu {
         Buoc { ten: "Lấy kết quả", than: &[Doan::Chu("Tự lưu _dem.txt · Mở kết quả · Copy dán vào Excel.")] },
     ],
     kho: true,
+};
+
+pub const MUC_LUC: GioiThieu = GioiThieu {
+    tieu_de: "Sinh mục lục hồ sơ",
+    mo_ta: "Sinh mục lục văn bản cho từng hồ sơ từ file biên mục Excel/CSV theo mẫu DOCX của đơn vị; xem mẫu, xem trước từng hồ sơ, xuất DOCX hàng loạt.",
+    buoc: [
+        Buoc { ten: "Chọn file biên mục", than: &[Doan::Chu("Bấm "), Doan::Link("Chọn", Bam::Chon), Doan::Chu("; mỗi văn bản một dòng, các dòng cùng hồ sơ nằm liền nhau.")] },
+        Buoc { ten: "Chọn mẫu, ghép biến", than: &[Doan::Chu("Tab Mẫu xem biến của mẫu; biến tự khớp tên cột, bấm ô Lấy từ để sửa.")] },
+        Buoc { ten: "Sinh mục lục", than: &[Doan::Chu("Tab Kết quả xem từng hồ sơ; mỗi hồ sơ một file DOCX.")] },
+    ],
+    kho: false,
 };
 
 pub const KY: GioiThieu = GioiThieu {

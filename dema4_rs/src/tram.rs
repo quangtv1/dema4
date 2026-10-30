@@ -173,6 +173,20 @@ pub fn so_lieu_dem(thu_muc: &str, kq: &crate::dem_pdf::KetQuaDem, thoi_gian: Dur
     }})
 }
 
+/// Số liệu 1 lần Sinh mục lục gửi trạm (tin 📑 SINH MỤC LỤC).
+pub fn so_lieu_muc_luc(du_lieu: &str, mau: &str, ho_so: usize, van_ban: usize, tk: &crate::muc_luc::sinh::TongKet, pdf: usize) -> Value {
+    json!({ "so_lieu": {
+        "du_lieu": duong_dan_tuyet_doi(du_lieu),
+        "mau": mau,
+        "ho_so": ho_so,
+        "van_ban": van_ban,
+        "docx": tk.docx,
+        "pdf": pdf,
+        "loi": tk.loi.len(),
+        "thoi_gian_ms": tk.thoi_gian.as_millis() as u64,
+    }})
+}
+
 /// Số liệu 1 lần Tách + thống kê ngưỡng trắng (tin, file CSV, 1 hàng tab "Ngưỡng trắng" — trạm ghi).
 pub fn so_lieu_tach(may: &ThongTinMay, thu_muc: &str, sl: &crate::telegram::SoLieuTach, thoi_gian: Duration, thong_ke: Option<&crate::tach_vb::thong_ke_nguong::ThongKeNguong>, nguong: (f32, f32)) -> Value {
     use crate::tach_vb::thong_ke_nguong as tkn;
@@ -405,6 +419,15 @@ mod tests {
     }
 
     /// Đủ trường trạm đọc (loi.js: soanTinDem / soanTinTach / dongNguong / themNguong); chữ tự do chỉ có đường dẫn thư mục.
+    #[test]
+    fn so_lieu_muc_luc_du_truong() {
+        let tk = crate::muc_luc::sinh::TongKet { docx: 21, bo_qua: 0, loi: vec![("a.docx".into(), "x".into())], da_dung: false, thoi_gian: Duration::from_millis(16_400) };
+        let v = so_lieu_muc_luc("/a/Bien muc.xlsx", "Mẫu 01 – Quảng Trị", 22, 326, &tk, 0)["so_lieu"].clone();
+        assert_eq!((v["ho_so"].as_u64(), v["van_ban"].as_u64(), v["docx"].as_u64(), v["pdf"].as_u64(), v["loi"].as_u64(), v["thoi_gian_ms"].as_u64()), (Some(22), Some(326), Some(21), Some(0), Some(1), Some(16_400)));
+        assert_eq!(v["mau"], "Mẫu 01 – Quảng Trị");
+        assert!(v["du_lieu"].as_str().unwrap().ends_with("Bien muc.xlsx"));
+    }
+
     #[test]
     fn so_lieu_gui_tram_du_truong() {
         use crate::tach_vb::thong_ke_nguong::ThongKeNguong;

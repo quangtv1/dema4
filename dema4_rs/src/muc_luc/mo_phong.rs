@@ -21,8 +21,8 @@ pub struct Doan {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Khoi {
     Doan(Doan),
-    /// Hàng → ô; mỗi ô gồm các đoạn của nó.
-    Bang(Vec<Vec<Vec<Doan>>>),
+    /// Hàng → ô; mỗi ô gồm các đoạn của nó. `vien` = bảng có kẻ viền (khai trong DOCX).
+    Bang { hang: Vec<Vec<Vec<Doan>>>, vien: bool },
 }
 
 fn doan(p: &The) -> Doan {
@@ -39,6 +39,22 @@ fn doan(p: &The) -> Doan {
     let run_chu = runs.into_iter().find(|r| !r.chu_w_t().trim().is_empty());
     let dam = dam_cua(ppr.and_then(|x| x.con_dau("w:rPr"))) || dam_cua(run_chu.and_then(|r| r.con_dau("w:rPr")));
     Doan { chu: p.chu_w_t(), can, dam }
+}
+
+/// Bảng có viền: `w:tblBorders` hoặc viền từng ô `w:tcBorders` có cạnh không phải nil/none, hoặc dùng kiểu bảng
+/// (thường là lưới) mà không tắt viền. Bảng không khai gì (kiểu mặc định TableNormal) → không viền, như Word.
+fn co_vien(tbl: &The) -> bool {
+    let co_canh = |b: &The| b.the_con().any(|c| !matches!(c.thuoc_tinh("w:val"), Some("nil") | Some("none")));
+    let mut o = Vec::new();
+    tbl.hau_due("w:tcBorders", &mut o);
+    if o.into_iter().any(co_canh) {
+        return true;
+    }
+    let Some(pr) = tbl.con_dau("w:tblPr") else { return false };
+    match pr.con_dau("w:tblBorders") {
+        Some(b) => co_canh(b),
+        None => pr.con_dau("w:tblStyle").and_then(|s| s.thuoc_tinh("w:val")).is_some_and(|v| v != "TableNormal"),
+    }
 }
 
 fn khoi_cua(cha: &The, ra: &mut Vec<Khoi>) {
@@ -61,7 +77,7 @@ fn khoi_cua(cha: &The, ra: &mut Vec<Khoi>) {
                             .collect()
                     })
                     .collect();
-                ra.push(Khoi::Bang(hang));
+                ra.push(Khoi::Bang { hang, vien: co_vien(t) });
             }
             // Nội dung trong khối điều khiển (w:sdt) vẫn hiển thị
             "w:sdt" => {
@@ -111,7 +127,7 @@ mod tests {
         k.iter()
             .map(|k| match k {
                 Khoi::Doan(d) => d.chu.clone(),
-                Khoi::Bang(h) => h.iter().flatten().flatten().map(|d| d.chu.clone()).collect::<Vec<_>>().join("|"),
+                Khoi::Bang { hang: h, .. } => h.iter().flatten().flatten().map(|d| d.chu.clone()).collect::<Vec<_>>().join("|"),
             })
             .collect::<Vec<_>>()
             .join("\n")
@@ -123,7 +139,10 @@ mod tests {
             let k = mo_phong(b).unwrap_or_else(|e| panic!("{ten}: {e}"));
             let m = mau::bien_dich(b).unwrap();
             let chu = chu_tat_ca(&k);
-            assert!(k.iter().any(|k| matches!(k, Khoi::Bang(h) if !h.is_empty())), "{ten}: có bảng");
+            assert!(k.iter().any(|k| matches!(k, Khoi::Bang { hang, .. } if !hang.is_empty())), "{ten}: có bảng");
+            // Mẫu 01 không khai viền (Word hiện không viền); 02/03 viền từng ô; 04 viền cả bảng
+            let co_vien = k.iter().any(|k| matches!(k, Khoi::Bang { vien: true, .. }));
+            assert_eq!(co_vien, !ten.contains("01"), "{ten}: viền bảng");
             for b in m.bien_dong.iter().chain(&m.bien_ho_so).chain(&m.bien_tu_dong) {
                 assert!(chu.contains(&format!("{{{b}}}")), "{ten}: thấy biến {{{b}}}");
             }

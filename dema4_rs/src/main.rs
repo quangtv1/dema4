@@ -14,11 +14,11 @@ mod cau_hinh;
 mod dem_pdf;
 mod gioi_thieu;
 mod license;
-#[allow(dead_code)] // lõi Mục lục hồ sơ: màn giao diện nối vào ở giai đoạn sau
 mod muc_luc;
 mod tram;
 mod hop_license;
 mod gui;
+mod gui_muc_luc;
 #[allow(dead_code)] // nối dần vào giao diện
 mod gui_tach;
 #[allow(dead_code)] // dùng dần từ các phần phân tích / giao diện tách văn bản

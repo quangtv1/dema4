@@ -15,7 +15,7 @@ use crate::dem_pdf::{self, KetQuaDem, SuKien, KHO};
 const TIEU_DE: &str = "Đếm trang A4 (Giải pháp số Sao Mai)";
 /// Số sự kiện xử lý tối đa mỗi khung hình để giao diện không bị đơ khi đếm nhanh
 const SU_KIEN_MOI_KHUNG: usize = 20_000;
-const RONG_NUT: f32 = 80.0;
+pub(crate) const RONG_NUT: f32 = 80.0;
 /// Dòng báo công khai ở góc dưới khi có cấu hình Telegram; chỉ đổi sang chữ đỏ khi gửi lỗi
 const THONG_BAO_THONG_KE: &str = "Thông tin đếm thư mục đã được ghi lại";
 /// Số cột của bảng chi tiết
@@ -59,6 +59,7 @@ pub fn chay() -> eframe::Result {
 enum Man {
     Dem,
     Tach,
+    MucLuc,
     Ky,
 }
 
@@ -67,6 +68,7 @@ impl Man {
         match self {
             Man::Dem => TIEU_DE,
             Man::Tach => "Tách văn bản PDF (Giải pháp số Sao Mai)",
+            Man::MucLuc => crate::gui_muc_luc::TIEU_DE,
             Man::Ky => "Ký văn bản (Giải pháp số Sao Mai)",
         }
     }
@@ -78,6 +80,7 @@ struct UngDungChinh {
     tieu_de_da_dat: Man,
     dem: UngDung,
     tach: crate::gui_tach::ManTach,
+    muc_luc: crate::gui_muc_luc::ManMucLuc,
     cfg: crate::cau_hinh::CauHinh,
     hop_cau_hinh: Option<crate::gui_tach::hop_cau_hinh::HopCauHinh>,
     tro_giup: Option<crate::tro_giup::HopTroGiup>,
@@ -94,7 +97,9 @@ impl Default for UngDungChinh {
         let dem = UngDung { quy_tac: cfg.quy_tac(), ..Default::default() };
         let mut tach = crate::gui_tach::ManTach::default();
         tach.license = dem.license.clone();
-        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach, cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
+        let mut muc_luc = crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&cfg.muc_luc);
+        muc_luc.license = dem.license.clone();
+        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
     }
 }
 
@@ -178,7 +183,7 @@ impl UngDungChinh {
     }
 
     fn dang_chay(&self) -> bool {
-        self.dem.dang_dem.is_some() || self.tach.dang_chay()
+        self.dem.dang_dem.is_some() || self.tach.dang_chay() || self.muc_luc.dang_chay()
     }
 
     fn thanh_menu(&mut self, ui: &mut egui::Ui) {
@@ -203,7 +208,7 @@ impl UngDungChinh {
                 ui.add_enabled_ui(!khoa, |ui| {
                     egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::MenuLuoi, 14.0, xam), "Chức năng", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
-                        for (man, ten, icon) in [(Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
+                        for (man, ten, icon) in [(Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
                             if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
                                 self.man = man;
                                 ui.close();
@@ -216,7 +221,12 @@ impl UngDungChinh {
                 let cau_hinh = ui.add_enabled(!khoa, egui::Button::new((atom_mau(BieuTuong::BanhRang, 14.0, xam), "Cấu hình")).frame(false)).on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để sửa Cấu hình");
                 if cau_hinh.clicked() {
                     use crate::gui_tach::hop_cau_hinh::{HopCauHinh, TabCauHinh};
-                    let mut hop = HopCauHinh::moi(&self.cfg, if self.man == Man::Dem { TabCauHinh::Dem } else { TabCauHinh::Tach });
+                    let tab = match self.man {
+                        Man::Dem => TabCauHinh::Dem,
+                        Man::MucLuc => TabCauHinh::MucLuc,
+                        _ => TabCauHinh::Tach,
+                    };
+                    let mut hop = HopCauHinh::moi(&self.cfg, tab);
                     hop.co_cache = self.tach.co_cache();
                     self.hop_cau_hinh = Some(hop);
                 }
@@ -273,6 +283,14 @@ impl eframe::App for UngDungChinh {
             Man::Tach => {
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN).inner_margin(Margin { left: 12, right: 12, top: 8, bottom: 0 })).show(ui, |ui| self.tach.ve(ui, &mut self.cfg));
                 if std::mem::take(&mut self.tach.cfg_doi) {
+                    let _ = crate::cau_hinh::ghi(&self.cfg);
+                }
+            }
+            Man::MucLuc => {
+                let cfg_ml = self.cfg.muc_luc.clone();
+                egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN).inner_margin(Margin { left: 12, right: 12, top: 8, bottom: 0 })).show(ui, |ui| self.muc_luc.ve(ui, &cfg_ml));
+                if std::mem::take(&mut self.muc_luc.cfg_doi) {
+                    self.muc_luc.ghi_vao(&mut self.cfg.muc_luc);
                     let _ = crate::cau_hinh::ghi(&self.cfg);
                 }
             }
@@ -1936,6 +1954,43 @@ mod tests {
             h.run_steps(4);
             h.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
         }
+    }
+
+    /// Chụp màn Sinh mục lục (fixture trong repo): mở đầu, tab Mẫu, đang sửa nguồn, tab Kết quả, popup đã sinh.
+    /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_man_muc_luc
+    #[test]
+    #[ignore = "cần GPU"]
+    fn chup_man_muc_luc() {
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        let tao = |nap: bool| {
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                let mut app = UngDungChinh { man: Man::MucLuc, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
+                app.muc_luc = if nap { crate::gui_muc_luc::tests::man_thu(5) } else { crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()) };
+                app
+            });
+            h.run_steps(3);
+            h
+        };
+        let mut h = tao(false);
+        h.render().unwrap().save(thu_muc_anh.join("ml_1_mo_dau.png")).unwrap();
+        let mut h = tao(true);
+        h.render().unwrap().save(thu_muc_anh.join("ml_2_mau.png")).unwrap();
+        h.state_mut().muc_luc.mo = Some("nguoi_lap".into());
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_3_sua_nguon.png")).unwrap();
+        h.state_mut().muc_luc.mo = None;
+        h.state_mut().muc_luc.tab = crate::gui_muc_luc::Tab::KetQua;
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_4_ket_qua.png")).unwrap();
+        h.state_mut().muc_luc.mo_hop_ghep_thu();
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_5_hop_ghep.png")).unwrap();
+        let mut h = tao(true);
+        let cfg = h.state().cfg.clone();
+        h.state_mut().hop_cau_hinh = Some(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::MucLuc));
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_6_cau_hinh.png")).unwrap();
     }
 
     #[test]

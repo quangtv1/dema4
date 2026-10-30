@@ -36,6 +36,7 @@ const NAU: Color32 = Color32::from_rgb(0x7A, 0x4A, 0x00);
 pub enum TabCauHinh {
     Dem,
     Tach,
+    MucLuc,
 }
 
 pub enum KetQuaHop {
@@ -103,6 +104,12 @@ pub fn mac_dinh_tach(c: &CauHinh) -> CauHinh {
 }
 
 /// Đưa các mục Đếm trang A4 về mặc định.
+/// Mặc định tab Sinh mục lục: chỉ phần kết quả (thư mục ra, mẫu tên, ghi đè); giữ lựa chọn gần nhất (file, mẫu, biến).
+pub fn mac_dinh_muc_luc(c: &CauHinh) -> CauHinh {
+    let md = crate::cau_hinh::CauHinhMucLuc::default();
+    CauHinh { muc_luc: crate::cau_hinh::CauHinhMucLuc { thu_muc_ra: md.thu_muc_ra, mau_ten: md.mau_ten, ghi_de: md.ghi_de, ..c.muc_luc.clone() }, ..c.clone() }
+}
+
 pub fn mac_dinh_dem(c: &CauHinh) -> CauHinh {
     let md = CauHinh::default();
     CauHinh { he_so: md.he_so, ranh_gioi: md.ranh_gioi, a0_lon: md.a0_lon, a0_lon_he_so: md.a0_lon_he_so, a0_nguong_mm: md.a0_nguong_mm, ..c.clone() }
@@ -186,7 +193,7 @@ impl HopCauHinh {
         let phan_hoi = kh::hop(ctx, "hop_cau_hinh", RONG_HOP, "Cấu hình", |ui| {
             let co_cache = self.co_cache;
             let mut bam_xoa = false;
-            kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF")], &mut self.tab, |ui| {
+            kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF"), (TabCauHinh::MucLuc, "Sinh mục lục")], &mut self.tab, |ui| {
                 // Canh phải, thẳng hàng 2 tab: chỉ bấm được khi thư mục đang mở còn cache
                 let nut = egui::Button::new(RichText::new("Xoá cache").size(12.0)).min_size(egui::vec2(0.0, 22.0));
                 bam_xoa = ui
@@ -201,6 +208,7 @@ impl HopCauHinh {
             kh::than(ui, "than_cau_hinh", CAO_THAN, Margin { left: 20, right: 20, top: 16, bottom: 8 }, |ui| match self.tab {
                 TabCauHinh::Tach => self.tab_tach(ui),
                 TabCauHinh::Dem => self.tab_dem(ui),
+                TabCauHinh::MucLuc => self.tab_muc_luc(ui),
             });
             let loi = self.loi();
             kh::chan(ui, |ui| {
@@ -208,6 +216,7 @@ impl HopCauHinh {
                     self.nhap = match self.tab {
                         TabCauHinh::Tach => mac_dinh_tach(&self.nhap),
                         TabCauHinh::Dem => mac_dinh_dem(&self.nhap),
+                        TabCauHinh::MucLuc => mac_dinh_muc_luc(&self.nhap),
                     };
                     self.dong_bo_o();
                 }
@@ -377,6 +386,71 @@ impl HopCauHinh {
                     ui.spacing_mut().item_spacing.x = 18.0;
                     kh::o_radio(ui, &mut self.nhap.luu_nhan, LuuNhan::TuDong, "Tự động");
                     kh::o_radio(ui, &mut self.nhap.luu_nhan, LuuNhan::BangTay, "Bằng tay (Ctrl+S)");
+                },
+            );
+        });
+    }
+
+    fn tab_muc_luc(&mut self, ui: &mut egui::Ui) {
+        let loi = self.loi();
+        nhom(ui, "1. File kết quả", None, |ui| {
+            let m = &mut self.nhap.muc_luc;
+            let mut focus_ra = false;
+            dong!(
+                ui,
+                |ui| {
+                    ui.label("Thư mục ra");
+                },
+                |ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    let r = ui.add(kh::o_nhap(&mut m.thu_muc_ra).desired_width(ui.available_width() - RONG_NUT_CHON - 4.0).hint_text("trống = thư mục dữ liệu cạnh app")).on_hover_text("Thư mục ghi các file mục lục");
+                    focus_ra = r.has_focus();
+                    if ui.add(egui::Button::new("…").min_size(egui::vec2(RONG_NUT_CHON, 24.0))).on_hover_text("Chọn thư mục").clicked() {
+                        if let Some(p) = rfd::FileDialog::new().pick_folder() {
+                            m.thu_muc_ra = p.display().to_string();
+                        }
+                    }
+                },
+            );
+            if focus_ra || m.thu_muc_ra.trim().is_empty() {
+                goi_y_duoi(ui, &format!("Trống: .sm-dema4{s}muc_luc{s}<tên file biên mục> cạnh file ứng dụng (thư mục ẩn — mở bằng nút Mở thư mục sau khi sinh)", s = std::path::MAIN_SEPARATOR), CHU_PHU);
+            }
+            dong!(
+                ui,
+                |ui| {
+                    ui.label("Mẫu tên file");
+                    thong_tin(ui, "Biến bất kỳ của mẫu trong {…}, vd {so_ho_so}. Ký tự cấm trong tên file được thay bằng _; trùng tên tự thêm _2, _3…");
+                },
+                |ui| {
+                    ui.add(kh::o_nhap(&mut m.mau_ten).desired_width(ui.available_width())).on_hover_text("Mẫu tên file mục lục");
+                },
+            );
+            if loi.contains(&LoiCauHinh::MauTenMucLuc) {
+                goi_y_duoi(ui, "Nhập mẫu tên, vd MLHS_{so_ho_so}", DO);
+            } else {
+                goi_y_duoi(ui, &format!("Vd: {}.docx", crate::muc_luc::token::thay(&m.mau_ten, &|t| Some(if t == "so_ho_so" { "HS-01".into() } else { format!("<{t}>") }))), CHU_PHU);
+            }
+            dong!(
+                ui,
+                |ui| {
+                    ui.label("File đã có");
+                },
+                |ui| {
+                    ui.spacing_mut().item_spacing.x = 18.0;
+                    kh::o_radio(ui, &mut m.ghi_de, true, "Ghi đè");
+                    kh::o_radio(ui, &mut m.ghi_de, false, "Bỏ qua");
+                },
+            );
+            dong!(
+                ui,
+                |ui| {
+                    ui.label("Định dạng");
+                },
+                |ui| {
+                    let mut docx = true;
+                    ui.add_enabled_ui(false, |ui| kh::o_tick(ui, &mut docx, "DOCX"));
+                    let mut pdf = false;
+                    ui.add_enabled_ui(false, |ui| kh::o_tick(ui, &mut pdf, "Kèm PDF")).response.on_disabled_hover_text("Xuất PDF cần Word / LibreOffice — có ở bản sau");
                 },
             );
         });
@@ -825,6 +899,18 @@ mod tests {
         let m = mac_dinh_tach(&c);
         assert_eq!((m.he_so, m.rong_cot_trai), ([1.0; 8], 300.0));
         assert_eq!((m.nguong_trang, m.mau_ten.as_str()), (1.0, "{hoso}.{n}"));
+    }
+
+    #[test]
+    fn mac_dinh_muc_luc_giu_lua_chon_gan_nhat() {
+        use crate::cau_hinh::CauHinhMucLuc;
+        let c = CauHinh { nguong_trang: 2.0, muc_luc: CauHinhMucLuc { thu_muc_ra: "/ra".into(), mau_ten: "X_{so_ho_so}".into(), ghi_de: false, file: "/a.xlsx".into(), bien: "{}".into(), ..Default::default() }, ..Default::default() };
+        let m = mac_dinh_muc_luc(&c);
+        assert_eq!((m.muc_luc.thu_muc_ra.as_str(), m.muc_luc.mau_ten.as_str(), m.muc_luc.ghi_de), ("", "MLHS_{so_ho_so}", true));
+        assert_eq!((m.muc_luc.file.as_str(), m.muc_luc.bien.as_str(), m.nguong_trang), ("/a.xlsx", "{}", 2.0), "giữ file / biến / tab khác");
+        let mut h = HopCauHinh::moi(&CauHinh::default(), TabCauHinh::MucLuc);
+        h.nhap.muc_luc.mau_ten = "  ".into();
+        assert_eq!(h.loi(), [LoiCauHinh::MauTenMucLuc], "mẫu tên trống → khoá Lưu");
     }
 
     #[test]
