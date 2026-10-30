@@ -334,6 +334,8 @@ impl eframe::App for UngDungChinh {
 
 /// Tên họ font đậm (egui không có chữ đậm sẵn, strong() chỉ đổi màu)
 pub(crate) const HO_FONT_DAM: &str = "dam";
+pub(crate) const HO_FONT_TRANG: &str = "trang";
+pub(crate) const HO_FONT_TRANG_DAM: &str = "trang_dam";
 
 /// In đậm thật bằng họ font đậm của hệ thống
 pub(crate) trait ChuDam {
@@ -377,7 +379,22 @@ fn cai_giao_dien(ctx: &egui::Context) {
         fonts.font_data.insert("he_thong_dam".into(), Arc::new(egui::FontData::from_owned(du_lieu)));
         dam.insert(0, "he_thong_dam".into());
     }
-    fonts.families.insert(egui::FontFamily::Name(HO_FONT_DAM.into()), dam);
+    fonts.families.insert(egui::FontFamily::Name(HO_FONT_DAM.into()), dam.clone());
+    // Họ font trang mô phỏng (Sinh mục lục): Times New Roman của hệ thống như văn bản Word; thiếu → font giao diện
+    const FONT_TRANG: [&str; 3] = [r"C:\Windows\Fonts\times.ttf", "/System/Library/Fonts/Supplemental/Times New Roman.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"];
+    const FONT_TRANG_DAM: [&str; 3] = [r"C:\Windows\Fonts\timesbd.ttf", "/System/Library/Fonts/Supplemental/Times New Roman Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"];
+    let mut trang = fonts.families.get(&egui::FontFamily::Proportional).cloned().unwrap_or_default();
+    if let Some(du_lieu) = doc(&FONT_TRANG) {
+        fonts.font_data.insert("trang".into(), Arc::new(egui::FontData::from_owned(du_lieu)));
+        trang.insert(0, "trang".into());
+    }
+    let mut trang_dam = dam;
+    if let Some(du_lieu) = doc(&FONT_TRANG_DAM) {
+        fonts.font_data.insert("trang_dam".into(), Arc::new(egui::FontData::from_owned(du_lieu)));
+        trang_dam.insert(0, "trang_dam".into());
+    }
+    fonts.families.insert(egui::FontFamily::Name(HO_FONT_TRANG.into()), trang);
+    fonts.families.insert(egui::FontFamily::Name(HO_FONT_TRANG_DAM.into()), trang_dam);
     ctx.set_fonts(fonts);
 
     crate::gui_tach::bieu_tuong::dang_ky_svg(ctx);

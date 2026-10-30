@@ -8,7 +8,7 @@ use crate::muc_luc::{Nguon, RangBuoc};
 
 pub const RONG_COT_BIEN: f32 = 128.0;
 const RONG_COT_CANH: f32 = 22.0;
-const CAO_DONG: f32 = 30.0;
+const CAO_DONG: f32 = 33.0;
 const CAO_NHOM: f32 = 24.0;
 pub const CAO_DAU: f32 = 27.0;
 const CAM: Color32 = Color32::from_rgb(0xB8, 0x5F, 0x00);
@@ -249,14 +249,10 @@ pub fn hang_nhom_theo(ui: &mut egui::Ui, cot: &[String], khac_nhau: &[usize], hi
             .inner;
         let hien = cot.iter().position(|c| c == hien_tai).map_or_else(|| hien_tai.to_string(), |i| ten(i, hien_tai));
         ui.scope(|ui| {
-            let w = &mut ui.visuals_mut().widgets;
-            for t in [&mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
-                t.weak_bg_fill = Color32::from_rgb(0xE1, 0xE8, 0xF0);
-                t.bg_fill = Color32::from_rgb(0xE1, 0xE8, 0xF0);
-            }
-            w.inactive.bg_stroke = Stroke::NONE;
+            super::kieu_o_chon(ui, Color32::from_rgb(0xE1, 0xE8, 0xF0), Color32::TRANSPARENT);
             let rong = (ui.available_width() - 6.0).max(40.0);
             egui::ComboBox::from_id_salt("ml_nhom_theo")
+                .icon(super::mui_ten_chon)
                 .width(rong)
                 .selected_text(RichText::new(format!("      {hien}")).size(12.0).color(Color32::from_rgb(0x2C, 0x3E, 0x55)))
                 .show_ui(ui, |ui| {

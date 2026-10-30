@@ -39,6 +39,26 @@ pub enum Tab {
     KetQua,
 }
 
+/// Ô chọn như prototype: nền `nen`, viền `vien`, bo 3 px; rê chuột viền đậm hơn.
+pub(super) fn kieu_o_chon(ui: &mut egui::Ui, nen: Color32, vien: Color32) {
+    let w = &mut ui.visuals_mut().widgets;
+    for v in [&mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
+        v.weak_bg_fill = nen;
+        v.bg_fill = nen;
+        v.corner_radius = egui::CornerRadius::same(3);
+        v.bg_stroke = Stroke::new(1.0, vien);
+        v.expansion = 0.0;
+    }
+    w.hovered.bg_stroke = Stroke::new(1.0, Color32::from_gray(0x8A));
+}
+
+/// Mũi tên ⌄ nét mảnh của ô chọn (thay tam giác đặc mặc định của egui).
+pub(super) fn mui_ten_chon(ui: &egui::Ui, r: Rect, _: &egui::style::WidgetVisuals, _: bool) {
+    let c = r.center();
+    let mau = if ui.is_enabled() { Color32::from_gray(0x55) } else { CHU_MO };
+    ui.painter().add(egui::Shape::line(vec![c + egui::vec2(-4.5, -2.0), c + egui::vec2(0.0, 2.5), c + egui::vec2(4.5, -2.0)], Stroke::new(1.3, mau)));
+}
+
 /// Mẫu đang dùng: "1".."4" = mẫu nhúng sẵn, còn lại = đường dẫn DOCX riêng.
 fn ten_mau(ma: &str) -> String {
     match ma.parse::<usize>() {
@@ -450,7 +470,11 @@ impl ManMucLuc {
     }
 
     fn nhan_co_dinh(ui: &mut egui::Ui, chu: &str) -> egui::Response {
-        ui.allocate_ui_with_layout(egui::vec2(RONG_NHAN, 26.0), Layout::left_to_right(Align::Center), |ui| ui.label(chu)).inner
+        ui.allocate_ui_with_layout(egui::vec2(RONG_NHAN, 26.0), Layout::left_to_right(Align::Center), |ui| {
+            ui.set_min_width(RONG_NHAN);
+            ui.label(chu)
+        })
+        .inner
     }
 
     fn hai_dong_dau_vao(&mut self, ui: &mut egui::Ui) {
@@ -474,7 +498,9 @@ impl ManMucLuc {
                 let hien = self.du_lieu.as_ref().map(|d| d.sheet.clone()).unwrap_or_default();
                 let mut chon = None;
                 ui.add_enabled_ui(!khoa && ds.len() > 1, |ui| {
+                    kieu_o_chon(ui, Color32::WHITE, VIEN);
                     egui::ComboBox::from_id_salt("ml_sheet")
+                        .icon(mui_ten_chon)
                         .width(ui.available_width() - 120.0)
                         .selected_text(if hien.is_empty() { "—".to_string() } else { hien.clone() })
                         .show_ui(ui, |ui| {
@@ -498,13 +524,14 @@ impl ManMucLuc {
                 }
             });
         });
-        ui.add_space(6.0);
+        ui.add_space(8.0 - ui.spacing().item_spacing.y);
         ui.horizontal(|ui| {
             let nhan_mau = Self::nhan_co_dinh(ui, "Mẫu mục lục:");
             let w = rong_o(ui);
             let mut chon = None;
             ui.add_enabled_ui(!khoa, |ui| {
-                let ph = egui::ComboBox::from_id_salt("ml_mau").width(w - 8.0).selected_text(ten_mau(&self.mau_chon)).show_ui(ui, |ui| {
+                kieu_o_chon(ui, Color32::WHITE, VIEN);
+                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(mui_ten_chon).width(w - 8.0).selected_text(ten_mau(&self.mau_chon)).show_ui(ui, |ui| {
                     for (i, (ten, _)) in mau::MAU_CO_SAN.iter().enumerate() {
                         let ma = (i + 1).to_string();
                         if ui.selectable_label(self.mau_chon == ma, *ten).clicked() {
@@ -569,7 +596,7 @@ impl ManMucLuc {
             let ph = ui.interact(r, ui.scope_id().with(("ml_tab", i)), if co { Sense::click() } else { Sense::hover() });
             ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, co, chon, chu));
             if chon {
-                ui.painter().rect_filled(r, 0.0, Color32::WHITE);
+                ui.painter().rect_filled(r, 0.0, crate::gui::NEN_TAB_CHON);
                 ui.painter().hline(r.x_range(), r.bottom() - 1.0, Stroke::new(2.0, VIEN_TAB_CHON));
             } else if co && ph.hovered() {
                 ui.painter().rect_filled(r, 0.0, crate::gui::NUT_HOVER);
@@ -807,7 +834,7 @@ impl ManMucLuc {
                     let khoi = match (&self.mau, &self.du_lieu) {
                         (Some(m), Some(d)) => crate::muc_luc::ghep::ghep(&m.db, &d.bang, &self.kq.ho_so[self.hs], &self.rb).and_then(|b| mo_phong::mo_phong(&b)).unwrap_or_else(|e| {
                             // Không dựng được trang xem trước: hiện lý do trên trang thay vì trang trắng
-                            vec![Khoi::Doan(mo_phong::Doan { chu: format!("Không xem trước được hồ sơ này: {e}"), can: mo_phong::Can::Trai, dam: false })]
+                            vec![Khoi::Doan(mo_phong::Doan { chu: format!("Không xem trước được hồ sơ này: {e}"), can: mo_phong::Can::Trai, dam: false, co: None })]
                         }),
                         _ => Vec::new(),
                     };
@@ -845,16 +872,28 @@ impl ManMucLuc {
                     return;
                 }
             }
-            let chu = match &self.sinh {
-                Some(s) => Some(format!("Đang sinh {}/{} hồ sơ · {} · đã chạy {}", (s.i + 1).min(s.tong), s.tong, s.ten, crate::gui_tach::gio_phut_giay(s.bat_dau.elapsed()))),
-                None if self.co_du_lieu() => Some(format!("Hồ sơ: {}; Văn bản: {}", so_nguyen(self.kq.ho_so.len()), so_nguyen(self.so_van_ban()))),
-                None if self.doc_nen.is_some() => Some("Đang đọc file biên mục…".into()),
-                None => None,
-            };
-            if let Some(chu) = chu {
+            // Như prototype: nhãn xám, số đậm ("Hồ sơ: **22**; Văn bản: **326**")
+            let (thuong, dam) = (crate::gui_tach::chu_dong(CHU_PHU, false), crate::gui_tach::chu_dong(CHU, true));
+            let mut job = egui::text::LayoutJob::default();
+            match &self.sinh {
+                Some(s) => {
+                    job.append("Đang sinh ", 0.0, thuong.clone());
+                    job.append(&format!("{}/{}", (s.i + 1).min(s.tong), s.tong), 0.0, dam.clone());
+                    job.append(&format!(" hồ sơ · {} · đã chạy {}", s.ten, crate::gui_tach::gio_phut_giay(s.bat_dau.elapsed())), 0.0, thuong.clone());
+                }
+                None if self.co_du_lieu() => {
+                    for (i, (ten, so)) in [("Hồ sơ", self.kq.ho_so.len()), ("Văn bản", self.so_van_ban())].into_iter().enumerate() {
+                        job.append(&format!("{}{ten}: ", if i == 0 { "" } else { "; " }), 0.0, thuong.clone());
+                        job.append(&so_nguyen(so), 0.0, dam.clone());
+                    }
+                }
+                None if self.doc_nen.is_some() => job.append("Đang đọc file biên mục…", 0.0, thuong.clone()),
+                None => {}
+            }
+            if !job.text.is_empty() {
                 let (r, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), Sense::hover());
                 crate::gui_tach::bieu_tuong::ve(ui.painter(), r, crate::gui_tach::bieu_tuong::BieuTuong::ThongTin, CHU_PHU);
-                ui.label(RichText::new(chu).color(CHU_PHU));
+                ui.label(job);
             }
             self.nut_day(ui, cfg);
         });

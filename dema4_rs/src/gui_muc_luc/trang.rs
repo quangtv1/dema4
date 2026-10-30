@@ -8,12 +8,15 @@ use eframe::egui::{self, Align, Color32, Rect, Sense, Stroke};
 use crate::muc_luc::mo_phong::{Can, Doan, Khoi};
 use crate::muc_luc::token;
 
-/// Bề rộng trang ở 100 % (tỷ lệ A4 dọc).
-const RONG_TRANG: f32 = 560.0;
+/// Bề rộng trang ở 100 % (như prototype: 420 px, tỷ lệ A4 dọc); 1 pt của DOCX = 420 / 595 px.
+const RONG_TRANG: f32 = 420.0;
 const CAO_TRANG_MIN: f32 = RONG_TRANG * 1.414;
-const LE_TRANG: f32 = 40.0;
-const CO_CHU: f32 = 11.0;
-const LE_O: f32 = 4.0;
+const LE_TRANG: f32 = 32.0;
+const PX_MOI_PT: f32 = RONG_TRANG / 595.0;
+/// Cỡ chữ khi DOCX không khai (13 pt — cỡ thường dùng của văn bản hành chính).
+const CO_MAC_DINH_PT: f32 = 13.0;
+const CO_CHU: f32 = CO_MAC_DINH_PT * PX_MOI_PT;
+const LE_O: f32 = 3.0;
 /// Chip đang định vị (rê chuột ở sidebar hoặc trên trang): vàng.
 pub const NEN_SANG: Color32 = Color32::from_rgb(0xFF, 0xE0, 0x66);
 pub const CHU_SANG: Color32 = Color32::from_rgb(0x3A, 0x2E, 0x00);
@@ -50,8 +53,9 @@ struct ChuDaDan {
 }
 
 fn dan(ui: &egui::Ui, d: &Doan, rong: f32, kieu: &KieuVe) -> ChuDaDan {
-    let co = CO_CHU * kieu.zoom;
-    let font = if d.dam { egui::FontId::new(co, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())) } else { egui::FontId::proportional(co) };
+    let co = d.co.unwrap_or(CO_MAC_DINH_PT) * PX_MOI_PT * kieu.zoom;
+    let ho = if d.dam { crate::gui::HO_FONT_TRANG_DAM } else { crate::gui::HO_FONT_TRANG };
+    let font = egui::FontId::new(co, egui::FontFamily::Name(ho.into()));
     let thuong = egui::TextFormat { font_id: font.clone(), color: Color32::from_gray(0x11), ..Default::default() };
     let mut job = egui::text::LayoutJob { halign: match d.can { Can::Trai => Align::LEFT, Can::Giua => Align::Center, Can::Phai => Align::RIGHT }, ..Default::default() };
     job.wrap.max_width = rong;
@@ -142,7 +146,7 @@ pub fn ve(ui: &mut egui::Ui, id: &str, khoi: &[Khoi], kieu: &KieuVe, canh_bao: O
                         let o: Vec<ChuDaDan> = h
                             .iter()
                             .map(|o| {
-                                let gop = Doan { chu: o.iter().map(|d| d.chu.as_str()).collect::<Vec<_>>().join("\n"), can: o.first().map_or(Can::Trai, |d| d.can), dam: !o.is_empty() && o.iter().all(|d| d.dam || d.chu.trim().is_empty()) };
+                                let gop = Doan { chu: o.iter().map(|d| d.chu.as_str()).collect::<Vec<_>>().join("\n"), can: o.first().map_or(Can::Trai, |d| d.can), dam: !o.is_empty() && o.iter().all(|d| d.dam || d.chu.trim().is_empty()), co: o.iter().find_map(|d| d.co) };
                                 dan(ui, &gop, rong_o.max(10.0), kieu)
                             })
                             .collect();

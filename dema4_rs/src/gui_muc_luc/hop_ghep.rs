@@ -47,7 +47,9 @@ impl ManMucLuc {
                 ui.horizontal(|ui| {
                     let nhan = ui.label("Nhóm theo");
                     let ten = |c: &str| format!("{c} ({})", d.bang.cot(c).and_then(|i| d.khac_nhau.get(i)).copied().unwrap_or(0));
+                    super::kieu_o_chon(ui, Color32::WHITE, crate::gui::VIEN);
                     egui::ComboBox::from_id_salt("ml_hop_nhom")
+                        .icon(super::mui_ten_chon)
                         .width(240.0)
                         .selected_text(ten(&self.rb.cot_nhom))
                         .show_ui(ui, |ui| {

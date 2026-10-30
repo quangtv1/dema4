@@ -16,6 +16,8 @@ pub struct Doan {
     pub chu: String,
     pub can: Can,
     pub dam: bool,
+    /// Cỡ chữ (pt) khai trong DOCX (`w:sz` = nửa pt); không khai → `None` (dùng cỡ mặc định).
+    pub co: Option<f32>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,7 +40,9 @@ fn doan(p: &The) -> Doan {
     p.hau_due("w:r", &mut runs);
     let run_chu = runs.into_iter().find(|r| !r.chu_w_t().trim().is_empty());
     let dam = dam_cua(ppr.and_then(|x| x.con_dau("w:rPr"))) || dam_cua(run_chu.and_then(|r| r.con_dau("w:rPr")));
-    Doan { chu: p.chu_w_t(), can, dam }
+    let co_cua = |rpr: Option<&The>| rpr.and_then(|r| r.con_dau("w:sz")).and_then(|s| s.thuoc_tinh("w:val")).and_then(|v| v.parse::<f32>().ok()).map(|n| n / 2.0);
+    let co = co_cua(run_chu.and_then(|r| r.con_dau("w:rPr"))).or_else(|| co_cua(ppr.and_then(|x| x.con_dau("w:rPr"))));
+    Doan { chu: p.chu_w_t(), can, dam, co }
 }
 
 /// Bảng có viền: `w:tblBorders` hoặc viền từng ô `w:tcBorders` có cạnh không phải nil/none, hoặc dùng kiểu bảng
@@ -149,6 +153,7 @@ mod tests {
         }
         let k = mo_phong(mau::MAU_CO_SAN[0].1).unwrap();
         assert!(k.iter().any(|k| matches!(k, Khoi::Doan(d) if d.can == Can::Giua && d.dam)), "có đoạn căn giữa, đậm (tiêu đề)");
+        assert!(k.iter().any(|k| matches!(k, Khoi::Doan(d) if d.co.is_some_and(|c| (8.0..=30.0).contains(&c)))), "đọc được cỡ chữ (pt)");
     }
 
     #[test]
