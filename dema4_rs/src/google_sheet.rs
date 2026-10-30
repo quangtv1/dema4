@@ -174,6 +174,73 @@ mod tests {
         assert_eq!(them_hang(&t, tk::TAB_MO_TA, &tk::mo_ta_sheet()).unwrap().0, 200);
     }
 
+    /// Tạo tab "Mẫu license" (dữ liệu giả, thả xuống Trạng thái, tô màu cột) + "Hướng dẫn cấp lượt" — để chủ Sheet xem trước.
+    #[test]
+    #[ignore = "ghi thật lên Google Sheet"]
+    fn tao_mau_license() {
+        let t = token().unwrap();
+        let goi = |yeu_cau: Value| -> Value {
+            let mut ph = agent().post(format!("{API}/{SPREADSHEET_ID}:batchUpdate")).header("Authorization", format!("Bearer {t}")).header("Content-Type", "application/json").send(json!({ "requests": yeu_cau }).to_string()).unwrap();
+            let (ma, v) = doc_json(&mut ph);
+            assert_eq!(ma, 200, "{v}");
+            v
+        };
+        let v = goi(json!([
+            { "addSheet": { "properties": { "title": "Hướng dẫn cấp lượt" } } },
+            { "addSheet": { "properties": { "title": "Mẫu license", "gridProperties": { "frozenRowCount": 1, "frozenColumnCount": 1 } } } }
+        ]));
+        let id_hd = v["replies"][0]["addSheet"]["properties"]["sheetId"].as_i64().unwrap();
+        let id = v["replies"][1]["addSheet"]["properties"]["sheetId"].as_i64().unwrap();
+        let s = |x: &str| Value::from(x);
+        let tieu_de: Vec<Value> = ["Mã máy", "Tên máy", "MAC", "IP nội bộ", "IP public", "Phiên bản", "Ngày đăng ký", "Lần dùng cuối", "Đã dùng Đếm", "Đã dùng Tách", "Hạn mức Đếm", "Hạn mức Tách", "Trạng thái", "Đơn vị", "Ghi chú"].map(s).into();
+        let hang = vec![
+            tieu_de,
+            vec![s("SM-7F3A-91C2-04BE"), s("PC-SOHOA-01"), s("AA:BB:CC:11:22:33"), s("192.168.1.21"), s("117.5.1.10"), s("0.6.0"), s("2026-11-02 08:15"), s("2026-11-02 09:40"), 2.into(), 2.into(), s(""), s(""), s("Dùng thử"), s(""), s("Máy mới: để trống hạn mức = 2 / 2")],
+            vec![s("SM-1C9E-55A0-B7D2"), s("KT-LAPTOP"), s("AA:BB:CC:44:55:66"), s("10.0.0.8"), s("113.160.2.3"), s("0.6.0"), s("2026-11-01 14:02"), s("2026-11-03 16:20"), 37.into(), 12.into(), 200.into(), 100.into(), s("Đã cấp"), s("Đơn vị A"), s("Nâng hạn mức: sửa ô K, L + chọn Đã cấp")],
+            vec![s("SM-ACD0-3E19-6F44"), s("PC-THU-VIEN"), s("AA:BB:CC:77:88:99"), s("192.168.0.30"), s("14.232.5.6"), s("0.6.0"), s("2026-10-31 10:00"), s("2026-11-01 11:11"), 2.into(), 1.into(), s(""), s(""), s("Khoá"), s(""), s("Khoá máy: chọn Khoá (hiện còn lại 0)")],
+            vec![s("SM-5B27-E0C4-9A81"), s("NOI-BO-SAOMAI"), s("AA:BB:CC:00:00:01"), s("192.168.10.246"), s("117.5.147.169"), s("0.6.0"), s("2026-10-30 12:00"), s("2026-11-03 17:00"), 154.into(), 88.into(), 100000.into(), 100000.into(), s("Đã cấp"), s("Sao Mai (nội bộ)"), s("Máy nội bộ / dev: hạn mức rất lớn")],
+        ];
+        assert_eq!(them_hang(&t, "Mẫu license", &hang).unwrap().0, 200);
+        let hd: Vec<Vec<Value>> = [
+            "CÁCH NÂNG SỐ LẦN ĐẾM / TÁCH CHO 1 MÁY (tab 'Mẫu license' là dữ liệu giả để xem bố cục; tab 'license' thật do trạm tự tạo khi triển khai)",
+            "1. Khách gửi mã máy (hiện trên popup 'Liên hệ Sao Mai', có nút Copy; email tự điền mã máy vào tiêu đề).",
+            "2. Mở tab license → Ctrl+F (Mac: Cmd+F) tìm mã máy, vd SM-1C9E-55A0-B7D2.",
+            "3. Sửa cột K 'Hạn mức Đếm' và / hoặc L 'Hạn mức Tách' thành TỔNG số lần được phép (không phải số cộng thêm). Vd đã dùng 37, cho thêm 100 → gõ 137 (hoặc số tròn 200).",
+            "4. Cột M 'Trạng thái' chọn 'Đã cấp'. Cột N ghi đơn vị, cột O ghi chú (số hợp đồng, ngày cấp…).",
+            "5. Báo khách bấm 'Kiểm tra lại' trên popup → dùng được ngay, không cần cài lại app.",
+            "",
+            "THAO TÁC KHÁC",
+            "• Khoá máy: cột M chọn 'Khoá' → máy chạy được tối đa thêm 1 lần rồi bị chặn (mở lại app → chặn ngay). Popup vẫn ghi 'Số lần … còn lại (0)'.",
+            "• Mở khoá: chọn lại 'Đã cấp' hoặc 'Dùng thử'.",
+            "• Đưa về dùng thử: xoá trống K, L, chọn 'Dùng thử' (số Đã dùng không về 0 — đã dùng ≥ 2 thì vẫn hết lượt).",
+            "• Máy nội bộ / dev: K = L = 100000, M = 'Đã cấp'.",
+            "",
+            "KHÔNG ĐƯỢC SỬA",
+            "✗ Cột A–J (thông tin máy, Đã dùng Đếm / Tách): trạm tự ghi; sửa 'Đã dùng' bị ghi đè lần chạy sau và lệch với tab license_nhat_ky.",
+            "✗ Không xoá dòng của máy: máy tự đăng ký lại thành 'Dùng thử' với đã dùng = 0.",
+            "✗ Không gõ tay trạng thái ngoài danh sách thả xuống (vd 'Khóa' dấu khác, 'đã cấp' chữ thường) — giá trị lạ bị coi là Khoá.",
+            "",
+            "Màu ở tab mẫu: xám = cột trạm ghi · vàng = cột Sao Mai sửa.",
+        ].iter().map(|d| vec![s(d)]).collect();
+        assert_eq!(them_hang(&t, "Hướng dẫn cấp lượt", &hd).unwrap().0, 200);
+        let vung = |c0: i64, c1: i64, r0: i64, r1: i64| json!({ "sheetId": id, "startRowIndex": r0, "endRowIndex": r1, "startColumnIndex": c0, "endColumnIndex": c1 });
+        let mau = |r: f64, g: f64, b: f64| json!({ "red": r, "green": g, "blue": b });
+        let ghi_chu = |c: i64, chu: &str| json!({ "updateCells": { "range": vung(c, c + 1, 0, 1), "rows": [{ "values": [{ "note": chu }] }], "fields": "note" } });
+        goi(json!([
+            { "repeatCell": { "range": vung(0, 10, 0, 1), "cell": { "userEnteredFormat": { "backgroundColor": mau(0.93, 0.93, 0.93), "textFormat": { "bold": true } } }, "fields": "userEnteredFormat(backgroundColor,textFormat)" } },
+            { "repeatCell": { "range": vung(10, 15, 0, 1), "cell": { "userEnteredFormat": { "backgroundColor": mau(1.0, 0.95, 0.8), "textFormat": { "bold": true } } }, "fields": "userEnteredFormat(backgroundColor,textFormat)" } },
+            { "repeatCell": { "range": vung(10, 15, 1, 5), "cell": { "userEnteredFormat": { "backgroundColor": mau(1.0, 0.95, 0.8) } }, "fields": "userEnteredFormat.backgroundColor" } },
+            { "setDataValidation": { "range": vung(12, 13, 1, 1000), "rule": { "condition": { "type": "ONE_OF_LIST", "values": [{ "userEnteredValue": "Dùng thử" }, { "userEnteredValue": "Đã cấp" }, { "userEnteredValue": "Khoá" }] }, "showCustomUi": true, "strict": true } } },
+            ghi_chu(10, "Số lần Đếm được phép (tổng). Để trống = 2. Muốn nâng: gõ số mới, vd 200."),
+            ghi_chu(11, "Số lần Tách được phép (tổng). Để trống = 2."),
+            ghi_chu(12, "Chọn trong danh sách: Dùng thử / Đã cấp / Khoá. Giá trị khác bị coi là Khoá."),
+            ghi_chu(8, "Trạm tự cộng — không sửa tay."),
+            { "autoResizeDimensions": { "dimensions": { "sheetId": id, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 15 } } },
+            { "updateDimensionProperties": { "range": { "sheetId": id_hd, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 1 }, "properties": { "pixelSize": 900 }, "fields": "pixelSize" } },
+            { "repeatCell": { "range": { "sheetId": id_hd, "startRowIndex": 0, "endRowIndex": 1 }, "cell": { "userEnteredFormat": { "textFormat": { "bold": true } } }, "fields": "userEnteredFormat.textFormat" } }
+        ]));
+    }
+
     /// Ghi thật 1 hàng vào tab "kiem_tra" của Sheet (cần khoá + Sheet đã chia sẻ cho service account).
     #[test]
     #[ignore = "ghi thật lên Google Sheet"]
