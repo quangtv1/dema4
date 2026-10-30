@@ -20,7 +20,8 @@ impl ManMucLuc {
     pub fn thu_muc_ra(&self, cfg: &CauHinhMucLuc) -> PathBuf {
         let rieng = cfg.thu_muc_ra.trim();
         if rieng.is_empty() {
-            sinh::thu_muc_mac_dinh(crate::tach_vb::du_lieu_an::goc_du_lieu(), std::path::Path::new(self.file.trim()))
+            let file = self.du_lieu.as_ref().map_or_else(|| PathBuf::from(self.file.trim()), |d| d.duong_dan.clone());
+            sinh::thu_muc_mac_dinh(crate::tach_vb::du_lieu_an::goc_du_lieu(), &file)
         } else {
             PathBuf::from(rieng)
         }
@@ -76,7 +77,8 @@ impl ManMucLuc {
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
-                    xong = Some(sinh::TongKet { loi: vec![(String::new(), "luồng sinh dừng bất thường".into())], ..Default::default() });
+                    // Luồng sinh chết giữa chừng: các hồ sơ trước hồ sơ đang làm đã ghi file → vẫn tính lượt
+                    xong = Some(sinh::TongKet { docx: s.i, loi: vec![(s.ten.clone(), "luồng sinh dừng bất thường".into())], ..Default::default() });
                     break;
                 }
             }
@@ -86,7 +88,8 @@ impl ManMucLuc {
         // 1 lượt = 1 lần Sinh có ≥ 1 DOCX ra; không ra file nào → hoàn lượt
         self.license.ket_thuc(&s.lan, tk.docx > 0);
         let co_telegram = tk.docx > 0 && {
-            let (du_lieu, mau, ho_so, van_ban, tk2) = (self.file.trim().to_string(), ten_mau(&self.mau_chon), s.tong, s.van_ban, tk.clone());
+            let du_lieu = self.du_lieu.as_ref().map_or_else(|| self.file.trim().to_string(), |d| d.duong_dan.display().to_string());
+            let (mau, ho_so, van_ban, tk2) = (ten_mau(&self.mau_chon), s.tong, s.van_ban, tk.clone());
             self.license.thong_ke("thong_ke_muc_luc", move |_| crate::tram::so_lieu_muc_luc(&du_lieu, &mau, ho_so, van_ban, &tk2, 0))
         };
         self.da_sinh = Some(DaSinh { tk, tong: s.tong, van_ban: s.van_ban, thu_muc: s.thu_muc, co_telegram });

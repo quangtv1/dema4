@@ -103,13 +103,13 @@ pub fn mac_dinh_tach(c: &CauHinh) -> CauHinh {
     }
 }
 
-/// Đưa các mục Đếm trang A4 về mặc định.
 /// Mặc định tab Sinh mục lục: chỉ phần kết quả (thư mục ra, mẫu tên, ghi đè); giữ lựa chọn gần nhất (file, mẫu, biến).
 pub fn mac_dinh_muc_luc(c: &CauHinh) -> CauHinh {
     let md = crate::cau_hinh::CauHinhMucLuc::default();
     CauHinh { muc_luc: crate::cau_hinh::CauHinhMucLuc { thu_muc_ra: md.thu_muc_ra, mau_ten: md.mau_ten, ghi_de: md.ghi_de, ..c.muc_luc.clone() }, ..c.clone() }
 }
 
+/// Đưa các mục Đếm trang A4 về mặc định.
 pub fn mac_dinh_dem(c: &CauHinh) -> CauHinh {
     let md = CauHinh::default();
     CauHinh { he_so: md.he_so, ranh_gioi: md.ranh_gioi, a0_lon: md.a0_lon, a0_lon_he_so: md.a0_lon_he_so, a0_nguong_mm: md.a0_nguong_mm, ..c.clone() }

@@ -119,7 +119,13 @@ impl UngDungChinh {
         }
         let mut chon = None;
         use crate::gui_tach::khung_hop as kh;
-        let viec = if self.tach.dang_tach() { "tách văn bản" } else { "phân tích" };
+        let viec = if self.muc_luc.dang_chay() {
+            "sinh mục lục"
+        } else if self.tach.dang_tach() {
+            "tách văn bản"
+        } else {
+            "phân tích"
+        };
         kh::hop(ctx, "hoi_dong_chay", 360.0, "Đang xử lý", |ui| {
             kh::than_chu(ui, &format!("Đang {viec}. Thoát ngay thì phần đang làm dở sẽ mất; nên bấm *Dừng*, đợi xong rồi mới thoát."));
             kh::chan(ui, |ui| {
@@ -266,7 +272,7 @@ impl eframe::App for UngDungChinh {
         if ctx.input(|i| i.viewport().close_requested()) {
             if self.cho_dong {
                 self.tach.ghi_cache();
-            } else if self.tach.dang_chay() {
+            } else if self.tach.dang_chay() || self.muc_luc.dang_chay() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                 self.hoi_dong_chay = true;
             } else if self.tach.chua_luu() {
@@ -1982,6 +1988,10 @@ mod tests {
                 cai_giao_dien(&cc.egui_ctx);
                 let mut app = UngDungChinh { man: Man::MucLuc, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
                 app.muc_luc = if nap { crate::gui_muc_luc::tests::man_thu(5) } else { crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()) };
+                if nap {
+                    // Ảnh dùng cho README (repo công khai): đường dẫn hiển thị trung tính, không lộ thư mục máy dev
+                    app.muc_luc.file = r"D:\SoHoa\Bien_muc\Bien_muc_tong_hop.xlsx".into();
+                }
                 app
             });
             h.run_steps(3);

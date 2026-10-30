@@ -31,6 +31,8 @@ impl ManMucLuc {
     pub(super) fn hop_ghep(&mut self, ctx: &egui::Context) {
         let (Some(goc), Some(m), Some(d)) = (&self.hop_ghep, &self.mau, &self.du_lieu) else { return };
         let goc = goc.clone();
+        // Esc lúc đang mở khung xổ = đóng khung đó, không phải Huỷ cả hộp
+        let esc_dong_khung = self.mo_hop.is_some() && ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let (mut huy, mut luu, mut tu_khop) = (false, false, false);
         let mut viec = Vec::new();
         let mut nhom_moi = None;
@@ -156,7 +158,7 @@ impl ManMucLuc {
                 self.da_doi();
             }
         }
-        if huy || (ph.should_close() && !luu) {
+        if huy || (ph.should_close() && !luu && !esc_dong_khung) {
             self.rb = goc;
             self.da_doi();
             self.hop_ghep = None;

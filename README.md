@@ -1,13 +1,16 @@
 # dema4
 
-Ứng dụng `dema4_saomai` (Giải pháp số Sao Mai) hỗ trợ số hoá hồ sơ scan, 2 chức năng:
+Ứng dụng `dema4_saomai` (Giải pháp số Sao Mai) hỗ trợ số hoá hồ sơ scan, 3 chức năng:
 
 - **Đếm trang A4**: phân loại khổ giấy A0–A7, quy đổi ra số trang A4 theo hệ số, cảnh báo trang sát ngưỡng chuyển khổ, trang có DPI bất thường, file đã ký số.
-- **Tách văn bản**: tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã Code 128), bỏ trang trắng, gợi ý trang scan bị xoay; duyệt và sửa nhãn trên giao diện trước khi tách. Một file chạy duy nhất, không cần cài thêm gì.
+- **Tách văn bản**: tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã Code 128), bỏ trang trắng, gợi ý trang scan bị xoay; duyệt và sửa nhãn trên giao diện trước khi tách.
+- **Sinh mục lục hồ sơ**: từ file biên mục Excel/CSV và mẫu DOCX của đơn vị, sinh mục lục văn bản cho từng hồ sơ (mỗi hồ sơ một file DOCX); xem mẫu, ghép biến với cột, xem trước từng hồ sơ trước khi sinh.
+
+Một file chạy duy nhất, không cần cài thêm gì.
 
 Tải bản mới nhất ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
 
-Mỗi máy dùng thử **10 lần Đếm** và **10 lần Tách**; cần thêm lượt liên hệ Sao Mai — xem [Lượt dùng](#lượt-dùng-license).
+Mỗi máy dùng thử **10 lần Đếm**, **10 lần Tách** và **10 lần Sinh mục lục**; cần thêm lượt liên hệ Sao Mai — xem [Lượt dùng](#lượt-dùng-license).
 
 File chạy chưa ký số với Apple / Microsoft nên lần đầu mở hệ điều hành sẽ cảnh báo:
 
@@ -85,13 +88,33 @@ dema4_saomai --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư 
 
 Không có file nhãn → tự phân tích (Cấu hình mặc định), ghi `index_and_blank.txt` rồi tách. Mã thoát: 0 xong, 1 có hồ sơ lỗi, 2 sai tham số.
 
+## Sinh mục lục hồ sơ
+
+Menu **Chức năng › Sinh mục lục** (chi tiết trong **Trợ giúp › Hướng dẫn sử dụng**, F1).
+
+1. **File biên mục**: Excel (.xlsx .xlsb .xls) hoặc CSV, mỗi văn bản một dòng, các dòng cùng hồ sơ nằm liền nhau; chọn **Sheet** và **Dòng tiêu đề** (số dòng như Excel hiển thị).
+2. **Mẫu mục lục**: 4 mẫu có sẵn (Quảng Trị, Quảng Ninh, Đống Đa, Vĩnh Phúc) hoặc mẫu DOCX riêng của đơn vị; biến viết dạng `{ten_bien}`, hàng có nhiều biến nhất trong bảng là hàng mẫu (mỗi văn bản một hàng).
+3. Tab **Mẫu**: biến tự khớp với cột cùng tên (bỏ dấu, không phân biệt hoa thường); bấm ô **Lấy từ** để chọn cột khác hoặc gõ giá trị cố định. **Nhóm theo** (chân sidebar) = cột tách hồ sơ, kèm số giá trị khác nhau của từng cột. Rê chuột lên dòng biến để thấy vị trí trên trang mẫu; hộp **Ghép biến…** sửa nhiều biến cùng lúc, kèm giá trị của hồ sơ đang xem.
+4. Tab **Kết quả**: xem trước mục lục từng hồ sơ (bản mô phỏng chữ + bảng); hồ sơ có ô trống ở cột đã ghép được đánh dấu cảnh báo.
+5. **Sinh mục lục** → mỗi hồ sơ một file DOCX, tên theo mẫu `MLHS_{so_ho_so}` (đổi ở **Cấu hình › Sinh mục lục**). Mặc định ghi vào thư mục ẩn `.sm-dema4/muc_luc/<tên file biên mục>` cạnh file chạy — mở bằng nút **Mở thư mục** trong popup kết quả.
+
+Lựa chọn gần nhất (file, sheet, mẫu, nhóm theo, cách ghép biến của từng mẫu) được nhớ cho lần mở sau. Xuất PDF (qua Word / LibreOffice) có ở bản sau.
+
+![Sinh mục lục: tab Mẫu](docs/anh/muc-luc-mau.png)
+
+![Sinh mục lục: tab Kết quả](docs/anh/muc-luc-ket-qua.png)
+
+![Ghép biến](docs/anh/muc-luc-ghep-bien.png)
+
 ## Cấu hình (`.dema4_saomai.cfg`)
 
-Menu **Cấu hình** (2 tab Đếm trang A4 / Tách PDF) ghi file **ẩn** `.dema4_saomai.cfg` cạnh file chạy (không ghi được → thư mục người dùng như trên). Thiếu khoá / sai → giá trị mặc định. File tên cũ `sm-dema4.cfg` vẫn được đọc và tự chuyển sang tên mới ở lần lưu đầu tiên.
+Menu **Cấu hình** (3 tab Đếm trang A4 / Tách PDF / Sinh mục lục) ghi file **ẩn** `.dema4_saomai.cfg` cạnh file chạy (không ghi được → thư mục người dùng như trên). Thiếu khoá / sai → giá trị mặc định. File tên cũ `sm-dema4.cfg` vẫn được đọc và tự chuyển sang tên mới ở lần lưu đầu tiên.
 
 ![Cấu hình Tách PDF](docs/anh/cau-hinh-tach.png)
 
 ![Cấu hình Đếm trang A4](docs/anh/cau-hinh-dem.png)
+
+![Cấu hình Sinh mục lục](docs/anh/cau-hinh-muc-luc.png)
 
 | Khoá | Mặc định | Ý nghĩa |
 |---|---|---|
@@ -132,18 +155,18 @@ Hệ số và ranh giới khổ đọc từ `.dema4_saomai.cfg` (không có file
 
 ## Lượt dùng (license)
 
-- Mỗi máy được **10 lần Đếm** và **10 lần Tách** dùng thử. Chỉ lần chạy **có kết quả** mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt. Áp dụng cho cả giao diện và dòng lệnh (hết lượt: in lý do + mã máy, mã thoát `3`).
-- Nhóm Telegram nhận thông báo khi có **máy mới đăng ký**, sau mỗi lần **Đếm / Tách**, và khi máy **hết lượt** một chức năng (mỗi loại một mẫu tin riêng).
+- Mỗi máy được **10 lần Đếm**, **10 lần Tách** và **10 lần Sinh mục lục** dùng thử. Chỉ lần chạy **có kết quả** mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt. Áp dụng cho cả giao diện và dòng lệnh (hết lượt: in lý do + mã máy, mã thoát `3`).
+- Nhóm Telegram nhận thông báo khi có **máy mới đăng ký**, sau mỗi lần **Đếm / Tách / Sinh mục lục**, và khi máy **hết lượt** một chức năng (mỗi loại một mẫu tin riêng).
 - Hết lượt → popup **Liên hệ Sao Mai** (mã máy, điện thoại **0979824615**, email **hotro@saomaiso.com**, saomaiso.com). Sao Mai cấp thêm lượt trên Sheet → bấm **Kiểm tra lại**.
 - **Mã máy** `SM-XXXX-XXXX-XXXX` lấy từ ID hệ điều hành (không đổi khi đổi tên máy), xem ở **Trợ giúp › Thông tin**.
 - Bấm Đếm / Tách quyết định ngay, không chờ mạng. Mất mạng: chạy được tối đa 2 lần chưa được máy chủ xác nhận, có mạng lại app tự ghi bù. Bị **Khoá** thì mất mạng vẫn khoá.
-- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `1_license` (mỗi máy 1 dòng, cộng dồn lượt đã dùng); câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `1_license` → sửa **Hạn mức Đếm / Tách** + Trạng thái **Đã cấp** (hướng dẫn ở ghi chú ô A1, ý nghĩa cột ở ghi chú từng ô tiêu đề).
+- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `1_license` (mỗi máy 1 dòng, cộng dồn lượt đã dùng); câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `1_license` → sửa **Hạn mức Đếm / Tách / Mục lục** + Trạng thái **Đã cấp** (hướng dẫn ở ghi chú ô A1, ý nghĩa cột ở ghi chú từng ô tiêu đề).
 
 ![Liên hệ Sao Mai](docs/anh/het-luot.png)
 
 ## Gửi thống kê
 
-Sau mỗi lần đếm / tách xong, app gửi thống kê (mã máy, tên máy, địa chỉ MAC, IP nội bộ và IP public, thư mục, số liệu — không gửi nội dung PDF) và báo công khai trong popup "Thông tin … đã được ghi lại".
+Sau mỗi lần đếm / tách / sinh mục lục xong, app gửi thống kê (mã máy, tên máy, địa chỉ MAC, IP nội bộ và IP public, thư mục hoặc đường dẫn file biên mục, số liệu — không gửi nội dung PDF hay nội dung biên mục) và báo công khai trong popup "Thông tin … đã được ghi lại".
 
 App gửi số liệu tới **trạm license** (Google Apps Script gắn vào Sheet "Monitor_dema4", mã nguồn `dema4_rs/apps-script/`); app không giữ token Telegram hay khoá ghi Sheet. Trạm:
 

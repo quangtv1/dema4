@@ -55,6 +55,8 @@ fn byte_mau(ma: &str) -> Result<Vec<u8>, String> {
 }
 
 pub struct DuLieu {
+    /// File đã đọc (ô đường dẫn có thể đang gõ dở file khác).
+    pub duong_dan: PathBuf,
     pub bang: Arc<BangDuLieu>,
     pub khac_nhau: Vec<usize>,
     pub ds_sheet: Vec<String>,
@@ -181,13 +183,14 @@ impl ManMucLuc {
     /// Ghi lựa chọn hiện tại vào cấu hình (gọi khi `cfg_doi`).
     pub fn ghi_vao(&self, c: &mut CauHinhMucLuc) {
         c.file = self.file.trim().to_string();
-        c.sheet = self.du_lieu.as_ref().map(|d| d.sheet.clone()).unwrap_or_default();
+        if let Some(d) = &self.du_lieu {
+            c.sheet = d.sheet.clone();
+        }
         c.dong_tieu_de = self.dong_tieu_de() as u32;
         c.mau = self.mau_chon.clone();
         c.rong_trai = self.rong_trai;
-        if self.mau.is_some() && self.du_lieu.is_some() {
-            c.bien = self.rb.json();
-        }
+        // Ràng buộc chỉ lưu cho đúng mẫu nó thuộc về (đổi mẫu khi chưa nạp dữ liệu → không mang sang mẫu mới)
+        c.bien = if self.bien_luu.0 == self.mau_chon { self.bien_luu.1.clone() } else { String::new() };
     }
 
     fn dong_tieu_de(&self) -> usize {
@@ -226,7 +229,7 @@ impl ManMucLuc {
                 let ds_sheet = doc_bang::danh_sach_sheet(&p)?;
                 let sheet = sheet.filter(|s| ds_sheet.contains(s)).or_else(|| ds_sheet.first().cloned()).unwrap_or_default();
                 let bang = doc_bang::doc(&p, (!sheet.is_empty()).then_some(sheet.as_str()), dong)?;
-                Ok(DuLieu { khac_nhau: khop::dem_khac_nhau(&bang), bang: Arc::new(bang), ds_sheet, sheet })
+                Ok(DuLieu { khac_nhau: khop::dem_khac_nhau(&bang), bang: Arc::new(bang), ds_sheet, sheet, duong_dan: p.clone() })
             })();
             let _ = gui.send(kq);
             if let Some(c) = ctx {
@@ -756,7 +759,10 @@ impl ManMucLuc {
                 });
                 if self.trang_kq.as_ref().is_none_or(|(h, p, _)| *h != self.hs || *p != self.phien_rb) {
                     let khoi = match (&self.mau, &self.du_lieu) {
-                        (Some(m), Some(d)) => crate::muc_luc::ghep::ghep(&m.db, &d.bang, &self.kq.ho_so[self.hs], &self.rb).and_then(|b| mo_phong::mo_phong(&b)).unwrap_or_default(),
+                        (Some(m), Some(d)) => crate::muc_luc::ghep::ghep(&m.db, &d.bang, &self.kq.ho_so[self.hs], &self.rb).and_then(|b| mo_phong::mo_phong(&b)).unwrap_or_else(|e| {
+                            // Không dựng được trang xem trước: hiện lý do trên trang thay vì trang trắng
+                            vec![Khoi::Doan(mo_phong::Doan { chu: format!("Không xem trước được hồ sơ này: {e}"), can: mo_phong::Can::Trai, dam: false })]
+                        }),
                         _ => Vec::new(),
                     };
                     self.trang_kq = Some((self.hs, self.phien_rb, khoi));
@@ -838,7 +844,7 @@ pub(crate) mod tests {
             self.file = p.display().to_string();
             self.o_dong = dong.to_string();
             let bang = doc_bang::doc(p, Some(sheet), dong).unwrap();
-            self.du_lieu = Some(DuLieu { khac_nhau: khop::dem_khac_nhau(&bang), ds_sheet: doc_bang::danh_sach_sheet(p).unwrap(), sheet: sheet.into(), bang: Arc::new(bang) });
+            self.du_lieu = Some(DuLieu { khac_nhau: khop::dem_khac_nhau(&bang), ds_sheet: doc_bang::danh_sach_sheet(p).unwrap(), sheet: sheet.into(), bang: Arc::new(bang), duong_dan: p.into() });
             self.ap_rang_buoc();
         }
 
@@ -917,6 +923,13 @@ pub(crate) mod tests {
         let truoc = m.kq.ho_so.len();
         m.dat_nhom("STT");
         assert_ne!(m.kq.ho_so.len(), truoc, "đổi Nhóm theo → số hồ sơ đổi");
+        // Đổi sang mẫu khác: ràng buộc của mẫu cũ không bị lưu thành của mẫu mới
+        let mut m3 = man_thu(5);
+        m3.dat_nguon("nguoi_lap", Some(Nguon::Hang("A".into())));
+        m3.mau_chon = "2".into();
+        let mut c3 = CauHinhMucLuc::default();
+        m3.ghi_vao(&mut c3);
+        assert_eq!((c3.mau.as_str(), c3.bien.as_str()), ("2", ""));
         // Mở lại app: ràng buộc đã lưu được áp lại cho đúng mẫu
         let mut m2 = ManMucLuc { bien_luu: (c.mau.clone(), c.bien.clone()), ..man_thu(5) };
         m2.ap_rang_buoc();
