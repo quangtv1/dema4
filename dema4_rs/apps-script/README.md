@@ -1,7 +1,7 @@
 # Trạm license dema4 (Google Apps Script)
 
 Trạm là bên **duy nhất** ghi Google Sheet: đăng ký máy, đếm lượt (chống trùng theo mã lần chạy), ký RSA câu trả lời,
-xếp và gửi tin Telegram (token ở tab `Cấu hình`), ghi tab `Ngưỡng trắng`. App chỉ giữ khoá **công khai**.
+xếp và gửi tin Telegram (token ở Script Properties), ghi tab `Ngưỡng trắng`. App chỉ giữ khoá **công khai**.
 
 | File | Vai trò |
 |---|---|
@@ -17,7 +17,7 @@ xếp và gửi tin Telegram (token ở tab `Cấu hình`), ghi tab `Ngưỡng t
 3. Spreadsheet › Tiện ích mở rộng › Apps Script: tạo file `loi` (dán `loi.js`), `license` (dán `license.gs`), bật hiện `appsscript.json` (Project Settings) rồi dán nội dung.
 4. Project Settings › Script Properties: `KHOA_BI_MAT` = toàn bộ `license_priv.pem` (dán nguyên, có thể thay xuống dòng bằng `\n`). Chạy `tuKiemKhoa` → Execution log có `chu_ky=…`. Xoá `license_priv.pem` khỏi máy.
 5. Deploy › New deployment › Web app (Execute as **Me**, Who has access **Anyone**) → chép URL. Sửa script sau này: Manage deployments › Edit › **New version** (giữ nguyên URL).
-6. Tab `Cấu hình` (tự tạo ở lời gọi đầu, hoặc tạo tay): dòng `telegram_token` | token mới, `telegram_chat_id` | id nhóm.
+6. Script Properties: `TELEGRAM_TOKEN` = token bot, `TELEGRAM_CHAT_ID` = id nhóm (đổi token / nhóm: sửa ở đây, không cần cài lại app).
 7. Chạy `caiTrigger` 1 lần, cấp quyền khi Google hỏi.
 8. Gửi `license_pub.pem` + URL cho người build app (khoá công khai không phải bí mật).
 
@@ -26,7 +26,7 @@ xếp và gửi tin Telegram (token ở tab `Cấu hình`), ghi tab `Ngưỡng t
 - Sửa script: chép `loi.js`, `license.gs` (đổi tên `license.js`), `appsscript.json` vào thư mục có `.clasp.json` → `clasp push --force` → `clasp update-deployment <deploymentId>` (giữ URL). clasp 3 có thể báo "already up to date" khi chỉ xoá file: sửa 1 file rồi push lại, kiểm bằng `clasp pull` vào thư mục trống.
 
 ## Bố cục Sheet
-`license` · `license_nhat_ky` · `Mô tả license` (xanh dương) — `Ngưỡng trắng` · `Mô tả ngưỡng trắng` (xanh lá) — `Hàng đợi Telegram` · `Cấu hình` (xám). Tiêu đề vàng = cột Sao Mai sửa. Cột mã / phiên bản / MAC / IP định dạng chữ (tránh Sheets đổi `0.6.0` thành ngày).
+`license` · `license_nhat_ky` · `Mô tả license` (xanh dương) — `Ngưỡng trắng` · `Mô tả ngưỡng trắng` (xanh lá) — `Hàng đợi Telegram` (tab ẩn: chuột phải thanh tab › Hiện). Tiêu đề vàng = cột Sao Mai sửa. Cột mã / phiên bản / MAC / IP định dạng chữ (tránh Sheets đổi `0.6.0` thành ngày).
 
 ## Cấp lượt
 Tab `license` → tìm mã máy → sửa **Hạn mức Đếm / Tách** (tổng số lần) → Trạng thái **Đã cấp** → khách bấm **Kiểm tra lại**. Xem tab `Mô tả license`.

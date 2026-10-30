@@ -146,7 +146,7 @@ Sau mỗi lần đếm / tách xong, app gửi thống kê (mã máy, tên máy,
 
 App gửi số liệu tới **trạm license** (Google Apps Script gắn vào Sheet "Monitor_dema4", mã nguồn `dema4_rs/apps-script/`); app không giữ token Telegram hay khoá ghi Sheet. Trạm:
 
-- soạn tin và gửi nhóm Telegram qua hàng đợi (token, id nhóm đặt ở tab `Cấu hình` — chỉ trạm đọc). Lần tách gửi thêm 2 dòng thống kê ngưỡng trắng và file CSV histogram (dùng để chỉnh ngưỡng mặc định: `dema4_rs/scripts/tong-hop-nguong.py`);
+- soạn tin và gửi nhóm Telegram qua hàng đợi (tab ẩn `Hàng đợi Telegram`; token, id nhóm nằm trong Script Properties của trạm, không có trên Sheet). Lần tách gửi thêm 2 dòng thống kê ngưỡng trắng và file CSV histogram (dùng để chỉnh ngưỡng mặc định: `dema4_rs/scripts/tong-hop-nguong.py`);
 - ghi tab `Ngưỡng trắng` (mỗi lần Tách 1 hàng) và tab `Mô tả ngưỡng trắng` giải thích từng cột (dữ liệu tab cũ `nguong` của v0.5.x đã gộp vào đây). IP public lấy từ api.ipify.org.
 
 Triển khai trạm: xem `dema4_rs/apps-script/README.md`; URL trạm đặt ở `URL_TRAM` (`dema4_rs/src/tram.rs`), khoá công khai ở `dema4_rs/assets/license_pub.pem`. Chưa có trạm thì app không gửi gì.

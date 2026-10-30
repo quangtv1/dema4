@@ -1,12 +1,12 @@
 // Trạm license dema4 — lớp mỏng nối logic thuần (loi.gs = loi.js) với Google Sheet / Cache / Lock / UrlFetch.
-// Triển khai: xem README.md cùng thư mục. Bí mật duy nhất: Script Properties KHOA_BI_MAT (khoá RSA PKCS#8 PEM).
+// Triển khai: xem README.md cùng thư mục. Bí mật chỉ ở Script Properties: KHOA_BI_MAT (khoá RSA PKCS#8 PEM),
+// TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.
 
 var TAB = {
   MAY: 'license',
   NHAT_KY: 'license_nhat_ky',
   HANG_DOI: 'Hàng đợi Telegram',
   MO_TA: 'Mô tả license',
-  CAU_HINH: 'Cấu hình',
   NGUONG: 'Ngưỡng trắng',
   MO_TA_NGUONG: 'Mô tả ngưỡng trắng',
 };
@@ -14,7 +14,6 @@ var TIEU_DE = {
   MAY: ['Mã máy', 'Tên máy', 'MAC', 'IP nội bộ', 'IP public', 'Phiên bản', 'Ngày đăng ký', 'Lần dùng cuối', 'Đã dùng Đếm', 'Đã dùng Tách', 'Hạn mức Đếm', 'Hạn mức Tách', 'Trạng thái', 'Đơn vị', 'Ghi chú'],
   NHAT_KY: ['Thời điểm', 'Mã máy', 'Mã lần', 'Chức năng', 'Nguồn', 'Phiên bản', 'IP nội bộ', 'IP public'],
   HANG_DOI: ['Mã', 'Thời điểm', 'Nội dung', 'Tên CSV', 'CSV', 'Số lần thử', 'Trạng thái', 'Lúc đánh dấu'],
-  CAU_HINH: ['Khoá', 'Giá trị'],
 };
 var MO_TA_LICENSE = [
   ['Cột (tab license)', 'Ý nghĩa', 'Ai sửa'],
@@ -32,7 +31,8 @@ var MO_TA_LICENSE = [
   ['Máy nội bộ / dev', 'Hạn mức 100000, Trạng thái Đã cấp.', 'Sao Mai'],
   ['Không được', 'Xoá dòng máy (máy đăng ký lại từ 0) · sửa cột Đã dùng (bị ghi đè, lệch nhật ký) · gõ trạng thái ngoài danh sách.', ''],
   ['', '', ''],
-  ['Tab khác', 'license_nhat_ky: mỗi lần chạy 1 dòng (nguồn online / bù offline). Ngưỡng trắng: mỗi lần Tách 1 dòng. Hàng đợi Telegram: tin chờ gửi (trigger mỗi phút, tự dọn sau 7 ngày). Cấu hình: token + id nhóm Telegram.', ''],
+  ['Tab khác', 'license_nhat_ky: mỗi lần chạy 1 dòng (nguồn online / bù offline). Ngưỡng trắng: mỗi lần Tách 1 dòng. Hàng đợi Telegram (tab ẩn — chuột phải thanh tab › Hiện): tin chờ gửi, trigger mỗi phút, tự dọn sau 7 ngày.', ''],
+  ['Telegram', 'Token + id nhóm ở Apps Script › Project Settings › Script Properties: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID. Đổi nhóm / token: sửa ở đó, không cần cài lại app.', ''],
 ];
 /** Cột lưu dạng chữ (không để Sheets đổi "0.6.0" thành ngày, mã hex thành số). */
 var COT_CHU = ['Mã máy', 'Phiên bản', 'Mã lần', 'Mã', 'MAC', 'Địa chỉ MAC', 'IP nội bộ', 'IP public'];
@@ -148,18 +148,14 @@ function doGet() {
   return traJson({ ok: true, tram: 'dema4-license' });
 }
 
+/** Cấu hình Telegram ở Script Properties (không nằm trên Sheet): TELEGRAM_TOKEN, TELEGRAM_CHAT_ID. */
 function cauHinh(khoa) {
-  var sh = bang(TAB.CAU_HINH, TIEU_DE.CAU_HINH);
-  var n = sh.getLastRow() - 1;
-  if (n <= 0) return '';
-  var ds = sh.getRange(2, 1, n, 2).getValues();
-  for (var i = 0; i < ds.length; i++) if (String(ds[i][0]).trim() === khoa) return String(ds[i][1]).trim();
-  return '';
+  return (PropertiesService.getScriptProperties().getProperty(khoa) || '').trim();
 }
 
 /** Trigger mỗi phút: gửi tối đa 15 lời gọi Telegram; gửi ngoài khoá, đánh dấu theo mã dòng. */
 function guiHangDoi() {
-  var token = cauHinh('telegram_token'), chat = cauHinh('telegram_chat_id');
+  var token = cauHinh('TELEGRAM_TOKEN'), chat = cauHinh('TELEGRAM_CHAT_ID');
   if (!token || !chat) return;
   var sh = bang(TAB.HANG_DOI, TIEU_DE.HANG_DOI);
   var khoa = LockService.getScriptLock();
