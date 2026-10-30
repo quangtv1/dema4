@@ -527,9 +527,11 @@
   .trangml th { font-weight:bold; text-align:center; }
   .trangml .ky { display:flex; justify-content:flex-end; margin-top:14px; text-align:center; font-size:8.5px; }
   .trangml .so-trang { text-align:center; margin-top:16px; font-size:8px; color:#555; }
-  .trangml .tk { font-family:Consolas, Menlo, monospace; font-size:7.5px; padding:0 2px; border-radius:2px; background:#E3EEFB; color:#1F4E99; white-space:nowrap; cursor:pointer; }
+  /* Màu nguồn biến (sidebar, hộp Ghép biến, trang mẫu) — một tông slate, chỉ "chưa ghép" dùng màu nhấn */
+  #manMucLuc, .ghep-ml { --ml-cot:#EDF1F6; --ml-cot-chu:#2C3E55; --ml-tudong:#F4F5F7; --ml-tudong-chu:#7A8594; --ml-vien-nhe:#C9D3DF; --ml-chan:#F4F6F9; --ml-nhom:#E1E8F0; }
+  .trangml .tk { font-family:Consolas, Menlo, monospace; font-size:7.5px; padding:0 2px; border-radius:2px; background:#E1E8F0; color:#2C3E55; white-space:nowrap; cursor:pointer; }
   .trangml .tk.thieu { background:#FFE9C2; color:#8A5A00; }
-  .trangml .tk.tudong { background:#E8E8E8; color:#555; }
+  .trangml .tk.tudong { background:#EEF0F2; color:#7A8594; }
   .trangml tr.hangmau td { background:#F5F9FF; }
   /* Hộp Ghép biến */
   .popup.ghep-ml { width:920px; }
@@ -550,18 +552,18 @@
   .oml:hover { border-color:var(--vien); }
   .oml.mo { border-color:var(--chon-vien); box-shadow:0 0 0 2px rgba(47,123,217,.18); }
   .oml .ten { flex:1; overflow:hidden; text-overflow:ellipsis; }
-  .oml.cot { background:#EAF1FB; color:#1F4E99; }
-  .oml.tach { background:#EFEAF8; color:#5B3E96; }
-  .oml.hang { background:#fff; border-color:var(--vien); color:var(--chu); }
-  .oml.cot:hover, .oml.tach:hover { border-color:#A9C2E6; }
-  .oml.tudong { background:#E8E8E8; color:#555; cursor:default; } .oml.tudong:hover { border-color:transparent; }
+  .oml.cot, .oml.tach { background:var(--ml-cot); color:var(--ml-cot-chu); }
+  .oml.tach .ten { font-style:italic; }
+  .oml.hang { background:#fff; border-color:var(--ml-vien-nhe); color:var(--chu); }
+  .oml.cot:hover, .oml.tach:hover, .oml.hang:hover { border-color:#9FB0C4; }
+  .oml.tudong { background:var(--ml-tudong); color:var(--ml-tudong-chu); cursor:default; } .oml.tudong:hover { border-color:transparent; }
   /* Hàng "Nhóm theo" ở chân sidebar: cùng lưới cột với bảng biến, nền riêng, ô chọn không viền */
-  .nhomtrai { flex:1; align-self:stretch; display:grid; grid-template-columns:118px minmax(0,1fr) 22px; align-items:center; background:#E6ECF4; font-size:12px; color:#33465E; font-weight:bold; }
+  .nhomtrai { flex:1; align-self:stretch; display:grid; grid-template-columns:118px minmax(0,1fr) 22px; align-items:center; background:var(--ml-chan); border-top:1px solid var(--vien-nhat); font-size:12px; color:var(--ml-cot-chu); font-weight:bold; }
   .nhomtrai > span { padding-left:6px; }
   #mlThan .daytrai { padding:0; width:0; min-width:100%; box-sizing:border-box; } /* không nới rộng cột trái theo nội dung chân */ #mlThan .timtrai { margin:0 6px; }
-  #manMucLuc .nhomtrai select { grid-column:2 / 4; width:calc(100% - 6px); min-width:0; height:26px; margin:0 2px; border-color:transparent; font-weight:normal; color:#1E5631;
-    padding-left:26px; background:#E2F2E7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%231E6B3A' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E") no-repeat 7px center; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%231E6B3A' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position:7px center, right 10px center; background-repeat:no-repeat; }
-  #manMucLuc .nhomtrai select:hover { border-color:#A9C2E6; }
+  #manMucLuc .nhomtrai select { grid-column:2 / 4; width:calc(100% - 6px); min-width:0; height:26px; margin:0 2px; border-color:transparent; font-weight:normal; color:var(--ml-cot-chu);
+    padding-left:26px; background:var(--ml-nhom) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%232C3E55' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E") no-repeat 7px center; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%232C3E55' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position:7px center, right 10px center; background-repeat:no-repeat; }
+  #manMucLuc .nhomtrai select:hover { border-color:#9FB0C4; }
   .oml svg { width:10px; height:6px; flex-shrink:0; margin-left:auto; opacity:0; } .oml:hover svg, .oml.mo svg { opacity:1; }
   .oml.thieu .ten { color:#B85F00; font-style:italic; } .oml.thieu { border-color:#E8C77A; background:#FFFBEF; }
   .dsml { position:absolute; left:12px; right:12px; top:36px; z-index:5; background:#fff; border:1px solid var(--vien); border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.18); padding:6px; max-height:236px; overflow-y:auto; }
@@ -2667,7 +2669,7 @@
             (ml.moTrai === i ? '<div class="dsml">' + dsNguon(b) + '</div>' : '');
         }).join('') + '<span class="nhombien">Tự động</span><div class="vbdong"><span><code>{trang_so}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">số trang</span></div></span><span></span></div>' +
         '<div class="vbdong"><span><code>{tong_so_trang}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">tổng số trang</span></div></span><span></span></div></div>';
-      $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:#E3EEFB"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#E8E8E8"></i>tự động</span></span>';
+      $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:#E1E8F0"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#EEF0F2"></i>tự động</span></span>';
       $('mlVungXem').innerHTML = trangMau(); datZoom(ml.zoom);
     } else {
       $('mlTrai').innerHTML = '<div class="banghs" role="grid" style="grid-template-columns:24px minmax(72px,1fr) 64px 28px"><span class="tieude-cot so">#</span><span class="tieude-cot">Hồ sơ</span><span class="tieude-cot so">Số dòng</span><span class="tieude-cot"></span>' +
