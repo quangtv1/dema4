@@ -100,12 +100,11 @@
   .gioithieu h2 { font-size:17px; font-weight:bold; margin:8px 0 4px; }
   .gioithieu p { font-size:12px; color:var(--chu-phu); margin:0 0 16px; line-height:1.5; }
   .buoc { display:flex; gap:14px; justify-content:center; }
-  .buoc div { width:160px; background:#fff; border:1px solid var(--vien-nhat); border-radius:8px; padding:12px 10px; font-size:12px; line-height:1.45; color:var(--chu); }
-  .buoc b { display:inline-flex; width:26px; height:26px; border-radius:50%; color:#fff; align-items:center; justify-content:center; font-size:13px; margin-bottom:6px; }
-  .buoc .xanh { background:var(--cobalt); } .buoc .cam { background:#E8731A; } .buoc .la { background:var(--xanh-la); }
+  .buoc div { width:160px; background:#fff; border:1px solid var(--vien); border-top:3px solid var(--cobalt); padding:10px 10px 12px; font-size:12px; line-height:1.45; color:var(--chu); text-align:left; }
+  .buoc b { display:inline-block; min-width:22px; height:22px; line-height:22px; text-align:center; background:var(--nen); border:1px solid var(--vien); color:var(--chu-phu); font-size:12px; margin-bottom:6px; }
   .buoc span { display:block; font-weight:bold; margin-bottom:2px; }
-  .kho { display:flex; gap:5px; justify-content:center; margin-top:14px; }
-  .kho i { font-style:normal; font-size:11px; padding:2px 7px; border-radius:10px; background:#EAF3FC; color:var(--cobalt); border:1px solid #CFE3F7; }
+  .kho { display:flex; gap:4px; justify-content:center; margin-top:14px; }
+  .kho i { font-style:normal; font-size:11px; padding:2px 7px; background:#fff; color:var(--chu-phu); border:1px solid var(--vien); }
   .loc { height:30px; display:flex; background:#F7F7F7; border-bottom:1px solid var(--vien-nhat); }
   .loc > button { padding:0 14px; border:0; border-bottom:2px solid transparent; background:transparent; cursor:pointer; }
   .loc > button.chon { border-bottom-color:var(--chon-vien); background:var(--chon-nen); font-weight:bold; }
@@ -523,9 +522,9 @@
               <h2>Tách văn bản</h2>
               <p>Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng và gợi ý trang bị xoay. Nhãn do máy đoán, người duyệt lại trước khi tách — file PDF gốc không bị sửa.</p>
               <div class="buoc">
-                <div><b class="xanh">1</b><span>Chọn thư mục</span>Bấm <u>Chọn</u> rồi <u>Phân tích</u>; tên hồ sơ hiện ngay ở cột trái.</div>
-                <div><b class="cam">2</b><span>Duyệt nhãn</span>Kiểm tra Index · Trắng · Split; duyệt hết Nghi trắng, Nghi xoay.</div>
-                <div><b class="la">3</b><span>Tách</span>Mỗi hồ sơ một thư mục, văn bản đặt tên theo mẫu, có log kết quả.</div>
+                <div><b>1</b><span>Chọn thư mục</span>Bấm <u>Chọn</u> rồi <u>Phân tích</u>; tên hồ sơ hiện ngay ở cột trái.</div>
+                <div><b>2</b><span>Duyệt nhãn</span>Kiểm tra Index · Trắng · Split; duyệt hết Nghi trắng, Nghi xoay.</div>
+                <div><b>3</b><span>Tách</span>Mỗi hồ sơ một thư mục, văn bản đặt tên theo mẫu, có log kết quả.</div>
               </div>
             </div>
           </div>
@@ -647,7 +646,18 @@
 
   <!-- Màn Đếm trang A4 (giữ nguyên) -->
   <!-- Màn Ký văn bản: giữ chỗ, chưa có chức năng -->
-  <div class="man an" id="manKy" style="align-items:center;justify-content:center;color:var(--chu-phu)"><div style="text-align:center"><b style="color:var(--chu)">Ký văn bản</b><br>Chức năng đang phát triển</div></div>
+  <div class="man an" id="manKy" style="align-items:center;justify-content:center">
+    <div class="gioithieu">
+      <img alt="" class="logo-gt">
+      <h2>Ký văn bản</h2>
+      <p>Ký số hàng loạt các văn bản PDF đã tách bằng chứng thư số của đơn vị; chèn hình chữ ký, kiểm tra file đã ký. <b>Chức năng đang phát triển.</b></p>
+      <div class="buoc">
+        <div><b>1</b><span>Chọn thư mục</span>Thư mục văn bản đã tách (kết quả của Tách văn bản).</div>
+        <div><b>2</b><span>Chọn chứng thư</span>USB token hoặc chứng thư trong máy; vị trí, kích thước chữ ký.</div>
+        <div><b>3</b><span>Ký</span>Ký lần lượt từng file, báo file lỗi, ghi log kết quả.</div>
+      </div>
+    </div>
+  </div>
 
   <div class="man an" id="manDem">
     <div class="hang">
@@ -667,9 +677,9 @@
           <h2>Đếm trang A4</h2>
           <p>Đếm số trang của mọi PDF trong thư mục (cả thư mục con), phân loại khổ giấy và quy đổi ra số trang A4 theo hệ số; cảnh báo trang sát ngưỡng khổ, DPI bất thường, file đã ký số.</p>
           <div class="buoc">
-            <div><b class="xanh">1</b><span>Chọn thư mục</span>Bấm <u>Chọn</u>; tuỳ chọn Check ký số, Check DPI.</div>
-            <div><b class="cam">2</b><span>Đếm</span>Bảng chi tiết từng trang, lọc theo khổ, bấm tên file để mở.</div>
-            <div><b class="la">3</b><span>Lấy kết quả</span>Tự lưu <u>_dem.txt</u> · Mở kết quả · Copy dán vào Excel.</div>
+            <div><b>1</b><span>Chọn thư mục</span>Bấm <u>Chọn</u>; tuỳ chọn Check ký số, Check DPI.</div>
+            <div><b>2</b><span>Đếm</span>Bảng chi tiết từng trang, lọc theo khổ, bấm tên file để mở.</div>
+            <div><b>3</b><span>Lấy kết quả</span>Tự lưu <u>_dem.txt</u> · Mở kết quả · Copy dán vào Excel.</div>
           </div>
           <div class="kho"><i>A0</i><i>A1</i><i>A2</i><i>A3</i><i>A4</i><i>A5</i><i>A6</i><i>A7</i></div>
         </div>
