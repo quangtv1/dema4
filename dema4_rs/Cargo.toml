@@ -31,6 +31,10 @@ getrandom = "0.2"
 # Tách văn bản: đọc mã vạch tờ index (zxing-cpp, dựng từ nguồn C++) + mô hình hướng trang (ONNX Runtime liên kết tĩnh)
 zxing-cpp = { version = "0.5.3", features = ["bundled"] }
 ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "download-binaries"] }
+zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
+quick-xml = "0.42"
+calamine = { version = "0.37.0", features = ["dates"] }
+encoding_rs = "0.8.44"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_Console", "Win32_Storage_FileSystem", "Win32_System_Registry"] }

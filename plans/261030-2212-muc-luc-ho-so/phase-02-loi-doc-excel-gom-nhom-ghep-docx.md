@@ -1,10 +1,10 @@
 ---
 phase: 2
-title: "Loi doc Excel gom nhom ghep DOCX"
-status: pending
+title: Loi doc Excel gom nhom ghep DOCX
+status: completed
 priority: P1
 dependencies: []
-effort: "5 ngày"
+effort: 5 ngày
 ---
 
 # Phase 2: Lõi — đọc Excel/CSV, gom nhóm, ghép DOCX
@@ -54,8 +54,15 @@ XML: `quick-xml` reader/writer theo sự kiện trên `word/document.xml`, `word
 6. `kiem_tra`, `ten_file` → xanh 8; `cargo test --release` toàn bộ.
 
 ## Success Criteria
-- [ ] Test 1–6, 8 xanh trên CI; test 7 xanh trên máy dev với dữ liệu thật.
-- [ ] 22 hồ sơ × 4 mẫu ghép < 5 s; RAM thấp.
+- [x] Test 1–6, 8 xanh; test 7 (đối chứng Core gốc, 4 mẫu × 22 hồ sơ, so chữ + định dạng run + số hàng + field) xanh trên máy dev.
+- [x] 88 hồ sơ ghép ~0,4 s.
+
+## Ghi chú thực hiện (30/10)
+- Cây XML tự viết (`xml.rs`) thay OpenXML SDK; CSV tự tách (`tach_csv`) vì crate `csv` bỏ dòng trống và đánh số dòng sai sau đó.
+- CSV dò dấu phân cách trên chính dòng tiêu đề (bản gốc: dòng 1).
+- Excel: `calamine` feature `dates` (hệ ngày 1904, ngày tràn không panic).
+- Đầu/chân trang theo relationship của document.xml.
+- Review: báo cáo `reports/` (code-reviewer) — đã sửa các mục Cao/Trung bình; chấp nhận: số thực mũ nhỏ khác .NET (`1E-05`), biến ghép trùng (UI không tạo).
 
 ## Risk Assessment
 - XML Word đa dạng (run lồng `w:ins`, `w:smartTag`, `w:proofErr`) → bám đúng thuật toán gốc + test đối chứng; gặp cấu trúc lạ thì giữ nguyên token và báo cảnh báo thay vì làm hỏng file.

@@ -29,7 +29,7 @@ Thêm Menu Chức năng › **Mục lục hồ sơ**: đọc biên mục Excel/C
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | [Prototype HTML man Muc luc](./phase-01-prototype-html-man-muc-luc.md) | Completed |
-| 2 | [Loi doc Excel gom nhom ghep DOCX](./phase-02-loi-doc-excel-gom-nhom-ghep-docx.md) | Pending |
+| 2 | [Loi doc Excel gom nhom ghep DOCX](./phase-02-loi-doc-excel-gom-nhom-ghep-docx.md) | Completed |
 | 3 | [Man Muc luc va license xuat DOCX](./phase-03-man-muc-luc-va-license-xuat-docx.md) | Pending |
 | 4 | [Xem truoc va PDF qua Word hoac LibreOffice](./phase-04-xem-truoc-va-pdf-qua-word-hoac-libreoffice.md) | Pending |
 | 5 | [Bien anh](./phase-05-bien-anh.md) | Pending |

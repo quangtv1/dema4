@@ -14,6 +14,8 @@ mod cau_hinh;
 mod dem_pdf;
 mod gioi_thieu;
 mod license;
+#[allow(dead_code)] // lõi Mục lục hồ sơ: màn giao diện nối vào ở giai đoạn sau
+mod muc_luc;
 mod tram;
 mod hop_license;
 mod gui;
