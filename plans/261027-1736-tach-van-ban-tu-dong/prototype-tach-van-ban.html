@@ -833,7 +833,7 @@
 
   <!-- Đang tách: popup có thanh tiến độ + số hồ sơ đã xử lý / tổng; không hiện tiến độ ở header -->
   <div class="phu" id="phuDangTach">
-    <div class="popup" role="dialog" aria-label="Đang tách" style="width:380px">
+    <div class="popup" role="dialog" aria-label="Đang tách" style="width:400px">
       <div class="dau">Đang tách <b>pdf_goc</b></div>
       <div class="than" style="display:block;padding-bottom:6px">
         <div class="tiendo" style="padding:0;height:24px"><div style="height:22px"><b id="dtVach" style="width:0"></b><span id="dtChu">1/2 hồ sơ · 0/211 văn bản · 0%</span></div></div>
@@ -2117,7 +2117,7 @@
       var con = 'đang tính…';
       if (ghi.trang > 0) {
         var conMs = tg / ghi.trang * (tongTrang - ghi.trang), xongLuc = new Date(Date.now() + conMs);
-        con = '~' + hhmmss(conMs) + ' · xong lúc ' + (xongLuc.getHours() < 10 ? '0' : '') + xongLuc.getHours() + ':' + (xongLuc.getMinutes() < 10 ? '0' : '') + xongLuc.getMinutes();
+        con = '~' + hhmmss(conMs) + ' (xong ' + (xongLuc.getHours() < 10 ? '0' : '') + xongLuc.getHours() + ':' + (xongLuc.getMinutes() < 10 ? '0' : '') + xongLuc.getMinutes() + ')';
         $('dtToc').textContent = Math.round(ghi.trang / (tg / 1000)) + ' trang/giây · ' + (ghi.mb / (tg / 1000)).toFixed(1) + ' MB/giây';
       } else { $('dtToc').textContent = '—'; }
       $('dtTg').innerHTML = 'Đã chạy <b>' + hhmmss(tg) + '</b> · còn ' + con;
@@ -2185,7 +2185,7 @@
     s.daPT = true; ve(); batDauTach(99); clearTimeout(tachHenGio); clearInterval(tachDongHo);
     $('dtVach').style.width = '54%'; $('dtChu').textContent = '2/2 hồ sơ · 115/211 văn bản · 54%';
     $('dtTen').textContent = tenVanBan(1, 8);
-    $('dtGhi').textContent = '1 hồ sơ · 524 trang · 284 MB'; $('dtTg').innerHTML = 'Đã chạy <b>00:00:21</b> · còn ~00:00:17 · xong lúc 08:42'; $('dtToc').textContent = '23 trang/giây · 12,8 MB/giây';
+    $('dtGhi').textContent = '1 hồ sơ · 524 trang · 284 MB'; $('dtTg').innerHTML = 'Đã chạy <b>00:00:21</b> · còn ~00:00:17 (xong 08:42)'; $('dtToc').textContent = '23 trang/giây · 12,8 MB/giây';
   }
   if (location.hash === '#phan-tich-lai') $('nutPhanTich').onclick();
   if (location.hash === '#xem-1-trang') { s.daPT = true; s.che = 'vanban'; s.vb = 3; s.xemVB = 'mot'; ve(); }
