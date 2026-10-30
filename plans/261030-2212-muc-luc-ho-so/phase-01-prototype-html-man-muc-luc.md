@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: Prototype HTML man Muc luc
-status: in-progress
+status: completed
 priority: P1
 dependencies: []
 effort: 1 ngày

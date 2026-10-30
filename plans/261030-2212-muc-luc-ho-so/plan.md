@@ -3,7 +3,7 @@ title: Muc luc ho so chuc nang thu 4
 description: >-
   Port lõi print_mltl (C# WPF) sang Rust: chức năng thứ 4 Mục lục hồ sơ trong
   dema4, UI 1 màn kiểu Tách, TDD
-status: in-progress
+status: pending
 priority: P2
 branch: main
 tags:
@@ -28,7 +28,7 @@ Thêm Menu Chức năng › **Mục lục hồ sơ**: đọc biên mục Excel/C
 ## Phases
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Prototype HTML man Muc luc](./phase-01-prototype-html-man-muc-luc.md) | In Progress |
+| 1 | [Prototype HTML man Muc luc](./phase-01-prototype-html-man-muc-luc.md) | Completed |
 | 2 | [Loi doc Excel gom nhom ghep DOCX](./phase-02-loi-doc-excel-gom-nhom-ghep-docx.md) | Pending |
 | 3 | [Man Muc luc va license xuat DOCX](./phase-03-man-muc-luc-va-license-xuat-docx.md) | Pending |
 | 4 | [Xem truoc va PDF qua Word hoac LibreOffice](./phase-04-xem-truoc-va-pdf-qua-word-hoac-libreoffice.md) | Pending |
