@@ -41,6 +41,7 @@
   .nut.xanh:hover:not(:disabled) { background:#0067C0; border-color:#004E94; color:#fff; } /* rê chuột: xanh dương Windows, chữ trắng tương phản 5,6:1 */
   .nut.xanh:active:not(:disabled) { background:#00559F; }
   .nut.xam { background:#B8B8B8; color:#fff; border-color:#A0A0A0; }
+  .nut.do { background:#D32F2F; color:#fff; border-color:#B71C1C; }
   .nut.nho { height:22px; min-width:0; padding:0 8px; font-size:12px; }
   .nut.dangchon { background:var(--chon-nen); border-color:var(--chon-vien); }
   /* Nút nhãn sáng theo nhãn của trang đang chọn: cả vùng chọn cùng nhãn = sáng đậm; chỉ một phần = viền */
@@ -827,6 +828,18 @@
       <div class="dau">Chưa tách được</div>
       <div class="than" style="display:block;line-height:1.6" id="cdNoiDung"></div>
       <div class="cuoi"><button class="nut" data-dong="phuChuaDuyet">Đóng</button><button class="nut" id="cdXoay">Duyệt Nghi xoay</button><button class="nut xanh" id="cdTrang">Duyệt Nghi trắng</button></div>
+    </div>
+  </div>
+
+  <!-- Đang tách: popup có thanh tiến độ + số hồ sơ đã xử lý / tổng; không hiện tiến độ ở header -->
+  <div class="phu" id="phuDangTach">
+    <div class="popup" role="dialog" aria-label="Đang tách">
+      <div class="dau">Đang tách <b>pdf_goc</b></div>
+      <div class="than" style="display:block">
+        <div class="tiendo" style="padding:0;height:24px"><div style="height:22px"><b id="dtVach" style="width:0"></b><span id="dtChu">0 / 2 hồ sơ</span></div></div>
+        <div id="dtTen" style="margin-top:9px;font-size:12px;color:var(--chu-phu)">Đang tách L1_05_13.pdf…</div>
+      </div>
+      <div class="cuoi"><button class="nut do" id="dtDung">Dừng</button></div>
     </div>
   </div>
 
@@ -2075,8 +2088,30 @@
       $('cdTrang').classList.toggle('an', !c.nt); $('cdXoay').classList.toggle('an', !c.nx);
       $('phuChuaDuyet').classList.add('mo'); return;
     }
-    $('phu').classList.add('mo');
+    batDauTach();
   };
+  // Mô phỏng tách nền: mỗi hồ sơ ~0,9 s; xong (hoặc Dừng) thì đổi sang popup kết quả
+  var tachHenGio = null;
+  function batDauTach(dungO) {
+    var tong = TEN.length, xong = 0;
+    $('dtVach').style.width = '0'; $('dtChu').textContent = '0 / ' + tong + ' hồ sơ'; $('dtTen').textContent = 'Đang tách ' + TEN[0] + '…';
+    $('phuDangTach').classList.add('mo');
+    function buoc() {
+      xong++;
+      $('dtVach').style.width = Math.round(xong * 100 / tong) + '%'; $('dtChu').textContent = xong + ' / ' + tong + ' hồ sơ';
+      if (xong >= tong || xong === dungO) { ketThucTach(xong < tong); return; }
+      $('dtTen').textContent = 'Đang tách ' + TEN[xong] + '…';
+      tachHenGio = setTimeout(buoc, 900);
+    }
+    tachHenGio = setTimeout(buoc, 900);
+  }
+  function ketThucTach(daDung) {
+    clearTimeout(tachHenGio); tachHenGio = null;
+    $('phuDangTach').classList.remove('mo');
+    document.querySelector('#phu .dau').innerHTML = (daDung ? 'Đã dừng tách ' : 'Đã tách xong ') + '<b>pdf_goc</b>';
+    $('phu').classList.add('mo');
+  }
+  $('dtDung').onclick = function () { ketThucTach(true); };
   $('nutDong').onclick = function () { $('phu').classList.remove('mo'); };
 
   // Mở thẳng trạng thái để chụp: #xem-van-ban, #cau-hinh
@@ -2116,6 +2151,7 @@
   if (location.hash === '#thong-tin') moTroGiup('thongtin');
   if (location.hash === '#tach-xong') { s.daPT = true; nghi = TEN.map(function () { return {}; }); goiy = TEN.map(function () { return {}; }); ve(); $('nutTach').onclick(); }
   if (location.hash === '#tach-chua-duyet') { s.daPT = true; ve(); $('nutTach').onclick(); }
+  if (location.hash === '#dang-tach') { s.daPT = true; ve(); batDauTach(1); $('dtVach').style.width = '50%'; $('dtChu').textContent = '1 / 2 hồ sơ'; $('dtTen').textContent = 'Đang tách L1_06_14.pdf…'; clearTimeout(tachHenGio); }
   if (location.hash === '#phan-tich-lai') $('nutPhanTich').onclick();
   if (location.hash === '#xem-1-trang') { s.daPT = true; s.che = 'vanban'; s.vb = 3; s.xemVB = 'mot'; ve(); }
   if (location.hash === '#xem-2-trang') { s.daPT = true; s.che = 'vanban'; s.vb = 3; s.xemVB = 'hai'; ve(); }
