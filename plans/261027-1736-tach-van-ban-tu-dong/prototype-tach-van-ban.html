@@ -801,7 +801,7 @@
       <label class="nhanml" for="mlMau">Mẫu mục lục:</label>
       <select id="mlMau" style="flex:1"><option>Mẫu 01 – Quảng Trị</option><option>Mẫu 02 – Quảng Ninh</option><option>Mẫu 03 – Đống Đa</option><option>Mẫu 04 – Vĩnh Phúc</option><option>Mẫu riêng: MucLuc_DonVi.docx</option></select>
       <button class="nut" id="mlChonMau">Chọn</button>
-      <div class="phaiml"><button class="nut" id="mlNutGhep" style="flex:1" title="Chọn nguồn dữ liệu cho từng biến của mẫu">Ghép biến…</button></div>
+      <div class="phaiml"><button class="nut" id="mlLuuMau" style="width:110px" title="Lưu mẫu đang chọn ra file DOCX — sửa trong Word rồi bấm Chọn để dùng làm mẫu riêng">Lưu mẫu…</button><button class="nut" id="mlNutGhep" style="flex:1" title="Chọn nguồn dữ liệu cho từng biến của mẫu">Ghép biến…</button></div>
     </div>
     <div class="bangdem">
       <div class="tabkho" id="mlTab"><span data-mltab="mau">Mẫu</span><span data-mltab="ketqua">Kết quả</span><div class="canhtab" id="mlCanh"></div></div>
@@ -2691,6 +2691,7 @@
     if (loi.length) canh.push(loi.length + ' hồ sơ cần xem (' + loi.map(function (h) { return h[0]; }).join(', ') + ')');
     $('mlCanh').innerHTML = co && canh.length ? '⚠ ' + canh.join(' · ') : '';
     var icon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+    if (ml.luuMau) { $('mlChan').innerHTML = icon + 'Đã lưu mẫu <b>Mẫu 01 – Quảng Trị</b>: D:\\Mau\\Mau_01_Quang_Tri.docx · <a class="lk">Mở thư mục</a>'; } else
     $('mlChan').innerHTML = !co ? '' : icon + (ml.chay === 1 ? 'Đang sinh <b>13/' + ML_HS.length + '</b> hồ sơ · MLHS_HS-14.docx · còn ~00:00:07'
       : ml.chay === 2 ? 'Đã sinh <b>' + ML_HS.length + '/' + ML_HS.length + '</b> hồ sơ · ' + ML_HS.length + ' DOCX, ' + ML_HS.length + ' PDF'
       : 'Hồ sơ: <b>' + ML_HS.length + '</b>; Văn bản: <b>' + TONG_DONG + '</b>');
@@ -2727,6 +2728,7 @@
   $('mlTruoc').onclick = function () { ml.hs = Math.max(0, ml.hs - 1); veMucLuc(); };
   $('mlSau').onclick = function () { ml.hs = Math.min(ML_HS.length - 1, ml.hs + 1); veMucLuc(); };
   $('mlNutGhep').onclick = moGhep;
+  $('mlLuuMau').onclick = function () { ml.luuMau = true; veMucLuc(); };
   $('mlTao').onclick = function () { ml.chay = ml.chay === 1 ? 0 : 1; ml.tab = 'ketqua'; veMucLuc(); $('phuMLTao').classList.toggle('mo', ml.chay === 1); };
   $('mlDung').onclick = function () { ml.chay = 0; $('phuMLTao').classList.remove('mo'); veMucLuc(); };
   // Thu phóng trang xem trước: 50–200 %, bước 25 %
@@ -2736,12 +2738,13 @@
   document.querySelectorAll('[data-dong^="phuML"]').forEach(function (b) { b.onclick = function () { $(b.getAttribute('data-dong')).classList.remove('mo'); }; });
   var h = location.hash;
   if (h.indexOf('#muc-luc') === 0 || h === '#cau-hinh-muc-luc') {
-    s.man = 'mucluc'; ml.coDuLieu = h !== '#muc-luc'; ml.tab = h === '#muc-luc-mau' || h === '#muc-luc-mau-sua' || h === '#muc-luc-mau-ro' || h === '#muc-luc-ghep' ? 'mau' : 'ketqua';
+    s.man = 'mucluc'; ml.coDuLieu = h !== '#muc-luc'; ml.tab = h === '#muc-luc-mau' || h === '#muc-luc-mau-sua' || h === '#muc-luc-mau-ro' || h === '#muc-luc-luu-mau' || h === '#muc-luc-ghep' ? 'mau' : 'ketqua';
     ml.hs = h === '#muc-luc-loi' ? 16 : 0; ml.chay = h === '#muc-luc-tao' ? 1 : h === '#muc-luc-xong' ? 2 : 0; ve();
   }
   if (h === '#muc-luc-ghep' || h === '#muc-luc-ghep-chon') { if (h === '#muc-luc-ghep-chon') ml.mo = 4; moGhep(); }
   if (h === '#muc-luc-mau-sua') { ml.moTrai = 4; veMucLuc(); }
   if (h === '#muc-luc-mau-ro') sangBien('so_ky_hieu');
+  if (h === '#muc-luc-luu-mau') { ml.luuMau = true; veMucLuc(); }
   ganNguon($('mlBien'), 'mo'); ganNguon($('mlTrai'), 'moTrai');
   // Rê chuột vào dòng biến ở sidebar → làm sáng các chỗ biến đó xuất hiện trên trang mẫu
   // Định vị hai chiều: sáng vàng cả chip trên trang mẫu lẫn dòng biến ở sidebar
