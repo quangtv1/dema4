@@ -7,6 +7,8 @@
 
 Tải bản mới nhất ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
 
+Mỗi máy dùng thử **2 lần Đếm** và **2 lần Tách**; cần thêm lượt liên hệ Sao Mai — xem [Lượt dùng](#lượt-dùng-license).
+
 File chạy chưa ký số với Apple / Microsoft nên lần đầu mở hệ điều hành sẽ cảnh báo:
 
 - **macOS** ("cannot be opened because it is from an unidentified developer"): bấm OK, vào **System Settings › Privacy & Security › Open Anyway**; hoặc trong Terminal `xattr -d com.apple.quarantine ~/Downloads/dema4_saomai && chmod +x ~/Downloads/dema4_saomai`.
