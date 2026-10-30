@@ -42,6 +42,14 @@
   .nut.xanh:active:not(:disabled) { background:#00559F; }
   .nut.xam { background:#B8B8B8; color:#fff; border-color:#A0A0A0; }
   .nut.do { background:#D32F2F; color:#fff; border-color:#B71C1C; }
+  /* Popup hết lượt (license) */
+  .hl-logo { text-align:center; padding:14px 16px 0; } .hl-logo img { width:56px; height:auto; cursor:pointer; }
+  .hl-lydo { padding:10px 18px 4px; font-size:13px; text-align:center; line-height:1.5; }
+  .hl-lydo b { color:var(--do); }
+  .hl-mang { padding:0 18px 6px; font-size:11.5px; color:var(--chu-phu); text-align:center; }
+  .hl-bang { padding:8px 18px 14px; display:grid; grid-template-columns:70px 1fr auto; row-gap:7px; column-gap:8px; align-items:center; font-size:12px; }
+  .hl-bang span { color:var(--chu-phu); } .hl-bang a { color:var(--cobalt); }
+  .hl-copy { font-size:11px; padding:1px 8px; height:20px; min-width:0; width:auto; }
   .nut.nho { height:22px; min-width:0; padding:0 8px; font-size:12px; }
   .nut.dangchon { background:var(--chon-nen); border-color:var(--chon-vien); }
   /* Nút nhãn sáng theo nhãn của trang đang chọn: cả vùng chọn cùng nhãn = sáng đậm; chỉ một phần = viền */
@@ -667,7 +675,7 @@
     <div class="hang">
       <label for="tmd">Chọn thư mục pdf:</label>
       <input id="tmd" type="text" value="G:\SoHoa\Lo_L1\pdf_goc" readonly>
-      <button class="nut" id="nutChonDem">Chọn</button><button class="nut xanh">Đếm</button>
+      <button class="nut" id="nutChonDem">Chọn</button><button class="nut xanh" id="nutDem">Đếm</button>
     </div>
     <div class="tomtat">
       <span>File PDF: <b>2</b></span><span>Số trang: <b>896</b></span><span>Quy ra A4: <b>896</b></span>
@@ -869,6 +877,23 @@
       <div class="dau">Phân tích lại từ đầu?</div>
       <div class="than" style="display:block;line-height:1.6">Nhãn sửa tay, Split, góc xoay, trang đã duyệt và trang đã xoá sẽ mất; nhãn tính lại theo Cấu hình.</div>
       <div class="cuoi"><button class="nut" id="ptlHuy">Huỷ</button><button class="nut xanh" id="ptlDongY">Phân tích lại</button></div>
+    </div>
+  </div>
+
+  <!-- Hết lượt dùng (license): 1 mẫu lý do chung; offline thêm dòng gợi ý kết nối mạng -->
+  <div class="phu" id="phuHetLuot">
+    <div class="popup" role="dialog" aria-label="Hết lượt dùng" style="width:380px">
+      <div class="dau">Liên hệ Sao Mai</div>
+      <div class="hl-logo"><a href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a></div>
+      <div class="hl-lydo">Lý do: Số lần <span id="hlChucNang">Tách</span> còn lại (<b>0</b>) → Liên hệ với Sao Mai để được hỗ trợ.</div>
+      <div class="hl-mang an" id="hlMang">Chưa kết nối được máy chủ — kết nối mạng rồi bấm Kiểm tra lại.</div>
+      <div class="hl-bang">
+        <span>Mã máy</span><b id="hlMa">SM-7F3A-91C2-04BE</b><button class="nut hl-copy" data-copy="hlMa">Copy</button>
+        <span>Điện thoại</span><b id="hlSdt">0979824615</b><button class="nut hl-copy" data-copy="hlSdt">Copy</button>
+        <span>Email</span><a id="hlEmail" href="mailto:hotro@saomaiso.com?subject=Cấp lượt dùng dema4 - SM-7F3A-91C2-04BE">hotro@saomaiso.com</a><button class="nut hl-copy" data-copy="hlEmail">Copy</button>
+        <span>Website</span><a href="https://saomaiso.com" target="_blank" rel="noopener">saomaiso.com</a><span></span>
+      </div>
+      <div class="cuoi"><button class="nut" data-dong="phuHetLuot">Đóng</button><button class="nut xanh" id="hlKiemTra">Kiểm tra lại</button></div>
     </div>
   </div>
 
@@ -2158,8 +2183,22 @@
       $('cdTrang').classList.toggle('an', !c.nt); $('cdXoay').classList.toggle('an', !c.nx);
       $('phuChuaDuyet').classList.add('mo'); return;
     }
+    if (!conLuot('tach')) return;
     batDauTach();
   };
+  // License (mô phỏng): mỗi máy 2 lần Đếm + 2 lần Tách; hết → popup liên hệ. #het-luot-offline mô phỏng mất mạng
+  var luot = { dem: 2, tach: 2 }, offline = location.hash === '#het-luot-offline';
+  function moHetLuot(cn) {
+    $('hlChucNang').textContent = cn === 'dem' ? 'Đếm' : 'Tách';
+    $('hlMang').classList.toggle('an', !offline);
+    $('phuHetLuot').classList.add('mo');
+  }
+  function conLuot(cn) { if (luot[cn] <= 0) { moHetLuot(cn); return false; } luot[cn]--; return true; }
+  $('nutDem').onclick = function () { conLuot('dem'); };
+  $('hlKiemTra').onclick = function () { var b = this; b.textContent = 'Đang kiểm tra…'; b.disabled = true; setTimeout(function () { b.textContent = 'Kiểm tra lại'; b.disabled = false; }, 1200); };
+  document.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.onclick = function () { var t = $(b.dataset.copy).textContent; if (navigator.clipboard) navigator.clipboard.writeText(t); b.textContent = 'Đã chép'; setTimeout(function () { b.textContent = 'Copy'; }, 1000); };
+  });
   // Mô phỏng tách nền: mỗi hồ sơ ~0,9 s; xong (hoặc Dừng) thì đổi sang popup kết quả
   // Số liệu mô phỏng từng hồ sơ (như mẫu 1): số trang, số văn bản, dung lượng ghi ra
   var DT_TRANG = [491, 405], DT_VB = [108, 103], DT_MB = [268, 203];
@@ -2241,6 +2280,7 @@
   if (location.hash === '#xoay-vb') { s.daPT = true; s.che = 'vanban'; s.vb = 0; xoay[0][2] = 90; s.chonVB = { '0.2': true, '0.3': true }; ve(); }
   if (location.hash === '#menu-phai') { s.daPT = true; ve(); setTimeout(function () { var t = document.querySelector('#luoi [data-k="0.10"]'), rr = t.getBoundingClientRect(); t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rr.left + 40, clientY: rr.top + 40 })); }, 50); }
   if (location.hash === '#ky-van-ban') { s.man = 'ky'; ve(); }
+  if (location.hash === '#het-luot' || location.hash === '#het-luot-offline') { s.daPT = true; ve(); moHetLuot('tach'); }
   if (location.hash === '#dem') { s.man = 'dem'; ve(); }
   if (location.hash === '#chuc-nang') { setTimeout(function () { $('nutMenu').click(); }, 50); }
   if (location.hash === '#tro-giup') { setTimeout(function () { $('nutTroGiup').click(); }, 50); }
