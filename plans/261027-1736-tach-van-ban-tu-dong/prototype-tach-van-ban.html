@@ -482,16 +482,20 @@
   #manMucLuc .hang > label.nhanml { width:104px; flex-shrink:0; }
   #manMucLuc .hang > .nut { width:80px; }
   #manMucLuc select { height:26px; border:1px solid var(--vien); background:#fff; padding:0 4px; font-size:12px; border-radius:3px; }
-  #manMucLuc .phaiml { width:360px; flex-shrink:0; display:flex; align-items:center; gap:6px; margin-left:10px; }
+  #manMucLuc .phaiml { width:320px; flex-shrink:0; display:flex; align-items:center; gap:6px; margin-left:10px; }
   #manMucLuc .phaiml .nhanphu { color:var(--chu-phu); white-space:nowrap; }
   #manMucLuc .phaiml .so-dong { width:52px; height:26px; box-sizing:border-box; border:1px solid var(--vien); padding:0 6px; text-align:right; }
   #manMucLuc .nutghep { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
   #manMucLuc .nutghep .so { font-size:11px; padding:1px 7px; border-radius:9px; background:#E8F3E8; color:#226622; }
   #manMucLuc .nutghep .so.thieu { background:#FFF1D6; color:#8A5A00; }
-  #manMucLuc .tomtat label { margin-left:auto; display:inline-flex; align-items:center; gap:4px; color:var(--chu); }
-  #manMucLuc .tabkho { grid-template-columns:repeat(2,190px); }
-  #manMucLuc .tabkho span { cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
-  #manMucLuc .tabkho span:not(.chon):hover { background:#EFEFEF; }
+  #manMucLuc .phaiml label { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  #manMucLuc .tabkho .dem { margin-left:7px; font-size:11px; font-weight:normal; padding:1px 7px; border-radius:9px; background:#E6E6E6; color:#555; }
+  #manMucLuc .tabkho .dem.canh { background:#FFF1D6; color:#8A5A00; }
+  #manMucLuc .dieuhuong .nut { height:24px; padding:0 10px; font-size:12px; }
+  .canhml { color:#B85F00; font-weight:bold; text-align:center; }
+  #manMucLuc .tabkho { grid-template-columns:repeat(2,210px); }
+  #manMucLuc .tabkho > span { cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+  #manMucLuc .tabkho > span:not(.chon):hover { background:#EFEFEF; }
   .bangbien { display:grid; grid-template-columns:minmax(90px,1fr) minmax(70px,1fr) 26px; font-size:12px; }
   .bangbien .tieude-cot { position:sticky; top:0; background:#EBEBEB; border-bottom:1px solid var(--vien-nhat); padding:6px 6px; color:var(--chu-phu); z-index:1; }
   .bangbien .vbdong > span { padding:6px; border-bottom:1px solid #F0F0F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
@@ -747,13 +751,12 @@
       <select id="mlMau" style="flex:1"><option>Mẫu 01 – Quảng Trị</option><option>Mẫu 02 – Quảng Ninh</option><option>Mẫu 03 – Đống Đa</option><option>Mẫu 04 – Vĩnh Phúc</option><option>Mẫu riêng: MucLuc_DonVi.docx</option></select>
       <button class="nut" id="mlChonMau">Chọn</button>
       <div class="phaiml">
-        <button class="nut nutghep" id="mlNutGhep">Ghép biến… <span class="so thieu" id="mlSoGhep">12/13</span></button>
-        <button class="nut xam" id="mlTao" style="width:120px" disabled>Sinh mục lục</button>
+        <label title="Xuất thêm PDF cạnh mỗi DOCX"><input type="checkbox" id="mlPdf" checked> Kèm PDF</label>
+        <button class="nut xam" id="mlTao" style="flex:1" disabled>Sinh mục lục</button>
       </div>
     </div>
-    <div class="tomtat" id="mlTomTat"></div>
     <div class="bangdem">
-      <div class="tabkho" id="mlTab"><span data-mltab="mau">Mẫu (13 biến)</span><span data-mltab="ketqua">Kết quả</span></div>
+      <div class="tabkho" id="mlTab"><span data-mltab="mau">Mẫu</span><span data-mltab="ketqua">Kết quả</span></div>
       <div class="trong mo-dau" id="mlGioiThieu">
         <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
         <div class="gioithieu">
@@ -783,8 +786,7 @@
               <button class="nutma" id="mlSau" aria-label="Hồ sơ sau"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
             </span>
             <span class="tt" id="mlXemTT"></span>
-            <span style="margin-left:auto;font-size:11px;color:var(--chu-phu)">Xem bằng Microsoft Word</span>
-            <span class="ngan" aria-hidden="true"></span>
+            <span style="margin-left:auto"></span>
             <div class="coanh" role="group" aria-label="Thu phóng">
               <button class="nutma" aria-label="Thu nhỏ"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M5 7h4"/></svg></button>
               <span style="min-width:38px;text-align:center;font-size:12px;color:var(--chu-phu)">100 %</span>
@@ -2519,7 +2521,7 @@
     $('mlBien').innerHTML = ML_BIEN.map(function (b) {
       if (b.length === 1) return '<tr class="nhom"><td colspan="4">' + b[0] + '</td></tr>';
       var gt = b[1] === 'hang' ? b[2] : b[3] ? b[3](hs) : '';
-      return '<tr' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '><td class="tt">' + (gt ? '<span style="color:var(--xanh-la)">✓</span>' : '<span style="color:#B85F00">!</span>') +
+      return '<tr' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '><td class="tt">' + (gt ? '' : '<span class="canhml">!</span>') +
         '</td><td><code>{' + b[0] + '}</code></td><td>' + chonNguon(b) + '</td><td><div class="gt' + (gt ? '' : ' thieu') + '" title="' + gt + '">' + (gt || 'chưa ghép — để nguyên {' + b[0] + '}') + '</div></td></tr>';
     }).join('');
   }
@@ -2546,15 +2548,12 @@
     $('mlDuLieu').value = co ? 'G:\\SoHoa\\Bien_muc\\Bien_muc_tong_hop.xlsx' : '';
     $('mlGioiThieu').classList.toggle('an', co);
     $('mlThan').classList.toggle('an', !co);
-    $('mlSoGhep').style.display = co ? '' : 'none';
     $('mlTao').disabled = !co && ml.chay !== 1;
     $('mlTao').className = 'nut ' + (ml.chay === 1 ? 'do' : co ? 'xanh' : 'xam'); $('mlTao').textContent = ml.chay === 1 ? 'Dừng' : 'Sinh mục lục';
     var tabs = $('mlTab').children; tabs[0].classList.toggle('chon', co && mau); tabs[1].classList.toggle('chon', co && !mau);
-    tabs[1].textContent = 'Kết quả' + (co ? ' (22 hồ sơ)' : '');
-    $('mlTomTat').innerHTML = '<span>Hồ sơ: <b>' + (co ? 22 : 0) + '</b></span><span>Văn bản: <b>' + (co ? 326 : 0) + '</b></span><span>Biến đã ghép: <b>' + (co ? '12/13' : '0') +
-      '</b></span><span>Cần xem: <b style="color:#B85F00">' + (co ? loi.length : 0) + '</b></span><span>Đã sinh: <b>' + (ml.chay === 2 ? 22 : ml.chay === 1 ? 13 : 0) + '</b></span>' +
-      '<label><input type="checkbox" id="mlPdf" checked> Kèm PDF</label>';
-    var td = ml.chay === 2 ? [100, '100% (22/22 hồ sơ)'] : ml.chay === 1 ? [59, '59% (13/22 hồ sơ) · đang tạo MLHS_HS-14.docx · còn ~00:00:07'] : [0, co ? 'Sẵn sàng' : ''];
+    tabs[0].innerHTML = 'Mẫu' + (co ? '<span class="dem canh" title="Biến đã ghép / tổng biến">12/13 biến</span>' : '');
+    tabs[1].innerHTML = 'Kết quả' + (co ? '<span class="dem">22 hồ sơ</span>' + (loi.length ? '<span class="dem canh" title="Hồ sơ cần xem">⚠ ' + loi.length + '</span>' : '') : '');
+    var td = ml.chay === 2 ? [100, '100% (22/22 hồ sơ)'] : ml.chay === 1 ? [59, '59% (13/22 hồ sơ) · đang tạo MLHS_HS-14.docx · còn ~00:00:07'] : [0, co ? 'Sẵn sàng · 22 hồ sơ · 326 văn bản · cần xem: ' + loi.map(function (h) { return h[0]; }).join(', ') + ' · xem trước bằng Microsoft Word' : ''];
     $('mlTienDo').style.width = td[0] + '%'; $('mlTienDoChu').textContent = td[1];
     if (!co) return;
     $('mlDieuHuong').style.display = mau ? 'none' : 'contents';
@@ -2564,14 +2563,14 @@
         ML_BIEN.map(function (b) {
           if (b.length === 1) return '<span class="nhombien">' + b[0].replace(/ \(.*/, '') + '</span>';
           return '<div class="vbdong" data-mlghep="1" role="row"><span><code>{' + b[0] + '}</code></span><span style="color:var(--chu-phu)">' + (b[1] === 'cot' ? b[2] : b[1] === 'hang' ? '“' + b[2] + '”' : '—') + '</span>' +
-            (b[1] === 'thieu' ? '<span style="color:#B85F00;font-weight:bold;text-align:center">!</span>' : '<span style="color:var(--xanh-la);text-align:center">✓</span>') + '</div>';
+            (b[1] === 'thieu' ? '<span class="canhml" title="Chưa ghép">!</span>' : '<span></span>') + '</div>';
         }).join('') + '<span class="nhombien">Tự động</span><div class="vbdong"><span><code>{trang_so}</code></span><span style="color:var(--chu-phu)">số trang</span><span></span></div>' +
         '<div class="vbdong"><span><code>{tong_so_trang}</code></span><span style="color:var(--chu-phu)">tổng số trang</span><span></span></div></div>';
-      $('mlXemTT').innerHTML = 'Mẫu 01 – Quảng Trị · hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:#E3EEFB"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#E8E8E8"></i>tự động</span></span>';
+      $('mlXemTT').innerHTML = '<button class="nut" data-mlghep="1">Ghép biến…</button><span style="margin-left:10px">Hàng mẫu: bảng 2, dòng 2</span><span class="chuthich"><span><i style="background:#E3EEFB"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#E8E8E8"></i>tự động</span></span>';
       $('mlVungXem').innerHTML = trangMau();
     } else {
       $('mlTrai').innerHTML = '<div class="banghs" role="grid" style="grid-template-columns:24px minmax(72px,1fr) 40px 28px"><span class="tieude-cot so">#</span><span class="tieude-cot">Hồ sơ</span><span class="tieude-cot so">VB</span><span class="tieude-cot"></span>' +
-        ML_HS.map(function (h, i) { return '<div class="vbdong' + (i === ml.hs ? ' chon' : '') + '" data-mlhs="' + i + '" role="row"><span class="so">' + (i + 1) + '</span><span>' + h[0] + '</span><span class="so">' + h[1] + '</span>' + (h[2] ? '<span title="' + h[2] + '" style="color:#B85F00;text-align:center;font-weight:bold">⚠</span>' : '<span style="color:var(--xanh-la);text-align:center">✓</span>') + '</div>'; }).join('') + '</div>';
+        ML_HS.map(function (h, i) { return '<div class="vbdong' + (i === ml.hs ? ' chon' : '') + '" data-mlhs="' + i + '" role="row"><span class="so">' + (i + 1) + '</span><span>' + h[0] + '</span><span class="so">' + h[1] + '</span>' + (h[2] ? '<span class="canhml" title="' + h[2] + '">⚠</span>' : '<span></span>') + '</div>'; }).join('') + '</div>';
       $('mlSo').value = ml.hs + 1; $('mlXemTT').innerHTML = 'Hồ sơ <b>' + hs[0] + '</b> · ' + hs[1] + ' văn bản · 1 trang';
       $('mlVungXem').innerHTML = trangKetQua(hs);
     }
@@ -2585,7 +2584,6 @@
   $('mlChonDuLieu').onclick = $('mlLkChon').onclick = function () { ml.coDuLieu = true; veMucLuc(); };
   $('mlTruoc').onclick = function () { ml.hs = Math.max(0, ml.hs - 1); veMucLuc(); };
   $('mlSau').onclick = function () { ml.hs = Math.min(ML_HS.length - 1, ml.hs + 1); veMucLuc(); };
-  $('mlNutGhep').onclick = moGhep;
   $('mlTao').onclick = function () { ml.chay = ml.chay === 1 ? 0 : 1; ml.tab = 'ketqua'; veMucLuc(); };
   document.querySelectorAll('[data-dong^="phuML"]').forEach(function (b) { b.onclick = function () { $(b.getAttribute('data-dong')).classList.remove('mo'); }; });
   var h = location.hash;
