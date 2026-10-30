@@ -24,10 +24,12 @@ Brainstorm: `plans/reports/brainstorm-261030-1009-license-gioi-han-so-lan-report
 - Mặc định 2 Đếm + 2 Tách; ô hạn mức trống trên Sheet = 2; ô trạng thái trống = Dùng thử.
 - Offline: luôn tối đa 2 lần (mỗi chức năng), kể cả máy đã cấp; có mạng lại thì ghi bù.
 - Áp cho cả giao diện và dòng lệnh (`--tach`, đếm CLI).
-- **Không chờ mạng khi bấm**: quyết định trên bản sao license trong bộ nhớ (làm mới ngầm lúc mở app, mỗi 5 phút, sau mỗi lần chạy, khi bấm Kiểm tra lại). Thay đổi trên Sheet có hiệu lực chậm ≤ 5 phút.
+- **Không chờ mạng khi bấm**: quyết định trên bản sao license trong bộ nhớ. **Không làm mới định kỳ** — chỉ gọi trạm lúc mở app, sau mỗi lần chạy xong (ghi lần dùng + nhận trạng thái mới trong cùng 1 lời gọi) và khi bấm Kiểm tra lại (~2–3 lời gọi / lần dùng). Đặt Khoá: máy chạy được tối đa thêm 1 lần rồi bị chặn.
 - Repo `quangtv1/dema4` **giữ công khai**; phát hành như hiện nay.
 - Thống kê Ngưỡng trắng chuyển qua trạm; khoá service account bị gỡ khỏi exe và thu hồi.
-- **Telegram qua trạm**: token + id nhóm lưu ở tab `Cấu hình` trên Sheet, chỉ trạm đọc; app gửi số liệu có cấu trúc, trạm tự soạn tin và gửi (kèm CSV ngưỡng). Bỏ token nhúng và `telegram.txt` khỏi app.
+- **Telegram qua trạm + hàng đợi**: token + id nhóm lưu ở tab `Cấu hình`, chỉ trạm đọc; app gửi số liệu có cấu trúc, trạm soạn tin rồi **xếp vào tab `Hàng đợi Telegram`**; trigger mỗi 1 phút gửi tối đa 15 tin (Telegram ~20 tin/phút/nhóm), lỗi 429 để lại lần sau → không mất tin, chậm tối đa vài phút. Bỏ token nhúng và `telegram.txt` khỏi app.
+- **Chịu tải**: trạm quá tải / lỗi → app dùng bản sao hoặc luật offline, ghi bù sau; không mất lượt, không treo.
+- **Tài khoản chủ Sheet + Apps Script: Google Workspace** (vd huce.edu.vn hoặc Workspace Sao Mai) — hạn mức UrlFetch ~100.000/ngày, trigger 6 giờ/ngày (Gmail thường: 20.000 và 90 phút).
 - AGPL / MuPDF: không còn vướng (repo mở).
 
 ## Phases
@@ -45,7 +47,9 @@ Thứ tự: 1 và 2 làm song song → 3 → 4; 5 sau 2 (cần trước khi test
 
 ## Acceptance criteria (cả kế hoạch)
 - Máy mới có mạng: tab `license` tự có dòng của máy; lần thứ 3 Đếm (hoặc Tách) bị chặn bằng popup có mã máy + Copy + Kiểm tra lại.
-- Chủ Sheet nâng hạn mức → khách bấm Kiểm tra lại dùng được ngay; đặt Khoá → máy bị chặn trong ≤ 5 phút (hoặc ngay sau lần chạy kế tiếp), kể cả còn lượt.
+- Chủ Sheet nâng hạn mức → khách bấm Kiểm tra lại dùng được ngay; đặt Khoá → máy chạy được tối đa 1 lần nữa rồi bị chặn (hoặc chặn ngay khi mở lại app / bấm Kiểm tra lại), kể cả còn lượt.
+- App không gọi trạm khi người dùng không thao tác (không có hẹn giờ làm mới).
+- 30 tin Telegram tới trạm trong 1 phút → cả 30 tới nhóm trong ≤ 3 phút, không mất tin.
 - Offline: 2 lần mỗi chức năng, lần 3 chặn; có mạng lại → nhật ký có dòng "bù offline".
 - Exe không chứa khoá ghi Sheet và không chứa token Telegram; câu trả lời giả (sửa 1 ký tự / chữ ký máy khác / phát lại) bị từ chối.
 - Đổi token / nhóm Telegram trên tab `Cấu hình` → tin kế tiếp đi đúng nhóm mới, không cần phát hành lại.

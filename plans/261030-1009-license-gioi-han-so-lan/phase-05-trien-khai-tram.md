@@ -20,11 +20,12 @@ Gắn `license.gs` vào spreadsheet Monitor_dema4, tạo khoá RSA, deploy web a
 1. Tạo cặp khoá trên máy chủ Sheet:
    `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out license_priv.pem` ;
    `openssl pkey -in license_priv.pem -pubout -out license_pub.pem`.
-2. Monitor_dema4 › Tiện ích mở rộng › Apps Script → dán `license.gs` + `appsscript.json`; Project Settings › Script Properties: `KHOA_BI_MAT` = nội dung `license_priv.pem`. Xoá file `license_priv.pem` khỏi máy sau khi dán (giữ 1 bản sao lưu an toàn ngoài máy nếu muốn).
+2. **Chủ spreadsheet + Apps Script là tài khoản Google Workspace** (huce.edu.vn hoặc Workspace Sao Mai; chuyển quyền sở hữu Monitor_dema4 nếu đang thuộc Gmail thường). Monitor_dema4 › Tiện ích mở rộng › Apps Script → dán `license.gs` + `appsscript.json`; Project Settings › Script Properties: `KHOA_BI_MAT` = nội dung `license_priv.pem`. Xoá file `license_priv.pem` khỏi máy sau khi dán (giữ 1 bản sao lưu an toàn ngoài máy nếu muốn).
 3. Deploy › New deployment › Web app: Execute as **Me**, Who has access **Anyone** → chép URL.
 4. Chép `license_pub.pem` vào `dema4_rs/assets/`, URL vào hằng trong `license.rs`.
 5. Tạo tab `Cấu hình` (Khoá | Giá trị): `telegram_token` = token bot hiện tại, `telegram_chat_id` = id nhóm hiện tại (lấy từ `telegram.rs` / `telegram.txt` trên máy quản trị — **không** dán vào chat hay commit).
-6. Chạy `#[ignore]` `kho_tram_that` → xanh; tab `license`, `license_nhat_ky`, `Mô tả license` tự xuất hiện; thử 1 `thong_ke_dem` → tin tới nhóm.
+6. Trong Apps Script chạy 1 lần hàm `caiTrigger()` (tạo trigger `guiHangDoi` mỗi 1 phút; không tạo trùng nếu đã có) và cấp quyền UrlFetch khi Google hỏi.
+6b. Chạy `#[ignore]` `kho_tram_that` → xanh; tab `license`, `license_nhat_ky`, `Mô tả license`, `Hàng đợi Telegram` tự xuất hiện; thử 1 `thong_ke_dem` → dòng "chờ" → trong ≤ 1 phút thành "đã gửi" và tin tới nhóm.
 7. Cấp máy dev / nội bộ: điền Hạn mức lớn + Trạng thái "Đã cấp".
 8. **Sau khi v0.6.0 đã phát hành và các máy đã cập nhật**: gỡ quyền service account khỏi spreadsheet (Chia sẻ › xoá email service account) và vô hiệu hoá khoá trong Google Cloud Console. Bản ≤ v0.5.x sẽ không ghi thống kê được nữa (chấp nhận).
 9. Cũng sau khi phát hành: **đổi token bot** (BotFather › /revoke) vì token cũ đã nằm trong các exe cũ; dán token mới vào tab `Cấu hình`. Bản cũ ngừng gửi Telegram (chấp nhận).
