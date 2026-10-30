@@ -551,8 +551,12 @@
   .oml.hang { background:#fff; border-color:var(--vien); color:var(--chu); }
   .oml.cot:hover, .oml.tach:hover { border-color:#A9C2E6; }
   .oml.tudong { background:#E8E8E8; color:#555; cursor:default; } .oml.tudong:hover { border-color:transparent; }
-  .nhomtrai { flex:1; min-width:0; display:flex; align-items:center; gap:6px; font-size:12px; color:var(--chu-phu); white-space:nowrap; }
-  .nhomtrai select { flex:1; min-width:0; height:22px !important; font-size:12px; }
+  /* Hàng "Nhóm theo" ở chân sidebar: cùng lưới cột với bảng biến, nền riêng, ô chọn không viền */
+  .nhomtrai { flex:1; align-self:stretch; display:grid; grid-template-columns:118px minmax(0,1fr) 22px; align-items:center; background:#E6ECF4; font-size:12px; color:#33465E; font-weight:bold; }
+  .nhomtrai > span { padding-left:6px; }
+  #mlThan .daytrai { padding:0; width:0; min-width:100%; box-sizing:border-box; } /* không nới rộng cột trái theo nội dung chân */ #mlThan .timtrai { margin:0 6px; }
+  #manMucLuc .nhomtrai select { width:calc(100% - 4px); min-width:0; height:26px; margin:0 2px; border-color:transparent; background-color:#fff; font-weight:normal; color:var(--chu); }
+  #manMucLuc .nhomtrai select:hover { border-color:#A9C2E6; }
   .oml svg { width:10px; height:6px; flex-shrink:0; margin-left:auto; opacity:0; } .oml:hover svg, .oml.mo svg { opacity:1; }
   .oml.thieu .ten { color:#B85F00; font-style:italic; } .oml.thieu { border-color:#E8C77A; background:#FFFBEF; }
   .dsml { position:absolute; left:12px; right:12px; top:36px; z-index:5; background:#fff; border:1px solid var(--vien); border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.18); padding:6px; max-height:236px; overflow-y:auto; }
@@ -787,7 +791,7 @@
           <div class="trai" id="mlTrai"></div>
           <div class="daytrai">
             <label class="timtrai"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
-              <input type="search" id="mlTim" placeholder="Tìm hồ sơ" aria-label="Tìm" autocomplete="off"></label><label class="nhomtrai" id="mlNhomTrai" title="Các dòng liền nhau có cùng giá trị ở cột này được gom thành 1 hồ sơ">Cột mã hồ sơ <select><option>Tiêu đề hồ sơ</option><option>STT</option></select></label></div>
+              <input type="search" id="mlTim" placeholder="Tìm hồ sơ" aria-label="Tìm" autocomplete="off"></label><label class="nhomtrai" id="mlNhomTrai" title="Nhóm các dòng liền nhau có cùng giá trị ở cột này thành 1 hồ sơ; (số) = số giá trị khác nhau trong cột"><span>Nhóm theo</span><select class="mlnhom"></select></label></div>
         </div>
         <div class="keo" id="mlKeo" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng cột trái" tabindex="0"></div>
         <div class="phai xemml">
@@ -1102,8 +1106,8 @@
   <div class="phu" id="phuMLGhep">
     <div class="popup ghep-ml" role="dialog" aria-label="Ghép biến">
       <div class="dau">Ghép biến — <b>Mẫu 01 – Quảng Trị</b></div>
-      <div class="dongnhom"><span title="Các dòng liền nhau có cùng giá trị ở cột này được gom thành 1 hồ sơ">Cột mã hồ sơ</span> <select id="mlNhom" title="Các dòng liền nhau có cùng giá trị ở cột này được gom thành 1 hồ sơ"><option>Tiêu đề hồ sơ</option><option>STT</option></select>
-        <span style="color:var(--chu-phu)">(dòng liền nhau cùng mã = 1 hồ sơ)</span>
+      <div class="dongnhom"><span title="Nhóm các dòng liền nhau có cùng giá trị ở cột này thành 1 hồ sơ; (số) = số giá trị khác nhau trong cột">Nhóm theo</span> <select id="mlNhom" class="mlnhom" title="Nhóm các dòng liền nhau có cùng giá trị ở cột này thành 1 hồ sơ; (số) = số giá trị khác nhau trong cột"></select>
+        <span style="color:var(--chu-phu)">(dòng liền nhau cùng giá trị = 1 hồ sơ)</span>
         <span class="goiy"><b>22</b> hồ sơ · <b>326</b> văn bản · đã ghép <b id="mlGhepSo">12/13</b> biến</span></div>
       <div class="bang"><table>
         <colgroup><col style="width:34px"><col style="width:190px"><col style="width:380px"><col></colgroup>
@@ -2518,6 +2522,8 @@
     ['22/BC-UBND', '30/03/2015', 'UBND xã', 'Báo cáo kết quả thực hiện quý I', 'Bản gốc'], ['07/CV-UBND', '14/04/2015', 'UBND huyện', 'Công văn hướng dẫn triển khai', 'Bản gốc'],
     ['31/QĐ-UBND', '20/05/2015', 'UBND xã', 'Quyết định phê duyệt danh sách', 'Bản sao']];
   var COT = ['Tiêu đề hồ sơ', 'STT', 'Số, ký hiệu văn bản', 'Ngày tháng văn bản', 'Tác giả', 'Trích yếu nội dung VB', 'Tờ số', 'Ghi chú'];
+  var COT_DUY_NHAT = [22, 65, 318, 241, 14, 309, 98, 3]; // số giá trị khác nhau mỗi cột, không tính dòng tiêu đề
+  document.querySelectorAll('.mlnhom').forEach(function (sel) { sel.innerHTML = COT.map(function (c, i) { return '<option>' + c + ' (' + COT_DUY_NHAT[i] + ')</option>'; }).join(''); });
   // [biến, nguồn: 'cot' | 'hang' | 'thieu', giá trị nguồn, giá trị của hồ sơ đang xem]
   var ML_BIEN = [
     ['Thông tin hồ sơ (in một lần)'],
