@@ -36,8 +36,9 @@ Dựng màn Mục lục trong prototype HTML hiện có (nguồn chân lý UI) �
 - Duyệt của chủ sản phẩm = điều kiện sang phase 3 (phase 2 chạy song song được).
 
 ## Success Criteria
-- [ ] 6 trạng thái hiển thị đúng, đồng bộ phong cách Tách.
-- [ ] Chủ sản phẩm duyệt; chốt câu hỏi mở: thư mục ra mặc định, nhiều sheet.
+- [x] 6 trạng thái hiển thị đúng, đồng bộ phong cách Tách (ảnh: `anh-prototype/`).
+- [x] Chủ sản phẩm duyệt (30/10): giữ bố cục, sửa dần khi làm app.
+- [x] Chốt: thư mục ra mặc định = thư mục dữ liệu ẩn cạnh exe `.sm-dema4/muc_luc/<tên file dữ liệu>/`; mỗi lần 1 sheet.
 
 ## Risk Assessment
 - Prototype phình to → chỉ thêm khối mới, không sửa màn cũ.

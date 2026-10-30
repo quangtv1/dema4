@@ -51,5 +51,4 @@ Ngày: 30/10/2026 · Nguồn: https://github.com/quangtv1/print_mltl (v1.12.12, 
 - License chặn đúng khi hết lượt; tin Telegram đủ thông tin.
 
 ## Câu hỏi còn mở
-- Đặt tên file / thư mục ra mặc định cạnh file Excel hay cạnh exe (dữ liệu ẩn)? — chốt ở prototype.
-- Có cần chọn nhiều sheet một lần không? (bản gốc: 1 sheet).
+- (Đã chốt 30/10) Thư mục ra mặc định `.sm-dema4/muc_luc/<tên file dữ liệu>/` cạnh exe; mỗi lần 1 sheet.

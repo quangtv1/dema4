@@ -14,11 +14,11 @@ Màn egui theo prototype đã duyệt, nối lõi phase 2; tính lượt license
 
 ## Requirements
 - `Man::MucLuc` (mục 4 menu Chức năng, tiêu đề cửa sổ "Mục lục hồ sơ (Giải pháp số Sao Mai)"); chưa có dữ liệu → `gioi_thieu::MUC_LUC` 3 bước.
-- Dòng Dữ liệu: ô đường dẫn + Chọn (rfd, nhớ thư mục, **đánh thức UI** như fix Tách), Sheet ▾, Header dòng; dòng Mẫu: 4 mẫu nhúng ▾ + Chọn DOCX.
+- Dòng Dữ liệu: ô đường dẫn + Chọn (rfd, nhớ thư mục, **đánh thức UI** như fix Tách), Sheet ▾ (mỗi lần 1 sheet), Header dòng; dòng Mẫu: 4 mẫu nhúng ▾ + Chọn DOCX.
 - Cột trái Hồ sơ (`cot_trai`): #, tên (khoá nhóm), số VB, ✓/⚠ (lỗi từ kiểm tra); ô Tìm; Tất cả.
 - Tab Ghép biến: bảng biến theo thứ tự xuất hiện trong mẫu, Nguồn ▾ (Cột…/Hằng), ô Hằng, giá trị của hồ sơ đang chọn; Cột gom nhóm ▾; tự khớp khi đổi file/mẫu; Kiểm tra dữ liệu (luồng nền).
 - Dòng đáy: Số hồ sơ; Số văn bản; Biến thiếu + **Tạo mục lục** (khoá khi lỗi). Popup tiến độ + kết quả (Mở thư mục).
-- Cấu hình › tab Mục lục: thư mục ra (mặc định theo câu trả lời prototype), mẫu tên, Ghi đè; lưu ở `.dema4_saomai.cfg` (khoá mới, mặc định khi thiếu).
+- Cấu hình › tab Mục lục: thư mục ra (trống = mặc định `goc_du_lieu()/muc_luc/<tên file dữ liệu không đuôi>/`, tức `.sm-dema4` cạnh exe; gõ đường dẫn để ghi nơi khác), mẫu tên, Ghi đè; lưu ở `.dema4_saomai.cfg` (khoá mới, mặc định khi thiếu). Popup kết quả có **Mở thư mục** (thư mục ẩn nên bắt buộc có nút này).
 - Nhớ lựa chọn gần nhất (file, sheet, mẫu, ràng buộc biến theo mẫu) trong cấu hình.
 - **License**: `ChucNang::MucLuc` (`ma()` = "muc_luc"); trạm: cột Đã dùng / Hạn mức Mục lục (thêm cột cuối, không xê dịch cột cũ), `thong_ke_muc_luc` + tin `📑 MỤC LỤC HỒ SƠ (x/y)` (Thông tin máy / ----- / chức năng: Dữ liệu, Mẫu, Số hồ sơ, Số văn bản, DOCX, PDF, Lỗi, Thời gian), tin hết lượt Mục lục. App cũ không gửi `muc_luc` → không ảnh hưởng.
 - 1 lượt = 1 lần Tạo có ≥ 1 DOCX ra; hết lượt → popup Liên hệ Sao Mai (đã có, thêm tên chức năng).
