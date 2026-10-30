@@ -67,6 +67,11 @@ jobs:
       - name: Test tách văn bản
         run: cargo test --release tach_vb
 
+      # Logic trạm license (Apps Script) chạy được bằng Node — test 1 lần trên macOS
+      - name: Test trạm license (Node)
+        if: runner.os == 'macOS'
+        run: node --test apps-script/test/loi.test.js
+
       - name: Tải lên artifact
         uses: actions/upload-artifact@v4
         with:

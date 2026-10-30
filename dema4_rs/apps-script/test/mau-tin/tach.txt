@@ -1,0 +1,4 @@
+Tên PC: <b>ABC</b>; Địa chỉ Mac: <b>AA:BB</b>
+- Thư mục tách: <b>/a/&lt;b&gt;</b>;
+- Hồ sơ: <b>2</b>; Văn bản: <b>211</b>; Số trang: <b>476</b>; Bỏ index: <b>209</b>; Bỏ trắng: <b>1</b>; Split: <b>0</b>; Sao nguyên: <b>0</b>; Hồ sơ lỗi: <b>0</b>
+- Thời điểm tách: <b>29.10.2026, 11:30:00</b>  (0 phút, 1,2 giây)
