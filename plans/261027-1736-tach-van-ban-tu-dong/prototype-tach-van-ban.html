@@ -94,6 +94,18 @@
   .hoso b { display:block; } .hoso span { display:block; color:var(--chu-phu); font-size:12px; margin-top:3px; }
   .phai { flex:1; min-width:0; display:flex; flex-direction:column; }
   .trong { flex:1; display:flex; align-items:center; justify-content:center; color:var(--chu-phu); }
+  /* Màn mở mặc định (chưa có dữ liệu): logo nhỏ + giới thiệu ngắn chức năng, 3 bước có màu */
+  .gioithieu { text-align:center; color:var(--chu); max-width:560px; }
+  .gioithieu img { width:72px; height:auto; }
+  .gioithieu h2 { font-size:17px; font-weight:bold; margin:8px 0 4px; }
+  .gioithieu p { font-size:12px; color:var(--chu-phu); margin:0 0 16px; line-height:1.5; }
+  .buoc { display:flex; gap:14px; justify-content:center; }
+  .buoc div { width:160px; background:#fff; border:1px solid var(--vien-nhat); border-radius:8px; padding:12px 10px; font-size:12px; line-height:1.45; color:var(--chu); }
+  .buoc b { display:inline-flex; width:26px; height:26px; border-radius:50%; color:#fff; align-items:center; justify-content:center; font-size:13px; margin-bottom:6px; }
+  .buoc .xanh { background:var(--cobalt); } .buoc .cam { background:#E8731A; } .buoc .la { background:var(--xanh-la); }
+  .buoc span { display:block; font-weight:bold; margin-bottom:2px; }
+  .kho { display:flex; gap:5px; justify-content:center; margin-top:14px; }
+  .kho i { font-style:normal; font-size:11px; padding:2px 7px; border-radius:10px; background:#EAF3FC; color:var(--cobalt); border:1px solid #CFE3F7; }
   .loc { height:30px; display:flex; background:#F7F7F7; border-bottom:1px solid var(--vien-nhat); }
   .loc > button { padding:0 14px; border:0; border-bottom:2px solid transparent; background:transparent; cursor:pointer; }
   .loc > button.chon { border-bottom-color:var(--chon-vien); background:var(--chon-nen); font-weight:bold; }
@@ -505,7 +517,18 @@
         </div>
         <div class="keo" id="keo" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng cột trái" tabindex="0"></div>
         <div class="phai">
-          <div class="trong" id="chuaPT">Bấm Phân tích</div>
+          <div class="trong" id="chuaPT">
+            <div class="gioithieu">
+              <img alt="" class="logo-gt">
+              <h2>Tách văn bản</h2>
+              <p>Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng và gợi ý trang bị xoay. Nhãn do máy đoán, người duyệt lại trước khi tách — file PDF gốc không bị sửa.</p>
+              <div class="buoc">
+                <div><b class="xanh">1</b><span>Chọn thư mục</span>Bấm <u>Chọn</u> rồi <u>Phân tích</u>; tên hồ sơ hiện ngay ở cột trái.</div>
+                <div><b class="cam">2</b><span>Duyệt nhãn</span>Kiểm tra Index · Trắng · Split; duyệt hết Nghi trắng, Nghi xoay.</div>
+                <div><b class="la">3</b><span>Tách</span>Mỗi hồ sơ một thư mục, văn bản đặt tên theo mẫu, có log kết quả.</div>
+              </div>
+            </div>
+          </div>
 
           <div id="cheTrang" class="an" style="flex:1;min-height:0;display:flex;flex-direction:column">
             <div class="loc">
@@ -638,7 +661,19 @@
     </div>
     <div class="bangdem">
       <div class="tabkho"><span class="chon">Tất cả (896)</span><span>A0 (0)</span><span>A1 (0)</span><span>A2 (0)</span><span>A3 (0)</span><span>A4 (896)</span><span>A5 (0)</span><span>A6 (0)</span><span>A7 (0)</span></div>
-      <div class="trong">Bảng chi tiết (như hiện tại)</div>
+      <div class="trong">
+        <div class="gioithieu">
+          <img alt="" class="logo-gt">
+          <h2>Đếm trang A4</h2>
+          <p>Đếm số trang của mọi PDF trong thư mục (cả thư mục con), phân loại khổ giấy và quy đổi ra số trang A4 theo hệ số; cảnh báo trang sát ngưỡng khổ, DPI bất thường, file đã ký số.</p>
+          <div class="buoc">
+            <div><b class="xanh">1</b><span>Chọn thư mục</span>Bấm <u>Chọn</u>; tuỳ chọn Check ký số, Check DPI.</div>
+            <div><b class="cam">2</b><span>Đếm</span>Bảng chi tiết từng trang, lọc theo khổ, bấm tên file để mở.</div>
+            <div><b class="la">3</b><span>Lấy kết quả</span>Tự lưu <u>_dem.txt</u> · Mở kết quả · Copy dán vào Excel.</div>
+          </div>
+          <div class="kho"><i>A0</i><i>A1</i><i>A2</i><i>A3</i><i>A4</i><i>A5</i><i>A6</i><i>A7</i></div>
+        </div>
+      </div>
     </div>
     <div class="tiendo"><div><b style="width:100%"></b><span>100% (2/2 files)</span></div></div>
   </div>
@@ -917,6 +952,8 @@
     goiyTuDong = JSON.stringify(lech); goiy = JSON.parse(goiyTuDong);
   })();
   // chonDs/neo dùng khoá trang 'hs.p' vì lưới gộp trang của mọi hồ sơ; locHS = -1: tất cả hồ sơ
+  // Logo màn mở mặc định dùng lại ảnh của hộp Thông tin (không nhúng base64 2 lần)
+  var logoGT = document.querySelector('.logott img').src; document.querySelectorAll('.logo-gt').forEach(function (i) { i.src = logoGT; });
   var s = { tdHS: '', tdVB: '', chonVB: {}, neoVB: '', locMenu: 'tat', xemVB: 'luoi', man: 'tach', hoSo: 0, locHS: -1, loc: 'tat', daPT: false, che: 'trang', vb: 0, sap: 'trang', chonDs: {}, neo: '' };
   var daXoa = TEN.map(function () { return {}; });
   var dangPT = false;
@@ -2183,6 +2220,7 @@
   if (location.hash === '#xoay-vb') { s.daPT = true; s.che = 'vanban'; s.vb = 0; xoay[0][2] = 90; s.chonVB = { '0.2': true, '0.3': true }; ve(); }
   if (location.hash === '#menu-phai') { s.daPT = true; ve(); setTimeout(function () { var t = document.querySelector('#luoi [data-k="0.10"]'), rr = t.getBoundingClientRect(); t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rr.left + 40, clientY: rr.top + 40 })); }, 50); }
   if (location.hash === '#ky-van-ban') { s.man = 'ky'; ve(); }
+  if (location.hash === '#dem') { s.man = 'dem'; ve(); }
   if (location.hash === '#chuc-nang') { setTimeout(function () { $('nutMenu').click(); }, 50); }
   if (location.hash === '#tro-giup') { setTimeout(function () { $('nutTroGiup').click(); }, 50); }
   if (location.hash === '#cap-nhat') moTroGiup('capnhat');
