@@ -44,8 +44,9 @@
   .nut.do { background:#D32F2F; color:#fff; border-color:#B71C1C; }
   /* Popup hết lượt (license) */
   /* Icon bên trái, 2 dòng lý do cân trái, mép trái thẳng cột "Mã máy" bên dưới */
+  .hl-logo { text-align:center; padding:14px 16px 0; } .hl-logo img { width:64px; height:auto; cursor:pointer; }
   .hl-dau { display:grid; grid-template-columns:70px 1fr; column-gap:8px; align-items:center; padding:16px 18px 6px; }
-  .hl-dau svg { width:34px; height:34px; color:var(--do); justify-self:start; }
+  .hl-dau svg { width:30px; height:30px; color:var(--do); justify-self:start; }
   .hl-lydo { font-size:13px; text-align:left; line-height:1.55; }
   .hl-lydo b { color:var(--do); }
   .hl-mang { padding:0 18px 6px 96px; font-size:11.5px; color:var(--chu-phu); text-align:left; }
@@ -886,8 +887,9 @@
   <div class="phu" id="phuHetLuot">
     <div class="popup" role="dialog" aria-label="Hết lượt dùng" style="width:380px">
       <div class="dau">Liên hệ Sao Mai</div>
+      <div class="hl-logo"><a href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a></div>
       <div class="hl-dau">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v6"/><path d="M12 16.5h.01"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="1.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2.5"/></svg>
         <div class="hl-lydo">Lý do: Số lần <span id="hlChucNang">Tách</span> còn lại (<b>0</b>)<br>Liên hệ với Sao Mai để được hỗ trợ.</div>
       </div>
       <div class="hl-mang an" id="hlMang">Chưa kết nối được máy chủ — kết nối mạng rồi bấm Kiểm tra lại.</div>
