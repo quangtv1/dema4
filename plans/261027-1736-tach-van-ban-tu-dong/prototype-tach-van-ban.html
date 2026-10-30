@@ -2616,7 +2616,7 @@
     $('mlTao').className = 'nut ' + (ml.chay === 1 ? 'do' : co ? 'xanh' : 'xam'); $('mlTao').textContent = ml.chay === 1 ? 'Dừng' : 'Sinh mục lục';
     var tabs = $('mlTab').children; tabs[0].classList.toggle('chon', co && mau); tabs[1].classList.toggle('chon', co && !mau);
     var dsb = ML_BIEN.filter(function (b) { return b.length > 1; }), thieu = dsb.filter(function (b) { return b[1] === 'thieu'; }).length;
-    tabs[0].textContent = 'Mẫu' + (co ? ' (' + (dsb.length - thieu) + '/' + dsb.length + ' biến)' : '');
+    tabs[0].textContent = 'Mẫu' + (co ? ' (' + (dsb.length + 2 - thieu) + '/' + (dsb.length + 2) + ' biến)' : '');
     tabs[1].textContent = 'Kết quả' + (co ? ' (22 hồ sơ)' : '');
     $('mlCanh').innerHTML = co ? '⚠ ' + (thieu ? thieu + ' biến chưa ghép · ' : '') + loi.length + ' hồ sơ cần xem (' + loi.map(function (h) { return h[0]; }).join(', ') + ')' : '';
     var icon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
