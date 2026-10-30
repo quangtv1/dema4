@@ -36,6 +36,7 @@ Chạy thật với trạm Apps Script trên Mac + Windows theo ma trận tình 
 | 15 | Đổi `telegram_chat_id` | Tin kế tiếp tới nhóm mới, không cài lại app |
 | 16 | 30 tin trong 1 phút | Tới đủ trong ≤ 3 phút, không trùng |
 | 17 | App mở 1 giờ không thao tác | Nhật ký thực thi trạm: chỉ lời gọi lúc mở app |
+| 18 | Đang mở app, chuyển Wi-Fi cơ quan → 4G rồi Đếm | Dòng license và dòng nhật ký lần đó có IP mới |
 
 ## Related Code Files
 - Modify: `README.md` (mục License: cách hoạt động, mã máy, liên hệ; mục Gửi thống kê thêm mã máy), `dema4_rs/src/tro_giup.rs` (Hướng dẫn: mục License), `dema4_rs/Cargo.toml` (0.6.0)
@@ -49,7 +50,7 @@ Chạy thật với trạm Apps Script trên Mac + Windows theo ma trận tình 
 5. Xác nhận phase 5 bước 0 đã làm (token mới, khoá service account đã vô hiệu).
 
 ## Success Criteria
-- [ ] 17 tình huống đạt (1–13 trên cả Mac và Windows; 14–17 một lần).
+- [ ] 18 tình huống đạt (1–13, 18 trên cả Mac và Windows; 14–17 một lần).
 - [ ] Release v0.6.0 có 2 file; service account cũ đã thu hồi.
 - [ ] Báo cáo kiểm thử lưu trong plan.
 

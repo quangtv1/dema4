@@ -21,7 +21,7 @@ Bấm Đếm / Tách: quyết định **tức thì** trên câu trả lời ký 
 - CLI: chặn → in lý do + mã máy, mã thoát 3. Hộp Thông tin hiện mã máy.
 
 ## Architecture
-- `license::KiemTra` (`Arc`): giữ `Arc<dyn KhoLicense>`, `SoLuot`, `ThongTinMay`, 1 thread gửi + kênh việc.
+- `license::KiemTra` (`Arc`): giữ `Arc<dyn KhoLicense>`, `SoLuot`, phần cố định của máy (mã máy, tên máy, MAC — đọc 1 lần lúc mở app), 1 thread gửi + kênh việc. **IP nội bộ / IP public đọc lại mỗi lần thread gửi chuẩn bị lời gọi** (máy chuyển mạng khi app đang mở vẫn gửi IP đúng; IP public chờ tối đa 4 s, chạy ngầm nên không ảnh hưởng thao tác).
   - `quyet_dinh(cn)` thuần.
   - `bat_dau(cn) -> Option<LanChay>`: quyết định + `SoLuot::dat_cho` (ghi đĩa) **trước khi** chạy.
   - `ket_thuc(lan, co_ket_qua)`: `SoLuot::xong`; có kết quả → đẩy việc `ghi_lan(cho_ghi())` vào thread gửi.
@@ -42,6 +42,7 @@ Bấm Đếm / Tách: quyết định **tức thì** trên câu trả lời ký 
 4. `dung_khong_co_ket_qua_hoan_luot` / `dung_co_ket_qua_tinh_luot`.
 5. `timeout_khong_dem_trung`: KhoGia ghi xong nhưng trả lỗi (giả timeout) → gửi lại cùng `ma_lan` → đã dùng chỉ +1.
 6. `mot_luong_gui`: 3 việc liên tiếp → kho thấy tối đa 1 lời gọi cùng lúc, thứ tự đúng.
+6b. `ip_doc_lai_moi_loi_goi`: hàm lấy IP giả trả "10.0.0.1" rồi đổi "10.0.0.2" → 2 lời gọi liên tiếp gửi 2 IP khác nhau.
 7. `khoa_sau_lan_chay_ke`; `khoa_offline_van_khoa` (trả lời ký Khoá lưu đĩa, kho lỗi → chặn).
 8. GUI (kittest): Đếm hết lượt → popup đúng nội dung; Kiểm tra lại sau khi kho nâng hạn → đếm chạy. Tách hết lượt → popup, không có luồng tách.
 9. CLI: `chay_tach` hết lượt → mã 3, không ghi file; `chay_dong_lenh --khong-ghi` 3 lần với hạn 2 → lần 3 mã 3.

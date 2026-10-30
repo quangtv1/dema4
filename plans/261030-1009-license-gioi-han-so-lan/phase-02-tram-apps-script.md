@@ -16,7 +16,7 @@ Web app Google Apps Script chạy bằng quyền tài khoản Sao Mai (Execute a
 - Hành động: `kiem_tra` (đọc / đăng ký máy mới), `ghi_lan` (ghi danh sách lần chạy có mã, trả trạng thái mới đã ký), `thong_ke_dem`, `thong_ke_tach` (xếp tin vào hàng đợi; Tách ghi thêm 1 hàng Ngưỡng trắng).
 - **Chống trùng**: mỗi lần chạy có `ma_lan` 32 hex; trạm bỏ qua mã đã ghi (tra cột mã lần trong nhật ký qua `CacheService` + `TextFinder`). Một lời gọi `ghi_lan` nhận tối đa 3 lần (1 vừa chạy + ≤ 2 bù offline). <!-- Red Team: đếm trùng / đốt quota máy khác -->
 - **Tổng đã dùng lưu ngay trong dòng `license`** (cộng +1 mỗi lần mới), nhật ký chỉ để đối chiếu; không quét nhật ký mỗi lời gọi. <!-- Red Team: trạm chậm dần -->
-- **Giới hạn toàn cục** (CacheService): ≤ 30 đăng ký máy mới / giờ, ≤ 120 lời gọi / phút; vượt → `{ok:false, loi:"ban"}`. `kiem_tra` không ghi đè thông tin dòng đã có (chỉ cập nhật Lần dùng cuối / Phiên bản / IP).
+- **Giới hạn toàn cục** (CacheService): ≤ 30 đăng ký máy mới / giờ, ≤ 120 lời gọi / phút; vượt → `{ok:false, loi:"ban"}`. `kiem_tra` / `ghi_lan` không ghi đè tên máy / MAC / ngày đăng ký của dòng đã có; **luôn cập nhật** Lần dùng cuối, Phiên bản, IP nội bộ, IP public theo lời gọi mới nhất.
 - **Lỗi luôn là JSON** `{ok:false, loi}` (Apps Script không trả được mã 503); khoá `LockService.waitLock(2500)` — ngắn hơn thời gian chờ của app. <!-- Red Team: không có 503 -->
 - **Kiểm tra đầu vào chặt**: mã máy `^SM-[0-9A-F]{4}(-[0-9A-F]{4}){2}$`, ma_lan `^[0-9a-f]{32}$`, chức năng ∈ {dem, tach}, IP theo mẫu IPv4/IPv6, phiên bản `^\d+\.\d+\.\d+$`, tên máy / thư mục: bỏ ký tự điều khiển, cắt 100 / 200 ký tự. **Mọi ô chữ ghi dạng văn bản thuần** (`setNumberFormat("@")` + `setValues`, không `USER_ENTERED`; ký tự đầu `= + - @` thêm `'`). <!-- Red Team: chèn công thức -->
 - Trạng thái trả về bằng mã ASCII `dung_thu | da_cap | khoa`; cột Trạng thái trên Sheet là **danh sách thả xuống** (Dùng thử / Đã cấp / Khoá); giá trị lạ → `khoa`. Chữ ký: `Utilities.computeRsaSha256Signature(du_lieu, khoa, Utilities.Charset.UTF_8)`. <!-- Red Team: tiếng Việt -->
@@ -30,7 +30,7 @@ POST {url}  JSON: { hanh_dong, ma_may, nonce, may:{ten, mac, ip_noi_bo, ip_publi
 du_lieu = { ma_may, nonce, han_dem, han_tach, da_dung_dem, da_dung_tach, trang_thai, da_ghi:[ma_lan…] }
 ```
 - Tab `license`: A Mã máy · B Tên máy · C MAC · D IP nội bộ · E IP public · F Phiên bản · G Ngày đăng ký · H Lần dùng cuối · I Đã dùng Đếm · J Đã dùng Tách (trạm ghi) · K Hạn mức Đếm · L Hạn mức Tách · M Trạng thái (thả xuống) · N Đơn vị · O Ghi chú (Sao Mai sửa K–O; trống K/L = 2, trống M = Dùng thử).
-- Tab `license_nhat_ky`: Thời điểm · Mã máy · Mã lần · Chức năng · Nguồn (online / bù offline) · Phiên bản.
+- Tab `license_nhat_ky`: Thời điểm · Mã máy · Mã lần · Chức năng · Nguồn (online / bù offline) · Phiên bản · IP nội bộ · IP public (IP của lời gọi ghi lần đó).
 - Tab `Hàng đợi Telegram`: Mã · Thời điểm · Loại · Nội dung · Tên CSV · CSV · Số lần thử · Trạng thái · Lúc đánh dấu.
 - Tab `Mô tả license` bên phải.
 - Mẫu tin Telegram: chép từ `telegram.rs` (`noi_dung_thong_ke`, `noi_dung_tach`, `dong_nguong`); **trước khi** sửa Rust, lưu đầu ra hiện tại làm chuỗi mẫu cố định cho test Node.
