@@ -1825,7 +1825,7 @@ mod tests {
             h.run_steps(4);
             h.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
         }
-        for ten in ["chua_tach", "phan_tich_lai", "tach_xong"] {
+        for ten in ["chua_tach", "phan_tich_lai", "dang_tach", "tach_xong"] {
             let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_pixels_per_point(1.5).build_eframe(|cc| {
                 cai_giao_dien(&cc.egui_ctx);
                 let mut app = UngDungChinh { man: Man::Tach, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };

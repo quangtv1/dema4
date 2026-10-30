@@ -2,9 +2,9 @@
 //! (phase 4), ghi `ketqua_tach.txt`, popup "Đã tách xong", gửi thống kê Telegram.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Align, Color32};
@@ -19,14 +19,55 @@ use crate::gui::{mo_bang_he_dieu_hanh, nut_mau, so_nguyen, so_thuc, thoi_gian_ph
 use crate::tach_vb::nhan::{Nhan, Xoay};
 use crate::tach_vb::phien::{thu_muc_an, PhienPhanTich};
 use crate::tach_vb::chi_so_trang::phan_loai;
-use crate::tach_vb::tach::{self, HoSoTach, KetQuaTach};
+use crate::tach_vb::tach::{self, HoSoTach, KetQuaTach, SuKienTach};
 use crate::tach_vb::thong_ke_nguong::{self, MauTrang, MauXoay, ThongKeNguong};
 use crate::telegram;
 
+/// Bộ đếm tiến độ tách, luồng nền ghi – giao diện đọc mỗi khung hình.
+#[derive(Default)]
+pub(super) struct TienDoTach {
+    hs_xong: AtomicUsize,
+    vb_xong: AtomicUsize,
+    loi: AtomicUsize,
+    /// Mọi văn bản đã ghi (kể cả hồ sơ đang dở) — để ước thời gian còn lại.
+    trang_ghi: AtomicUsize,
+    byte_ghi: AtomicU64,
+    /// Chỉ các hồ sơ đã tách trọn — dòng "Đã xong".
+    trang_tron: AtomicUsize,
+    byte_tron: AtomicU64,
+    /// Văn bản đang ghi (mới nhất khi nhiều luồng).
+    ten_dang: Mutex<String>,
+}
+
+impl TienDoTach {
+    fn nhan(&self, sk: SuKienTach) {
+        match sk {
+            SuKienTach::BatDauVanBan { ten, .. } => *self.ten_dang.lock().unwrap_or_else(|e| e.into_inner()) = ten,
+            SuKienTach::XongVanBan { so_trang, dung_luong, .. } => {
+                self.vb_xong.fetch_add(1, Ordering::Relaxed);
+                self.trang_ghi.fetch_add(so_trang, Ordering::Relaxed);
+                self.byte_ghi.fetch_add(dung_luong, Ordering::Relaxed);
+            }
+            SuKienTach::XongHoSo { so_trang, dung_luong, loi, .. } => {
+                self.hs_xong.fetch_add(1, Ordering::Relaxed);
+                self.trang_tron.fetch_add(so_trang, Ordering::Relaxed);
+                self.byte_tron.fetch_add(dung_luong, Ordering::Relaxed);
+                if loi {
+                    self.loi.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        }
+    }
+}
+
 pub(super) struct DangTach {
     nhan: Receiver<Result<KetQuaTach, String>>,
-    pub(super) xong: Arc<AtomicUsize>,
+    pub(super) tien_do: Arc<TienDoTach>,
+    /// Tổng hồ sơ / văn bản / trang sẽ ghi (biết trước từ bảng trang).
     pub(super) tong: usize,
+    tong_vb: usize,
+    tong_trang: usize,
+    ten_thu_muc: String,
     dung: Arc<AtomicBool>,
     bat_dau: Instant,
     ra: PathBuf,
@@ -48,6 +89,22 @@ pub(super) struct XongTach {
     /// Số cảnh báo (dải chỉ có trang trắng, hồ sơ 0 trang) — chi tiết trong log.
     so_canh_bao: usize,
     co_telegram: bool,
+}
+
+#[cfg(test)]
+impl DangTach {
+    /// Trạng thái mẫu (hồ sơ 1 xong, đang ghi văn bản 8 của hồ sơ 2) cho ảnh chụp so prototype.
+    pub(super) fn mau() -> Self {
+        let td = TienDoTach::default();
+        td.nhan(SuKienTach::XongHoSo { ho_so: 0, so_trang: 491, dung_luong: 268 << 20, loi: false });
+        td.vb_xong.store(115, Ordering::Relaxed);
+        td.trang_ghi.store(524, Ordering::Relaxed);
+        td.byte_ghi.store(284 << 20, Ordering::Relaxed);
+        td.nhan(SuKienTach::BatDauVanBan { ho_so: 1, ten: "L1_06_14.8.pdf".into() });
+        let (gui, nhan) = mpsc::channel();
+        std::mem::forget(gui); // giữ kênh mở để popup không tự đóng trong ảnh chụp
+        DangTach { nhan, tien_do: Arc::new(td), tong: 2, tong_vb: 211, tong_trang: 896, ten_thu_muc: "pdf_goc".into(), dung: Arc::new(AtomicBool::new(false)), bat_dau: Instant::now() - Duration::from_secs(21), ra: PathBuf::new(), so_lieu: Default::default(), thong_ke: None, nguong: (1.0, 3.2) }
+    }
 }
 
 #[cfg(test)]
@@ -217,17 +274,20 @@ impl ManTach {
         let so_lieu = telegram::SoLieuTach { ho_so: ho_so.len(), bo_index: b.tong.index as usize, bo_trang: b.tong.trang as usize, split: b.tong.split as usize, ..Default::default() };
         let thong_ke = thong_ke_lo(phien, b, cfg);
         let nguong = (cfg.nguong_trang, cfg.nguong_nghi);
+        let (tong_vb, tong_trang) = self.tong_thong_tin(&cfg.quy_tac()).map_or((0, 0), |t| (t.so_van_ban, t.so_trang));
+        let ten_thu_muc = Path::new(self.thu_muc.trim().trim_end_matches(['/', '\\'])).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         let (gui, nhan) = mpsc::channel();
-        let (xong, dung) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicBool::new(false)));
-        let (xong2, dung2, ra2, mau) = (xong.clone(), dung.clone(), ra.clone(), cfg.mau_ten.clone());
+        let (tien_do, dung) = (Arc::new(TienDoTach::default()), Arc::new(AtomicBool::new(false)));
+        let (td2, dung2, ra2, mau) = (tien_do.clone(), dung.clone(), ra.clone(), cfg.mau_ten.clone());
         let tong = ho_so.len();
         std::thread::spawn(move || {
             // Panic ngoài dự kiến → báo lỗi thường cho người dùng, không sập app
-            let kq = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tach::tach_thu_muc(&nguon, &ra2, &ho_so, &mau, &dung2, &|n, _| xong2.store(n, Ordering::Relaxed))))
+            let kq = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tach::tach_thu_muc(&nguon, &ra2, &ho_so, &mau, &dung2, &|sk| td2.nhan(sk))))
                 .unwrap_or_else(|p| Err(format!("lỗi bất ngờ: {}", tach::chu_panic(&*p))));
             let _ = gui.send(kq);
         });
-        self.tach = Some(DangTach { nhan, xong, tong, dung, bat_dau: Instant::now(), ra, so_lieu, thong_ke, nguong });
+        self.trang_thai = "Đang tách…".into();
+        self.tach = Some(DangTach { nhan, tien_do, tong, tong_vb, tong_trang, ten_thu_muc, dung, bat_dau: Instant::now(), ra, so_lieu, thong_ke, nguong });
     }
 
     /// Nhận kết quả tách: ghi log, gửi thống kê, mở popup.
@@ -246,6 +306,9 @@ impl ManTach {
                 return;
             }
         };
+        // Nhãn trạng thái góc phải thay cho "Phân tích xong": tổng thời gian tách
+        let tg = super::gio_phut_giay(t.bat_dau.elapsed());
+        self.trang_thai = if t.dung.load(Ordering::Relaxed) { format!("Đã dừng tách ({tg})") } else { format!("Đã tách xong ({tg})") };
         let log = thu_muc_an(Path::new(self.thu_muc.trim())).join("ketqua_tach.txt");
         let mut loi: Vec<String> = kq.loi.iter().map(|(p, e)| format!("{}: {e}", p.display())).collect();
         let noi_dung = tach::noi_dung_log(&kq.dong) + &tach::dong_log_khong_xoa(&kq.khong_xoa) + &tach::dong_log_loi(&kq.loi, &kq.canh_bao);
@@ -264,8 +327,58 @@ impl ManTach {
         self.xong_tach = Some(XongTach { ten_thu_muc, so_lieu, ra: t.ra, log, thoi_gian, da_dung: t.dung.load(Ordering::Relaxed), khong_xoa: kq.khong_xoa, loi, so_canh_bao: kq.canh_bao.len(), co_telegram });
     }
 
-    /// Hộp "Chưa tách được" (còn trang Nghi) + hỏi lưu trước khi tách + popup "Đã tách xong".
+    /// Popup "Đang tách": thanh tiến độ theo văn bản, văn bản đang tạo, đã xong, lỗi, thời gian / ước còn lại, tốc độ, nút Dừng.
+    fn popup_dang_tach(&mut self, ctx: &egui::Context) {
+        let Some(t) = &self.tach else { return };
+        let td = &t.tien_do;
+        let lay = |a: &AtomicUsize| a.load(Ordering::Relaxed);
+        let (hs_xong, vb_xong, loi) = (lay(&td.hs_xong), lay(&td.vb_xong), lay(&td.loi));
+        let (trang_ghi, byte_ghi) = (lay(&td.trang_ghi), td.byte_ghi.load(Ordering::Relaxed));
+        let (trang_tron, byte_tron) = (lay(&td.trang_tron), td.byte_tron.load(Ordering::Relaxed));
+        let mb = |b: u64| so_nguyen((b as f64 / 1_048_576.0).round() as usize);
+        let phan = if t.tong_vb > 0 { vb_xong as f32 / t.tong_vb as f32 } else { hs_xong as f32 / t.tong.max(1) as f32 };
+        let chu_thanh = format!("{}/{} hồ sơ · {}/{} văn bản · {}%", hs_xong, t.tong, so_nguyen(vb_xong), so_nguyen(t.tong_vb), (phan * 100.0) as u32);
+        let ten_dang = td.ten_dang.lock().map(|s| s.clone()).unwrap_or_default();
+        let ten_dang = if ten_dang.is_empty() { "…".to_string() } else { ten_dang };
+        let da_xong = format!("{} hồ sơ · {} trang · {} MB", hs_xong, so_nguyen(trang_tron), mb(byte_tron));
+        let tg = t.bat_dau.elapsed();
+        let giay = tg.as_secs_f64().max(0.001);
+        let (thoi_gian, toc_do) = if trang_ghi > 0 {
+            let con = Duration::from_secs_f64(giay / trang_ghi as f64 * t.tong_trang.saturating_sub(trang_ghi) as f64);
+            let xong_luc = (chrono::Local::now() + chrono::Duration::from_std(con).unwrap_or_default()).format("%H:%M");
+            (
+                format!("Đã chạy {} · còn ~{} (xong {xong_luc})", super::gio_phut_giay(tg), super::gio_phut_giay(con)),
+                format!("{} trang/giây · {} MB/giây", (trang_ghi as f64 / giay).round() as usize, so_thuc(byte_ghi as f64 / 1_048_576.0 / giay)),
+            )
+        } else {
+            (format!("Đã chạy {} · còn: đang tính…", super::gio_phut_giay(tg)), "—".to_string())
+        };
+        let tieu_de = khung_hop::tieu_de_dam("Đang tách ", &t.ten_thu_muc);
+        let dung = t.dung.clone();
+        khung_hop::hop(ctx, "dang_tach", 460.0, tieu_de, |ui| {
+            egui::Frame::new().inner_margin(egui::Margin { left: 20, right: 20, top: 18, bottom: 6 }).show(ui, |ui| {
+                let thanh = ui.add(egui::ProgressBar::new(phan).desired_width(ui.available_width()).desired_height(28.0).fill(crate::gui::XAM_TIEN_DO).corner_radius(0));
+                ui.painter().rect_stroke(thanh.rect, 0.0, egui::Stroke::new(1.0, crate::gui::VIEN_NHAT), egui::StrokeKind::Inside);
+                ui.painter().text(thanh.rect.center(), egui::Align2::CENTER_CENTER, chu_thanh, egui::FontId::proportional(12.0), CHU);
+            });
+            khung_hop::bang_gon_rong(
+                ui,
+                118.0,
+                &[("Văn bản đang tạo", &ten_dang, true, 12.0), ("Đã xong", &da_xong, true, 12.0), ("Lỗi", &loi.to_string(), true, 12.0), ("Thời gian", &thoi_gian, false, 12.0), ("Tốc độ", &toc_do, false, 12.0)],
+            );
+            khung_hop::chan(ui, |ui| {
+                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(khung_hop::nut_chan_mau("Dừng", DO)).on_hover_text("Dừng tách (hồ sơ đang làm vẫn xong)").clicked() {
+                        dung.store(true, Ordering::Relaxed);
+                    }
+                });
+            });
+        });
+    }
+
+    /// Hộp "Chưa tách được" (còn trang Nghi) + hỏi lưu trước khi tách + popup "Đang tách" / "Đã tách xong".
     pub(super) fn hop_tach(&mut self, ctx: &egui::Context, cfg: &CauHinh) {
+        self.popup_dang_tach(ctx);
         if let Some((nt, nx)) = self.chua_tach {
             let mut chon: Option<Option<Loc>> = None;
             let mut con = Vec::new();
@@ -479,6 +592,7 @@ mod tests {
         let x = man.xong_tach.as_ref().expect("có popup Đã tách xong");
         assert_eq!((x.so_lieu.ho_so, x.so_lieu.van_ban, x.so_lieu.so_trang, x.so_lieu.bo_index), (1, 2, 4, 1));
         assert!(x.khong_xoa.is_empty() && x.loi.is_empty());
+        assert!(man.trang_thai.starts_with("Đã tách xong ("), "nhãn góc phải sau khi tách: {}", man.trang_thai);
         assert!(ra.join("a").join("a.1.pdf").exists() && ra.join("a").join("a.2.pdf").exists());
         // Thống kê ngưỡng của lô: 5 trang có chỉ số; máy cho Trắng 4 trang (trang 4 bị giả làm Nghi), người giữ nội dung / Index hết
         let tk = thong_ke_lo(man.phien.as_ref().unwrap(), man.bang.as_ref().unwrap(), &cfg).unwrap();

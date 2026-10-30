@@ -354,7 +354,7 @@ impl HopCauHinh {
                 ui,
                 |ui| {
                     ui.label("Tên văn bản");
-                    thong_tin(ui, "{hoso} tên hồ sơ · {n} số thứ tự · {n3} số 3 chữ số (001). Phải có {n} hoặc {n3}.");
+                    thong_tin(ui, "{hoso} tên hồ sơ · {n} số thứ tự · {n3} đệm 0 cho đủ 3 chữ số (001), {n7} đủ 7 chữ số (0000001)… Phải có {n} hoặc {nK}.");
                 },
                 |ui| {
                     let r = ui.add(kh::o_nhap(&mut self.nhap.mau_ten).desired_width(ui.available_width())).on_hover_text("Mẫu tên văn bản");
@@ -362,7 +362,7 @@ impl HopCauHinh {
                 },
             );
             if loi.contains(&LoiCauHinh::MauTen) {
-                goi_y_duoi(ui, "Mẫu phải có {n} hoặc {n3}", DO);
+                goi_y_duoi(ui, "Mẫu phải có {n} hoặc {n3} / {n7}…", DO);
             } else if focus_ten {
                 let vd = |n| crate::tach_vb::tach::ten_van_ban(&self.nhap.mau_ten, "HS001", n);
                 goi_y_duoi(ui, &format!("Vd: {}, {}", vd(1), vd(2)), CHU_PHU);

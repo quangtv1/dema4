@@ -784,7 +784,7 @@
           <span style="display:flex;gap:4px"><input id="chRa" type="text" placeholder="cạnh thư mục gốc"><button class="nut nho" type="button" title="Chọn thư mục">…</button></span>
           <span class="goiy" id="chRaViDu"></span></div>
 
-        <div class="dongch"><label for="chTen">Tên văn bản <span class="tip ich-tip" data-tip="{hoso} tên hồ sơ · {n} số thứ tự · {n3} số 3 chữ số (001). Phải có {n} hoặc {n3}."><span class="ich">i</span></span></label>
+        <div class="dongch"><label for="chTen">Tên văn bản <span class="tip ich-tip" data-tip="{hoso} tên hồ sơ · {n} số thứ tự · {n3} đệm 0 cho đủ 3 chữ số (001), {n7} đủ 7 chữ số (0000001)… Phải có {n} hoặc {nK}."><span class="ich">i</span></span></label>
           <input id="chTen" type="text">
           <span class="goiy" id="chVidu"></span></div>
 
@@ -994,8 +994,9 @@
 
   function tenVanBan(hs, n) {
     var g = TEN[hs].replace(/\.pdf$/i, '');
-    var n3 = ('00' + n).slice(-3);
-    return cauHinh.ten.split('{hoso}').join(g).split('{n3}').join(n3).split('{n}').join(n) + '.pdf';
+    var t = cauHinh.ten.split('{hoso}').join(g);
+    for (var k = 1; k <= 9; k++) t = t.split('{n' + k + '}').join(('000000000' + n).slice(-k)); // {nK}: đệm 0 cho đủ K chữ số
+    return t.split('{n}').join(n) + '.pdf';
   }
 
   function ruotGiay(l) {
@@ -1530,9 +1531,9 @@
   $('chThu').oninput = veRanh;
   $('chHeSo').innerHTML = ['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'].map(function (k, i) { return '<span>' + k + '<input type="number" step="0.125" data-heso="' + i + '"></span>'; }).join('');
   function veViDu() {
-    var t = $('chTen').value, hopLe = t.indexOf('{n}') >= 0 || t.indexOf('{n3}') >= 0;
+    var t = $('chTen').value, hopLe = /\{n[1-9]?\}/.test(t);
     var cu = cauHinh.ten; cauHinh.ten = t;
-    $('chVidu').textContent = hopLe ? 'Vd: ' + tenVanBan(0, 1) + ', ' + tenVanBan(0, 2) : 'Phải có {n} hoặc {n3}';
+    $('chVidu').textContent = hopLe ? 'Vd: ' + tenVanBan(0, 1) + ', ' + tenVanBan(0, 2) : 'Phải có {n} hoặc {n3} / {n7}…';
     $('chVidu').classList.toggle('loi', !hopLe);
     cauHinh.ten = cu;
     var a = parseFloat($('chNguong').value), b = parseFloat($('chNghi').value), nguongDung = a >= 0 && b >= a;

@@ -27,14 +27,23 @@ pub fn thu_muc_ra(nguon: &Path, cha: Option<&Path>) -> Result<PathBuf, String> {
     Ok(ra)
 }
 
-/// Mẫu tên văn bản phải có `{n}` hoặc `{n3}` để các văn bản không trùng tên.
+/// Thẻ số đệm 0 trong mẫu: `{n3}` → 3 chữ số (001), `{n7}` → 7 chữ số (0000001)… Trả (thẻ, số chữ số) của thẻ đầu tiên.
+fn the_so_dem(mau: &str) -> Option<(String, usize)> {
+    (1..=9).map(|k| (format!("{{n{k}}}"), k)).find(|(the, _)| mau.contains(the.as_str()))
+}
+
+/// Mẫu tên văn bản phải có `{n}` hoặc `{nK}` (K = 1–9, đệm số 0) để các văn bản không trùng tên.
 pub fn kiem_mau_ten(mau: &str) -> Result<(), String> {
-    if mau.contains("{n}") || mau.contains("{n3}") { Ok(()) } else { Err("mẫu tên văn bản phải có {n} hoặc {n3}".to_string()) }
+    if mau.contains("{n}") || the_so_dem(mau).is_some() { Ok(()) } else { Err("mẫu tên văn bản phải có {n} hoặc {n3} / {n7}…".to_string()) }
 }
 
 /// Tên file văn bản (kèm `.pdf`) theo mẫu; ký tự không hợp lệ cho tên file thay bằng `_`.
 pub fn ten_van_ban(mau: &str, ho_so: &str, n: usize) -> String {
-    let ten = mau.replace("{hoso}", ho_so).replace("{n3}", &format!("{n:03}")).replace("{n}", &n.to_string());
+    let mut ten = mau.replace("{hoso}", ho_so);
+    for k in 1..=9 {
+        ten = ten.replace(&format!("{{n{k}}}"), &format!("{n:0k$}"));
+    }
+    let ten = ten.replace("{n}", &n.to_string());
     let sach: String = ten.chars().map(|c| if matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() { '_' } else { c }).collect();
     format!("{sach}.pdf")
 }
@@ -43,8 +52,8 @@ pub fn ten_van_ban(mau: &str, ho_so: &str, n: usize) -> String {
 fn khop_mau(mau: &str, ho_so: &str, ten_file: &str) -> bool {
     let Some(goc) = ten_file.strip_suffix(".pdf") else { return false };
     let mau = mau.replace("{hoso}", ho_so);
-    let (cho, rong) = if mau.contains("{n3}") { ("{n3}", 3) } else { ("{n}", 0) };
-    let Some((truoc, sau)) = mau.split_once(cho) else { return false };
+    let (cho, rong) = the_so_dem(&mau).unwrap_or(("{n}".to_string(), 0));
+    let Some((truoc, sau)) = mau.split_once(cho.as_str()) else { return false };
     let truoc: String = ten_van_ban(truoc, "", 0).trim_end_matches(".pdf").to_string();
     let sau: String = ten_van_ban(sau, "", 0).trim_end_matches(".pdf").to_string();
     let Some(giua) = goc.strip_prefix(&truoc).and_then(|x| x.strip_suffix(&sau)) else { return false };
@@ -67,7 +76,23 @@ pub struct DongLog {
     pub file_ra: PathBuf,
     pub trang_bo: Vec<usize>,
     pub so_trang: usize,
+    /// Dung lượng file ra (byte) — cho popup tiến độ, không ghi vào log.
+    pub dung_luong: u64,
 }
+
+/// Tiến độ tách báo từ luồng nền về giao diện (các hồ sơ chạy song song nên sự kiện của nhiều hồ sơ xen nhau).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SuKienTach {
+    /// Bắt đầu ghi 1 văn bản (`ten` = tên file ra).
+    BatDauVanBan { ho_so: usize, ten: String },
+    /// Ghi xong 1 văn bản.
+    XongVanBan { ho_so: usize, so_trang: usize, dung_luong: u64 },
+    /// Hồ sơ xong (kể cả lỗi): tổng trang / byte đã ghi của hồ sơ đó.
+    XongHoSo { ho_so: usize, so_trang: usize, dung_luong: u64, loi: bool },
+}
+
+/// Hàm nhận tiến độ; `&|_| {}` khi không cần.
+pub type BaoTienDo<'a> = &'a (dyn Fn(SuKienTach) + Sync);
 
 #[derive(Debug, Default)]
 pub struct KetQuaTach {
@@ -120,7 +145,7 @@ pub fn chu_panic(p: &(dyn std::any::Any + Send)) -> String {
 const DUOI_TAM: &str = ".tmp";
 
 /// Tách 1 hồ sơ vào `thu_muc_ho_so` (= `<ra>/<thư mục con>/<hồ sơ>/`). Trả các dòng log + có chép nguyên không.
-fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<KetQuaHoSo, String> {
+fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str, chi_so: usize, bao: BaoTienDo) -> Result<KetQuaHoSo, String> {
     let ten_ho_so = ho_so.pdf.file_stem().ok_or("tên file không hợp lệ")?.to_string_lossy().into_owned();
     let so_trang = so_trang_pdf(&ho_so.pdf)?;
     if so_trang == 0 {
@@ -137,6 +162,7 @@ fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<KetQu
         let ten = ten_van_ban(mau, &ten_ho_so, vb.so);
         let ra = thu_muc_ho_so.join(&ten);
         let tam = thu_muc_ho_so.join(format!("{ten}{DUOI_TAM}"));
+        bao(SuKienTach::BatDauVanBan { ho_so: chi_so, ten: ten.clone() });
         let ghi = if dai.nguyen_ven {
             // Không nhãn, không xoay: chép từng byte (giữ cả chữ ký số), không ghi lại bằng MuPDF
             std::fs::copy(&ho_so.pdf, &tam).map(|_| ()).map_err(|e| format!("không chép được {}: {e}", ra.display()))
@@ -147,8 +173,10 @@ fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<KetQu
             let _ = std::fs::remove_file(&tam);
             return Err(e);
         }
+        let dung_luong = std::fs::metadata(&ra).map(|m| m.len()).unwrap_or(0);
+        bao(SuKienTach::XongVanBan { ho_so: chi_so, so_trang: vb.trang_giu.len(), dung_luong });
         da_ghi.insert(ten);
-        dong.push(DongLog { file_vao: ho_so.pdf.clone(), tu: vb.tu, den: vb.den, file_ra: ra, trang_bo: vb.bo.clone(), so_trang: vb.trang_giu.len() });
+        dong.push(DongLog { file_vao: ho_so.pdf.clone(), tu: vb.tu, den: vb.den, file_ra: ra, trang_bo: vb.bo.clone(), so_trang: vb.trang_giu.len(), dung_luong });
     }
     // Dọn văn bản cũ của lần tách trước không còn sinh ra (chỉ file khớp mẫu tên đang áp) và file tạm bỏ dở
     let mut khong_xoa = Vec::new();
@@ -167,10 +195,9 @@ fn tach_ho_so(ho_so: &HoSoTach, thu_muc_ho_so: &Path, mau: &str) -> Result<KetQu
 }
 
 /// Tách mọi hồ sơ (song song theo hồ sơ). `nguon` = thư mục đầu vào (để giữ cấu trúc thư mục con), `ra` = thư mục ra.
-/// `tien_do(đã xong, tổng)` gọi sau mỗi hồ sơ; `dung` bật → bỏ các hồ sơ chưa bắt đầu.
-pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung: &AtomicBool, tien_do: &(dyn Fn(usize, usize) + Sync)) -> Result<KetQuaTach, String> {
+/// `bao` nhận tiến độ từng văn bản / hồ sơ; `dung` bật → bỏ các hồ sơ chưa bắt đầu.
+pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung: &AtomicBool, bao: BaoTienDo) -> Result<KetQuaTach, String> {
     kiem_mau_ten(mau)?;
-    let xong = std::sync::atomic::AtomicUsize::new(0);
     let tung: Vec<(usize, Result<KetQuaHoSo, String>)> = ho_so
         .par_iter()
         .enumerate()
@@ -180,10 +207,11 @@ pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung
             let ten = hs.pdf.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             // Một hồ sơ gây panic (lỗi trong thư viện PDF) chỉ thành lỗi của hồ sơ đó, không làm hỏng cả lô
             let thu_muc_hs = ra.join(con).join(ten);
-            let kq = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tach_ho_so(hs, &thu_muc_hs, mau)))
+            let kq = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tach_ho_so(hs, &thu_muc_hs, mau, i, bao)))
                 .unwrap_or_else(|p| Err(format!("lỗi bất ngờ khi tách: {}", chu_panic(&*p))))
                 .map_err(ro_loi);
-            tien_do(xong.fetch_add(1, Ordering::Relaxed) + 1, ho_so.len());
+            let (so_trang, dung_luong) = kq.as_ref().map_or((0, 0), |k| k.0.iter().fold((0, 0), |(t, d), x| (t + x.so_trang, d + x.dung_luong)));
+            bao(SuKienTach::XongHoSo { ho_so: i, so_trang, dung_luong, loi: kq.is_err() });
             (i, kq)
         })
         .collect();
@@ -308,7 +336,7 @@ pub(crate) mod tests {
             HoSoTach { pdf: nguon.join("mk_owner.pdf"), nhan, xoay: BTreeMap::new() },
         ];
         let ra = thu_muc_ra(&nguon, None).unwrap();
-        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert_eq!(kq.loi.len(), 1, "{:?}", kq.loi);
         assert!(kq.loi[0].0.ends_with("mk_user.pdf") && kq.loi[0].1.contains("mật khẩu"), "{:?}", kq.loi);
         assert!(!ra.join("mk_user").exists(), "không được ghi file nào từ PDF có mật khẩu");
@@ -336,7 +364,7 @@ pub(crate) mod tests {
         std::fs::write(ra.join("ok").join("ok.9.pdf.tmp"), b"do dang").unwrap();
         let nhan: BTreeMap<usize, Nhan> = [(2, Nhan::Index)].into();
         let ho_so: Vec<HoSoTach> = ["ok.pdf", "trong.pdf", "hong.pdf"].iter().map(|t| HoSoTach { pdf: nguon.join(t), nhan: nhan.clone(), xoay: BTreeMap::new() }).collect();
-        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert_eq!(kq.loi.len(), 1, "{:?}", kq.loi);
         assert!(kq.loi[0].0.ends_with("hong.pdf") && kq.loi[0].1.contains("file hỏng hoặc không phải PDF"), "{:?}", kq.loi);
         assert!(kq.canh_bao.iter().any(|c| c.contains("trong.pdf") && c.contains("0 trang")), "{:?}", kq.canh_bao);
@@ -345,6 +373,34 @@ pub(crate) mod tests {
         assert_eq!(ten, ["ok.1.pdf", "ok.2.pdf"], "không còn file tạm");
         let log = dong_log_loi(&kq.loi, &kq.canh_bao);
         assert!(log.contains("# Lỗi ") && log.contains("hong.pdf") && log.contains("# Cảnh báo ") && log.contains("0 trang"), "{log}");
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Luồng tách báo đủ sự kiện: mỗi văn bản 1 cặp bắt đầu / xong, mỗi hồ sơ 1 sự kiện xong với tổng trang + dung lượng.
+    #[test]
+    fn bao_tien_do_tung_van_ban_va_ho_so() {
+        use std::sync::Mutex;
+        let goc = std::env::temp_dir().join(format!("dema4_tien_do_tach_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let nguon = goc.join("nguon");
+        std::fs::create_dir_all(&nguon).unwrap();
+        tao_pdf(&nguon.join("a.pdf"), 5);
+        tao_pdf(&nguon.join("b.pdf"), 2);
+        let nhan: BTreeMap<usize, Nhan> = [(2, Nhan::Index), (4, Nhan::Split)].into();
+        let ho_so = vec![HoSoTach { pdf: nguon.join("a.pdf"), nhan, xoay: BTreeMap::new() }, HoSoTach { pdf: nguon.join("b.pdf"), nhan: BTreeMap::new(), xoay: BTreeMap::new() }];
+        let ra = thu_muc_ra(&nguon, None).unwrap();
+        let sk: Mutex<Vec<SuKienTach>> = Mutex::new(Vec::new());
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|s| sk.lock().unwrap().push(s)).unwrap();
+        let sk = sk.into_inner().unwrap();
+        let dem = |f: &dyn Fn(&SuKienTach) -> bool| sk.iter().filter(|s| f(s)).count();
+        assert_eq!(kq.dong.len(), 4, "a: 1 | 3 | 4-5; b: nguyên");
+        assert_eq!(dem(&|s| matches!(s, SuKienTach::BatDauVanBan { .. })), 4);
+        assert_eq!(dem(&|s| matches!(s, SuKienTach::XongVanBan { .. })), 4);
+        let xong_hs: Vec<_> = sk.iter().filter_map(|s| if let SuKienTach::XongHoSo { ho_so, so_trang, dung_luong, loi } = s { Some((*ho_so, *so_trang, *dung_luong, *loi)) } else { None }).collect();
+        assert_eq!(xong_hs.len(), 2);
+        assert!(xong_hs.iter().any(|&(h, t, d, l)| h == 0 && t == 4 && d > 0 && !l), "{xong_hs:?}");
+        assert!(xong_hs.iter().any(|&(h, t, d, l)| h == 1 && t == 2 && d > 0 && !l), "{xong_hs:?}");
+        assert!(kq.dong.iter().all(|d| d.dung_luong > 0));
         let _ = std::fs::remove_dir_all(&goc);
     }
 
@@ -365,6 +421,9 @@ pub(crate) mod tests {
     fn ten_va_thu_muc_ra() {
         assert_eq!(ten_van_ban(MAU_TEN_MAC_DINH, "L1_05_13", 3), "L1_05_13.3.pdf");
         assert_eq!(ten_van_ban("{hoso}_{n3}", "L1_05_13", 1), "L1_05_13_001.pdf");
+        assert_eq!(ten_van_ban("{hoso}.{n7}", "L1_05_13", 12), "L1_05_13.0000012.pdf", "đệm 7 chữ số như TEXT(n, \"0000000\")");
+        assert!(kiem_mau_ten("{hoso}.{n7}").is_ok() && kiem_mau_ten("{hoso}").is_err());
+        assert!(khop_mau("{hoso}.{n7}", "L1_05_13", "L1_05_13.0000012.pdf") && !khop_mau("{hoso}.{n7}", "L1_05_13", "L1_05_13.12.pdf"));
         assert_eq!(ten_van_ban("{hoso}:{n}", "Hồ sơ số 5", 2), "Hồ sơ số 5_2.pdf");
         assert!(kiem_mau_ten("{hoso}_part").is_err());
         let nguon = Path::new("/du_lieu/mau2");
@@ -394,7 +453,7 @@ pub(crate) mod tests {
             HoSoTach { pdf: nguon.join("goc.pdf"), nhan: BTreeMap::new(), xoay: BTreeMap::new() },
         ];
         let ra = thu_muc_ra(&nguon, None).unwrap();
-        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert!(kq.loi.is_empty(), "{:?}", kq.loi);
         let thu_muc_hs = ra.join("HOP 462").join("4766").join("4766");
         assert_eq!(chu_cac_trang(&thu_muc_hs.join("4766.1.pdf")), vec!["Trang 1", "Trang 2"]);
@@ -417,7 +476,7 @@ pub(crate) mod tests {
         // Chạy lại với ít văn bản hơn → part thừa cũ bị xoá, file khác trong thư mục giữ nguyên
         std::fs::write(thu_muc_hs.join("ghi_chu.txt"), b"giu").unwrap();
         let ho_so_2 = vec![HoSoTach { pdf: con.join("4766.pdf"), nhan: [(3, Nhan::Index)].into_iter().collect(), xoay: BTreeMap::new() }];
-        let kq2 = tach_thu_muc(&nguon, &ra, &ho_so_2, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        let kq2 = tach_thu_muc(&nguon, &ra, &ho_so_2, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert_eq!(kq2.dong.len(), 2);
         assert!(!thu_muc_hs.join("4766.3.pdf").exists());
         assert!(thu_muc_hs.join("ghi_chu.txt").exists());
@@ -425,7 +484,7 @@ pub(crate) mod tests {
         // Part cũ không xoá được (Windows: file đang mở; giả lập bằng thư mục trùng tên part) → báo lại, không im lặng
         std::fs::create_dir(thu_muc_hs.join("4766.3.pdf")).unwrap();
         std::fs::write(thu_muc_hs.join("4766.3.pdf").join("x"), b"").unwrap();
-        let kq3 = tach_thu_muc(&nguon, &ra, &ho_so_2, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        let kq3 = tach_thu_muc(&nguon, &ra, &ho_so_2, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert!(kq3.loi.is_empty(), "{:?}", kq3.loi);
         assert_eq!(kq3.khong_xoa, vec![thu_muc_hs.join("4766.3.pdf")]);
         assert!(dong_log_khong_xoa(&kq3.khong_xoa).starts_with("# Không xoá được file cũ"));
@@ -443,7 +502,7 @@ pub(crate) mod tests {
         tao_pdf(&nguon.join("b").join("x.pdf"), 3);
         let ho_so: Vec<HoSoTach> = ["a", "b"].iter().map(|d| HoSoTach { pdf: nguon.join(d).join("x.pdf"), nhan: [(1, Nhan::Trang)].into_iter().collect(), xoay: BTreeMap::new() }).collect();
         let ra = thu_muc_ra(&nguon, None).unwrap();
-        tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert_eq!(chu_cac_trang(&ra.join("a/x/x.1.pdf")), vec!["Trang 2"]);
         assert_eq!(chu_cac_trang(&ra.join("b/x/x.1.pdf")), vec!["Trang 2", "Trang 3"]);
         let _ = std::fs::remove_dir_all(&goc);
@@ -462,7 +521,7 @@ pub(crate) mod tests {
         let ra = std::env::temp_dir().join("dema4_tach_mau1");
         let _ = std::fs::remove_dir_all(&ra);
         let t0 = std::time::Instant::now();
-        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         println!("{} part, {:.1} s", kq.dong.len(), t0.elapsed().as_secs_f64());
         assert!(kq.loi.is_empty());
         assert_eq!(kq.dong.len(), 211);
@@ -501,7 +560,7 @@ pub(crate) mod tests {
         let ra = std::env::temp_dir().join("dema4_tach_mau2");
         let _ = std::fs::remove_dir_all(&ra);
         let t0 = std::time::Instant::now();
-        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}).unwrap();
+        let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         println!("{} hồ sơ → {} part ({} chép nguyên) trong {:.1} s", ho_so.len(), kq.dong.len(), kq.sao_nguyen, t0.elapsed().as_secs_f64());
         assert!(kq.loi.is_empty(), "{:?}", kq.loi);
         assert_eq!(kq.dong.len(), tong_vb);

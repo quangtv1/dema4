@@ -1154,20 +1154,15 @@ impl ManTach {
                 let p = *xong as f32 / (*tong).max(1) as f32;
                 (format!("Đang phân tích {}% ({})", (p * 100.0) as u32, gio_phut_giay(bat_dau.elapsed())), Some(p))
             }
-            None => match &self.tach {
-                Some(t) => {
-                    let p = t.xong.load(std::sync::atomic::Ordering::Relaxed) as f32 / t.tong.max(1) as f32;
-                    (format!("Đang tách {}%", (p * 100.0) as u32), Some(p))
-                }
-                None => (self.trang_thai.clone(), None),
-            },
+            // Đang tách: tiến độ nằm trong popup, header chỉ ghi chữ
+            None => (self.trang_thai.clone(), None),
         };
         // Dừng giữa chừng: chữ cam đậm trên nền cam nhạt cho nổi; xong: chữ xanh lá
         let (mau_chu, nen) = if ty_le.is_some() {
             (CHU_PHU, None)
         } else if chu.starts_with("Đã dừng") {
             (Color32::from_rgb(0xB8, 0x5F, 0x00), Some(Color32::from_rgb(0xFF, 0xF1, 0xDC)))
-        } else if chu.starts_with("Phân tích xong") {
+        } else if chu.starts_with("Phân tích xong") || chu.starts_with("Đã tách xong") {
             (XANH_LA, None)
         } else {
             (CHU_PHU, None)
@@ -1842,6 +1837,7 @@ impl ManTach {
         match ten {
             "chua_tach" => self.chua_tach = Some((3, 2)),
             "phan_tich_lai" => self.hoi_phan_tich_lai = true,
+            "dang_tach" => self.tach = Some(nut_tach::DangTach::mau()),
             _ => self.xong_tach = Some(nut_tach::XongTach::mau()),
         }
     }

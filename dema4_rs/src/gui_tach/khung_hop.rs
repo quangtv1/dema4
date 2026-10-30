@@ -208,6 +208,11 @@ pub fn than_chu(ui: &mut egui::Ui, chu: &str) {
 
 /// Bảng 2 cột của popup gọn: nhãn xám 96 px | giá trị (đậm nếu `dam`; cỡ `co`), dòng cách 9 px.
 pub fn bang_gon(ui: &mut egui::Ui, dong: &[(&str, &str, bool, f32)]) {
+    bang_gon_rong(ui, 96.0, dong);
+}
+
+/// Như `bang_gon` với bề rộng cột nhãn tuỳ ý (nhãn dài như "Văn bản đang tạo").
+pub fn bang_gon_rong(ui: &mut egui::Ui, rong_nhan: f32, dong: &[(&str, &str, bool, f32)]) {
     egui::Frame::new().inner_margin(Margin::symmetric(16, 14)).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.spacing_mut().item_spacing.y = 9.0;
@@ -216,8 +221,8 @@ pub fn bang_gon(ui: &mut egui::Ui, dong: &[(&str, &str, bool, f32)]) {
         for &(nhan, gia_tri, dam, co) in dong {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 10.0;
-                ui.allocate_ui_with_layout(egui::vec2(96.0, 14.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    ui.set_min_width(96.0);
+                ui.allocate_ui_with_layout(egui::vec2(rong_nhan, 14.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.set_min_width(rong_nhan);
                     ui.label(RichText::new(nhan).size(12.0).color(crate::gui::CHU_PHU));
                 });
                 if let Some(hien) = gia_tri.strip_prefix("https://") {

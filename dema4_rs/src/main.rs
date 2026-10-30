@@ -155,7 +155,7 @@ fn chay_tach(tham_so: &[String]) -> i32 {
         Err(e) => { eprintln!("{e}"); return 2; }
     };
     let bat_dau = std::time::Instant::now();
-    let kq = match tach::tach_thu_muc(&thu_muc, &ra, &ho_so, tach::MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_, _| {}) {
+    let kq = match tach::tach_thu_muc(&thu_muc, &ra, &ho_so, tach::MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}) {
         Ok(k) => k,
         Err(e) => { eprintln!("{e}"); return 2; }
     };

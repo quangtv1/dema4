@@ -90,7 +90,7 @@ Menu **Cấu hình** (2 tab Đếm trang A4 / Tách PDF) ghi file `sm-dema4.cfg`
 | `nguong_trang` · `nguong_nghi` | 1.00 · 3.20 | ngưỡng Trắng / Nghi trắng (% diện tích có nét mực đậm) |
 | `loai_ma` · `ma_index` | `code128` · `NAMSAO-TACH` | mã tờ index (lệch ≤ 3 ký tự; trống = mọi mã) |
 | `tin_cay_xoay` | 0.80 | độ tin cậy gợi ý Nghi xoay (0,50–0,95) |
-| `thu_muc_ra` · `mau_ten` · `luu_nhan` | trống · `{hoso}.{n}` · `tu_dong` | thư mục cha kết quả; mẫu tên (`{hoso}` `{n}` `{n3}`); lưu nhãn tự động / `bang_tay` |
+| `thu_muc_ra` · `mau_ten` · `luu_nhan` | trống · `{hoso}.{n}` · `tu_dong` | thư mục cha kết quả; mẫu tên (`{hoso}` · `{n}` · `{n3}`…`{n9}` đệm số 0, vd `{n7}` → 0000001); lưu nhãn tự động / `bang_tay` |
 | `rong_cot_trai` · `nac_anh_hs` · `nac_anh_vb` · `ty_le_vb` · `che_do_vb` · `an_dong_thu_muc` | 290 · 3 · 3 · 100 · `luoi` · 0 | trạng thái giao diện (nấc ảnh lưới 0–11: 3 = 26 %, 11 = 250 %) |
 
 ## Chế độ dòng lệnh (Đếm)
