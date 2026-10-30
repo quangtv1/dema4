@@ -550,6 +550,9 @@
   .oml.tach { background:#EFEAF8; color:#5B3E96; }
   .oml.hang { background:#fff; border-color:var(--vien); color:var(--chu); }
   .oml.cot:hover, .oml.tach:hover { border-color:#A9C2E6; }
+  .oml.tudong { background:#E8E8E8; color:#555; cursor:default; } .oml.tudong:hover { border-color:transparent; }
+  .nhomtrai { flex:1; min-width:0; display:flex; align-items:center; gap:6px; font-size:12px; color:var(--chu-phu); white-space:nowrap; }
+  .nhomtrai select { flex:1; min-width:0; height:22px !important; font-size:12px; }
   .oml svg { width:10px; height:6px; flex-shrink:0; margin-left:auto; opacity:0; } .oml:hover svg, .oml.mo svg { opacity:1; }
   .oml.thieu .ten { color:#B85F00; font-style:italic; } .oml.thieu { border-color:#E8C77A; background:#FFFBEF; }
   .dsml { position:absolute; left:12px; right:12px; top:36px; z-index:5; background:#fff; border:1px solid var(--vien); border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.18); padding:6px; max-height:236px; overflow-y:auto; }
@@ -784,7 +787,7 @@
           <div class="trai" id="mlTrai"></div>
           <div class="daytrai">
             <label class="timtrai"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
-              <input type="search" id="mlTim" placeholder="Tìm hồ sơ" aria-label="Tìm" autocomplete="off"></label></div>
+              <input type="search" id="mlTim" placeholder="Tìm hồ sơ" aria-label="Tìm" autocomplete="off"></label><label class="nhomtrai" id="mlNhomTrai" title="Các dòng liền nhau có cùng giá trị ở cột này được gom thành 1 hồ sơ">Cột mã hồ sơ <select><option>Tiêu đề hồ sơ</option><option>STT</option></select></label></div>
         </div>
         <div class="keo" id="mlKeo" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng cột trái" tabindex="0"></div>
         <div class="phai xemml">
@@ -1099,8 +1102,8 @@
   <div class="phu" id="phuMLGhep">
     <div class="popup ghep-ml" role="dialog" aria-label="Ghép biến">
       <div class="dau">Ghép biến — <b>Mẫu 01 – Quảng Trị</b></div>
-      <div class="dongnhom">Gom hồ sơ theo cột <select id="mlNhom"><option>Tiêu đề hồ sơ</option><option>STT</option></select>
-        <span style="color:var(--chu-phu)">(các dòng liền nhau cùng giá trị = 1 hồ sơ)</span>
+      <div class="dongnhom"><span title="Các dòng liền nhau có cùng giá trị ở cột này được gom thành 1 hồ sơ">Cột mã hồ sơ</span> <select id="mlNhom" title="Các dòng liền nhau có cùng giá trị ở cột này được gom thành 1 hồ sơ"><option>Tiêu đề hồ sơ</option><option>STT</option></select>
+        <span style="color:var(--chu-phu)">(dòng liền nhau cùng mã = 1 hồ sơ)</span>
         <span class="goiy"><b>22</b> hồ sơ · <b>326</b> văn bản · đã ghép <b id="mlGhepSo">12/13</b> biến</span></div>
       <div class="bang"><table>
         <colgroup><col style="width:34px"><col style="width:190px"><col style="width:380px"><col></colgroup>
@@ -2611,7 +2614,7 @@
     $('mlDuLieu').value = co ? 'G:\\SoHoa\\Bien_muc\\Bien_muc_tong_hop.xlsx' : '';
     $('mlGioiThieu').classList.toggle('an', co);
     $('mlCongCu').classList.toggle('an', !co); $('mlVungXem').classList.toggle('an', !co);
-    if (!co) $('mlTrai').innerHTML = '';
+    if (!co) { $('mlTrai').innerHTML = ''; $('mlNhomTrai').style.display = 'none'; }
     $('mlTao').disabled = !co && ml.chay !== 1;
     $('mlTao').className = 'nut ' + (ml.chay === 1 ? 'do' : co ? 'xanh' : 'xam'); $('mlTao').textContent = ml.chay === 1 ? 'Dừng' : 'Sinh mục lục';
     var tabs = $('mlTab').children; tabs[0].classList.toggle('chon', co && mau); tabs[1].classList.toggle('chon', co && !mau);
@@ -2625,7 +2628,7 @@
       : 'Hồ sơ: <b>22</b>; Văn bản: <b>326</b> · xem trước bằng Microsoft Word');
     if (!co) return;
     $('mlDieuHuong').style.display = mau ? 'none' : 'contents';
-    $('mlTim').placeholder = mau ? 'Tìm biến' : 'Tìm hồ sơ'
+    $('mlTim').parentNode.style.display = mau ? 'none' : ''; $('mlNhomTrai').style.display = mau ? '' : 'none'
     if (mau) {
       $('mlTrai').innerHTML = '<div class="bangbien" role="grid"><span class="tieude-cot">Biến</span><span class="tieude-cot">Lấy từ</span><span class="tieude-cot"></span>' +
         ML_BIEN.map(function (b) {
@@ -2634,8 +2637,8 @@
           return '<div class="vbdong' + (ml.moTrai === i ? ' chon' : '') + '" role="row"><span><code>{' + b[0] + '}</code></span><span class="lay">' + oNguon(b, i, ml.moTrai) + '</span>' +
             (b[1] === 'thieu' ? '<span class="canhml" title="Chưa ghép">!</span>' : '<span></span>') + '</div>' +
             (ml.moTrai === i ? '<div class="dsml">' + dsNguon(b) + '</div>' : '');
-        }).join('') + '<span class="nhombien">Tự động</span><div class="vbdong"><span><code>{trang_so}</code></span><span style="color:var(--chu-phu)">số trang</span><span></span></div>' +
-        '<div class="vbdong"><span><code>{tong_so_trang}</code></span><span style="color:var(--chu-phu)">tổng số trang</span><span></span></div></div>';
+        }).join('') + '<span class="nhombien">Tự động</span><div class="vbdong"><span><code>{trang_so}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">số trang</span></div></span><span></span></div>' +
+        '<div class="vbdong"><span><code>{tong_so_trang}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">tổng số trang</span></div></span><span></span></div></div>';
       $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:#E3EEFB"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#E8E8E8"></i>tự động</span></span>';
       $('mlVungXem').innerHTML = trangMau();
     } else {
