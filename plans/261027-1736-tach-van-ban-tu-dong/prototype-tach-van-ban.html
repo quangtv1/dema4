@@ -2626,7 +2626,7 @@
     var tabs = $('mlTab').children; tabs[0].classList.toggle('chon', co && mau); tabs[1].classList.toggle('chon', co && !mau);
     var dsb = ML_BIEN.filter(function (b) { return b.length > 1; }), thieu = dsb.filter(function (b) { return b[1] === 'thieu'; }).length;
     tabs[0].textContent = 'Mẫu' + (co ? ' (' + (dsb.length + 2 - thieu) + '/' + (dsb.length + 2) + ' biến)' : '');
-    tabs[1].textContent = 'Kết quả' + (co ? ' (22 hồ sơ)' : '');
+    tabs[1].textContent = 'Kết quả' + (co ? ' (22)' : '');
     $('mlCanh').innerHTML = co ? '⚠ ' + (thieu ? thieu + ' biến chưa ghép · ' : '') + loi.length + ' hồ sơ cần xem (' + loi.map(function (h) { return h[0]; }).join(', ') + ')' : '';
     var icon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
     $('mlChan').innerHTML = !co ? '' : icon + (ml.chay === 1 ? 'Đang sinh <b>13/22</b> hồ sơ (59%) · MLHS_HS-14.docx · còn ~00:00:07'
@@ -2648,9 +2648,9 @@
       $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:#E3EEFB"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#E8E8E8"></i>tự động</span></span>';
       $('mlVungXem').innerHTML = trangMau();
     } else {
-      $('mlTrai').innerHTML = '<div class="banghs" role="grid" style="grid-template-columns:24px minmax(72px,1fr) 40px 28px"><span class="tieude-cot so">#</span><span class="tieude-cot">Hồ sơ</span><span class="tieude-cot so">VB</span><span class="tieude-cot"></span>' +
+      $('mlTrai').innerHTML = '<div class="banghs" role="grid" style="grid-template-columns:24px minmax(72px,1fr) 64px 28px"><span class="tieude-cot so">#</span><span class="tieude-cot">Hồ sơ</span><span class="tieude-cot so">Số dòng</span><span class="tieude-cot"></span>' +
         ML_HS.map(function (h, i) { return '<div class="vbdong' + (i === ml.hs ? ' chon' : '') + '" data-mlhs="' + i + '" role="row"><span class="so">' + (i + 1) + '</span><span>' + h[0] + '</span><span class="so">' + h[1] + '</span>' + (h[2] ? '<span class="canhml" title="' + h[2] + '">⚠</span>' : '<span></span>') + '</div>'; }).join('') + '</div>';
-      $('mlSo').value = ml.hs + 1; $('mlXemTT').innerHTML = 'Hồ sơ <b>' + hs[0] + '</b> · ' + hs[1] + ' văn bản · 1 trang';
+      $('mlSo').value = ml.hs + 1; $('mlXemTT').innerHTML = 'Hồ sơ <b>' + hs[0] + '</b> · ' + hs[1] + ' dòng · 1 trang';
       $('mlVungXem').innerHTML = trangKetQua(hs);
     }
   }
