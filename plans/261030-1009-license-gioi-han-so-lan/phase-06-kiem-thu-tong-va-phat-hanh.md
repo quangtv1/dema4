@@ -30,7 +30,9 @@ Chạy thật với trạm Apps Script trên Mac + Windows theo ma trận tình 
 | 9 | CLI `--tach` khi hết lượt | In thông báo + mã máy, mã thoát 3 |
 | 10 | Gửi câu trả lời giả (sửa `du_lieu` / chữ ký máy khác) vào app qua proxy | App từ chối, dùng luật offline |
 | 11 | `strings` exe tìm khoá | Không có `BEGIN PRIVATE KEY` / `private_key` |
-| 12 | Tách xong | Hàng mới ở tab Ngưỡng trắng (qua trạm) |
+| 12 | Tách xong | Hàng mới ở tab Ngưỡng trắng + tin + CSV ở nhóm Telegram (qua trạm) |
+| 13 | Đổi `telegram_chat_id` trên tab Cấu hình sang nhóm thử | Tin kế tiếp tới nhóm thử, không cần cài lại app |
+| 14 | `strings` exe tìm token bot | Không có |
 
 ## Related Code Files
 - Modify: `README.md` (mục License: cách hoạt động, mã máy, liên hệ; mục Gửi thống kê thêm mã máy), `dema4_rs/src/tro_giup.rs` (Hướng dẫn: mục License), `dema4_rs/Cargo.toml` (0.6.0)
@@ -41,10 +43,10 @@ Chạy thật với trạm Apps Script trên Mac + Windows theo ma trận tình 
 2. Chạy ma trận trên Mac (build local) và Windows (bản CI tag rc).
 3. Ghi kết quả vào báo cáo kiểm thử; sửa lỗi phát sinh (test trước rồi sửa).
 4. Cập nhật README (mục License, Gửi thống kê: qua trạm, mã máy) + Hướng dẫn; bump 0.6.0; tag `v0.6.0`.
-5. Sau khi phát hành: thu hồi service account cũ (phase 5 bước 7), thử khoá cũ → 403.
+5. Sau khi phát hành: thu hồi service account cũ, đổi token bot, chia sẻ lại spreadsheet (phase 5 bước 8–10).
 
 ## Success Criteria
-- [ ] 12 tình huống đạt trên cả Mac và Windows.
+- [ ] 14 tình huống đạt trên cả Mac và Windows.
 - [ ] Release v0.6.0 có 2 file; service account cũ đã thu hồi.
 - [ ] Báo cáo kiểm thử lưu trong plan.
 

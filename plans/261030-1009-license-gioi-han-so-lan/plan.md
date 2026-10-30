@@ -27,6 +27,7 @@ Brainstorm: `plans/reports/brainstorm-261030-1009-license-gioi-han-so-lan-report
 - **Không chờ mạng khi bấm**: quyết định trên bản sao license trong bộ nhớ (làm mới ngầm lúc mở app, mỗi 5 phút, sau mỗi lần chạy, khi bấm Kiểm tra lại). Thay đổi trên Sheet có hiệu lực chậm ≤ 5 phút.
 - Repo `quangtv1/dema4` **giữ công khai**; phát hành như hiện nay.
 - Thống kê Ngưỡng trắng chuyển qua trạm; khoá service account bị gỡ khỏi exe và thu hồi.
+- **Telegram qua trạm**: token + id nhóm lưu ở tab `Cấu hình` trên Sheet, chỉ trạm đọc; app gửi số liệu có cấu trúc, trạm tự soạn tin và gửi (kèm CSV ngưỡng). Bỏ token nhúng và `telegram.txt` khỏi app.
 - AGPL / MuPDF: không còn vướng (repo mở).
 
 ## Phases
@@ -46,7 +47,8 @@ Thứ tự: 1 và 2 làm song song → 3 → 4; 5 sau 2 (cần trước khi test
 - Máy mới có mạng: tab `license` tự có dòng của máy; lần thứ 3 Đếm (hoặc Tách) bị chặn bằng popup có mã máy + Copy + Kiểm tra lại.
 - Chủ Sheet nâng hạn mức → khách bấm Kiểm tra lại dùng được ngay; đặt Khoá → máy bị chặn trong ≤ 5 phút (hoặc ngay sau lần chạy kế tiếp), kể cả còn lượt.
 - Offline: 2 lần mỗi chức năng, lần 3 chặn; có mạng lại → nhật ký có dòng "bù offline".
-- Exe không chứa khoá ghi Sheet; câu trả lời giả (sửa 1 ký tự / chữ ký máy khác / phát lại) bị từ chối.
+- Exe không chứa khoá ghi Sheet và không chứa token Telegram; câu trả lời giả (sửa 1 ký tự / chữ ký máy khác / phát lại) bị từ chối.
+- Đổi token / nhóm Telegram trên tab `Cấu hình` → tin kế tiếp đi đúng nhóm mới, không cần phát hành lại.
 - Bấm Đếm / Tách quyết định tức thì (không gọi mạng); mất mạng / trạm lỗi không treo giao diện.
 - `cargo test --release` xanh; test license không gọi mạng thật (trừ test `#[ignore]`).
 
