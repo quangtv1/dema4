@@ -512,6 +512,13 @@
   .bangbien .vbdong.chon > span { background:var(--chon-nen); }
   .bangbien .dsml { position:static; grid-column:1 / -1; margin:2px 6px 8px; max-height:260px; }
   .bangbien .vbdong > span { padding:6px; border-bottom:1px solid #F0F0F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  /* Căn giữa theo chiều dọc mọi ô trong dòng biến; cột cảnh báo căn giữa ngang */
+  .bangbien .vbdong > span { display:flex; align-items:center; min-width:0; min-height:30px; box-sizing:border-box; }
+  .bangbien .vbdong > span.canhml { justify-content:center; }
+  .bangbien .vbdong > span.lay > .oml { flex:1; min-width:0; }
+  .bangbien .vbdong > span > code { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  /* Đang định vị: chip biến ở sidebar vàng giống chip trên trang mẫu */
+  .bangbien .vbdong.sang code { background:#FFE066; color:#3A2E00; }
   .bangbien .nhombien { grid-column:1 / -1; padding:5px 6px; font-size:11px; font-weight:bold; border-bottom:1px solid #EFEFEF; }
   .nhom-ttin, .nhom-bang, .nhom-tudong { background:#FAFAFA; color:var(--chu-phu); }
   /* Tên biến hiển thị như chip biến trên trang mẫu: cùng nền, cùng màu chữ theo trạng thái */
