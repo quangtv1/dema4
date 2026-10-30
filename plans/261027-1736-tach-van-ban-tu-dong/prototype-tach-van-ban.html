@@ -559,7 +559,8 @@
   .nhomtrai { flex:1; align-self:stretch; display:grid; grid-template-columns:118px minmax(0,1fr) 22px; align-items:center; background:#E6ECF4; font-size:12px; color:#33465E; font-weight:bold; }
   .nhomtrai > span { padding-left:6px; }
   #mlThan .daytrai { padding:0; width:0; min-width:100%; box-sizing:border-box; } /* không nới rộng cột trái theo nội dung chân */ #mlThan .timtrai { margin:0 6px; }
-  #manMucLuc .nhomtrai select { width:calc(100% - 4px); min-width:0; height:26px; margin:0 2px; border-color:transparent; background-color:#fff; font-weight:normal; color:var(--chu); }
+  #manMucLuc .nhomtrai select { grid-column:2 / 4; width:calc(100% - 6px); min-width:0; height:26px; margin:0 2px; border-color:transparent; font-weight:normal; color:#1E5631;
+    padding-left:26px; background:#E2F2E7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%231E6B3A' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E") no-repeat 7px center; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%231E6B3A' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position:7px center, right 10px center; background-repeat:no-repeat; }
   #manMucLuc .nhomtrai select:hover { border-color:#A9C2E6; }
   .oml svg { width:10px; height:6px; flex-shrink:0; margin-left:auto; opacity:0; } .oml:hover svg, .oml.mo svg { opacity:1; }
   .oml.thieu .ten { color:#B85F00; font-style:italic; } .oml.thieu { border-color:#E8C77A; background:#FFFBEF; }
@@ -821,9 +822,9 @@
             <span class="tt" id="mlXemTT"></span>
             <span style="margin-left:auto"></span>
             <div class="coanh" role="group" aria-label="Thu phóng">
-              <button class="nutma" aria-label="Thu nhỏ"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M5 7h4"/></svg></button>
-              <span style="min-width:38px;text-align:center;font-size:12px;color:var(--chu-phu)">100 %</span>
-              <button class="nutma" aria-label="Phóng to"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M5 7h4M7 5v4"/></svg></button>
+              <button class="nutma" id="mlThuNho" aria-label="Thu nhỏ"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M5 7h4"/></svg></button>
+              <span id="mlZoom" style="min-width:38px;text-align:center;font-size:12px;color:var(--chu-phu)">100 %</span>
+              <button class="nutma" id="mlPhongTo" aria-label="Phóng to"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M5 7h4M7 5v4"/></svg></button>
             </div>
           </div>
           <div class="vungxem" id="mlVungXem"></div>
@@ -1119,6 +1120,23 @@
         <tbody id="mlBien"></tbody></table></div>
       <div class="ghi">Tự động, không cần ghép: <code>{trang_so}</code> <code>{tong_so_trang}</code> — Word tự tính khi in. Biến chưa ghép giữ nguyên <code>{…}</code> trong file kết quả.</div>
       <div class="cuoi"><button class="nut sang-trai" id="mlTuKhop">Tự khớp lại</button><button class="nut" data-dong="phuMLGhep">Huỷ</button><button class="nut xanh" data-dong="phuMLGhep">Lưu</button></div>
+    </div>
+  </div>
+  <div class="phu" id="phuMLTao">
+    <div class="popup" role="dialog" aria-label="Đang sinh mục lục" style="width:480px">
+      <div class="dau">Đang sinh mục lục <b>Bien_muc_tong_hop.xlsx</b></div>
+      <div class="than" style="display:block;padding:18px 20px 6px">
+        <div class="tiendo" style="padding:0;height:30px"><div style="height:26px"><b style="width:59%"></b><span>13/22 hồ sơ · 59%</span></div></div>
+      </div>
+      <div class="than" style="padding:8px 20px 18px;row-gap:10px;grid-template-columns:110px 1fr">
+        <span>Đang tạo</span><b>MLHS_HS-14.docx</b>
+        <span>Mẫu</span><b style="font-weight:normal">Mẫu 01 – Quảng Trị · nhóm theo Tiêu đề hồ sơ</b>
+        <span>Đã xong</span><b>13 DOCX · 13 PDF</b>
+        <span>Lỗi</span><b>0</b>
+        <span>Ghi ra</span><b style="font-weight:normal;word-break:break-all;font-size:11.5px">D:\App\.sm-dema4\muc_luc\Bien_muc_tong_hop</b>
+        <span>Thời gian</span><b style="font-weight:normal">Đã chạy <b>00:00:09</b> · còn ~00:00:07</b>
+      </div>
+      <div class="cuoi"><button class="nut do" id="mlDung">Dừng</button></div>
     </div>
   </div>
   <div class="phu" id="phuMLXong">
@@ -2519,7 +2537,7 @@
   if (location.hash === '#phong-to') { s.daPT = true; ve(); moPhongTo(thuTuView(), '0.10'); }
   if (location.hash === '#tip') { s.daPT = true; ve(); document.querySelectorAll('.tip')[1].classList.add('hien'); document.querySelector('.tip.tren').classList.add('hien'); }
   // ---- Màn Sinh mục lục hồ sơ (dữ liệu giả theo Mẫu 01 – Quảng Trị) ----
-  var ml = { coDuLieu: false, hs: 0, tab: 'mau', chay: 0, mo: -1, moTrai: -1 };
+  var ml = { coDuLieu: false, hs: 0, tab: 'mau', chay: 0, mo: -1, moTrai: -1, zoom: 100 };
   var ML_HS = []; for (var k = 0; k < 22; k++) ML_HS.push(['HS-' + ('0' + (k + 1)).slice(-2), [14, 65, 9, 21, 12, 18, 7, 30, 11, 16, 8, 19, 13, 10, 22, 6, 15, 9, 12, 8, 14, 7][k]]);
   ML_HS[16].push('dòng 241 trống cột Trích yếu nội dung VB — ô để trống trong mục lục');
   var ML_VB = [['01/QĐ-UBND', '05/01/2015', 'UBND xã', 'Quyết định thành lập tổ công tác', 'Bản gốc'], ['15/TTr-UBND', '12/02/2015', 'UBND xã', 'Tờ trình phê duyệt kế hoạch', 'Bản sao'],
@@ -2650,12 +2668,12 @@
         }).join('') + '<span class="nhombien">Tự động</span><div class="vbdong"><span><code>{trang_so}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">số trang</span></div></span><span></span></div>' +
         '<div class="vbdong"><span><code>{tong_so_trang}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">tổng số trang</span></div></span><span></span></div></div>';
       $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:#E3EEFB"></i>đã ghép</span><span><i style="background:#FFE9C2"></i>chưa ghép</span><span><i style="background:#E8E8E8"></i>tự động</span></span>';
-      $('mlVungXem').innerHTML = trangMau();
+      $('mlVungXem').innerHTML = trangMau(); datZoom(ml.zoom);
     } else {
       $('mlTrai').innerHTML = '<div class="banghs" role="grid" style="grid-template-columns:24px minmax(72px,1fr) 64px 28px"><span class="tieude-cot so">#</span><span class="tieude-cot">Hồ sơ</span><span class="tieude-cot so">Số dòng</span><span class="tieude-cot"></span>' +
         ML_HS.map(function (h, i) { return '<div class="vbdong' + (i === ml.hs ? ' chon' : '') + '" data-mlhs="' + i + '" role="row"><span class="so">' + (i + 1) + '</span><span>' + h[0] + '</span><span class="so">' + h[1] + '</span>' + (h[2] ? '<span class="canhml" title="' + h[2] + '">⚠</span>' : '<span></span>') + '</div>'; }).join('') + '</div>';
-      $('mlSo').value = ml.hs + 1; $('mlXemTT').innerHTML = 'Hồ sơ <b>' + hs[0] + '</b> · ' + hs[1] + ' dòng · 1 trang';
-      $('mlVungXem').innerHTML = trangKetQua(hs);
+      $('mlSo').value = ml.hs + 1; $('mlXemTT').textContent = 'Mục lục hồ sơ ' + hs[0] + ' · ' + hs[1] + ' dòng · 1 trang';
+      $('mlVungXem').innerHTML = trangKetQua(hs); datZoom(ml.zoom);
     }
   }
   window.veMucLuc = veMucLuc;
@@ -2669,7 +2687,12 @@
   $('mlTruoc').onclick = function () { ml.hs = Math.max(0, ml.hs - 1); veMucLuc(); };
   $('mlSau').onclick = function () { ml.hs = Math.min(ML_HS.length - 1, ml.hs + 1); veMucLuc(); };
   $('mlNutGhep').onclick = moGhep;
-  $('mlTao').onclick = function () { ml.chay = ml.chay === 1 ? 0 : 1; ml.tab = 'ketqua'; veMucLuc(); };
+  $('mlTao').onclick = function () { ml.chay = ml.chay === 1 ? 0 : 1; ml.tab = 'ketqua'; veMucLuc(); $('phuMLTao').classList.toggle('mo', ml.chay === 1); };
+  $('mlDung').onclick = function () { ml.chay = 0; $('phuMLTao').classList.remove('mo'); veMucLuc(); };
+  // Thu phóng trang xem trước: 50–200 %, bước 25 %
+  function datZoom(z) { ml.zoom = Math.max(50, Math.min(200, z)); $('mlZoom').textContent = ml.zoom + ' %'; $('mlVungXem').querySelectorAll('.trangml').forEach(function (t) { t.style.zoom = ml.zoom / 100; }); }
+  $('mlThuNho').onclick = function () { datZoom(ml.zoom - 25); };
+  $('mlPhongTo').onclick = function () { datZoom(ml.zoom + 25); };
   document.querySelectorAll('[data-dong^="phuML"]').forEach(function (b) { b.onclick = function () { $(b.getAttribute('data-dong')).classList.remove('mo'); }; });
   var h = location.hash;
   if (h.indexOf('#muc-luc') === 0 || h === '#cau-hinh-muc-luc') {
@@ -2686,6 +2709,7 @@
     var hop = ml.mo >= 0; ml.mo = -1; ml.moTrai = -1; veMucLuc(); if (hop) veGhep();
   });
   if (h === '#muc-luc-xong') $('phuMLXong').classList.add('mo');
+  if (h === '#muc-luc-tao') $('phuMLTao').classList.add('mo');
   if (h === '#cau-hinh-muc-luc') $('nutCauHinh').onclick();
 })();
 </script>
