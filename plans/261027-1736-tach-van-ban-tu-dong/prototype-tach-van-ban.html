@@ -495,7 +495,9 @@
   #manMucLuc .tabkho .dem.canh { background:#FFF1D6; color:#8A5A00; }
   #manMucLuc .dieuhuong .nut { height:24px; padding:0 10px; font-size:12px; }
   .canhml { color:#B85F00; font-weight:bold; text-align:center; }
-  #manMucLuc .tabkho { grid-template-columns:repeat(2,210px); }
+  #manMucLuc .tabkho { grid-template-columns:200px 200px 1fr; }
+  #manMucLuc .canhtab { justify-self:end; padding-right:12px; color:#B85F00; font-size:12px; cursor:pointer; }
+  #manMucLuc .canhtab:hover { text-decoration:underline; }
   #manMucLuc .tabkho > span { cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
   #manMucLuc .tabkho > span:not(.chon):hover { background:#EFEFEF; }
   .bangbien { display:grid; grid-template-columns:minmax(90px,1fr) minmax(70px,1fr) 26px; font-size:12px; }
@@ -535,7 +537,20 @@
   .ghep-ml tr.nhom td { background:#FAFAFA; color:var(--chu-phu); font-size:11.5px; font-weight:bold; height:auto; padding:7px 12px; }
   .ghep-ml select { height:28px; padding:0 30px 0 8px; width:100%; font-size:12.5px; }
   .ghep-ml input { height:28px; box-sizing:border-box; border:1px solid var(--vien); border-radius:3px; font-size:12.5px; width:100%; background:#fff; padding:0 6px; }
-  .ghep-ml .kep { display:flex; gap:6px; } .ghep-ml .kep select { width:130px; flex-shrink:0; }
+  .ghep-ml td.lay { position:relative; }
+  .oml { height:28px; box-sizing:border-box; display:flex; align-items:center; gap:6px; padding:0 8px; border:1px solid transparent; border-radius:3px; cursor:pointer; white-space:nowrap; overflow:hidden; }
+  .oml:hover, .oml.mo { border-color:var(--vien); background:#fff; }
+  .oml.mo { border-color:var(--chon-vien); box-shadow:0 0 0 2px rgba(47,123,217,.18); }
+  .oml .ten { flex:1; overflow:hidden; text-overflow:ellipsis; }
+  .oml .tag { font-size:10.5px; color:#666; border:1px solid #DADADA; border-radius:3px; padding:0 4px; line-height:16px; flex-shrink:0; }
+  .oml svg { width:10px; height:6px; flex-shrink:0; margin-left:auto; opacity:0; } .oml:hover svg, .oml.mo svg { opacity:1; }
+  .oml.thieu .ten { color:#B85F00; font-style:italic; } .oml.thieu { border-color:#E8C77A; background:#FFFBEF; }
+  .dsml { position:absolute; left:12px; right:12px; top:36px; z-index:5; background:#fff; border:1px solid var(--vien); border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.18); padding:6px; max-height:236px; overflow-y:auto; }
+  .dsml input { width:100%; height:28px; box-sizing:border-box; border:1px solid var(--vien); border-radius:3px; padding:0 8px; font-size:12.5px; margin-bottom:4px; }
+  .dsml .goi { font-size:11px; color:var(--chu-phu); padding:4px 6px 2px; }
+  .dsml .mucml { padding:5px 8px; border-radius:3px; cursor:pointer; display:flex; gap:6px; align-items:center; }
+  .dsml .mucml:hover { background:var(--chon-nen); } .dsml .mucml.chon { font-weight:bold; }
+  .dsml .mucml.bo { color:#B85F00; border-top:1px solid #EFEFEF; margin-top:4px; padding-top:7px; border-radius:0; }
   .ghep-ml tr.thieu select { border-color:#D9A21B; background-color:#FFFBEF; }
   .ghep-ml .gt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .ghep-ml .gt.thieu { color:#B85F00; font-style:italic; }
@@ -753,9 +768,10 @@
       <label class="nhanml" for="mlMau">Mẫu mục lục:</label>
       <select id="mlMau" style="flex:1"><option>Mẫu 01 – Quảng Trị</option><option>Mẫu 02 – Quảng Ninh</option><option>Mẫu 03 – Đống Đa</option><option>Mẫu 04 – Vĩnh Phúc</option><option>Mẫu riêng: MucLuc_DonVi.docx</option></select>
       <button class="nut" id="mlChonMau">Chọn</button>
+      <div class="phaiml"><button class="nut" id="mlNutGhep" style="flex:1" title="Chọn nguồn dữ liệu cho từng biến của mẫu">Ghép biến…</button></div>
     </div>
     <div class="bangdem">
-      <div class="tabkho" id="mlTab"><span data-mltab="mau">Mẫu</span><span data-mltab="ketqua">Kết quả</span></div>
+      <div class="tabkho" id="mlTab"><span data-mltab="mau">Mẫu</span><span data-mltab="ketqua">Kết quả</span><div class="canhtab" id="mlCanh"></div></div>
       <div class="trong mo-dau" id="mlGioiThieu">
         <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
         <div class="gioithieu">
@@ -773,7 +789,7 @@
           <div class="trai" id="mlTrai"></div>
           <div class="daytrai">
             <label class="timtrai"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
-              <input type="search" id="mlTim" placeholder="Tìm hồ sơ" aria-label="Tìm" autocomplete="off"></label><button class="nut" id="mlNutGhep" data-mlghep="1" title="Chọn nguồn dữ liệu cho từng biến">Ghép biến…</button></div>
+              <input type="search" id="mlTim" placeholder="Tìm hồ sơ" aria-label="Tìm" autocomplete="off"></label></div>
         </div>
         <div class="keo" role="separator" aria-orientation="vertical"></div>
         <div class="phai xemml">
@@ -2484,7 +2500,7 @@
   if (location.hash === '#phong-to') { s.daPT = true; ve(); moPhongTo(thuTuView(), '0.10'); }
   if (location.hash === '#tip') { s.daPT = true; ve(); document.querySelectorAll('.tip')[1].classList.add('hien'); document.querySelector('.tip.tren').classList.add('hien'); }
   // ---- Màn Sinh mục lục hồ sơ (dữ liệu giả theo Mẫu 01 – Quảng Trị) ----
-  var ml = { coDuLieu: false, hs: 0, tab: 'mau', chay: 0 };
+  var ml = { coDuLieu: false, hs: 0, tab: 'mau', chay: 0, mo: -1 };
   var ML_HS = []; for (var k = 0; k < 22; k++) ML_HS.push(['HS-' + ('0' + (k + 1)).slice(-2), [14, 65, 9, 21, 12, 18, 7, 30, 11, 16, 8, 19, 13, 10, 22, 6, 15, 9, 12, 8, 14, 7][k]]);
   ML_HS[16].push('dòng 241 trống cột Trích yếu nội dung VB — ô để trống trong mục lục');
   var ML_VB = [['01/QĐ-UBND', '05/01/2015', 'UBND xã', 'Quyết định thành lập tổ công tác', 'Bản gốc'], ['15/TTr-UBND', '12/02/2015', 'UBND xã', 'Tờ trình phê duyệt kế hoạch', 'Bản sao'],
@@ -2494,38 +2510,54 @@
   // [biến, nguồn: 'cot' | 'hang' | 'thieu', giá trị nguồn, giá trị của hồ sơ đang xem]
   var ML_BIEN = [
     ['Thông tin hồ sơ (in một lần)'],
-    ['so_ho_so', 'cot', 'Tiêu đề hồ sơ', function (h) { return h; }],
+    ['so_ho_so', 'cot', 'Tiêu đề hồ sơ'],
     ['don_vi', 'hang', 'VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI'],
     ['chi_nhanh', 'hang', 'CHI NHÁNH THÀNH PHỐ ĐÔNG HÀ'],
     ['nguoi_lap', 'thieu', ''],
     ['Bảng văn bản (mỗi văn bản một dòng)'],
-    ['stt', 'cot', 'STT', function () { return '1'; }],
-    ['so_ky_hieu', 'cot', 'Số, ký hiệu văn bản', function () { return ML_VB[0][0]; }],
-    ['ngay_thang', 'cot', 'Ngày tháng văn bản', function () { return ML_VB[0][1]; }],
-    ['tac_gia', 'cot', 'Tác giả', function () { return ML_VB[0][2]; }],
-    ['trich_yeu', 'cot', 'Trích yếu nội dung VB', function () { return ML_VB[0][3]; }],
-    ['to_so', 'cot', 'Tờ số', function () { return '01'; }],
-    ['ghi_chu', 'cot', 'Ghi chú', function () { return ML_VB[0][4]; }]
+    ['stt', 'cot', 'STT'],
+    ['so_ky_hieu', 'cot', 'Số, ký hiệu văn bản'],
+    ['ngay_thang', 'cot', 'Ngày tháng văn bản'],
+    ['tac_gia', 'cot', 'Tác giả'],
+    ['trich_yeu', 'cot', 'Trích yếu nội dung VB'],
+    ['to_so', 'cot', 'Tờ số'],
+    ['ghi_chu', 'cot', 'Ghi chú']
   ];
   function bien(ten) { for (var i = 0; i < ML_BIEN.length; i++) if (ML_BIEN[i][0] === ten) return ML_BIEN[i]; }
   function tk(ten) {
     var b = bien(ten), lop = !b ? 'tudong' : b[1] === 'thieu' ? 'thieu' : '';
     return '<span class="tk ' + lop + '" data-mlghep="1">{' + ten + '}</span>';
   }
-  function chonNguon(b) {
-    var o = function (dk, nhan) { return '<option' + (dk ? ' selected' : '') + '>' + nhan + '</option>'; };
-    var sel = '<select>' + o(b[1] === 'thieu', '— Chưa ghép —') + COT.map(function (c) { return o(b[1] === 'cot' && c === b[2], 'Cột: ' + c); }).join('') +
-      o(b[1] === 'hang', 'Nhập giá trị') + o(false, 'Từ kết quả Tách') + '</select>';
-    return b[1] === 'hang' ? '<div class="kep">' + sel + '<input value="' + b[2] + '"></div>' : sel;
+  var MUI_TEN = '<svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="#666" stroke-width="1.4" stroke-linecap="round"/></svg>';
+  function giaTri(b, hs) {
+    if (b[1] === 'hang') return b[2];
+    if (b[1] === 'tach') return 'theo thứ tự kết quả Tách';
+    if (b[1] !== 'cot') return '';
+    var i = COT.indexOf(b[2]);
+    return i === 0 ? hs : i === 1 ? '1' : i === 6 ? '01' : i === 7 ? ML_VB[0][4] : ML_VB[0][i - 2] || '';
+  }
+  // Ô "Lấy từ": hiển thị gọn; bấm để mở danh sách cột, hoặc gõ thẳng giá trị cố định rồi Enter
+  function chonNguon(b, i) {
+    var nhan = b[1] === 'cot' ? '<span class="tag">Cột</span><span class="ten">' + b[2] + '</span>'
+      : b[1] === 'hang' ? '<span class="tag">Giá trị</span><span class="ten">' + b[2] + '</span>'
+      : b[1] === 'tach' ? '<span class="tag">Tách</span><span class="ten">Từ kết quả Tách</span>'
+      : '<span class="ten">Bấm để chọn cột hoặc nhập giá trị</span>';
+    var o = '<div class="oml' + (b[1] === 'thieu' ? ' thieu' : '') + (ml.mo === i ? ' mo' : '') + '" data-mloml="' + i + '" tabindex="0" role="combobox" aria-expanded="' + (ml.mo === i) + '">' + nhan + MUI_TEN + '</div>';
+    if (ml.mo !== i) return o;
+    return o + '<div class="dsml"><input id="mlGo" placeholder="Gõ giá trị cố định rồi Enter, hoặc chọn bên dưới…" value="' + (b[1] === 'hang' ? b[2] : '') + '">' +
+      '<div class="goi">Cột trong file biên mục</div>' +
+      COT.map(function (c) { return '<div class="mucml' + (b[1] === 'cot' && b[2] === c ? ' chon' : '') + '" data-mlchon="cot" data-gt="' + c + '">' + c + '</div>'; }).join('') +
+      '<div class="goi">Khác</div><div class="mucml" data-mlchon="tach">Từ kết quả Tách (khớp theo thứ tự)</div>' +
+      (b[1] !== 'thieu' ? '<div class="mucml bo" data-mlchon="thieu">Bỏ ghép</div>' : '') + '</div>';
   }
   function veGhep() {
     var hs = ML_HS[ml.hs][0];
     $('mlGhepHs').textContent = hs;
     $('mlBien').innerHTML = ML_BIEN.map(function (b) {
       if (b.length === 1) return '<tr class="nhom"><td colspan="4">' + b[0] + '</td></tr>';
-      var gt = b[1] === 'hang' ? b[2] : b[3] ? b[3](hs) : '';
+      var gt = giaTri(b, hs), i = ML_BIEN.indexOf(b);
       return '<tr' + (b[1] === 'thieu' ? ' class="thieu"' : '') + '><td class="tt">' + (gt ? '' : '<span class="canhml">!</span>') +
-        '</td><td><code>{' + b[0] + '}</code></td><td>' + chonNguon(b) + '</td><td><div class="gt' + (gt ? '' : ' thieu') + '" title="' + gt + '">' + (gt || 'chưa ghép — để nguyên {' + b[0] + '}') + '</div></td></tr>';
+        '</td><td><code>{' + b[0] + '}</code></td><td class="lay">' + chonNguon(b, i) + '</td><td><div class="gt' + (gt ? '' : ' thieu') + '" title="' + gt + '">' + (gt || 'chưa ghép — để nguyên {' + b[0] + '}') + '</div></td></tr>';
     }).join('');
   }
   function moGhep() { veGhep(); $('phuMLGhep').classList.add('mo'); }
@@ -2554,20 +2586,21 @@
     $('mlTao').disabled = !co && ml.chay !== 1;
     $('mlTao').className = 'nut ' + (ml.chay === 1 ? 'do' : co ? 'xanh' : 'xam'); $('mlTao').textContent = ml.chay === 1 ? 'Dừng' : 'Sinh mục lục';
     var tabs = $('mlTab').children; tabs[0].classList.toggle('chon', co && mau); tabs[1].classList.toggle('chon', co && !mau);
-    tabs[0].innerHTML = 'Mẫu' + (co ? '<span class="dem canh" title="Biến đã ghép / tổng biến">12/13 biến</span>' : '');
-    tabs[1].innerHTML = 'Kết quả' + (co ? '<span class="dem">22 hồ sơ</span>' + (loi.length ? '<span class="dem canh" title="Hồ sơ cần xem">⚠ ' + loi.length + '</span>' : '') : '');
+    tabs[0].textContent = 'Mẫu' + (co ? ' (12/13 biến)' : '');
+    tabs[1].textContent = 'Kết quả' + (co ? ' (22 hồ sơ)' : '');
+    $('mlCanh').innerHTML = co ? '⚠ 1 biến chưa ghép · ' + loi.length + ' hồ sơ cần xem (' + loi.map(function (h) { return h[0]; }).join(', ') + ')' : '';
     var icon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
     $('mlChan').innerHTML = !co ? '' : icon + (ml.chay === 1 ? 'Đang sinh <b>13/22</b> hồ sơ (59%) · MLHS_HS-14.docx · còn ~00:00:07'
       : ml.chay === 2 ? 'Đã sinh <b>22/22</b> hồ sơ · 22 DOCX, 22 PDF · 16 giây'
-      : 'Hồ sơ: <b>22</b>; Văn bản: <b>326</b>; Cần xem: <b style="color:#B85F00">' + loi.length + '</b> (' + loi.map(function (h) { return h[0]; }).join(', ') + ') · xem trước bằng Microsoft Word');
+      : 'Hồ sơ: <b>22</b>; Văn bản: <b>326</b> · xem trước bằng Microsoft Word');
     if (!co) return;
     $('mlDieuHuong').style.display = mau ? 'none' : 'contents';
-    $('mlTim').placeholder = mau ? 'Tìm biến' : 'Tìm hồ sơ'; $('mlNutGhep').style.display = mau ? '' : 'none';
+    $('mlTim').placeholder = mau ? 'Tìm biến' : 'Tìm hồ sơ'
     if (mau) {
       $('mlTrai').innerHTML = '<div class="bangbien" role="grid"><span class="tieude-cot">Biến</span><span class="tieude-cot">Lấy từ</span><span class="tieude-cot"></span>' +
         ML_BIEN.map(function (b) {
           if (b.length === 1) return '<span class="nhombien">' + b[0].replace(/ \(.*/, '') + '</span>';
-          return '<div class="vbdong" data-mlghep="1" role="row"><span><code>{' + b[0] + '}</code></span><span style="color:var(--chu-phu)">' + (b[1] === 'cot' ? b[2] : b[1] === 'hang' ? '“' + b[2] + '”' : '—') + '</span>' +
+          return '<div class="vbdong" data-mlghep="1" role="row"><span><code>{' + b[0] + '}</code></span><span style="color:var(--chu-phu)">' + (b[1] === 'cot' ? b[2] : b[1] === 'hang' ? '“' + b[2] + '”' : b[1] === 'tach' ? 'Từ Tách' : '—') + '</span>' +
             (b[1] === 'thieu' ? '<span class="canhml" title="Chưa ghép">!</span>' : '<span></span>') + '</div>';
         }).join('') + '<span class="nhombien">Tự động</span><div class="vbdong"><span><code>{trang_so}</code></span><span style="color:var(--chu-phu)">số trang</span><span></span></div>' +
         '<div class="vbdong"><span><code>{tong_so_trang}</code></span><span style="color:var(--chu-phu)">tổng số trang</span><span></span></div></div>';
@@ -2582,6 +2615,7 @@
   }
   window.veMucLuc = veMucLuc;
   $('manMucLuc').addEventListener('click', function (e) {
+    if (e.target.closest('#mlCanh')) { ml.tab = 'ketqua'; ml.hs = 16; veMucLuc(); return; }
     var t = e.target.closest('[data-mltab]'); if (t && ml.coDuLieu) { ml.tab = t.getAttribute('data-mltab'); veMucLuc(); return; }
     var r = e.target.closest('[data-mlhs]'); if (r) { ml.hs = +r.getAttribute('data-mlhs'); veMucLuc(); return; }
     if (e.target.closest('[data-mlghep]')) moGhep();
@@ -2589,6 +2623,7 @@
   $('mlChonDuLieu').onclick = $('mlLkChon').onclick = function () { ml.coDuLieu = true; veMucLuc(); };
   $('mlTruoc').onclick = function () { ml.hs = Math.max(0, ml.hs - 1); veMucLuc(); };
   $('mlSau').onclick = function () { ml.hs = Math.min(ML_HS.length - 1, ml.hs + 1); veMucLuc(); };
+  $('mlNutGhep').onclick = moGhep;
   $('mlTao').onclick = function () { ml.chay = ml.chay === 1 ? 0 : 1; ml.tab = 'ketqua'; veMucLuc(); };
   document.querySelectorAll('[data-dong^="phuML"]').forEach(function (b) { b.onclick = function () { $(b.getAttribute('data-dong')).classList.remove('mo'); }; });
   var h = location.hash;
@@ -2596,7 +2631,21 @@
     s.man = 'mucluc'; ml.coDuLieu = h !== '#muc-luc'; ml.tab = h === '#muc-luc-mau' || h === '#muc-luc-ghep' ? 'mau' : 'ketqua';
     ml.hs = h === '#muc-luc-loi' ? 16 : 0; ml.chay = h === '#muc-luc-tao' ? 1 : h === '#muc-luc-xong' ? 2 : 0; ve();
   }
-  if (h === '#muc-luc-ghep') moGhep();
+  if (h === '#muc-luc-ghep' || h === '#muc-luc-ghep-chon') { if (h === '#muc-luc-ghep-chon') ml.mo = 4; moGhep(); }
+  $('mlBien').addEventListener('click', function (e) {
+    var c = e.target.closest('[data-mlchon]'), o = e.target.closest('[data-mloml]');
+    if (c) { var b = ML_BIEN[ml.mo], k = c.getAttribute('data-mlchon'); b[1] = k; b[2] = k === 'cot' ? c.getAttribute('data-gt') : ''; ml.mo = -1; veGhep(); return; }
+    if (o) { var i = +o.getAttribute('data-mloml'); ml.mo = ml.mo === i ? -1 : i; veGhep(); if ($('mlGo')) $('mlGo').focus(); }
+  });
+  $('mlBien').addEventListener('keydown', function (e) {
+    if (e.target.id !== 'mlGo') return;
+    if (e.key === 'Escape') { ml.mo = -1; veGhep(); }
+    if (e.key === 'Enter' && e.target.value.trim()) { var b = ML_BIEN[ml.mo]; b[1] = 'hang'; b[2] = e.target.value.trim(); ml.mo = -1; veGhep(); }
+  });
+  $('mlBien').addEventListener('input', function (e) {
+    if (e.target.id !== 'mlGo') return; var q = e.target.value.toLowerCase();
+    e.target.parentNode.querySelectorAll('[data-mlchon="cot"]').forEach(function (d) { d.style.display = d.textContent.toLowerCase().indexOf(q) < 0 ? 'none' : ''; });
+  });
   if (h === '#muc-luc-xong') $('phuMLXong').classList.add('mo');
   if (h === '#cau-hinh-muc-luc') $('nutCauHinh').onclick();
 })();
