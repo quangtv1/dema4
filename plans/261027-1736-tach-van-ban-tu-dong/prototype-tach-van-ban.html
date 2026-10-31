@@ -499,7 +499,7 @@
   #manMucLuc .daytrai .nut { height:22px; padding:0 10px; font-size:12px; flex-shrink:0; }
   #manMucLuc .phaiml { width:354px; flex-shrink:0; display:flex; align-items:center; gap:6px; margin-left:10px; }
   #manMucLuc .phaiml .nhanphu { color:var(--chu-phu); white-space:nowrap; }
-  #manMucLuc .phaiml .so-dong { width:52px; height:26px; box-sizing:border-box; border:1px solid var(--vien); padding:0 6px; text-align:right; }
+  #manMucLuc .phaiml .so-dong { width:72px; height:26px; box-sizing:border-box; border:1px solid var(--vien); padding:0 6px; text-align:right; }
   #manMucLuc .nutghep { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
   #manMucLuc .nutghep .so { font-size:11px; padding:1px 7px; border-radius:9px; background:#E8F3E8; color:#226622; }
   #manMucLuc .nutghep .so.thieu { background:#FFF1D6; color:#8A5A00; }
@@ -806,7 +806,7 @@
       <input id="mlDuLieu" type="text" value="" placeholder="Chọn file Excel (.xlsx .xlsb .xls) hoặc CSV" readonly>
       <button class="nut" id="mlChonDuLieu">Chọn</button>
       <div class="phaiml">
-        <span class="nhanphu">Sheet</span><select id="mlSheet" aria-label="Sheet" style="flex:1"><option>KhanhLinh</option><option>Sheet2</option></select>
+        <select id="mlSheet" aria-label="Sheet" style="flex:1"><option value="" hidden>Chọn sheet</option><option>KhanhLinh</option><option>Sheet2</option></select>
         <span class="nhanphu">Dòng tiêu đề</span><input class="so-dong" id="mlHeader" type="number" min="1" value="1" aria-label="Dòng tiêu đề">
         <button class="nut nutxo" id="mlXemDong" title="Xem dòng tiêu đề và dòng dữ liệu đầu — kiểm tra chọn đúng Dòng tiêu đề"><svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg></button>
       </div>
@@ -2697,6 +2697,7 @@
     if (s.man !== 'mucluc') return;
     var coDl = ml.coDuLieu, co = coDl && ml.coMau, mau = ml.tab === 'mau', hs = ML_HS[ml.hs], loi = ML_HS.filter(function (h) { return h[2]; });
     $('mlLuuMau').style.display = ml.coMau ? '' : 'none';
+    $('mlSheet').disabled = !coDl; $('mlSheet').selectedIndex = coDl ? Math.max(1, $('mlSheet').selectedIndex) : 0;
     $('mlDuLieu').value = coDl ? 'G:\\SoHoa\\Bien_muc\\Bien_muc_tong_hop.xlsx' : '';
     $('mlGioiThieu').classList.toggle('an', co);
     $('mlCongCu').classList.toggle('an', !co); $('mlVungXem').classList.toggle('an', !co);

@@ -30,6 +30,11 @@ pub const TIEU_DE: &str = "Sinh mục lục hồ sơ (Giải pháp số Sao Mai)
 /// Khối phải 2 dòng đầu vào (Sheet · Dòng tiêu đề · nút xổ / Ghép biến…) — ô đường dẫn và ô mẫu bằng nhau.
 const RONG_KHOI_PHAI: f32 = 354.0;
 const RONG_NUT_XO: f32 = 28.0;
+/// Ô số Dòng tiêu đề (chữ số + cột tăng/giảm bên phải).
+const RONG_O_SO: f32 = 72.0;
+const RONG_TANG_GIAM: f32 = 16.0;
+/// ComboBox vẽ rộng hơn tham số `width` một chút (khung + mũi tên) — trừ đi để khối phải đúng RONG_KHOI_PHAI.
+const CHENH_O_CHON: f32 = 8.0;
 const RONG_NHAN: f32 = 104.0;
 const CAO_TAB: f32 = 32.0;
 const CAM: Color32 = Color32::from_rgb(0xB8, 0x5F, 0x00);
@@ -492,6 +497,39 @@ impl ManMucLuc {
         .inner
     }
 
+    /// Ô số Dòng tiêu đề có cột ▲▼ bên phải; trả về true khi giá trị đã chốt (rời ô / bấm tăng giảm) → đọc lại file.
+    fn o_so_dong(&mut self, ui: &mut egui::Ui, bat: bool, nhan: egui::Id) -> bool {
+        // Ô chữ đặt bằng `put` (đẩy con trỏ tới mép nó) → tính khung trước, vẽ xong mới đẩy con trỏ qua hết khung
+        let r = Rect::from_min_size(egui::pos2(ui.cursor().min.x, ui.max_rect().center().y - 13.0), egui::vec2(RONG_O_SO, 26.0));
+        let p = ui.painter().clone();
+        p.rect_filled(r, 2.0, if bat { Color32::WHITE } else { NEN });
+        let o_chu = Rect::from_min_max(r.min + egui::vec2(4.0, 1.0), egui::pos2(r.right() - RONG_TANG_GIAM - 4.0, r.bottom() - 1.0));
+        let te = ui.put(o_chu, egui::TextEdit::singleline(&mut self.o_dong).frame(egui::Frame::NONE).align(egui::Align2::RIGHT_CENTER).interactive(bat)).labelled_by(nhan);
+        let mut chot = te.lost_focus();
+        let cot = Rect::from_min_max(egui::pos2(r.right() - RONG_TANG_GIAM, r.top()), r.max);
+        p.vline(cot.left(), r.y_range(), Stroke::new(1.0, VIEN_NHAT));
+        let mau = if bat { Color32::from_gray(0x55) } else { CHU_MO };
+        for (k, (ten, len)) in [("Tăng dòng tiêu đề", true), ("Giảm dòng tiêu đề", false)].into_iter().enumerate() {
+            let o = Rect::from_min_size(egui::pos2(cot.left(), cot.top() + k as f32 * 13.0), egui::vec2(RONG_TANG_GIAM, 13.0));
+            let ph = ui.interact(o, ui.scope_id().with(("ml_tang_giam", k)), if bat { Sense::click() } else { Sense::hover() });
+            ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, bat, ten));
+            if bat && ph.hovered() {
+                p.rect_filled(o.shrink(1.0), 0.0, crate::gui::NUT_HOVER);
+            }
+            let c = o.center();
+            let d = if len { -1.0 } else { 1.0 };
+            p.add(egui::Shape::line(vec![c + egui::vec2(-3.0, -1.5 * d), c + egui::vec2(0.0, 1.5 * d), c + egui::vec2(3.0, -1.5 * d)], Stroke::new(1.2, mau)));
+            if ph.clicked() {
+                let n = self.dong_tieu_de();
+                self.o_dong = if len { n + 1 } else { n.saturating_sub(1).max(1) }.to_string();
+                chot = true;
+            }
+        }
+        ui.advance_cursor_after_rect(r);
+        p.rect_stroke(r, 2.0, Stroke::new(1.0, if te.has_focus() { crate::gui::VIEN_TAB_CHON } else { VIEN }), egui::StrokeKind::Inside);
+        chot
+    }
+
     /// Bảng nhỏ dưới dòng 1: dòng tiêu đề + dòng dữ liệu đầu tiên (cột co theo chữ, dài thì cắt, cuộn ngang).
     fn xem_hai_dong(ui: &mut egui::Ui, d: &DuLieu, dong_tieu_de: usize) {
         let b = &d.bang;
@@ -556,16 +594,19 @@ impl ManMucLuc {
             }
             ui.add_space(10.0);
             ui.allocate_ui_with_layout(egui::vec2(RONG_KHOI_PHAI, 26.0), Layout::left_to_right(Align::Center), |ui| {
-                let nhan_sheet = ui.label(RichText::new("Sheet").color(CHU_PHU));
+                // Ô sheet không nhãn: chưa đọc file → mờ, chữ gợi ý "Chọn sheet" trong ô
+                let co = self.du_lieu.is_some();
                 let ds: Vec<String> = self.du_lieu.as_ref().map(|d| d.ds_sheet.clone()).unwrap_or_default();
                 let hien = self.du_lieu.as_ref().map(|d| d.sheet.clone()).unwrap_or_default();
+                let chu_dong = "Dòng tiêu đề";
+                let rong_chu = ui.fonts_mut(|x| x.layout_no_wrap(chu_dong.into(), egui::TextStyle::Body.resolve(ui.style()), CHU).size().x);
                 let mut chon = None;
-                ui.add_enabled_ui(!khoa && ds.len() > 1, |ui| {
+                ui.add_enabled_ui(!khoa && co, |ui| {
                     kieu_o_chon(ui, Color32::WHITE, VIEN);
                     egui::ComboBox::from_id_salt("ml_sheet")
                         .icon(mui_ten_chon)
-                        .width(ui.available_width() - 127.0 - RONG_NUT_XO - khe)
-                        .selected_text(if hien.is_empty() { "—".to_string() } else { hien.clone() })
+                        .width(ui.available_width() - rong_chu - RONG_O_SO - RONG_NUT_XO - 3.0 * khe - CHENH_O_CHON)
+                        .selected_text(if hien.is_empty() { RichText::new("Chọn sheet").color(CHU_MO) } else { RichText::new(hien.clone()) })
                         .show_ui(ui, |ui| {
                             for s in &ds {
                                 if ui.selectable_label(*s == hien, s).clicked() {
@@ -574,18 +615,16 @@ impl ManMucLuc {
                             }
                         })
                         .response
-                        .labelled_by(nhan_sheet.id);
+                        .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, co, "Sheet"));
                 });
                 if let Some(s) = chon {
                     self.doc_du_lieu(Some(ui.ctx()), Some(s));
                 }
-                let nhan_dong = ui.label(RichText::new("Dòng tiêu đề").color(CHU_PHU));
-                let r = ui.add_enabled(!khoa, egui::TextEdit::singleline(&mut self.o_dong).desired_width(44.0).align(egui::Align2::RIGHT_CENTER)).labelled_by(nhan_dong.id);
-                if r.lost_focus() && !self.file.trim().is_empty() {
+                let nhan_dong = ui.label(RichText::new(chu_dong).color(CHU_PHU));
+                if self.o_so_dong(ui, !khoa, nhan_dong.id) && !self.file.trim().is_empty() {
                     let sheet = self.du_lieu.as_ref().map(|d| d.sheet.clone());
                     self.doc_du_lieu(Some(ui.ctx()), sheet);
                 }
-                let co = self.du_lieu.is_some();
                 let nut_xo = ui.add_enabled(co, egui::Button::new("").min_size(egui::vec2(RONG_NUT_XO, 26.0)));
                 let c = nut_xo.rect.center();
                 let mau = if co { Color32::from_gray(0x55) } else { CHU_MO };
