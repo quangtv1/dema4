@@ -123,7 +123,8 @@ pub fn ve_noi_bat(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>) -> 
             ui.add_space(4.0);
             if gt.dang_phat_trien {
                 // Chừa chỗ cho nhãn; vẽ sau, ngoài phần bị làm mờ
-                let (o, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 30.0), Sense::hover());
+                let (o, ph) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 30.0), Sense::hover());
+                ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, "Chức năng đang phát triển"));
                 cho_nhan = Some(o);
                 ui.add_space(4.0);
             }
