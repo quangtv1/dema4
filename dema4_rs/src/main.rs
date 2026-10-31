@@ -135,7 +135,7 @@ fn chay_tach(kt: &license::KiemTra, tham_so: &[String]) -> i32 {
         i += 1;
     }
     let Some(thu_muc) = thu_muc.filter(|p| p.is_dir()) else {
-        eprintln!("Cách dùng: sm-dema4 --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]\nThiếu thư mục PDF hoặc thư mục không tồn tại.");
+        eprintln!("Cách dùng: dema4_saomai --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]\nThiếu thư mục PDF hoặc thư mục không tồn tại.");
         return 2;
     };
     let thu_muc = std::fs::canonicalize(&thu_muc).unwrap_or(thu_muc);

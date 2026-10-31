@@ -1595,7 +1595,7 @@
 
   function ve() {
     var m = nhan[s.hoSo];
-    $('tenCuaSo').textContent = ({ trangchu: 'sm-dema4', tach: 'Tách văn bản PDF', dem: 'Đếm trang A4', ky: 'Ký văn bản', mucluc: 'Sinh mục lục hồ sơ' })[s.man] + ' (Giải pháp số Sao Mai)';
+    $('tenCuaSo').textContent = ({ trangchu: 'dema4-saomai', tach: 'Tách văn bản PDF', dem: 'Đếm trang A4', ky: 'Ký văn bản', mucluc: 'Sinh mục lục hồ sơ' })[s.man] + ' (Giải pháp số Sao Mai)';
     $('manTrangChu').classList.toggle('an', s.man !== 'trangchu');
     $('manTach').classList.toggle('an', s.man !== 'tach');
     $('manDem').classList.toggle('an', s.man !== 'dem'); $('manKy').classList.toggle('an', s.man !== 'ky'); $('manMucLuc').classList.toggle('an', s.man !== 'mucluc'); if (window.veMucLuc) window.veMucLuc();

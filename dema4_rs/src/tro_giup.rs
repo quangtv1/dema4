@@ -99,7 +99,7 @@ impl HopTroGiup {
                 };
                 kh::hop(ctx, "hop_tro_giup", RONG_GON, "Kiểm tra cập nhật", |ui| {
                     kh::bang_gon(ui, &[("Đang dùng", PHIEN_BAN, true, 12.0), ("Mới nhất", &moi_nhat, true, 12.0)]);
-                    kh::ghi_gon(ui, "Tải từ trang phát hành của sm-dema4 (GitHub); không gửi dữ liệu nào khác.", CHU_PHU);
+                    kh::ghi_gon(ui, "Tải từ trang phát hành của dema4-saomai (GitHub); không gửi dữ liệu nào khác.", CHU_PHU);
                     kh::chan(ui, |ui| {
                         ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                             if ui.add(kh::nut_chan("Đóng")).clicked() {
@@ -144,7 +144,7 @@ impl HopTroGiup {
                 kh::bang_gon(
                     ui,
                     &[
-                        ("Ứng dụng", "sm-dema4", true, 12.0),
+                        ("Ứng dụng", "dema4-saomai", true, 12.0),
                         ("Phiên bản", PHIEN_BAN, true, 12.0),
                         ("Mã máy", &crate::license::ma_may(), true, 12.0),
                         ("Chức năng", "Đếm trang A4 · Tách văn bản PDF", false, 12.0),
@@ -177,13 +177,6 @@ pub enum Khoi {
     Ghi(&'static str),
 }
 
-/// Mục "Lượt dùng" chung cho các tab.
-const LUOT_DUNG: Khoi = Khoi::Bang(&[
-    ("Dùng thử", "Mỗi máy *10 lần Đếm*, *10 lần Tách* và *10 lần Sinh mục lục*. Chỉ lần chạy có kết quả mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt."),
-    ("Hết lượt", "Popup *Liên hệ Sao Mai*: mã máy, điện thoại, email. Sao Mai cấp thêm lượt → bấm *Kiểm tra lại*."),
-    ("Mất mạng", "Chạy được tối đa 2 lần chưa được máy chủ xác nhận; có mạng lại app tự ghi bù."),
-    ("Mã máy", "Xem ở *Trợ giúp › Thông tin*; không đổi khi đổi tên máy."),
-]);
 
 const HD_DEM: &[Khoi] = &[
     Khoi::Muc("Các bước"),
@@ -206,8 +199,6 @@ const HD_DEM: &[Khoi] = &[
         ("Ranh giới khổ", "Kéo vạch trên thước (mặc định ở giữa 2 khổ, vd A3|A4 = 358,5 mm). Gõ *Thử cạnh dài* để xem trang thuộc khổ nào."),
         ("Lưu · Mặc định", "Áp cho lần Đếm sau (file ẩn `.dema4_saomai.cfg` cạnh file chạy). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
     ]),
-    Khoi::Muc("Lượt dùng"),
-    LUOT_DUNG,
 ];
 
 const HD_TACH: &[Khoi] = &[
@@ -245,8 +236,6 @@ const HD_TACH: &[Khoi] = &[
         ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc nút − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước/sau · [F1] hướng dẫn"),
     ]),
     Khoi::Ghi("Nhãn, góc xoay, log và cache lưu trong thư mục ẩn `.sm-dema4` cạnh file ứng dụng (mỗi thư mục đầu vào 1 thư mục con riêng); thư mục đầu vào và file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
-    Khoi::Muc("Lượt dùng"),
-    LUOT_DUNG,
 ];
 
 const HD_MUC_LUC: &[Khoi] = &[
@@ -266,8 +255,6 @@ const HD_MUC_LUC: &[Khoi] = &[
         ("Chưa ghép", "Giữ nguyên `{bien}` trong file kết quả. Rê chuột lên dòng biến để thấy vị trí trên trang mẫu."),
     ]),
     Khoi::Ghi("File kết quả mặc định nằm trong thư mục ẩn `.sm-dema4/muc_luc/<tên file biên mục>` cạnh file ứng dụng — mở bằng *Mở thư mục* trong popup kết quả, hoặc đặt thư mục khác ở *Cấu hình › Sinh mục lục*. Trang xem trước là bản mô phỏng (chữ + bảng); xuất PDF có ở bản sau."),
-    Khoi::Muc("Lượt dùng"),
-    LUOT_DUNG,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

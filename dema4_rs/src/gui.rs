@@ -67,7 +67,7 @@ enum Man {
 impl Man {
     fn tieu_de(self) -> &'static str {
         match self {
-            Man::TrangChu => "sm-dema4 (Giải pháp số Sao Mai)",
+            Man::TrangChu => "dema4-saomai (Giải pháp số Sao Mai)",
             Man::Dem => TIEU_DE,
             Man::Tach => "Tách văn bản PDF (Giải pháp số Sao Mai)",
             Man::MucLuc => crate::gui_muc_luc::TIEU_DE,
@@ -2127,7 +2127,7 @@ mod tests {
         for (man, ten) in [(Man::TrangChu, "gt_trang_chu.png"), (Man::Dem, "gt_dem.png"), (Man::Tach, "gt_tach.png"), (Man::MucLuc, "gt_muc_luc.png"), (Man::Ky, "gt_ky.png")] {
             let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
                 cai_giao_dien(&cc.egui_ctx);
-                UngDungChinh { man, cfg: crate::cau_hinh::CauHinh::default(), muc_luc: crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()), ..Default::default() }
+                UngDungChinh { man, cfg: crate::cau_hinh::CauHinh::default(), muc_luc: crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()), trang_chu: crate::trang_chu::TrangChu::thu("192.168.1.5"), ..Default::default() }
             });
             h.run_steps(3);
             h.render().unwrap().save(thu_muc_anh.join(ten)).unwrap();

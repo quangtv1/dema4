@@ -297,7 +297,7 @@ impl CauHinh {
 
     pub fn noi_dung(&self) -> String {
         let bool_ = |b: bool| if b { "1" } else { "0" };
-        let mut s = String::from("# Cấu hình sm-dema4 (sửa trong app: menu Cấu hình)\n");
+        let mut s = String::from("# Cấu hình dema4-saomai (sửa trong app: menu Cấu hình)\n");
         for (i, h) in self.he_so.iter().enumerate() {
             s += &format!("he_so_a{i}={h}\n");
         }

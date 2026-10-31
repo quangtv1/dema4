@@ -61,6 +61,12 @@ fn font(co: f32, dam: bool) -> egui::FontId {
 }
 
 impl TrangChu {
+    /// IP cố định cho test / ảnh chụp tài liệu (không lộ IP máy chạy test).
+    #[cfg(test)]
+    pub fn thu(ip: &str) -> Self {
+        TrangChu { ip: ip.into() }
+    }
+
     /// Vẽ Trang chủ vào `ui` (đã có thanh menu phía trên); trả chức năng vừa bấm.
     pub fn ve(&self, ui: &mut egui::Ui, license: &crate::license::KiemTra) -> Option<ChonChucNang> {
         egui::Panel::bottom("tc_day").exact_size(CAO_DAY).frame(egui::Frame::new().fill(NEN)).show(ui, |ui| self.thanh_day(ui, license));
