@@ -98,7 +98,7 @@ Menu **Chức năng › Sinh mục lục** (chi tiết trong **Trợ giúp › H
 4. Tab **Kết quả**: xem trước mục lục từng hồ sơ (bản mô phỏng chữ + bảng); hồ sơ có ô trống ở cột đã ghép được đánh dấu cảnh báo.
 5. **Sinh mục lục** → mỗi hồ sơ một file DOCX, tên theo mẫu `MLHS_{so_ho_so}` (đổi ở **Cấu hình › Sinh mục lục**). Mặc định ghi vào thư mục ẩn `.sm-dema4/muc_luc/<tên file biên mục>` cạnh file chạy — mở bằng nút **Mở thư mục** trong popup kết quả.
 
-Lựa chọn gần nhất (file, sheet, mẫu, nhóm theo, cách ghép biến của từng mẫu) được nhớ cho lần mở sau. Xuất PDF (qua Word / LibreOffice) có ở bản sau.
+Mỗi lần mở app hoặc chuyển sang chức năng này, màn hình bắt đầu trống (không nạp lại file / mẫu cũ); cách ghép biến đã chỉnh được nhớ và áp lại khi chọn đúng mẫu đó. Nút ⓧ cuối ô mẫu bỏ mẫu đang chọn. Xuất PDF (qua Word / LibreOffice) có ở bản sau.
 
 ![Sinh mục lục: tab Mẫu](docs/anh/muc-luc-mau.png)
 

@@ -97,7 +97,7 @@ impl Default for UngDungChinh {
         let dem = UngDung { quy_tac: cfg.quy_tac(), ..Default::default() };
         let mut tach = crate::gui_tach::ManTach::default();
         tach.license = dem.license.clone();
-        let mut muc_luc = crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&cfg.muc_luc);
+        let mut muc_luc = crate::gui_muc_luc::ManMucLuc::moi(&cfg.muc_luc);
         muc_luc.license = dem.license.clone();
         Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
     }
@@ -220,6 +220,10 @@ impl UngDungChinh {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
                         for (man, ten, icon) in [(Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
                             if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
+                                // Sang Sinh mục lục từ chức năng khác: mở như lần đầu (không giữ file / mẫu cũ)
+                                if man == Man::MucLuc && self.man != Man::MucLuc {
+                                    self.muc_luc.dat_lai();
+                                }
                                 self.man = man;
                                 ui.close();
                             }
@@ -2098,7 +2102,10 @@ mod tests {
     fn chup_man_muc_luc() {
         let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
         let tao = |nap: bool| {
-            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
+            // DEMA4_RONG / DEMA4_PPP: thử bề rộng cửa sổ và tỉ lệ điểm ảnh khác (kiểm tra thẳng hàng)
+            let rong = std::env::var("DEMA4_RONG").ok().and_then(|v| v.parse().ok()).unwrap_or(1240.0);
+            let ppp = std::env::var("DEMA4_PPP").ok().and_then(|v| v.parse().ok()).unwrap_or(1.5);
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(rong, 820.0)).with_pixels_per_point(ppp).build_eframe(move |cc| {
                 cai_giao_dien(&cc.egui_ctx);
                 let mut app = UngDungChinh { man: Man::MucLuc, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
                 app.muc_luc = if nap { crate::gui_muc_luc::tests::man_thu(5) } else { crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()) };

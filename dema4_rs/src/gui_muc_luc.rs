@@ -33,8 +33,6 @@ const RONG_NUT_XO: f32 = 28.0;
 /// Ô số Dòng tiêu đề (chữ số + cột tăng/giảm bên phải).
 const RONG_O_SO: f32 = 72.0;
 const RONG_TANG_GIAM: f32 = 16.0;
-/// ComboBox vẽ rộng hơn tham số `width` một chút (khung + mũi tên) — trừ đi để khối phải đúng RONG_KHOI_PHAI.
-const CHENH_O_CHON: f32 = 8.0;
 const RONG_NHAN: f32 = 104.0;
 const CAO_TAB: f32 = 32.0;
 const CAM: Color32 = Color32::from_rgb(0xB8, 0x5F, 0x00);
@@ -250,6 +248,22 @@ impl ManMucLuc {
         m
     }
 
+    /// Màn mới như lần đầu mở chức năng: không nạp lại file / sheet / mẫu / dòng tiêu đề cũ; chỉ giữ bề rộng sidebar
+    /// và cách ghép biến đã lưu (áp lại khi người dùng chọn đúng mẫu đó).
+    pub fn moi(c: &CauHinhMucLuc) -> Self {
+        let mut m = Self::tu_cau_hinh(&CauHinhMucLuc { rong_trai: c.rong_trai, ..Default::default() });
+        m.bien_luu = (c.mau.clone(), c.bien.clone());
+        m
+    }
+
+    /// Mở lại chức năng (chuyển từ chức năng khác sang): về trạng thái ban đầu, giữ license + cách ghép đã lưu.
+    pub fn dat_lai(&mut self) {
+        let mut moi = Self::moi(&CauHinhMucLuc { rong_trai: self.rong_trai, ..Default::default() });
+        moi.license = self.license.clone();
+        moi.bien_luu = std::mem::take(&mut self.bien_luu);
+        *self = moi;
+    }
+
     pub fn dang_chay(&self) -> bool {
         self.sinh.is_some()
     }
@@ -261,10 +275,10 @@ impl ManMucLuc {
             c.sheet = d.sheet.clone();
         }
         c.dong_tieu_de = self.dong_tieu_de() as u32;
-        c.mau = self.mau_chon.clone();
         c.rong_trai = self.rong_trai;
-        // Ràng buộc chỉ lưu cho đúng mẫu nó thuộc về (đổi mẫu khi chưa nạp dữ liệu → không mang sang mẫu mới)
-        c.bien = if self.bien_luu.0 == self.mau_chon { self.bien_luu.1.clone() } else { String::new() };
+        // `mau` + `bien` = cách ghép biến đã lưu và mẫu nó thuộc về (mở lại app không tự chọn lại mẫu)
+        c.mau = self.bien_luu.0.clone();
+        c.bien = self.bien_luu.1.clone();
     }
 
     fn dong_tieu_de(&self) -> usize {
@@ -562,13 +576,14 @@ impl ManMucLuc {
     }
 
     /// Ô số Dòng tiêu đề có cột ▲▼ bên phải; trả về true khi giá trị đã chốt (rời ô / bấm tăng giảm) → đọc lại file.
-    fn o_so_dong(&mut self, ui: &mut egui::Ui, bat: bool, nhan: egui::Id) -> bool {
-        // Ô chữ đặt bằng `put` (đẩy con trỏ tới mép nó) → tính khung trước, vẽ xong mới đẩy con trỏ qua hết khung
-        let r = Rect::from_min_size(egui::pos2(ui.cursor().min.x, ui.max_rect().center().y - 13.0), egui::vec2(RONG_O_SO, 26.0));
+    fn o_so_dong(&mut self, ui: &mut egui::Ui, bat: bool) -> (bool, egui::Response) {
+        let (r, _) = ui.allocate_exact_size(egui::vec2(RONG_O_SO, 26.0), Sense::hover());
         let p = ui.painter().clone();
         p.rect_filled(r, 2.0, if bat { Color32::WHITE } else { NEN });
         let o_chu = Rect::from_min_max(r.min + egui::vec2(4.0, 1.0), egui::pos2(r.right() - RONG_TANG_GIAM - 4.0, r.bottom() - 1.0));
-        let te = ui.put(o_chu, egui::TextEdit::singleline(&mut self.o_dong).frame(egui::Frame::NONE).align(egui::Align2::RIGHT_CENTER).interactive(bat)).labelled_by(nhan);
+        // Ô chữ vẽ trong ui con (không chiếm chỗ thêm trong hàng)
+        let mut con = ui.new_child(egui::UiBuilder::new().max_rect(o_chu).layout(Layout::left_to_right(Align::Center)));
+        let te = con.add_sized(o_chu.size(), egui::TextEdit::singleline(&mut self.o_dong).frame(egui::Frame::NONE).align(egui::Align2::RIGHT_CENTER).interactive(bat));
         let mut chot = te.lost_focus();
         let cot = Rect::from_min_max(egui::pos2(r.right() - RONG_TANG_GIAM, r.top()), r.max);
         p.vline(cot.left(), r.y_range(), Stroke::new(1.0, VIEN_NHAT));
@@ -589,9 +604,8 @@ impl ManMucLuc {
                 chot = true;
             }
         }
-        ui.advance_cursor_after_rect(r);
         p.rect_stroke(r, 2.0, Stroke::new(1.0, if te.has_focus() { crate::gui::VIEN_TAB_CHON } else { VIEN }), egui::StrokeKind::Inside);
-        chot
+        (chot, te)
     }
 
     /// Bảng dưới dòng 1: các dòng đầu sheet, cột đầu = số dòng như Excel; dòng tiêu đề tô nền xanh nhạt + đậm,
@@ -665,19 +679,35 @@ impl ManMucLuc {
                 self.chon_file = Some(chon_file_nen(&self.file, ui.ctx(), "Chọn file biên mục", &["xlsx", "xlsb", "xls", "xlsm", "csv"]));
             }
             ui.add_space(10.0);
-            ui.allocate_ui_with_layout(egui::vec2(RONG_KHOI_PHAI, 26.0), Layout::left_to_right(Align::Center), |ui| {
+            // Xếp từ phải sang trái: mép phải cố định (thẳng nút Ghép biến… dòng dưới), ô sheet lấy phần còn lại
+            ui.allocate_ui_with_layout(egui::vec2(RONG_KHOI_PHAI, 26.0), Layout::right_to_left(Align::Center), |ui| {
+                let co_dau = !self.dong_dau.is_empty();
+                let nut_xo = ui.add_enabled(co_dau, egui::Button::new("").min_size(egui::vec2(RONG_NUT_XO, 26.0)));
+                let c = nut_xo.rect.center();
+                let mau = if co_dau { Color32::from_gray(0x55) } else { CHU_MO };
+                let (a, b) = if self.xem_dong { (2.0, -2.5) } else { (-2.0, 2.5) };
+                ui.painter().add(egui::Shape::line(vec![c + egui::vec2(-4.5, a), c + egui::vec2(0.0, b), c + egui::vec2(4.5, a)], Stroke::new(1.3, mau)));
+                nut_xo.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, co_dau, "Xem các dòng đầu sheet"));
+                if nut_xo.on_hover_text("Xem 10 dòng đầu sheet — dòng tô nền là Dòng tiêu đề, dữ liệu lấy từ dòng sau nó").on_disabled_hover_text("Chọn file biên mục trước").clicked() {
+                    self.xem_dong = !self.xem_dong;
+                }
+                let (chot, o_so) = self.o_so_dong(ui, !khoa);
+                let nhan_dong = ui.label(RichText::new("Dòng tiêu đề").color(CHU_PHU));
+                o_so.labelled_by(nhan_dong.id);
+                if chot && !self.file.trim().is_empty() {
+                    let sheet = self.du_lieu.as_ref().map(|d| d.sheet.clone());
+                    self.doc_du_lieu(Some(ui.ctx()), sheet);
+                }
                 // Ô sheet không nhãn: chưa đọc file → mờ, chữ gợi ý "Chọn sheet" trong ô
                 let co = self.du_lieu.is_some();
                 let ds: Vec<String> = self.du_lieu.as_ref().map(|d| d.ds_sheet.clone()).unwrap_or_default();
                 let hien = self.du_lieu.as_ref().map(|d| d.sheet.clone()).unwrap_or_default();
-                let chu_dong = "Dòng tiêu đề";
-                let rong_chu = ui.fonts_mut(|x| x.layout_no_wrap(chu_dong.into(), egui::TextStyle::Body.resolve(ui.style()), CHU).size().x);
                 let mut chon = None;
                 ui.add_enabled_ui(!khoa && co, |ui| {
                     kieu_o_chon(ui, Color32::WHITE, VIEN);
                     egui::ComboBox::from_id_salt("ml_sheet")
                         .icon(mui_ten_chon)
-                        .width(ui.available_width() - rong_chu - RONG_O_SO - RONG_NUT_XO - 3.0 * khe - CHENH_O_CHON)
+                        .width(ui.available_width())
                         .selected_text(if hien.is_empty() { RichText::new("Chọn sheet").color(CHU_MO) } else { RichText::new(hien.clone()) })
                         .show_ui(ui, |ui| {
                             for s in &ds {
@@ -691,21 +721,6 @@ impl ManMucLuc {
                 });
                 if let Some(s) = chon {
                     self.doc_du_lieu(Some(ui.ctx()), Some(s));
-                }
-                let nhan_dong = ui.label(RichText::new(chu_dong).color(CHU_PHU));
-                if self.o_so_dong(ui, !khoa, nhan_dong.id) && !self.file.trim().is_empty() {
-                    let sheet = self.du_lieu.as_ref().map(|d| d.sheet.clone());
-                    self.doc_du_lieu(Some(ui.ctx()), sheet);
-                }
-                let co = !self.dong_dau.is_empty();
-                let nut_xo = ui.add_enabled(co, egui::Button::new("").min_size(egui::vec2(RONG_NUT_XO, 26.0)));
-                let c = nut_xo.rect.center();
-                let mau = if co { Color32::from_gray(0x55) } else { CHU_MO };
-                let (a, b) = if self.xem_dong { (2.0, -2.5) } else { (-2.0, 2.5) };
-                ui.painter().add(egui::Shape::line(vec![c + egui::vec2(-4.5, a), c + egui::vec2(0.0, b), c + egui::vec2(4.5, a)], Stroke::new(1.3, mau)));
-                nut_xo.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, co, "Xem các dòng đầu sheet"));
-                if nut_xo.on_hover_text("Xem 10 dòng đầu sheet — dòng tô nền là Dòng tiêu đề, dữ liệu lấy từ dòng sau nó").on_disabled_hover_text("Chọn file biên mục trước").clicked() {
-                    self.xem_dong = !self.xem_dong;
                 }
             });
         });
@@ -723,7 +738,8 @@ impl ManMucLuc {
             let hien = if rieng { rut_gon_trai(ui, &self.mau_chon, w - 64.0) } else { ten_mau(&self.mau_chon) };
             ui.add_enabled_ui(!khoa, |ui| {
                 kieu_o_chon(ui, Color32::WHITE, VIEN);
-                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(mui_ten_chon).width(w).selected_text(hien).show_ui(ui, |ui| {
+                // ComboBox vẽ rộng hơn ô chữ cùng tham số 1 px (đo trên ảnh chụp ở nhiều cỡ) → trừ để thẳng ô đường dẫn dòng trên
+                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(mui_ten_chon).width(w - 1.0).selected_text(hien).show_ui(ui, |ui| {
                     for (i, (ten, _)) in mau::MAU_CO_SAN.iter().enumerate() {
                         let ma = (i + 1).to_string();
                         if ui.selectable_label(self.mau_chon == ma, *ten).clicked() {
@@ -739,17 +755,18 @@ impl ManMucLuc {
                 if rieng {
                     ph.on_hover_text(self.mau_chon.as_str());
                 }
-                if rieng {
-                    xoa_mau = !khoa && crate::gui::nut_xoa_tai(ui, egui::pos2(o.right() - 34.0, o.center().y), "Bỏ mẫu riêng");
-                    return;
-                }
                 if self.mau_chon.is_empty() {
                     return;
                 }
-                // Link "Lưu mẫu" ở đuôi ô chọn mẫu, trước mũi tên: chữ xám, rê chuột → đen + gạch chân
+                // ⓧ bỏ mẫu (mọi mẫu) ngay trước mũi tên; mẫu có sẵn thêm link "Lưu mẫu" bên trái ⓧ
+                xoa_mau = !khoa && crate::gui::nut_xoa_tai(ui, egui::pos2(o.right() - 34.0, o.center().y), "Bỏ mẫu");
+                if rieng {
+                    return;
+                }
+                // Link "Lưu mẫu": chữ xám, rê chuột → đen + gạch chân
                 let f = egui::FontId::proportional(12.0);
                 let rong_chu = ui.fonts_mut(|x| x.layout_no_wrap("Lưu mẫu".into(), f.clone(), CHU).size().x);
-                let r = Rect::from_center_size(egui::pos2(o.right() - 30.0 - rong_chu / 2.0, o.center().y), egui::vec2(rong_chu + 8.0, 18.0));
+                let r = Rect::from_center_size(egui::pos2(o.right() - 52.0 - rong_chu / 2.0, o.center().y), egui::vec2(rong_chu + 8.0, 18.0));
                 let link = ui.interact(r, ui.scope_id().with("ml_luu_mau"), if khoa { Sense::hover() } else { Sense::click() });
                 link.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, !khoa, "Lưu mẫu"));
                 let re = link.hovered() && !khoa;
@@ -1286,6 +1303,17 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn mo_lai_khong_nap_cai_cu() {
+        let cfg = CauHinhMucLuc { file: fixture().display().to_string(), sheet: "Bien muc".into(), dong_tieu_de: 4, mau: "1".into(), bien: "{}".into(), ..Default::default() };
+        let m = ManMucLuc::moi(&cfg);
+        assert!(m.file.is_empty() && m.mau_chon.is_empty() && m.du_lieu.is_none() && m.doc_nen.is_none() && m.o_dong == "1");
+        assert_eq!(m.bien_luu, ("1".to_string(), "{}".to_string()), "giữ cách ghép đã lưu");
+        let mut m = man_thu(5);
+        m.dat_lai();
+        assert!(m.file.is_empty() && m.mau_chon.is_empty() && m.du_lieu.is_none() && m.kq.ho_so.is_empty());
+    }
+
+    #[test]
     fn xoa_file_ve_chua_chon() {
         let mut m = man_thu(5);
         m.xem_dong = true;
@@ -1344,13 +1372,14 @@ pub(crate) mod tests {
         let truoc = m.kq.ho_so.len();
         m.dat_nhom("STT");
         assert_ne!(m.kq.ho_so.len(), truoc, "đổi Nhóm theo → số hồ sơ đổi");
-        // Đổi sang mẫu khác: ràng buộc của mẫu cũ không bị lưu thành của mẫu mới
+        // Đổi sang mẫu khác: ràng buộc vẫn lưu kèm đúng mẫu cũ nó thuộc về (không gán sang mẫu mới)
         let mut m3 = man_thu(5);
         m3.dat_nguon("nguoi_lap", Some(Nguon::Hang("A".into())));
         m3.mau_chon = "2".into();
         let mut c3 = CauHinhMucLuc::default();
         m3.ghi_vao(&mut c3);
-        assert_eq!((c3.mau.as_str(), c3.bien.as_str()), ("2", ""));
+        assert_eq!(c3.mau, "1");
+        assert_eq!(RangBuoc::doc_json(&c3.bien).unwrap().nguon("nguoi_lap"), Some(&Nguon::Hang("A".into())));
         // Mở lại app: ràng buộc đã lưu được áp lại cho đúng mẫu
         let mut m2 = ManMucLuc { bien_luu: (c.mau.clone(), c.bien.clone()), ..man_thu(5) };
         m2.ap_rang_buoc();
