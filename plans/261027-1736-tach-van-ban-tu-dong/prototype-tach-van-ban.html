@@ -114,24 +114,24 @@
   .gioithieu.pt > *:not(.nhan-pt) { opacity:.4; }
   .nhan-pt { display:inline-block; background:#D9822B; color:#fff; font-weight:bold; font-size:12px; padding:5px 14px; border-radius:999px; margin:0 0 10px; letter-spacing:.2px; }
   /* Trang chủ: 4 thẻ chức năng (logo + tên), rê chuột hiện tóm tắt mục đích; logo Sao Mai góc dưới trái */
-  #manTrangChu { align-items:center; justify-content:center; padding-top:0; padding-bottom:44px; position:relative; background:#fff; margin:0 -12px; }
-  /* Đầu trang chủ: logo Sao Mai bên trái, vạch dọc mảnh, tên + mô tả bên phải — một khối căn giữa */
-  .tc-dau { display:flex; align-items:center; gap:22px; margin-bottom:34px; }
-  .tc-dau .logo-dinh { display:block; width:84px; flex-shrink:0; } .tc-dau .logo-dinh img { width:100%; height:auto; display:block; }
-  .tc-dau .vach { width:1px; align-self:stretch; background:var(--vien-nhat); }
-  .tc-dau .chu { text-align:left; }
-  .tc-dau .chu small { display:block; color:var(--cobalt); font-size:11.5px; font-weight:bold; letter-spacing:.6px; margin-bottom:4px; }
-  /* Thanh đáy trang chủ: phiên bản app căn phải */
-  .tc-day { position:absolute; left:0; right:0; bottom:0; height:30px; display:flex; align-items:center; justify-content:flex-end; padding:0 28px; background:var(--nen); border-top:1px solid var(--vien-nhat); font-size:12px; color:var(--chu-phu); }
+  #manTrangChu { align-items:center; justify-content:center; padding-top:0; padding-bottom:30px; position:relative; background:#fff; margin:0 -12px; }
+  /* Đầu trang chủ: dải nền xanh rất nhạt chạy hết bề ngang, hoạ tiết lưới chấm mờ; logo Sao Mai giữa, tên + mô tả bên dưới */
+  .tc-dau { position:absolute; left:0; right:0; top:0; height:206px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    background:#F3F6FB radial-gradient(#D5DEEB 1px, transparent 1.2px) 0 0 / 18px 18px; border-bottom:1px solid #E1E7F0; }
+  .tc-dau .logo-dinh { display:block; width:78px; margin-bottom:10px; } .tc-dau .logo-dinh img { width:100%; height:auto; display:block; }
+  .tc-dau .vach, .tc-dau small { display:none; }
+  .tc-dau p { margin:0; color:var(--chu-phu); font-size:12.5px; }
+  .tc-than { display:flex; flex-direction:column; align-items:center; margin-top:206px; }
+  /* Thanh đáy trang chủ: liên hệ bên trái, thông tin máy + phiên bản bên phải */
+  .tc-day { position:absolute; left:0; right:0; bottom:0; height:30px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:0 28px; background:var(--nen); border-top:1px solid var(--vien-nhat); font-size:12px; color:var(--chu-phu); }
   .tc-day b { color:var(--chu); font-weight:normal; margin-left:4px; }
-  .tc-day { justify-content:space-between; gap:18px; } .tc-day > span { display:flex; gap:16px; align-items:center; }
+  .tc-day > span { display:flex; gap:16px; align-items:center; }
   .tc-day a { color:var(--chu-phu); text-decoration:none; } .tc-day a:hover { color:var(--cobalt); text-decoration:underline; }
-  /* Dải điểm nổi bật dưới các ô chức năng */
-  .tc-diem { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px 34px; margin-top:64px; padding-top:24px; border-top:1px solid var(--vien-nhat); width:780px; }
+  /* Lưới thông tin dưới các ô chức năng */
+  .tc-diem { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px 34px; margin-top:44px; padding-top:22px; border-top:1px solid var(--vien-nhat); width:780px; }
   .tc-diem div { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--chu-phu); line-height:1.4; }
   .tc-diem svg { width:22px; height:22px; flex-shrink:0; fill:none; stroke:#3C4858; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
   .tc-diem b { color:var(--chu); display:block; font-size:12.5px; }
-  .tc-dau small { display:block; color:var(--chu-phu); font-size:12px; letter-spacing:.3px; margin-bottom:6px; }
   .tc-dau h1 { font-size:22px; margin:0 0 6px; }
   .tc-dau p { margin:0; color:var(--chu-phu); font-size:12.5px; }
   .tc-luoi { display:flex; gap:22px; justify-content:center; }
@@ -683,13 +683,10 @@
   <div class="man an" id="manTrangChu">
     <div class="tc-dau">
       <a class="logo-dinh" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
-      <span class="vach"></span>
-      <div class="chu">
-        <small>GIẢI PHÁP SỐ SAO MAI</small>
-        <h1>Hỗ trợ số hoá hồ sơ</h1>
-        <p>Đếm trang, tách văn bản, sinh mục lục cho hồ sơ số hoá.<br>Chọn chức năng để bắt đầu — rê chuột lên từng ô để xem tóm tắt.</p>
-      </div>
+      <h1>Hỗ trợ số hoá hồ sơ</h1>
+      <p>Đếm trang · Tách văn bản · Sinh mục lục — chọn chức năng để bắt đầu</p>
     </div>
+    <div class="tc-than">
     <div class="tc-luoi">
       <button class="tc-the" data-den="dem" aria-describedby="tom-dem"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M27 30V23H69V81H62" stroke-width="2.2"/><path d="M34 23V16H76V74H69" stroke-width="2.2"/><path d="M20 30H51L62 41V88H20Z" stroke-width="3"/><path d="M51 30V41H62" stroke-width="3"/><text x="41" y="69" text-anchor="middle" font-size="19" font-weight="bold" fill="#3C4858" stroke="none">A4</text></svg><b>Đếm trang A4</b><span class="tom" id="tom-dem" role="tooltip">Đếm số trang mọi PDF trong thư mục (cả thư mục con), phân loại khổ A0–A7 và quy đổi ra số trang A4; cảnh báo trang sát ngưỡng, DPI bất thường, file đã ký số.</span></button>
       <button class="tc-the" data-den="tach" aria-describedby="tom-tach"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M6 26H31L40 35V74H6Z" stroke-width="3"/><path d="M31 26V35H40" stroke-width="3"/><path d="M13 42H30" stroke-width="2.2"/><path d="M13 51H33" stroke-width="2.2"/><path d="M13 60H26" stroke-width="2.2"/><path d="M68 10H87L94 17V44H68Z" stroke-width="3"/><path d="M87 10V17H94" stroke-width="3"/><path d="M74 23H86" stroke-width="2.2"/><path d="M74 31H82" stroke-width="2.2"/><path d="M68 56H87L94 63V90H68Z" stroke-width="3"/><path d="M87 56V63H94" stroke-width="3"/><path d="M74 69H86" stroke-width="2.2"/><path d="M74 77H82" stroke-width="2.2"/><path d="M44 50H51" stroke-width="3"/><path d="M51 50L56 27H64" stroke-width="3"/><path d="M57.5 21L64 27L57.5 33" stroke-width="3"/><path d="M51 50L56 73H64" stroke-width="3"/><path d="M57.5 67L64 73L57.5 79" stroke-width="3"/></svg><b>Tách văn bản</b><span class="tom" id="tom-tach" role="tooltip">Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng, gợi ý trang bị xoay; người duyệt nhãn trước khi tách.</span></button>
@@ -704,9 +701,10 @@
       <div><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.3 2.2-2.3 3.5"/><path d="M12 17.5h.01"/></svg><span><b>Hướng dẫn sử dụng</b>Nhấn F1 hoặc Trợ giúp › Hướng dẫn</span></div>
       <div><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7 9l3 3-3 3M12 15h5"/></svg><span><b>Chạy hàng loạt</b>Đếm / Tách bằng dòng lệnh</span></div>
     </div>
+    </div>
     <div class="tc-day">
       <span><span>Website:<a href="https://saomaiso.com" target="_blank" rel="noopener" style="margin-left:4px;color:var(--chu)">saomaiso.com</a></span><span>Email:<a href="mailto:hotro@saomaiso.com" style="margin-left:4px;color:var(--chu)">hotro@saomaiso.com</a></span></span>
-      <span><span>Mã máy:<b>SM-2145-6787-A9FB</b></span><span>Phiên bản:<b>1.0.0</b></span></span>
+      <span><span>Địa chỉ MAC:<b>AA:BB:CC:DD:EE:FF</b></span><span>IP nội bộ:<b>192.168.1.5</b></span><span>Phiên bản:<b>1.0.0</b></span></span>
     </div>
   </div>
 
