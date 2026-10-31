@@ -548,6 +548,9 @@ struct UngDung {
     /// License dùng chung với màn Tách; popup "Liên hệ Sao Mai" khi hết lượt Đếm.
     license: Arc<crate::license::KiemTra>,
     hop_license: Option<crate::hop_license::HopLicense>,
+    /// Số file PDF của thư mục vừa chọn (quét nền, chưa đếm) — hiện ở "File PDF:" và thay lời giới thiệu bằng lời nhắc bấm Đếm.
+    so_pdf: Option<usize>,
+    quet_pdf: Option<Receiver<usize>>,
 }
 
 impl Default for UngDung {
@@ -576,6 +579,8 @@ impl Default for UngDung {
             co_telegram: false,
             license: crate::license::KiemTra::mac_dinh(),
             hop_license: None,
+            so_pdf: None,
+            quet_pdf: None,
         }
     }
 }
@@ -713,7 +718,11 @@ pub(crate) const LE_O_CO_NUT_XOA: Margin = Margin { left: 8, right: 26, top: 4, 
 
 /// Nút ⓧ (x trong vòng tròn) ở cuối ô đường dẫn `o`; true khi bấm. Rê chuột → đậm lên.
 pub(crate) fn nut_xoa_trong_o(ui: &mut egui::Ui, o: egui::Rect, ten: &str) -> bool {
-    let c = egui::pos2(o.right() - 13.0, o.center().y);
+    nut_xoa_tai(ui, egui::pos2(o.right() - 13.0, o.center().y), ten)
+}
+
+/// Nút ⓧ tâm `c` (dùng khi đuôi ô đã có thứ khác, vd mũi tên ô chọn).
+pub(crate) fn nut_xoa_tai(ui: &mut egui::Ui, c: egui::Pos2, ten: &str) -> bool {
     let ph = ui.interact(egui::Rect::from_center_size(c, egui::vec2(20.0, 20.0)), ui.scope_id().with(("nut_xoa_o", ten)), egui::Sense::click());
     ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, ten));
     let net = Stroke::new(1.2, if ph.hovered() { CHU } else { Color32::from_gray(0x99) });
@@ -749,6 +758,38 @@ impl UngDung {
         self.so_dong_da_cuon = 0;
         self.quy_tac_da_dung = None;
         self.trang_thai = String::new();
+        self.so_pdf = None;
+        self.quet_pdf = None;
+    }
+
+    /// Chọn thư mục mới: xoá kết quả cũ rồi quét nền số file PDF (cùng cách tìm như khi Đếm).
+    fn chon_thu_muc(&mut self, thu_muc: String, ctx: &egui::Context) {
+        self.thu_muc = thu_muc;
+        self.xoa_ket_qua();
+        let tm = self.thu_muc.trim().to_string();
+        if !Path::new(&tm).is_dir() {
+            return;
+        }
+        let (gui, nhan) = mpsc::channel();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let (bo, _nhan_bo) = mpsc::channel();
+            let _ = gui.send(dem_pdf::tim_file_pdf(&tm, &AtomicBool::new(false), &bo).len());
+            ctx.request_repaint();
+        });
+        self.quet_pdf = Some(nhan);
+    }
+
+    fn nhan_so_pdf(&mut self) {
+        let Some(n) = &self.quet_pdf else { return };
+        match n.try_recv() {
+            Ok(so) => {
+                self.so_pdf = Some(so);
+                self.quet_pdf = None;
+            }
+            Err(TryRecvError::Disconnected) => self.quet_pdf = None,
+            Err(TryRecvError::Empty) => {}
+        }
     }
 
     fn bat_dau_dem(&mut self, ctx: &egui::Context) {
@@ -944,6 +985,7 @@ impl UngDung {
 
     fn hang_thu_muc(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
+        self.nhan_so_pdf();
         ui.horizontal(|ui| {
             let ranh = self.dang_dem.is_none();
             let nhan = ui.label("Chọn thư mục pdf:");
@@ -955,14 +997,18 @@ impl UngDung {
                 self.thu_muc.clear();
                 self.xoa_ket_qua();
             }
-            if ranh && phan_hoi.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                self.bat_dau_dem(&ctx);
+            if ranh && phan_hoi.lost_focus() {
+                if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    self.bat_dau_dem(&ctx);
+                } else if self.dong.is_empty() {
+                    // Gõ / dán đường dẫn rồi rời ô: quét số PDF như khi bấm Chọn
+                    self.chon_thu_muc(self.thu_muc.clone(), &ctx);
+                }
             }
             if ui.add_enabled(ranh, nut("Chọn")).clicked() {
                 if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục chứa PDF").pick_folder() {
-                    self.thu_muc = p.display().to_string();
-                    // Chọn thư mục mới: xoá bảng kết quả cũ như lúc mới mở ứng dụng
-                    self.xoa_ket_qua();
+                    // Chọn thư mục mới: xoá bảng kết quả cũ, quét số file PDF
+                    self.chon_thu_muc(p.display().to_string(), &ctx);
                 }
             }
             match &self.dang_dem {
@@ -991,7 +1037,7 @@ impl UngDung {
 
     fn dong_tom_tat(&mut self, ui: &mut egui::Ui) {
         let tk = self.thong_ke.clone();
-        let so_file = self.tien_do.map(|(d, _)| d).unwrap_or(0);
+        let so_file = self.tien_do.map(|(d, _)| d).or(self.so_pdf).unwrap_or(0);
         ui.horizontal(|ui| {
             let muc = |ui: &mut egui::Ui, nhan: &str, gia_tri: String| {
                 ui.label(RichText::new(nhan).color(CHU_PHU));
@@ -1123,15 +1169,26 @@ impl UngDung {
             self.thanh_tab_loc(ui);
             ui.add_space(-ui.spacing().item_spacing.y);
             if self.dong.is_empty() {
-                if self.dang_dem.is_some() {
+                // Đã chọn thư mục (chưa đếm): thay lời giới thiệu bằng lời nhắc bước tiếp theo
+                let nhac = if self.dang_dem.is_some() {
+                    Some("Đang đọc file…")
+                } else if self.quet_pdf.is_some() {
+                    Some("Đang tìm file PDF…")
+                } else {
+                    match self.so_pdf {
+                        Some(0) => Some("Thư mục không có file PDF nào — chọn thư mục khác"),
+                        Some(_) => Some("Bấm nút Đếm để thực hiện tiếp"),
+                        None => None,
+                    }
+                };
+                if let Some(chu) = nhac {
                     ui.allocate_ui_with_layout(ui.available_size(), Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
-                        ui.label(RichText::new("Đang đọc file…").color(CHU_PHU));
+                        ui.label(RichText::new(chu).color(CHU_PHU));
                     });
                 } else if crate::gioi_thieu::ve(ui, &crate::gioi_thieu::DEM) == Some(crate::gioi_thieu::Bam::Chon) {
                     // Link "Chọn" trong giới thiệu = nút Chọn
                     if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục chứa PDF").pick_folder() {
-                        self.thu_muc = p.display().to_string();
-                        self.xoa_ket_qua();
+                        self.chon_thu_muc(p.display().to_string(), ui.ctx());
                     }
                 }
                 return;
@@ -2026,6 +2083,7 @@ mod tests {
                 cai_giao_dien(&cc.egui_ctx);
                 let mut app = UngDungChinh { man, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
                 app.dem.thu_muc = r"D:\SoHoa\Ho_so_PDF".into();
+                app.dem.so_pdf = Some(48);
                 app.tach.thu_muc = r"D:\SoHoa\Ho_so_PDF".into();
                 app
             });
@@ -2076,6 +2134,23 @@ mod tests {
         h.state_mut().hop_cau_hinh = Some(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::MucLuc));
         h.run_steps(3);
         h.render().unwrap().save(thu_muc_anh.join("ml_6_cau_hinh.png")).unwrap();
+        // Mẫu riêng (đường dẫn + ⓧ), mẫu sai yêu cầu (vẫn xem nội dung), bỏ mẫu (nổi bước 2)
+        let rieng = std::env::temp_dir().join("Mau_rieng_don_vi.docx");
+        std::fs::write(&rieng, crate::muc_luc::mau::MAU_CO_SAN[1].1).unwrap();
+        let mut h = tao(true);
+        h.state_mut().muc_luc.dat_mau_thu(&rieng.display().to_string());
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_8_mau_rieng.png")).unwrap();
+        let sai = std::env::temp_dir().join("Mau_sai.docx");
+        std::fs::write(&sai, crate::gui_muc_luc::tests::docx_khong_bang()).unwrap();
+        h.state_mut().muc_luc.dat_mau_thu(&sai.display().to_string());
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_9_mau_sai.png")).unwrap();
+        h.state_mut().muc_luc.bo_mau_thu();
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_10_bo_mau.png")).unwrap();
+        let _ = std::fs::remove_file(&rieng);
+        let _ = std::fs::remove_file(&sai);
     }
 
     #[test]

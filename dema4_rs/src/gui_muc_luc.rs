@@ -77,6 +77,24 @@ fn ten_mau(ma: &str) -> String {
     }
 }
 
+/// Chuỗi vừa bề rộng `rong` (cỡ chữ thường): dài thì bỏ bớt đầu, thêm "…" — giữ phần cuối (tên file).
+fn rut_gon_trai(ui: &egui::Ui, s: &str, rong: f32) -> String {
+    let f = egui::TextStyle::Body.resolve(ui.style());
+    let do_rong = |t: &str| ui.fonts_mut(|x| x.layout_no_wrap(t.into(), f.clone(), CHU).size().x);
+    if do_rong(s) <= rong {
+        return s.to_string();
+    }
+    // Tìm nhị phân số ký tự đầu phải bỏ
+    let ky_tu: Vec<char> = s.chars().collect();
+    let cat = |i: usize| format!("…{}", ky_tu[i..].iter().collect::<String>());
+    let (mut thap, mut cao) = (1, ky_tu.len());
+    while thap < cao {
+        let giua = (thap + cao) / 2;
+        if do_rong(&cat(giua)) <= rong { cao = giua } else { thap = giua + 1 }
+    }
+    cat(thap)
+}
+
 fn byte_mau(ma: &str) -> Result<Vec<u8>, String> {
     match ma.parse::<usize>() {
         Ok(i) if (1..=mau::MAU_CO_SAN.len()).contains(&i) => Ok(mau::MAU_CO_SAN[i - 1].1.to_vec()),
@@ -147,6 +165,10 @@ pub struct ManMucLuc {
     da_luu_mau: Option<(Result<PathBuf, String>, Instant)>,
     pub mau: Option<MauDung>,
     loi_mau: Option<String>,
+    /// Mẫu chọn được nhưng không đúng yêu cầu (vd không có biến): vẫn xem nội dung, kèm dải cảnh báo `loi_mau`.
+    trang_mau_loi: Option<Vec<Khoi>>,
+    /// Vừa bấm ⓧ bỏ mẫu riêng → màn giới thiệu làm nổi bước 2 (chọn mẫu).
+    da_bo_mau: bool,
     /// Ràng buộc đã lưu (mẫu, JSON) — áp lại khi đọc xong dữ liệu.
     bien_luu: (String, String),
     pub rb: RangBuoc,
@@ -197,6 +219,8 @@ impl ManMucLuc {
             da_luu_mau: None,
             mau: None,
             loi_mau: None,
+            trang_mau_loi: None,
+            da_bo_mau: false,
             bien_luu: (c.mau.clone(), c.bien.clone()),
             rb: RangBuoc::default(),
             kq: KetQuaKiemTra::default(),
@@ -250,25 +274,21 @@ impl ManMucLuc {
     // ---- Nạp dữ liệu / mẫu, ràng buộc, kiểm tra ----
 
     fn nap_mau(&mut self) {
-        if self.mau_chon.is_empty() {
-            self.mau = None;
-            self.loi_mau = None;
-            self.ap_rang_buoc();
-            return;
-        }
-        let kq = byte_mau(&self.mau_chon).and_then(|b| {
-            let db = mau::bien_dich(&b)?;
-            let trang = mo_phong::mo_phong(&b)?;
-            Ok(MauDung { nhom: NhomBien { nhom: khop::nhom_bien(&db) }, db: Arc::new(db), trang })
-        });
-        match kq {
-            Ok(m) => {
-                self.mau = Some(m);
-                self.loi_mau = None;
-            }
-            Err(e) => {
-                self.mau = None;
-                self.loi_mau = Some(e);
+        self.mau = None;
+        self.loi_mau = None;
+        self.trang_mau_loi = None;
+        if !self.mau_chon.is_empty() {
+            self.da_bo_mau = false;
+            match byte_mau(&self.mau_chon) {
+                Err(e) => self.loi_mau = Some(e),
+                Ok(b) => match mau::bien_dich(&b).and_then(|db| Ok((mo_phong::mo_phong(&b)?, db))) {
+                    Ok((trang, db)) => self.mau = Some(MauDung { nhom: NhomBien { nhom: khop::nhom_bien(&db) }, db: Arc::new(db), trang }),
+                    // Mẫu sai yêu cầu (vd không có bảng chứa biến): vẫn cho xem nội dung để người dùng biết sửa gì
+                    Err(e) => {
+                        self.loi_mau = Some(format!("Mẫu không đúng yêu cầu: {e}"));
+                        self.trang_mau_loi = mo_phong::mo_phong(&b).ok();
+                    }
+                },
             }
         }
         self.ap_rang_buoc();
@@ -385,15 +405,17 @@ impl ManMucLuc {
         self.mau_chon.clear();
         self.mau = None;
         self.loi_mau = None;
+        self.trang_mau_loi = None;
+        self.da_bo_mau = true;
         self.mo = None;
         self.sang = None;
         self.tab = Tab::Mau;
         self.cfg_doi = true;
     }
 
-    /// Bỏ file biên mục đang chọn — dữ liệu, mẫu, kết quả để trắng như lúc chưa chọn đường dẫn.
+    /// Bỏ file biên mục đang chọn — dữ liệu, kết quả để trắng như lúc chưa chọn đường dẫn; mẫu giữ nguyên
+    /// (mẫu chỉ đổi khi người dùng chọn lại).
     fn xoa_file(&mut self) {
-        self.bo_mau();
         self.file.clear();
         self.du_lieu = None;
         self.loi_doc = None;
@@ -427,8 +449,6 @@ impl ManMucLuc {
                     if let Some(p) = p {
                         self.file = p.display().to_string();
                         self.cfg_doi = true;
-                        // File mới: người dùng tự chọn mẫu lại (không mang mẫu cũ sang)
-                        self.bo_mau();
                         self.doc_du_lieu(Some(ctx), None);
                     }
                 }
@@ -639,7 +659,6 @@ impl ManMucLuc {
                 self.xoa_file();
             }
             if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) && !self.file.trim().is_empty() {
-                self.bo_mau();
                 self.doc_du_lieu(Some(ui.ctx()), None);
             }
             if ui.add_enabled(!khoa && self.chon_file.is_none(), nut("Chọn")).clicked() {
@@ -698,9 +717,13 @@ impl ManMucLuc {
             let nhan_mau = Self::nhan_co_dinh(ui, "Mẫu mục lục:");
             let w = rong_o(ui);
             let mut chon = None;
+            let mut xoa_mau = false;
+            // Mẫu riêng: hiện đường dẫn đầy đủ (dài thì cắt bớt đầu, giữ tên file) + ⓧ; mẫu có sẵn: tên + link "Lưu mẫu"
+            let rieng = !self.mau_chon.is_empty() && self.mau_chon.parse::<usize>().is_err();
+            let hien = if rieng { rut_gon_trai(ui, &self.mau_chon, w - 64.0) } else { ten_mau(&self.mau_chon) };
             ui.add_enabled_ui(!khoa, |ui| {
                 kieu_o_chon(ui, Color32::WHITE, VIEN);
-                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(mui_ten_chon).width(w).selected_text(ten_mau(&self.mau_chon)).show_ui(ui, |ui| {
+                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(mui_ten_chon).width(w).selected_text(hien).show_ui(ui, |ui| {
                     for (i, (ten, _)) in mau::MAU_CO_SAN.iter().enumerate() {
                         let ma = (i + 1).to_string();
                         if ui.selectable_label(self.mau_chon == ma, *ten).clicked() {
@@ -712,7 +735,14 @@ impl ManMucLuc {
                     }
                 });
                 let o = ph.response.rect;
-                ph.response.labelled_by(nhan_mau.id);
+                let ph = ph.response.labelled_by(nhan_mau.id);
+                if rieng {
+                    ph.on_hover_text(self.mau_chon.as_str());
+                }
+                if rieng {
+                    xoa_mau = !khoa && crate::gui::nut_xoa_tai(ui, egui::pos2(o.right() - 34.0, o.center().y), "Bỏ mẫu riêng");
+                    return;
+                }
                 if self.mau_chon.is_empty() {
                     return;
                 }
@@ -737,6 +767,10 @@ impl ManMucLuc {
                     self.luu_mau = Some(luu_file_nen(&ten, ui.ctx()));
                 }
             });
+            if xoa_mau {
+                self.bo_mau();
+                self.ap_rang_buoc();
+            }
             if let Some(ma) = chon {
                 self.mau_chon = ma;
                 self.cfg_doi = true;
@@ -939,10 +973,19 @@ impl ManMucLuc {
 
     fn khung_phai(&mut self, ui: &mut egui::Ui) {
         if !self.co_du_lieu() {
+            // Mẫu không đúng yêu cầu: vẫn hiện nội dung mẫu, dải cảnh báo phía trên
+            if let Some(trang) = &self.trang_mau_loi {
+                let mau_chip = |_: &str| Loai::ChuaGhep.mau();
+                let kieu = trang::KieuVe { zoom: self.zoom, mau_chip: Some(&mau_chip), sang: None };
+                trang::ve(ui, "ml_trang_mau_loi", trang, &kieu, self.loi_mau.as_deref());
+                return;
+            }
+            // Đã có file (hoặc vừa bỏ mẫu riêng) mà chưa có mẫu → làm nổi bước 2
+            let noi_bat = (self.mau_chon.is_empty() && (self.da_bo_mau || self.du_lieu.is_some())).then_some(2);
             egui::Frame::new().show(ui, |ui| {
                 ui.set_min_size(ui.available_size());
                 let dang_doc = self.doc_nen.is_some();
-                if let Some(crate::gioi_thieu::Bam::Chon) = crate::gioi_thieu::ve(ui, &crate::gioi_thieu::MUC_LUC) {
+                if let Some(crate::gioi_thieu::Bam::Chon) = crate::gioi_thieu::ve_noi_bat(ui, &crate::gioi_thieu::MUC_LUC, noi_bat) {
                     if !dang_doc && self.chon_file.is_none() {
                         self.chon_file = Some(chon_file_nen(&self.file, ui.ctx(), "Chọn file biên mục", &["xlsx", "xlsb", "xls", "xlsm", "csv"]));
                     }
@@ -1158,6 +1201,16 @@ pub(crate) mod tests {
             self.ap_rang_buoc();
         }
 
+        pub fn dat_mau_thu(&mut self, ma: &str) {
+            self.mau_chon = ma.into();
+            self.nap_mau();
+        }
+
+        pub fn bo_mau_thu(&mut self) {
+            self.bo_mau();
+            self.ap_rang_buoc();
+        }
+
         pub fn mo_xem_dong_thu(&mut self) {
             self.xem_dong = true;
         }
@@ -1175,6 +1228,15 @@ pub(crate) mod tests {
                 std::thread::sleep(Duration::from_millis(10));
             }
         }
+    }
+
+    /// DOCX chỉ có một đoạn văn, không có bảng chứa biến (mẫu sai yêu cầu).
+    pub fn docx_khong_bang() -> Vec<u8> {
+        use std::io::Write;
+        let mut z = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        z.start_file(crate::muc_luc::docx::PART_CHINH, zip::write::SimpleFileOptions::default()).unwrap();
+        z.write_all(br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>MUC LUC VAN BAN</w:t></w:r></w:p><w:p><w:r><w:t>So ho so: {so_ho_so}</w:t></w:r></w:p></w:body></w:document>"#).unwrap();
+        z.finish().unwrap().into_inner()
     }
 
     /// Màn đã nạp fixture + mẫu 01, license giả (`han_ml` lượt Sinh mục lục).
@@ -1210,12 +1272,26 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn mau_rieng_sai_van_xem_noi_dung_va_bo_mau() {
+        let mut m = man_thu(5);
+        let p = std::env::temp_dir().join(format!("dema4_mau_sai_{}.docx", std::process::id()));
+        std::fs::write(&p, docx_khong_bang()).unwrap();
+        m.mau_chon = p.display().to_string();
+        m.nap_mau();
+        assert!(m.mau.is_none() && m.loi_mau.as_deref().is_some_and(|l| l.starts_with("Mẫu không đúng yêu cầu")));
+        assert!(m.trang_mau_loi.as_ref().is_some_and(|t| !t.is_empty()), "vẫn có nội dung để xem");
+        m.bo_mau();
+        assert!(m.mau_chon.is_empty() && m.trang_mau_loi.is_none() && m.da_bo_mau);
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
     fn xoa_file_ve_chua_chon() {
         let mut m = man_thu(5);
         m.xem_dong = true;
         m.xoa_file();
         assert!(m.file.is_empty() && m.du_lieu.is_none() && !m.xem_dong && m.dong_dau.is_empty() && m.kq.ho_so.is_empty() && m.cfg_doi);
-        assert!(m.mau_chon.is_empty() && m.mau.is_none(), "mẫu cũng bỏ");
+        assert!(m.mau_chon == "1" && m.mau.is_some(), "mẫu giữ nguyên");
     }
 
     fn thu_muc(ten: &str) -> PathBuf {

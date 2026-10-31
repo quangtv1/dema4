@@ -85,6 +85,11 @@ pub const WEB: &str = "https://saomaiso.com";
 
 /// Vẽ vào vùng còn trống của `ui`; trả link vừa bấm (nếu có).
 pub fn ve(ui: &mut egui::Ui, gt: &GioiThieu) -> Option<Bam> {
+    ve_noi_bat(ui, gt, None)
+}
+
+/// Như `ve`, làm nổi thẻ bước `noi_bat` (1-based) — bước người dùng cần làm tiếp.
+pub fn ve_noi_bat(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>) -> Option<Bam> {
     let vung = ui.available_rect_before_wrap();
     let mut bam = None;
     ui.scope(|ui| {
@@ -106,7 +111,7 @@ pub fn ve(ui: &mut egui::Ui, gt: &GioiThieu) -> Option<Bam> {
             ui.spacing_mut().item_spacing.x = KHE_THE;
             ui.add_space(((ui.available_width() - rong_hang) / 2.0).max(0.0));
             for (i, b) in gt.buoc.iter().enumerate() {
-                if let Some(x) = the_buoc(ui, i + 1, b) {
+                if let Some(x) = the_buoc(ui, i + 1, b, noi_bat == Some(i + 1)) {
                     bam = Some(x);
                 }
             }
@@ -129,10 +134,10 @@ pub fn ve(ui: &mut egui::Ui, gt: &GioiThieu) -> Option<Bam> {
     bam
 }
 
-/// 1 thẻ bước: ô số xám, tên đậm, thân chữ (có thể chứa link).
-fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc) -> Option<Bam> {
+/// 1 thẻ bước: ô số xám, tên đậm, thân chữ (có thể chứa link). `noi` = bước cần làm tiếp: viền xanh, ô số xanh.
+fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool) -> Option<Bam> {
     let mut bam = None;
-    let khung = egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, VIEN)).inner_margin(Margin { left: 10, right: 10, top: 10, bottom: 12 });
+    let khung = egui::Frame::new().fill(Color32::WHITE).stroke(if noi { Stroke::new(1.5, XANH_COBALT) } else { Stroke::new(1.0, VIEN) }).inner_margin(Margin { left: 10, right: 10, top: 10, bottom: 12 });
     let r = khung.show(ui, |ui| {
         // Thẻ nằm trong hàng ngang: nội dung bên trong phải xếp dọc
         ui.vertical(|ui| {
@@ -140,8 +145,9 @@ fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc) -> Option<Bam> {
         ui.set_min_height(CAO_THE);
         ui.spacing_mut().item_spacing.y = 0.0;
         let (o, _) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), Sense::hover());
-        ui.painter().rect(o, 0.0, NEN, Stroke::new(1.0, VIEN), StrokeKind::Inside);
-        ui.painter().text(o.center(), egui::Align2::CENTER_CENTER, so.to_string(), egui::FontId::proportional(12.0), CHU_PHU);
+        let (nen, vien, chu) = if noi { (XANH_COBALT, XANH_COBALT, Color32::WHITE) } else { (NEN, VIEN, CHU_PHU) };
+        ui.painter().rect(o, 0.0, nen, Stroke::new(1.0, vien), StrokeKind::Inside);
+        ui.painter().text(o.center(), egui::Align2::CENTER_CENTER, so.to_string(), egui::FontId::proportional(12.0), chu);
         ui.add_space(6.0);
         ui.label(RichText::new(b.ten).size(12.0).color(CHU).dam());
         ui.add_space(2.0);
@@ -164,7 +170,7 @@ fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc) -> Option<Bam> {
     });
     // Vạch xanh mảnh mép trên thẻ
     let rect = r.response.rect;
-    ui.painter().rect_filled(Rect::from_min_size(rect.min, egui::vec2(rect.width(), 2.0)), 0.0, XANH_COBALT);
+    ui.painter().rect_filled(Rect::from_min_size(rect.min, egui::vec2(rect.width(), if noi { 3.0 } else { 2.0 })), 0.0, XANH_COBALT);
     bam
 }
 
