@@ -554,6 +554,9 @@ impl ManMucLuc {
                 .size_range(RONG_TRAI_ML.0..=RONG_TRAI_ML.1)
                 .frame(egui::Frame::new().fill(Color32::WHITE))
                 .show(ui, |ui| self.sidebar(ui));
+            // Kẻ mờ ngăn sidebar với khung xem bên phải
+            let rt = trai.response.rect;
+            ui.painter().vline(rt.right().round() - 0.5, rt.y_range(), Stroke::new(1.0, VIEN_NHAT));
             let rong = trai.response.rect.width().round();
             if (rong - self.rong_trai).abs() >= 1.0 && !ctx.input(|i| i.pointer.any_down()) {
                 self.rong_trai = rong;
@@ -971,7 +974,7 @@ impl ManMucLuc {
 
     fn thanh_cong_cu(&mut self, ui: &mut egui::Ui, trai: impl FnOnce(&mut Self, &mut egui::Ui)) {
         let (r, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), bang_bien::CAO_DAU), Sense::hover());
-        ui.painter().rect_filled(r, 0.0, Color32::from_gray(0xFA));
+        ui.painter().rect_filled(r, 0.0, bang_bien::NEN_DAI_DAU);
         ui.painter().hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
         let mut con = ui.new_child(egui::UiBuilder::new().max_rect(r.shrink2(egui::vec2(12.0, 0.0))).layout(Layout::left_to_right(Align::Center)));
         con.spacing_mut().item_spacing.x = 6.0;

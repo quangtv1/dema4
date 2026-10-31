@@ -3,7 +3,7 @@
 
 use eframe::egui::{self, Color32, Key, Rect, RichText, Sense, Stroke, StrokeKind};
 
-use crate::gui::{CHU, CHU_PHU, NEN_TIEU_DE, VIEN, VIEN_NHAT};
+use crate::gui::{CHU, CHU_PHU, VIEN, VIEN_NHAT};
 use crate::muc_luc::{Nguon, RangBuoc};
 
 pub const RONG_COT_BIEN: f32 = 128.0;
@@ -79,10 +79,23 @@ pub(super) fn chip(ui: &egui::Ui, o: Rect, ten: &str, (nen, chu): (Color32, Colo
     ui.painter().galley(r.min + egui::vec2(6.0, 3.0), g, chu);
 }
 
+/// Nền dải đầu (tiêu đề bảng biến, thanh công cụ khung xem bên phải) — cùng một màu.
+pub const NEN_DAI_DAU: Color32 = Color32::from_gray(0xFA);
+/// Đường kẻ mờ chia cột trong bảng biến.
+const KE_COT: Color32 = Color32::from_gray(0xEC);
+
+/// Kẻ dọc mờ giữa cột Biến | Lấy từ | ! trên khoảng y của `r`.
+fn ke_cot(ui: &egui::Ui, r: Rect) {
+    for x in [r.left() + RONG_COT_BIEN - 3.0, r.right() - RONG_COT_CANH + 2.0] {
+        ui.painter().vline(x.round() + 0.5, r.y_range(), Stroke::new(1.0, KE_COT));
+    }
+}
+
 fn hang_tieu_de(ui: &mut egui::Ui) {
     let (r, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), CAO_DAU), Sense::hover());
-    ui.painter().rect_filled(r, 0.0, NEN_TIEU_DE);
+    ui.painter().rect_filled(r, 0.0, NEN_DAI_DAU);
     ui.painter().hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
+    ke_cot(ui, r);
     let f = egui::FontId::proportional(12.0);
     ui.painter().text(egui::pos2(r.left() + 6.0, r.center().y), egui::Align2::LEFT_CENTER, "Biến", f.clone(), CHU_PHU);
     ui.painter().text(egui::pos2(r.left() + RONG_COT_BIEN + 6.0, r.center().y), egui::Align2::LEFT_CENTER, "Lấy từ", f, CHU_PHU);
@@ -199,6 +212,7 @@ pub fn ve(ui: &mut egui::Ui, v: &VaoBang, o_go: &mut String, re: &mut Option<Str
                     ui.painter().rect_filled(r, 0.0, Color32::from_rgb(0xE6, 0xF0, 0xFB));
                 }
                 ui.painter().hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, Color32::from_gray(0xF0)));
+                ke_cot(ui, r);
                 let loai = v.nhom.loai(v.rb, b);
                 chip(ui, Rect::from_min_max(egui::pos2(r.left() + 6.0, r.top()), egui::pos2(r.left() + RONG_COT_BIEN - 4.0, r.bottom())), b, loai.mau());
                 let o = Rect::from_min_max(egui::pos2(r.left() + RONG_COT_BIEN, r.top() + 3.0), egui::pos2(r.right() - RONG_COT_CANH, r.bottom() - 3.0));
