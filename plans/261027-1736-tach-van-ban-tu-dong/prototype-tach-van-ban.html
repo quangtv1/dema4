@@ -107,7 +107,38 @@
   .trong { flex:1; display:flex; align-items:center; justify-content:center; color:var(--chu-phu); }
   /* Màn mở mặc định (chưa có dữ liệu): logo nhỏ + giới thiệu ngắn chức năng, 3 bước có màu */
   /* Khối giới thiệu đặt cao (cách mép trên ~56px), logo nhỏ ở góc dưới phải vùng trống */
-  .mo-dau { align-items:flex-start; padding-top:56px; position:relative; }
+  .mo-dau { align-items:flex-start; padding-top:36px; position:relative; }
+  /* Logo chức năng: nét mảnh một màu, vẽ lại đúng như app (logo_chuc_nang.rs) */
+  .logo-cn { width:68px; height:68px; display:block; margin:0 auto 14px; fill:none; stroke:#3C4858; stroke-linejoin:round; stroke-linecap:round; }
+  /* Chức năng chưa dùng được: cả khối mờ, riêng nhãn ĐANG PHÁT TRIỂN giữ nguyên */
+  .gioithieu.pt > *:not(.nhan-pt) { opacity:.4; }
+  .nhan-pt { display:inline-block; background:#D9822B; color:#fff; font-weight:bold; font-size:12px; padding:5px 14px; border-radius:999px; margin:0 0 10px; letter-spacing:.2px; }
+  /* Trang chủ: 4 thẻ chức năng (logo + tên), rê chuột hiện tóm tắt mục đích; logo Sao Mai góc dưới trái */
+  #manTrangChu { align-items:center; justify-content:flex-start; padding-top:64px; position:relative; background:#fff; margin:0 -12px; }
+  .tc-dau { text-align:center; margin-bottom:34px; }
+  .tc-dau small { display:block; color:var(--chu-phu); font-size:12px; letter-spacing:.3px; margin-bottom:6px; }
+  .tc-dau h1 { font-size:20px; margin:0 0 6px; }
+  .tc-dau p { margin:0; color:var(--chu-phu); font-size:12.5px; }
+  .tc-luoi { display:flex; gap:22px; justify-content:center; }
+  .tc-the { position:relative; width:168px; height:168px; background:#fff; border:1px solid var(--vien); border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; cursor:pointer; transition:border-color .15s, box-shadow .15s, transform .15s; font:inherit; color:var(--chu); }
+  .tc-the svg { width:76px; height:76px; fill:none; stroke:#3C4858; stroke-linejoin:round; stroke-linecap:round; transition:stroke .15s; }
+  .tc-the b { font-size:14px; }
+  .tc-the:hover, .tc-the:focus-visible { border-color:var(--cobalt); box-shadow:0 6px 18px rgba(0,71,171,.12); transform:translateY(-2px); outline:none; }
+  .tc-the:hover svg, .tc-the:focus-visible svg { stroke:var(--cobalt); }
+  .tc-the .tom { position:absolute; left:50%; top:calc(100% + 12px); width:236px; transform:translate(-50%, 4px); background:#2B3440; color:#fff; font-size:12px; line-height:1.5; text-align:left; padding:9px 12px; border-radius:5px; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; z-index:5; font-weight:normal; }
+  .tc-the .tom::before { content:''; position:absolute; left:50%; top:-6px; margin-left:-6px; border:6px solid transparent; border-top:0; border-bottom-color:#2B3440; }
+  .tc-the:hover .tom, .tc-the:focus-visible .tom, .tc-the.mo-tom .tom { opacity:1; transform:translate(-50%, 0); }
+  .tc-the.pt svg, .tc-the.pt b { opacity:.4; }
+  .tc-the.mo-tom { border-color:var(--cobalt); box-shadow:0 6px 18px rgba(0,71,171,.12); transform:translateY(-2px); } .tc-the.mo-tom svg { stroke:var(--cobalt); }
+  /* Ô đường dẫn có nút ⓧ ở cuối: xoá → về như lúc chưa chọn */
+  .o-xoa { position:relative; flex:1; display:flex; min-width:0; } .o-xoa > input, .o-xoa > select { flex:1; min-width:0; padding-right:28px; }
+  .xoa-o { position:absolute; right:6px; top:50%; transform:translateY(-50%); width:18px; height:18px; padding:0; border:0; background:none; cursor:pointer; display:flex; }
+  .xoa-o svg { width:18px; height:18px; fill:none; stroke:#999; stroke-width:1.2; stroke-linecap:round; } .xoa-o:hover svg { stroke:var(--chu); }
+  .o-xoa.trong .xoa-o { display:none; }
+  /* Ô số Dòng tiêu đề: luôn hiện nút tăng / giảm */
+  #mlHeader::-webkit-inner-spin-button { opacity:1; }
+  .tc-the.pt .nhan-pt { position:absolute; top:10px; right:10px; margin:0; font-size:10px; padding:2px 8px; }
+  .logo-trai { position:absolute; left:32px; bottom:16px; width:64px; opacity:.9; } .logo-trai img { width:100%; height:auto; display:block; }
   .gioithieu { text-align:center; color:var(--chu); max-width:560px; }
   .logo-goc { position:absolute; right:20px; bottom:16px; width:64px; opacity:.9; cursor:pointer; } .logo-goc img { width:100%; height:auto; display:block; }
   .gioithieu a.lk { color:var(--cobalt); text-decoration:underline; cursor:pointer; }
@@ -489,10 +520,12 @@
   #manMucLuc .xemdong table { border-collapse:collapse; font-size:12px; white-space:nowrap; }
   #manMucLuc .xemdong td, #manMucLuc .xemdong th { border-right:1px solid var(--vien-nhat); border-bottom:1px solid var(--vien-nhat); padding:4px 10px; text-align:left; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
   #manMucLuc .xemdong th { background:#F3F3F3; font-weight:bold; }
+  #manMucLuc .xemdong tr.dau td { background:#DCE8F7; font-weight:bold; } #manMucLuc .xemdong tr.bo td:not(.so) { color:#AAA; }
+  #manMucLuc .xemdong td.so { background:#F3F3F3; }
   #manMucLuc .xemdong td.so, #manMucLuc .xemdong th.so { color:var(--chu-phu); font-weight:normal; background:#FAFAFA; text-align:right; }
   /* Link "Lưu mẫu" gắn ở đuôi ô chọn mẫu, trước mũi tên */
   #manMucLuc .o-mau { position:relative; display:flex; }
-  #manMucLuc .luu-mau { position:absolute; right:30px; top:50%; transform:translateY(-50%); font-size:12px; color:var(--chu-phu); text-decoration:none; cursor:pointer; padding:0 4px; line-height:16px; }
+  #manMucLuc .luu-mau { position:absolute; right:28px; top:50%; transform:translateY(-50%); font-size:12px; color:var(--chu-phu); text-decoration:none; cursor:pointer; padding:0 4px; line-height:16px; }
   #manMucLuc .luu-mau:hover { color:var(--chu); text-decoration:underline; }
   #manMucLuc select, .ghep-ml select { -webkit-appearance:none; appearance:none; height:26px; border:1px solid var(--vien); border-radius:3px; font-size:12px; padding:0 30px 0 8px; background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center; cursor:pointer; }
   #manMucLuc select:hover, .ghep-ml select:hover { border-color:#9A9A9A; }
@@ -518,10 +551,13 @@
   #manMucLuc .tabkho > span { cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
   #manMucLuc .tabkho > span:not(.chon):hover { background:#EFEFEF; }
   .bangbien { display:grid; grid-template-columns:128px minmax(0,1fr) 22px; font-size:12px; }
-  .bangbien .tieude-cot { position:sticky; top:0; background:#EBEBEB; border-bottom:1px solid var(--vien-nhat); padding:6px 6px; color:var(--chu-phu); z-index:1; }
+  .bangbien .tieude-cot { position:sticky; top:0; background:#FAFAFA; border-bottom:1px solid var(--vien-nhat); padding:6px 6px; color:var(--chu-phu); z-index:1; }
   .bangbien .vbdong > span.lay { padding:2px 2px; overflow:visible; cursor:default; }
   .bangbien .oml { height:26px; padding:0 6px; font-weight:normal; }
-  .bangbien .vbdong.sang > span { background:#E6F0FB; } /* dòng đang định vị: xanh nhạt; chip trên trang mẫu: vàng */
+  .bangbien .vbdong.sang > span { background:#E6F0FB; }
+  #mlTrai .bangbien .vbdong > span { border-bottom:0; } #mlTrai .banghs .tieude-cot { background:#FAFAFA; }
+  .bangbien .ke-vung { grid-column:1 / -1; height:1px; background:#E4E4E4; margin:5px 6px; }
+  #mlTab > span.chon { border-bottom-width:1px; } /* dòng đang định vị: xanh nhạt; chip trên trang mẫu: vàng */
   .bangbien .vbdong.chon > span { background:var(--chon-nen); }
   .bangbien .dsml { position:static; grid-column:1 / -1; margin:2px 6px 8px; max-height:260px; }
   .bangbien .vbdong > span { padding:6px; border-bottom:1px solid #F0F0F0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
@@ -587,7 +623,7 @@
   .nhomtrai > span { padding-left:6px; }
   #mlThan .daytrai { padding:0; width:0; min-width:100%; box-sizing:border-box; } /* không nới rộng cột trái theo nội dung chân */ #mlThan .timtrai { margin:0 6px; }
   #manMucLuc .nhomtrai select { grid-column:2 / 4; width:calc(100% - 6px); min-width:0; height:26px; margin:0 2px; border-color:transparent; font-weight:normal; color:var(--ml-cot-chu);
-    padding-left:26px; background:var(--ml-nhom) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%232C3E55' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E") no-repeat 7px center; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%232C3E55' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position:7px center, right 10px center; background-repeat:no-repeat; }
+    padding-left:8px; background:var(--ml-nhom) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%232C3E55' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1.5' y='2' width='13' height='3.2' rx='1'/%3E%3Cpath d='M4 8h9M4 11h9M4 14h9M1.8 8v6'/%3E%3C/svg%3E") no-repeat 7px center; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position:right 10px center; background-repeat:no-repeat; }
   #manMucLuc .nhomtrai select:hover { border-color:#9FB0C4; }
   .oml svg { width:10px; height:6px; flex-shrink:0; margin-left:auto; opacity:0; } .oml:hover svg, .oml.mo svg { opacity:1; }
   .oml.thieu .ten { color:#B85F00; font-style:italic; } .oml.thieu { border-color:#E8C77A; background:#FFFBEF; }
@@ -620,6 +656,7 @@
       <button role="menuitem" data-tg="thongtin"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>Thông tin</button>
     </div>
     <div class="menu" id="menu" role="menu">
+      <button role="menuitem" data-man="trangchu"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>Trang chủ<span class="dau"></span></button>
       <button role="menuitem" data-man="dem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>Đếm trang A4<span class="dau"></span></button>
       <button role="menuitem" data-man="tach"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>Tách văn bản<span class="dau"></span></button>
       <button role="menuitem" data-man="ky"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.9.9-2.9a2 2 0 0 1 .5-.9z"/></svg>Ký văn bản<span class="dau"></span></button>
@@ -627,11 +664,27 @@
     </div>
   </div>
 
+  <!-- Trang chủ: chọn chức năng (logo + tên, rê chuột hiện tóm tắt) -->
+  <div class="man an" id="manTrangChu">
+    <div class="tc-dau">
+      <small>GIẢI PHÁP SỐ SAO MAI</small>
+      <h1>Hỗ trợ số hoá hồ sơ</h1>
+      <p>Chọn chức năng để bắt đầu — rê chuột lên từng ô để xem tóm tắt.</p>
+    </div>
+    <div class="tc-luoi">
+      <button class="tc-the" data-den="dem" aria-describedby="tom-dem"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M27 30V23H69V81H62" stroke-width="2.2"/><path d="M34 23V16H76V74H69" stroke-width="2.2"/><path d="M20 30H51L62 41V88H20Z" stroke-width="3"/><path d="M51 30V41H62" stroke-width="3"/><text x="41" y="69" text-anchor="middle" font-size="19" font-weight="bold" fill="#3C4858" stroke="none">A4</text></svg><b>Đếm trang A4</b><span class="tom" id="tom-dem" role="tooltip">Đếm số trang mọi PDF trong thư mục (cả thư mục con), phân loại khổ A0–A7 và quy đổi ra số trang A4; cảnh báo trang sát ngưỡng, DPI bất thường, file đã ký số.</span></button>
+      <button class="tc-the" data-den="tach" aria-describedby="tom-tach"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M6 26H31L40 35V74H6Z" stroke-width="3"/><path d="M31 26V35H40" stroke-width="3"/><path d="M13 42H30" stroke-width="2.2"/><path d="M13 51H33" stroke-width="2.2"/><path d="M13 60H26" stroke-width="2.2"/><path d="M68 10H87L94 17V44H68Z" stroke-width="3"/><path d="M87 10V17H94" stroke-width="3"/><path d="M74 23H86" stroke-width="2.2"/><path d="M74 31H82" stroke-width="2.2"/><path d="M68 56H87L94 63V90H68Z" stroke-width="3"/><path d="M87 56V63H94" stroke-width="3"/><path d="M74 69H86" stroke-width="2.2"/><path d="M74 77H82" stroke-width="2.2"/><path d="M44 50H51" stroke-width="3"/><path d="M51 50L56 27H64" stroke-width="3"/><path d="M57.5 21L64 27L57.5 33" stroke-width="3"/><path d="M51 50L56 73H64" stroke-width="3"/><path d="M57.5 67L64 73L57.5 79" stroke-width="3"/></svg><b>Tách văn bản</b><span class="tom" id="tom-tach" role="tooltip">Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng, gợi ý trang bị xoay; người duyệt nhãn trước khi tách.</span></button>
+      <button class="tc-the" data-den="mucluc" aria-describedby="tom-mucluc"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M20 12H68L80 24V88H20Z" stroke-width="3"/><path d="M68 12V24H80" stroke-width="3"/><path d="M33 26H57" stroke-width="3"/><rect x="28.5" y="36.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="44.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">1</text><path d="M44 42H57" stroke-width="2.2"/><circle cx="61.0" cy="42" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="42" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="42" r="0.9" fill="#3C4858" stroke="none"/><rect x="28.5" y="51.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="59.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">2</text><path d="M44 57H57" stroke-width="2.2"/><circle cx="61.0" cy="57" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="57" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="57" r="0.9" fill="#3C4858" stroke="none"/><rect x="28.5" y="66.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="74.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">3</text><path d="M44 72H57" stroke-width="2.2"/><circle cx="61.0" cy="72" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="72" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="72" r="0.9" fill="#3C4858" stroke="none"/></svg><b>Sinh mục lục</b><span class="tom" id="tom-mucluc" role="tooltip">Sinh mục lục văn bản cho từng hồ sơ từ file biên mục Excel/CSV theo mẫu DOCX của đơn vị; xem trước từng hồ sơ, xuất DOCX hàng loạt.</span></button>
+      <button class="tc-the pt" data-den="ky" aria-describedby="tom-ky"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 12H49L60 23V88H14Z" stroke-width="3"/><path d="M49 12V23H60" stroke-width="3"/><path d="M23 27H44" stroke-width="2.2"/><path d="M23 36H48" stroke-width="2.2"/><path d="M23 45H38" stroke-width="2.2"/><path d="M22.0 65.0 L23.1 63.5 L24.2 62.3 L25.3 61.3 L26.4 60.9 L27.5 60.9 L28.6 61.3 L29.8 62.2 L30.9 63.3 L32.0 64.7 L33.1 66.0 L34.2 67.1 L35.3 68.0 L36.4 68.5 L37.5 68.6 L38.6 68.3 L39.7 67.6 L40.8 66.7 L41.9 65.6 L43.0 64.5 L44.1 63.5 L45.2 62.7 L46.4 62.1 L47.5 62.0 L48.6 62.2 L49.7 62.7 L50.8 63.4 L51.9 64.3 L53.0 65.2" stroke-width="3"/><path d="M22 75H52" stroke-width="2.2"/><path d="M86.0 27.0 L64.5 56.2 L62.0 68.0 L72.6 62.1 L94.0 33.0Z" stroke-width="3"/><path d="M64.5 56.2L72.6 62.1" stroke-width="2.2"/><path d="M81.8 32.7L89.9 38.6" stroke-width="2.2"/></svg><b>Ký văn bản</b><span class="nhan-pt">Đang phát triển</span><span class="tom" id="tom-ky" role="tooltip">Ký số hàng loạt văn bản PDF đã tách bằng chứng thư số của đơn vị, chèn hình chữ ký. Chức năng đang phát triển.</span></button>
+    </div>
+    <a class="logo-trai" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
+  </div>
+
   <!-- Màn Tách văn bản -->
   <div class="man" id="manTach">
     <div class="hang" id="hangTM">
       <label for="tm">Thư mục hồ sơ PDF:</label>
-      <input id="tm" type="text" value="G:\SoHoa\Lo_L1\pdf_goc" readonly>
+      <span class="o-xoa"><input id="tm" type="text" value="G:\SoHoa\Lo_L1\pdf_goc" readonly><button class="xoa-o" type="button" title="Xoá đường dẫn" aria-label="Xoá đường dẫn"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8"/></svg></button></span>
       <button class="nut" id="nutChonTM">Chọn</button>
       <button class="nut xanh" id="nutPhanTich">Phân tích</button>
     </div>
@@ -659,6 +712,7 @@
           <div class="trong mo-dau" id="chuaPT">
             <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
             <div class="gioithieu">
+              <svg class="logo-cn" viewBox="0 0 100 100" aria-hidden="true"><path d="M6 26H31L40 35V74H6Z" stroke-width="3"/><path d="M31 26V35H40" stroke-width="3"/><path d="M13 42H30" stroke-width="2.2"/><path d="M13 51H33" stroke-width="2.2"/><path d="M13 60H26" stroke-width="2.2"/><path d="M68 10H87L94 17V44H68Z" stroke-width="3"/><path d="M87 10V17H94" stroke-width="3"/><path d="M74 23H86" stroke-width="2.2"/><path d="M74 31H82" stroke-width="2.2"/><path d="M68 56H87L94 63V90H68Z" stroke-width="3"/><path d="M87 56V63H94" stroke-width="3"/><path d="M74 69H86" stroke-width="2.2"/><path d="M74 77H82" stroke-width="2.2"/><path d="M44 50H51" stroke-width="3"/><path d="M51 50L56 27H64" stroke-width="3"/><path d="M57.5 21L64 27L57.5 33" stroke-width="3"/><path d="M51 50L56 73H64" stroke-width="3"/><path d="M57.5 67L64 73L57.5 79" stroke-width="3"/></svg>
               <h2>Tách văn bản</h2>
               <p>Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng và gợi ý trang bị xoay. Nhãn do máy đoán, người duyệt lại trước khi tách — file PDF gốc không bị sửa.</p>
               <div class="buoc">
@@ -788,9 +842,11 @@
   <!-- Màn Ký văn bản: giữ chỗ, chưa có chức năng -->
   <div class="man an mo-dau" id="manKy" style="align-items:center">
     <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
-    <div class="gioithieu">
+    <div class="gioithieu pt">
+      <svg class="logo-cn" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 12H49L60 23V88H14Z" stroke-width="3"/><path d="M49 12V23H60" stroke-width="3"/><path d="M23 27H44" stroke-width="2.2"/><path d="M23 36H48" stroke-width="2.2"/><path d="M23 45H38" stroke-width="2.2"/><path d="M22.0 65.0 L23.1 63.5 L24.2 62.3 L25.3 61.3 L26.4 60.9 L27.5 60.9 L28.6 61.3 L29.8 62.2 L30.9 63.3 L32.0 64.7 L33.1 66.0 L34.2 67.1 L35.3 68.0 L36.4 68.5 L37.5 68.6 L38.6 68.3 L39.7 67.6 L40.8 66.7 L41.9 65.6 L43.0 64.5 L44.1 63.5 L45.2 62.7 L46.4 62.1 L47.5 62.0 L48.6 62.2 L49.7 62.7 L50.8 63.4 L51.9 64.3 L53.0 65.2" stroke-width="3"/><path d="M22 75H52" stroke-width="2.2"/><path d="M86.0 27.0 L64.5 56.2 L62.0 68.0 L72.6 62.1 L94.0 33.0Z" stroke-width="3"/><path d="M64.5 56.2L72.6 62.1" stroke-width="2.2"/><path d="M81.8 32.7L89.9 38.6" stroke-width="2.2"/></svg>
       <h2>Ký văn bản</h2>
-      <p>Ký số hàng loạt các văn bản PDF đã tách bằng chứng thư số của đơn vị; chèn hình chữ ký, kiểm tra file đã ký. <b>Chức năng đang phát triển.</b></p>
+      <div class="nhan-pt">ĐANG PHÁT TRIỂN</div>
+      <p>Ký số hàng loạt các văn bản PDF đã tách bằng chứng thư số của đơn vị; chèn hình chữ ký, kiểm tra file đã ký.</p>
       <div class="buoc">
         <div><b>1</b><span>Chọn thư mục</span>Thư mục văn bản đã tách (kết quả của Tách văn bản).</div>
         <div><b>2</b><span>Chọn chứng thư</span>USB token hoặc chứng thư trong máy; vị trí, kích thước chữ ký.</div>
@@ -803,23 +859,31 @@
   <div class="man an" id="manMucLuc">
     <div class="hang">
       <label class="nhanml" for="mlDuLieu">File biên mục:</label>
-      <input id="mlDuLieu" type="text" value="" placeholder="Chọn file Excel (.xlsx .xlsb .xls) hoặc CSV" readonly>
+      <span class="o-xoa trong" id="oMlDuLieu"><input id="mlDuLieu" type="text" value="" placeholder="Chọn file Excel (.xlsx .xlsb .xls) hoặc CSV" readonly><button class="xoa-o" type="button" title="Xoá đường dẫn" aria-label="Xoá đường dẫn"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8"/></svg></button></span>
       <button class="nut" id="mlChonDuLieu">Chọn</button>
       <div class="phaiml">
         <select id="mlSheet" aria-label="Sheet" style="flex:1"><option value="" hidden>Chọn sheet</option><option>KhanhLinh</option><option>Sheet2</option></select>
         <span class="nhanphu">Dòng tiêu đề</span><input class="so-dong" id="mlHeader" type="number" min="1" value="1" aria-label="Dòng tiêu đề">
-        <button class="nut nutxo" id="mlXemDong" title="Xem dòng tiêu đề và dòng dữ liệu đầu — kiểm tra chọn đúng Dòng tiêu đề"><svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg></button>
+        <button class="nut nutxo" id="mlXemDong" title="Xem 10 dòng đầu sheet — dòng tô nền là Dòng tiêu đề, dữ liệu lấy từ dòng sau nó"><svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg></button>
       </div>
     </div>
     <div class="xemdong an" id="mlXemTruoc"><table>
-      <tr><th class="so">Dòng 1</th><th>Tiêu đề hồ sơ</th><th>STT</th><th>Số, ký hiệu văn bản</th><th>Ngày tháng văn bản</th><th>Tác giả</th><th>Trích yếu nội dung VB</th><th>Tờ số</th><th>Ghi chú</th></tr>
-      <tr><td class="so">Dòng 2</td><td>HS-01</td><td>1</td><td>01/QĐ-UBND</td><td>05/01/2015</td><td>UBND xã</td><td>Quyết định thành lập tổ công tác</td><td>01</td><td>Bản gốc</td></tr>
+      <tr class="bo"><td class="so">1</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr class="bo"><td class="so">2</td><td>MỤC LỤC THỬ (dữ liệu tổng hợp)</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr class="bo"><td class="so">3</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr class="dau"><td class="so">4</td><td>Tiêu đề hồ sơ</td><td>STT</td><td>Số, ký hiệu văn bản</td><td>Ngày tháng văn bản</td><td>Tác giả</td><td>Trích yếu nội dung VB</td><td>Tờ số</td><td>Ghi chú</td></tr>
+      <tr><td class="so">5</td><td>HS-01</td><td>1</td><td>01/QĐ-UBND</td><td>05/01/2015</td><td>UBND xã</td><td>Quyết định thành lập tổ công tác</td><td>01</td><td>Bản gốc</td></tr>
+      <tr><td class="so">6</td><td>HS-01</td><td>2</td><td>15/TTr</td><td>12/02/2015</td><td>UBND xã</td><td>Tờ trình phê duyệt</td><td>02-04</td><td></td></tr>
+      <tr><td class="so">7</td><td>HS-02</td><td>1</td><td>22/BC</td><td>30/03/2015</td><td>Phòng TN&MT</td><td>Báo cáo kết quả</td><td>01</td><td></td></tr>
+      <tr><td class="so">8</td><td>HS-02</td><td>2</td><td>07/QĐ</td><td>02/04/2015</td><td>UBND huyện</td><td>Quyết định giao đất</td><td>02</td><td></td></tr>
+      <tr><td class="so">9</td><td>HS-03</td><td>1</td><td>11/TB</td><td>15/04/2015</td><td>UBND xã</td><td>Thông báo</td><td>01</td><td></td></tr>
+      <tr><td class="so">10</td><td>HS-03</td><td>2</td><td>03/BB</td><td>20/04/2015</td><td>Tổ công tác</td><td>Biên bản kiểm tra</td><td>02</td><td></td></tr>
     </table></div>
     <div class="hang">
       <label class="nhanml" for="mlMau">Mẫu mục lục:</label>
-      <div class="o-mau" style="flex:1">
-        <select id="mlMau" style="width:100%;padding-right:92px"><option value="">— Chọn mẫu mục lục —</option><option>Mẫu 01 – Quảng Trị</option><option>Mẫu 02 – Quảng Ninh</option><option>Mẫu 03 – Đống Đa</option><option>Mẫu 04 – Vĩnh Phúc</option><option>Mẫu riêng: MucLuc_DonVi.docx</option></select>
-        <a class="luu-mau" id="mlLuuMau" title="Lưu mẫu đang chọn ra file DOCX — sửa trong Word rồi bấm Chọn để dùng làm mẫu riêng">Lưu mẫu</a>
+      <div class="o-mau o-xoa trong" id="oMlMau" style="flex:1">
+        <select id="mlMau" style="width:100%;padding-right:92px;background-image:none"><option value="">— Chọn mẫu mục lục —</option><option>Mẫu 01 – Quảng Trị</option><option>Mẫu 02 – Quảng Ninh</option><option>Mẫu 03 – Đống Đa</option><option>Mẫu 04 – Vĩnh Phúc</option><option>Mẫu riêng: MucLuc_DonVi.docx</option></select>
+        <a class="luu-mau" id="mlLuuMau" title="Lưu mẫu đang chọn ra file DOCX — sửa trong Word rồi bấm Chọn để dùng làm mẫu riêng">Lưu mẫu</a><button class="xoa-o" type="button" title="Bỏ mẫu" aria-label="Bỏ mẫu"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8"/></svg></button>
       </div>
       <button class="nut" id="mlChonMau">Chọn</button>
       <div class="phaiml"><button class="nut" id="mlNutGhep" style="flex:1" title="Chọn nguồn dữ liệu cho từng biến của mẫu">Ghép biến…</button></div>
@@ -831,13 +895,14 @@
           <div class="trai" id="mlTrai"></div>
           <div class="daytrai">
             <label class="timtrai"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
-              <input type="search" id="mlTim" placeholder="Tìm hồ sơ" aria-label="Tìm" autocomplete="off"></label><label class="nhomtrai" id="mlNhomTrai" title="Nhóm các dòng liền nhau có cùng giá trị ở cột này thành 1 hồ sơ; (số) = số giá trị khác nhau trong cột"><span>Nhóm theo</span><select class="mlnhom"></select></label></div>
+              <input type="search" id="mlTim" placeholder="Tìm hồ sơ" aria-label="Tìm" autocomplete="off" hidden></label><label class="nhomtrai" id="mlNhomTrai" title="Nhóm các dòng liền nhau có cùng giá trị ở cột này thành 1 hồ sơ; (số) = số giá trị khác nhau trong cột"><span>Nhóm theo</span><select class="mlnhom"></select></label></div>
         </div>
         <div class="keo" id="mlKeo" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng cột trái" tabindex="0"></div>
         <div class="phai xemml">
           <div class="trong mo-dau" id="mlGioiThieu">
             <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
             <div class="gioithieu">
+              <svg class="logo-cn" viewBox="0 0 100 100" aria-hidden="true"><path d="M20 12H68L80 24V88H20Z" stroke-width="3"/><path d="M68 12V24H80" stroke-width="3"/><path d="M33 26H57" stroke-width="3"/><rect x="28.5" y="36.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="44.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">1</text><path d="M44 42H57" stroke-width="2.2"/><circle cx="61.0" cy="42" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="42" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="42" r="0.9" fill="#3C4858" stroke="none"/><rect x="28.5" y="51.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="59.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">2</text><path d="M44 57H57" stroke-width="2.2"/><circle cx="61.0" cy="57" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="57" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="57" r="0.9" fill="#3C4858" stroke="none"/><rect x="28.5" y="66.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="74.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">3</text><path d="M44 72H57" stroke-width="2.2"/><circle cx="61.0" cy="72" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="72" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="72" r="0.9" fill="#3C4858" stroke="none"/></svg>
               <h2>Sinh mục lục hồ sơ</h2>
               <p>Sinh mục lục văn bản cho từng hồ sơ từ file biên mục Excel/CSV theo mẫu DOCX của đơn vị; xem mẫu, xem trước đúng bản sẽ in, xuất DOCX và PDF hàng loạt.</p>
               <div class="buoc">
@@ -868,7 +933,7 @@
     </div>
     <div class="chan" style="height:44px;padding-bottom:6px;box-sizing:border-box">
       <span class="dan" id="mlChan"></span>
-      <label style="display:inline-flex;align-items:center;gap:4px;color:var(--chu)" title="Xuất thêm PDF cạnh mỗi DOCX"><input type="checkbox" id="mlPdf" checked> Kèm PDF</label>
+      <label style="display:inline-flex;align-items:center;gap:4px;color:var(--chu-mo, #999)" title="Xuất PDF cần Word / LibreOffice — có ở bản sau"><input type="checkbox" id="mlPdf" disabled> Kèm PDF</label>
       <button class="nut xam" id="mlTao" style="width:130px;height:28px" disabled>Sinh mục lục</button>
     </div>
   </div>
@@ -876,18 +941,20 @@
   <div class="man an" id="manDem">
     <div class="hang">
       <label for="tmd">Chọn thư mục pdf:</label>
-      <input id="tmd" type="text" value="G:\SoHoa\Lo_L1\pdf_goc" readonly>
+      <span class="o-xoa trong" id="oTmd"><input id="tmd" type="text" value="" placeholder="Chọn thư mục chứa PDF" readonly><button class="xoa-o" type="button" title="Xoá đường dẫn" aria-label="Xoá đường dẫn"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8"/></svg></button></span>
       <button class="nut" id="nutChonDem">Chọn</button><button class="nut xanh" id="nutDem">Đếm</button>
     </div>
     <div class="tomtat">
-      <span>File PDF: <b>2</b></span><span>Số trang: <b>896</b></span><span>Quy ra A4: <b>896</b></span>
-      <span>Cảnh báo: <b>0</b></span><span>File lỗi: <b>0</b></span><span>Ký số: <b style="color:var(--cobalt)">0</b></span>
+      <span>File PDF: <b id="demSoPdf">0</b></span><span>Số trang: <b>0</b></span><span>Quy ra A4: <b>0</b></span>
+      <span>Cảnh báo: <b>0</b></span><span>File lỗi: <b>0</b></span><span>Ký số: <b>0</b></span>
     </div>
     <div class="bangdem">
-      <div class="tabkho"><span class="chon">Tất cả (896)</span><span>A0 (0)</span><span>A1 (0)</span><span>A2 (0)</span><span>A3 (0)</span><span>A4 (896)</span><span>A5 (0)</span><span>A6 (0)</span><span>A7 (0)</span></div>
-      <div class="trong mo-dau">
+      <div class="tabkho"><span class="chon">Tất cả (0)</span><span>A0 (0)</span><span>A1 (0)</span><span>A2 (0)</span><span>A3 (0)</span><span>A4 (0)</span><span>A5 (0)</span><span>A6 (0)</span><span>A7 (0)</span></div>
+      <div class="trong an" id="demNhac">Bấm nút Đếm để thực hiện tiếp</div>
+      <div class="trong mo-dau" id="demGioiThieu">
         <a class="logo-goc" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
         <div class="gioithieu">
+          <svg class="logo-cn" viewBox="0 0 100 100" aria-hidden="true"><path d="M27 30V23H69V81H62" stroke-width="2.2"/><path d="M34 23V16H76V74H69" stroke-width="2.2"/><path d="M20 30H51L62 41V88H20Z" stroke-width="3"/><path d="M51 30V41H62" stroke-width="3"/><text x="41" y="69" text-anchor="middle" font-size="19" font-weight="bold" fill="#3C4858" stroke="none">A4</text></svg>
           <h2>Đếm trang A4</h2>
           <p>Đếm số trang của mọi PDF trong thư mục (cả thư mục con), phân loại khổ giấy và quy đổi ra số trang A4 theo hệ số; cảnh báo trang sát ngưỡng khổ, DPI bất thường, file đã ký số.</p>
           <div class="buoc">
@@ -899,7 +966,7 @@
         </div>
       </div>
     </div>
-    <div class="tiendo"><div><b style="width:100%"></b><span>100% (2/2 files)</span></div></div>
+    <div class="tiendo"><div><b style="width:0"></b><span></span></div></div>
   </div>
 
 
@@ -1498,7 +1565,8 @@
 
   function ve() {
     var m = nhan[s.hoSo];
-    $('tenCuaSo').textContent = ({ tach: 'Tách văn bản PDF', dem: 'Đếm trang A4', ky: 'Ký văn bản', mucluc: 'Sinh mục lục hồ sơ' })[s.man] + ' (Giải pháp số Sao Mai)';
+    $('tenCuaSo').textContent = ({ trangchu: 'sm-dema4', tach: 'Tách văn bản PDF', dem: 'Đếm trang A4', ky: 'Ký văn bản', mucluc: 'Sinh mục lục hồ sơ' })[s.man] + ' (Giải pháp số Sao Mai)';
+    $('manTrangChu').classList.toggle('an', s.man !== 'trangchu');
     $('manTach').classList.toggle('an', s.man !== 'tach');
     $('manDem').classList.toggle('an', s.man !== 'dem'); $('manKy').classList.toggle('an', s.man !== 'ky'); $('manMucLuc').classList.toggle('an', s.man !== 'mucluc'); if (window.veMucLuc) window.veMucLuc();
     var mucs = document.querySelectorAll('#menu button');
@@ -2548,8 +2616,20 @@
   if (location.hash === '#xoay-vb') { s.daPT = true; s.che = 'vanban'; s.vb = 0; xoay[0][2] = 90; s.chonVB = { '0.2': true, '0.3': true }; ve(); }
   if (location.hash === '#menu-phai') { s.daPT = true; ve(); setTimeout(function () { var t = document.querySelector('#luoi [data-k="0.10"]'), rr = t.getBoundingClientRect(); t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rr.left + 40, clientY: rr.top + 40 })); }, 50); }
   if (location.hash === '#ky-van-ban') { s.man = 'ky'; ve(); }
+  // Trang chủ: mở khi không có hash (như lúc mở app); bấm thẻ → vào chức năng
+  document.querySelectorAll('.tc-the').forEach(function (b) { b.onclick = function () { s.man = b.getAttribute('data-den'); ve(); }; });
+  if (location.hash === '' || location.hash === '#trang-chu' || location.hash === '#trang-chu-hover') { s.man = 'trangchu'; ve(); }
+  if (location.hash === '#trang-chu-hover') document.querySelector('.tc-the[data-den="tach"]').classList.add('mo-tom');
   if (location.hash === '#het-luot' || location.hash === '#het-luot-offline') { s.daPT = true; ve(); moHetLuot('tach'); }
   if (location.hash === '#dem') { s.man = 'dem'; ve(); }
+  // Đếm: chọn thư mục → File PDF hiện ngay, lời nhắc thay giới thiệu; ⓧ → về như lúc mở
+  function demChon(co) {
+    $('tmd').value = co ? 'G:\\SoHoa\\Lo_L1\\pdf_goc' : ''; $('oTmd').classList.toggle('trong', !co);
+    $('demSoPdf').textContent = co ? '48' : '0'; $('demNhac').classList.toggle('an', !co); $('demGioiThieu').classList.toggle('an', co);
+  }
+  $('nutChonDem').addEventListener('click', function () { demChon(true); });
+  $('oTmd').querySelector('.xoa-o').onclick = function () { demChon(false); };
+  if (location.hash === '#dem-da-chon') { s.man = 'dem'; ve(); demChon(true); }
   if (location.hash === '#chuc-nang') { setTimeout(function () { $('nutMenu').click(); }, 50); }
   if (location.hash === '#tro-giup') { setTimeout(function () { $('nutTroGiup').click(); }, 50); }
   if (location.hash === '#cap-nhat') moTroGiup('capnhat');
@@ -2624,6 +2704,7 @@
   var MUI_TEN = '<svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="#666" stroke-width="1.4" stroke-linecap="round"/></svg>';
   function lopNhom(ten) { return ten.indexOf('Thông tin') === 0 ? 'nhom-ttin' : 'nhom-bang'; }
   // Lớp màu chip của biến: theo loại (thông tin hồ sơ / bảng văn bản), chưa ghép thì 'thieu'
+  function lopVung(b) { return ML_BIEN.indexOf(b) > ML_BIEN.indexOf(NHOM_BANG) ? 'bang' : 'ttin'; }
   function lopBien(b) { if (b[1] === 'thieu') return 'thieu'; return ML_BIEN.indexOf(b) > ML_BIEN.indexOf(NHOM_BANG) ? 'bang' : 'ttin'; }
   function giaTri(b, hs) {
     if (b[1] === 'hang') return b[2];
@@ -2687,7 +2768,7 @@
       '</tbody></table><div class="ky"><div>Người lập<br><br><br>' + tk('nguoi_lap') + '</div></div><div class="so-trang">Trang ' + tk('trang_so') + '/' + tk('tong_so_trang') + '</div></div>';
   }
   function trangKetQua(hs) {
-    return (hs[2] ? '<div class="baoml">⚠ ' + hs[2] + '</div>' : '') +
+    return (hs[2] ? '<div class="baoml">Kiểm tra: ' + hs[2] + '</div>' : '') +
       '<div class="trangml"><div class="qh"><div>VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI<br><b>CHI NHÁNH THÀNH PHỐ ĐÔNG HÀ</b></div><div><b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br><b>Độc lập - Tự do - Hạnh phúc</b></div></div>' +
       '<h3>MỤC LỤC VĂN BẢN, TÀI LIỆU</h3><div class="hs">Số, ký hiệu hồ sơ (đơn vị bảo quản): <b>' + hs[0] + '</b></div>' + bangDau() +
       ML_VB.map(function (v, i) { return '<tr><td style="text-align:center">' + (i + 1) + '</td><td>' + v[0] + '</td><td>' + v[1] + '</td><td>' + v[2] + '</td><td>' + (hs[2] && i === 2 ? '' : v[3]) + '</td><td style="text-align:center">' + ('0' + (i + 1)).slice(-2) + '</td><td>' + v[4] + '</td></tr>'; }).join('') +
@@ -2699,6 +2780,7 @@
     $('mlLuuMau').style.display = ml.coMau ? '' : 'none';
     $('mlSheet').disabled = !coDl; $('mlSheet').selectedIndex = coDl ? Math.max(1, $('mlSheet').selectedIndex) : 0;
     $('mlDuLieu').value = coDl ? 'G:\\SoHoa\\Bien_muc\\Bien_muc_tong_hop.xlsx' : '';
+    $('oMlDuLieu').classList.toggle('trong', !coDl); $('oMlMau').classList.toggle('trong', !ml.coMau);
     $('mlGioiThieu').classList.toggle('an', co);
     $('mlCongCu').classList.toggle('an', !co); $('mlVungXem').classList.toggle('an', !co);
     if (!co) { $('mlTrai').innerHTML = ''; $('mlNhomTrai').style.display = 'none'; }
@@ -2712,7 +2794,7 @@
     var canh = [];
     if (thieu) canh.push(thieu + ' biến chưa ghép');
     if (loi.length) canh.push(loi.length + ' hồ sơ cần xem (' + loi.map(function (h) { return h[0]; }).join(', ') + ')');
-    $('mlCanh').innerHTML = co && canh.length ? '⚠ ' + canh.join(' · ') : '';
+    $('mlCanh').innerHTML = co && canh.length ? 'Kiểm tra: ' + canh.join(' · ') : '';
     var icon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
     if (ml.luuMau) { $('mlChan').innerHTML = icon + 'Đã lưu mẫu <b>Mẫu 01 – Quảng Trị</b>: D:\\Mau\\Mau_01_Quang_Tri.docx · <a class="lk">Mở thư mục</a>'; } else
     if (coDl && !ml.coMau) { $('mlChan').innerHTML = icon + 'Đã đọc <b>326</b> dòng dữ liệu · chọn <b>Mẫu mục lục</b> để tiếp tục'; } else
@@ -2721,22 +2803,27 @@
       : 'Hồ sơ: <b>' + ML_HS.length + '</b>; Văn bản: <b>' + TONG_DONG + '</b>');
     if (!co) return;
     $('mlDieuHuong').style.display = mau ? 'none' : 'contents';
-    $('mlTim').parentNode.style.display = mau ? 'none' : ''; $('mlNhomTrai').style.display = mau ? '' : 'none'
+    $('mlTim').parentNode.style.display = 'none'; $('mlNhomTrai').style.display = mau ? '' : 'none'; $('mlThan').querySelector('.daytrai').style.display = mau ? '' : 'none'
     if (mau) {
       $('mlTrai').innerHTML = '<div class="bangbien" role="grid"><span class="tieude-cot">Biến</span><span class="tieude-cot">Lấy từ</span><span class="tieude-cot"></span>' +
         ML_BIEN.map(function (b) {
-          if (b.length === 1) return '<span class="nhombien ' + lopNhom(b[0]) + '">' + b[0].replace(/ \(.*/, '') + '</span>';
+          // Không tiêu đề vùng: giữa hai vùng một kẻ mờ; chip biến giữ màu vùng (chưa ghép chỉ tô ô Lấy từ + dấu !)
+          if (b.length === 1) return ML_BIEN.indexOf(b) === 0 ? '' : '<div class="ke-vung"></div>';
           var i = ML_BIEN.indexOf(b);
-          return '<div class="vbdong' + (ml.moTrai === i ? ' chon' : '') + '" data-ten="' + b[0] + '" role="row"><span><code class="' + lopBien(b) + '">{' + b[0] + '}</code></span><span class="lay">' + oNguon(b, i, ml.moTrai) + '</span>' +
+          return '<div class="vbdong' + (ml.moTrai === i ? ' chon' : '') + '" data-ten="' + b[0] + '" role="row"><span><code class="' + lopVung(b) + '">{' + b[0] + '}</code></span><span class="lay">' + oNguon(b, i, ml.moTrai) + '</span>' +
             (b[1] === 'thieu' ? '<span class="canhml" title="Chưa ghép">!</span>' : '<span></span>') + '</div>' +
             (ml.moTrai === i ? '<div class="dsml">' + dsNguon(b) + '</div>' : '');
-        }).join('') + '<span class="nhombien nhom-tudong">Tự động</span><div class="vbdong" data-ten="trang_so"><span><code class="tudong">{trang_so}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">số trang</span></div></span><span></span></div>' +
+        }).join('') + '<div class="ke-vung"></div><div class="vbdong" data-ten="trang_so"><span><code class="tudong">{trang_so}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">số trang</span></div></span><span></span></div>' +
         '<div class="vbdong" data-ten="tong_so_trang"><span><code class="tudong">{tong_so_trang}</code></span><span class="lay"><div class="oml tudong" title="Word tự điền khi in"><span class="ten">tổng số trang</span></div></span><span></span></div></div>';
-      $('mlXemTT').innerHTML = 'Hàng mẫu: bảng 2, dòng 2<span class="chuthich"><span><i style="background:var(--tk-nen)"></i>thông tin hồ sơ</span><span><i style="background:var(--tk-bang-nen)"></i>bảng văn bản</span><span><i style="background:var(--tk-tudong-nen)"></i>tự động</span><span><i style="background:var(--tk-thieu-nen)"></i>chưa ghép</span></span>';
+      // Chú thích màu kèm số biến từng loại (loại không có biến thì ẩn) + gợi ý thao tác
+      var dem = { ttin: 0, bang: 0, thieu: thieu };
+      dsb.forEach(function (b) { if (b[1] !== 'thieu') dem[lopBien(b)]++; });
+      var mucCt = [['--tk-nen', 'thông tin hồ sơ', dem.ttin], ['--tk-bang-nen', 'bảng văn bản', dem.bang], ['--tk-tudong-nen', 'tự động', 2], ['--tk-thieu-nen', 'chưa ghép', dem.thieu]];
+      $('mlXemTT').innerHTML = '<span class="chuthich" style="margin-left:0">' + mucCt.filter(function (m) { return m[2] > 0; }).map(function (m) { return '<span><i style="background:var(' + m[0] + ')"></i>' + m[1] + ' <b style="color:' + (m[0] === '--tk-thieu-nen' ? '#B85F00' : 'var(--chu)') + '">' + m[2] + '</b></span>'; }).join('') + '<span style="color:#999">· bấm biến trên trang để sửa nguồn</span></span>';
       $('mlVungXem').innerHTML = trangMau(); datZoom(ml.zoom);
     } else {
       $('mlTrai').innerHTML = '<div class="banghs" role="grid" style="grid-template-columns:24px minmax(72px,1fr) 64px 28px"><span class="tieude-cot so">#</span><span class="tieude-cot">Hồ sơ</span><span class="tieude-cot so">Số dòng</span><span class="tieude-cot"></span>' +
-        ML_HS.map(function (h, i) { return '<div class="vbdong' + (i === ml.hs ? ' chon' : '') + '" data-mlhs="' + i + '" role="row"><span class="so">' + (i + 1) + '</span><span>' + h[0] + '</span><span class="so">' + h[1] + '</span>' + (h[2] ? '<span class="canhml" title="' + h[2] + '">⚠</span>' : '<span></span>') + '</div>'; }).join('') + '</div>';
+        ML_HS.map(function (h, i) { return '<div class="vbdong' + (i === ml.hs ? ' chon' : '') + '" data-mlhs="' + i + '" role="row"><span class="so">' + (i + 1) + '</span><span>' + h[0] + '</span><span class="so">' + h[1] + '</span>' + (h[2] ? '<span class="canhml" title="' + h[2] + '">!</span>' : '<span></span>') + '</div>'; }).join('') + '</div>';
       $('mlSo').value = ml.hs + 1; $('mlXemTT').textContent = 'Mục lục hồ sơ ' + hs[0] + ' · ' + hs[1] + ' dòng · 1 trang';
       $('mlVungXem').innerHTML = trangKetQua(hs); datZoom(ml.zoom);
     }
