@@ -27,7 +27,9 @@ use bang_bien::{Loai, NhomBien};
 
 pub const TIEU_DE: &str = "Sinh mục lục hồ sơ (Giải pháp số Sao Mai)";
 /// Khối bên phải 2 dòng đầu vào (Sheet + Dòng tiêu đề / Ghép biến) — 2 dòng thẳng cột nhau.
-const RONG_KHOI_PHAI: f32 = 320.0;
+/// Khối phải 2 dòng đầu vào (Sheet · Dòng tiêu đề · nút xổ / Ghép biến…) — ô đường dẫn và ô mẫu bằng nhau.
+const RONG_KHOI_PHAI: f32 = 354.0;
+const RONG_NUT_XO: f32 = 28.0;
 const RONG_NHAN: f32 = 104.0;
 const CAO_TAB: f32 = 32.0;
 const CAM: Color32 = Color32::from_rgb(0xB8, 0x5F, 0x00);
@@ -59,8 +61,11 @@ pub(super) fn mui_ten_chon(ui: &egui::Ui, r: Rect, _: &egui::style::WidgetVisual
     ui.painter().add(egui::Shape::line(vec![c + egui::vec2(-4.5, -2.0), c + egui::vec2(0.0, 2.5), c + egui::vec2(4.5, -2.0)], Stroke::new(1.3, mau)));
 }
 
-/// Mẫu đang dùng: "1".."4" = mẫu nhúng sẵn, còn lại = đường dẫn DOCX riêng.
+/// Mẫu đang dùng: "" = chưa chọn, "1".."4" = mẫu nhúng sẵn, còn lại = đường dẫn DOCX riêng.
 fn ten_mau(ma: &str) -> String {
+    if ma.is_empty() {
+        return "— Chọn mẫu mục lục —".into();
+    }
     match ma.parse::<usize>() {
         Ok(i) if (1..=mau::MAU_CO_SAN.len()).contains(&i) => mau::MAU_CO_SAN[i - 1].0.to_string(),
         _ => format!("Mẫu riêng: {}", Path::new(ma).file_name().map_or_else(|| ma.to_string(), |s| s.to_string_lossy().into_owned())),
@@ -115,6 +120,8 @@ pub struct ManMucLuc {
     o_dong: String,
     pub mau_chon: String,
     pub du_lieu: Option<DuLieu>,
+    /// Đang xổ bảng xem dòng tiêu đề + dòng dữ liệu đầu (kiểm tra chọn đúng Dòng tiêu đề).
+    xem_dong: bool,
     loi_doc: Option<String>,
     doc_nen: Option<Receiver<Result<DuLieu, String>>>,
     chon_file: Option<Receiver<Option<PathBuf>>>,
@@ -164,6 +171,7 @@ impl ManMucLuc {
             o_dong: c.dong_tieu_de.to_string(),
             mau_chon: c.mau.clone(),
             du_lieu: None,
+            xem_dong: false,
             loi_doc: None,
             doc_nen: None,
             chon_file: None,
@@ -225,6 +233,12 @@ impl ManMucLuc {
     // ---- Nạp dữ liệu / mẫu, ràng buộc, kiểm tra ----
 
     fn nap_mau(&mut self) {
+        if self.mau_chon.is_empty() {
+            self.mau = None;
+            self.loi_mau = None;
+            self.ap_rang_buoc();
+            return;
+        }
         let kq = byte_mau(&self.mau_chon).and_then(|b| {
             let db = mau::bien_dich(&b)?;
             let trang = mo_phong::mo_phong(&b)?;
@@ -381,6 +395,7 @@ impl ManMucLuc {
                     if let Some(p) = p {
                         self.mau_chon = p.display().to_string();
                         self.cfg_doi = true;
+                        self.tab = Tab::Mau;
                         self.nap_mau();
                     }
                 }
@@ -477,10 +492,58 @@ impl ManMucLuc {
         .inner
     }
 
+    /// Bảng nhỏ dưới dòng 1: dòng tiêu đề + dòng dữ liệu đầu tiên (cột co theo chữ, dài thì cắt, cuộn ngang).
+    fn xem_hai_dong(ui: &mut egui::Ui, d: &DuLieu, dong_tieu_de: usize) {
+        let b = &d.bang;
+        let f = egui::FontId::proportional(12.0);
+        let f_dam = egui::FontId::new(12.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into()));
+        let dau = b.dong.first();
+        let nhan = [format!("Dòng {dong_tieu_de}"), b.so_dong.first().map_or_else(|| "—".into(), |n| format!("Dòng {n}"))];
+        let do_rong = |chu: &str, font: &egui::FontId| ui.fonts_mut(|x| x.layout_no_wrap(chu.into(), font.clone(), CHU).size().x);
+        let rong_nhan = nhan.iter().map(|n| do_rong(n, &f)).fold(0.0, f32::max) + 20.0;
+        let rong: Vec<f32> = b
+            .tieu_de
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (do_rong(t, &f_dam).max(dau.and_then(|r| r.get(i)).map_or(0.0, |o| do_rong(o, &f))) + 20.0).clamp(40.0, 180.0))
+            .collect();
+        const CAO: f32 = 24.0;
+        ui.add_space(6.0 - ui.spacing().item_spacing.y);
+        ui.horizontal(|ui| {
+            ui.add_space(RONG_NHAN + ui.spacing().item_spacing.x);
+            egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, VIEN)).show(ui, |ui| {
+                egui::ScrollArea::horizontal().id_salt("ml_xem_dong").auto_shrink([false, true]).show(ui, |ui| {
+                    let tong = rong_nhan + rong.iter().sum::<f32>();
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(tong, 2.0 * CAO), Sense::hover());
+                    let p = ui.painter_at(r);
+                    let ke = Stroke::new(1.0, VIEN_NHAT);
+                    p.rect_filled(Rect::from_min_size(r.min, egui::vec2(tong, CAO)), 0.0, Color32::from_gray(0xF3));
+                    p.rect_filled(Rect::from_min_size(r.min, egui::vec2(rong_nhan, 2.0 * CAO)), 0.0, Color32::from_gray(0xFA));
+                    let mut x = r.left();
+                    let cot = std::iter::once((rong_nhan, [nhan[0].clone(), nhan[1].clone()], true)).chain(rong.iter().enumerate().map(|(i, w)| (*w, [b.tieu_de[i].clone(), dau.and_then(|d| d.get(i)).cloned().unwrap_or_default()], false)));
+                    for (w, [tren, duoi], la_nhan) in cot {
+                        for (k, chu) in [tren, duoi].into_iter().enumerate() {
+                            let (font, mau) = if la_nhan { (f.clone(), CHU_PHU) } else if k == 0 { (f_dam.clone(), CHU) } else { (f.clone(), CHU) };
+                            let mut job = egui::text::LayoutJob::single_section(chu, egui::TextFormat { font_id: font, color: mau, ..Default::default() });
+                            job.wrap = egui::text::TextWrapping::truncate_at_width(w - 20.0);
+                            let g = ui.fonts_mut(|x| x.layout_job(job));
+                            let y = r.top() + k as f32 * CAO + (CAO - g.size().y) / 2.0;
+                            let gx = if la_nhan { x + w - 10.0 - g.size().x } else { x + 10.0 };
+                            p.galley(egui::pos2(gx, y), g, mau);
+                        }
+                        x += w;
+                        p.vline(x - 0.5, r.y_range(), ke);
+                    }
+                    p.hline(r.x_range(), r.top() + CAO - 0.5, ke);
+                });
+            });
+        });
+    }
+
     fn hai_dong_dau_vao(&mut self, ui: &mut egui::Ui) {
         let khoa = self.sinh.is_some();
         let khe = ui.spacing().item_spacing.x;
-        let rong_o = |ui: &egui::Ui| ui.available_width() - crate::gui::RONG_NUT - RONG_KHOI_PHAI - 3.0 * khe - 10.0;
+        let rong_o = |ui: &egui::Ui| ui.available_width() - crate::gui::RONG_NUT - RONG_KHOI_PHAI - 3.0 * khe - 3.0;
         ui.horizontal(|ui| {
             let nhan = Self::nhan_co_dinh(ui, "File biên mục:");
             let w = rong_o(ui);
@@ -501,7 +564,7 @@ impl ManMucLuc {
                     kieu_o_chon(ui, Color32::WHITE, VIEN);
                     egui::ComboBox::from_id_salt("ml_sheet")
                         .icon(mui_ten_chon)
-                        .width(ui.available_width() - 120.0)
+                        .width(ui.available_width() - 127.0 - RONG_NUT_XO - khe)
                         .selected_text(if hien.is_empty() { "—".to_string() } else { hien.clone() })
                         .show_ui(ui, |ui| {
                             for s in &ds {
@@ -522,8 +585,23 @@ impl ManMucLuc {
                     let sheet = self.du_lieu.as_ref().map(|d| d.sheet.clone());
                     self.doc_du_lieu(Some(ui.ctx()), sheet);
                 }
+                let co = self.du_lieu.is_some();
+                let nut_xo = ui.add_enabled(co, egui::Button::new("").min_size(egui::vec2(RONG_NUT_XO, 26.0)));
+                let c = nut_xo.rect.center();
+                let mau = if co { Color32::from_gray(0x55) } else { CHU_MO };
+                let (a, b) = if self.xem_dong { (2.0, -2.5) } else { (-2.0, 2.5) };
+                ui.painter().add(egui::Shape::line(vec![c + egui::vec2(-4.5, a), c + egui::vec2(0.0, b), c + egui::vec2(4.5, a)], Stroke::new(1.3, mau)));
+                nut_xo.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, co, "Xem dòng tiêu đề"));
+                if nut_xo.on_hover_text("Xem dòng tiêu đề và dòng dữ liệu đầu — kiểm tra chọn đúng Dòng tiêu đề").on_disabled_hover_text("Chọn file biên mục trước").clicked() {
+                    self.xem_dong = !self.xem_dong;
+                }
             });
         });
+        if self.xem_dong {
+            if let Some(d) = &self.du_lieu {
+                Self::xem_hai_dong(ui, d, self.dong_tieu_de());
+            }
+        }
         ui.add_space(8.0 - ui.spacing().item_spacing.y);
         ui.horizontal(|ui| {
             let nhan_mau = Self::nhan_co_dinh(ui, "Mẫu mục lục:");
@@ -531,7 +609,7 @@ impl ManMucLuc {
             let mut chon = None;
             ui.add_enabled_ui(!khoa, |ui| {
                 kieu_o_chon(ui, Color32::WHITE, VIEN);
-                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(mui_ten_chon).width(w - 8.0).selected_text(ten_mau(&self.mau_chon)).show_ui(ui, |ui| {
+                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(mui_ten_chon).width(w).selected_text(ten_mau(&self.mau_chon)).show_ui(ui, |ui| {
                     for (i, (ten, _)) in mau::MAU_CO_SAN.iter().enumerate() {
                         let ma = (i + 1).to_string();
                         if ui.selectable_label(self.mau_chon == ma, *ten).clicked() {
@@ -544,6 +622,9 @@ impl ManMucLuc {
                 });
                 let o = ph.response.rect;
                 ph.response.labelled_by(nhan_mau.id);
+                if self.mau_chon.is_empty() {
+                    return;
+                }
                 // Link "Lưu mẫu" ở đuôi ô chọn mẫu, trước mũi tên: chữ xám, rê chuột → đen + gạch chân
                 let f = egui::FontId::proportional(12.0);
                 let rong_chu = ui.fonts_mut(|x| x.layout_no_wrap("Lưu mẫu".into(), f.clone(), CHU).size().x);
@@ -568,6 +649,7 @@ impl ManMucLuc {
             if let Some(ma) = chon {
                 self.mau_chon = ma;
                 self.cfg_doi = true;
+                self.tab = Tab::Mau;
                 self.nap_mau();
             }
             if ui.add_enabled(!khoa && self.chon_mau.is_none(), nut("Chọn")).on_hover_text("Chọn mẫu DOCX riêng của đơn vị").clicked() {
@@ -888,6 +970,13 @@ impl ManMucLuc {
                     }
                 }
                 None if self.doc_nen.is_some() => job.append("Đang đọc file biên mục…", 0.0, thuong.clone()),
+                None if self.mau_chon.is_empty() && self.du_lieu.is_some() => {
+                    job.append("Đã đọc ", 0.0, thuong.clone());
+                    job.append(&so_nguyen(self.du_lieu.as_ref().map_or(0, |d| d.bang.dong.len())), 0.0, dam.clone());
+                    job.append(" dòng dữ liệu · chọn ", 0.0, thuong.clone());
+                    job.append("Mẫu mục lục", 0.0, dam.clone());
+                    job.append(" để tiếp tục", 0.0, thuong.clone());
+                }
                 None => {}
             }
             if !job.text.is_empty() {
@@ -976,6 +1065,10 @@ pub(crate) mod tests {
             self.ap_rang_buoc();
         }
 
+        pub fn mo_xem_dong_thu(&mut self) {
+            self.xem_dong = true;
+        }
+
         pub fn mo_hop_ghep_thu(&mut self) {
             self.mo_hop_ghep();
             self.mo_hop = Some("nguoi_lap".into());
@@ -996,9 +1089,21 @@ pub(crate) mod tests {
         let kt = crate::license::KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(5, han_ml)));
         kt.mo_app();
         kt.moc().recv().unwrap();
-        let mut m = ManMucLuc { license: kt, ..ManMucLuc::tu_cau_hinh(&CauHinhMucLuc::default()) };
+        let mut m = ManMucLuc { license: kt, ..ManMucLuc::tu_cau_hinh(&CauHinhMucLuc { mau: "1".into(), ..Default::default() }) };
         m.nap_thu(&fixture(), "Bien muc", 4);
         m
+    }
+
+    #[test]
+    fn mac_dinh_chua_chon_mau() {
+        let mut m = ManMucLuc::tu_cau_hinh(&CauHinhMucLuc::default());
+        assert!(m.mau_chon.is_empty() && m.mau.is_none() && m.loi_mau.is_none());
+        m.nap_thu(&fixture(), "Bien muc", 4);
+        assert!(!m.co_du_lieu() && m.kq.ho_so.is_empty(), "đọc Excel không tự chọn mẫu");
+        assert_eq!(ten_mau(""), "— Chọn mẫu mục lục —");
+        m.mau_chon = "1".into();
+        m.nap_mau();
+        assert!(m.co_du_lieu() && !m.kq.ho_so.is_empty());
     }
 
     fn thu_muc(ten: &str) -> PathBuf {

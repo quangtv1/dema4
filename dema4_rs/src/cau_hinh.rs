@@ -117,7 +117,8 @@ impl Default for CauHinhMucLuc {
             file: String::new(),
             sheet: String::new(),
             dong_tieu_de: 1,
-            mau: "1".into(),
+            // Trống = chưa chọn mẫu (người dùng tự chọn)
+            mau: String::new(),
             bien: String::new(),
         }
     }

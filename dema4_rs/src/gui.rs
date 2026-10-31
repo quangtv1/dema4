@@ -2018,6 +2018,10 @@ mod tests {
         h.render().unwrap().save(thu_muc_anh.join("ml_1_mo_dau.png")).unwrap();
         let mut h = tao(true);
         h.render().unwrap().save(thu_muc_anh.join("ml_2_mau.png")).unwrap();
+        h.state_mut().muc_luc.mo_xem_dong_thu();
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_7_xem_dong.png")).unwrap();
+        let mut h = tao(true);
         h.state_mut().muc_luc.mo = Some("nguoi_lap".into());
         h.run_steps(3);
         h.render().unwrap().save(thu_muc_anh.join("ml_3_sua_nguon.png")).unwrap();
