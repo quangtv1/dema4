@@ -114,26 +114,30 @@
   .gioithieu.pt > *:not(.nhan-pt) { opacity:.4; }
   .nhan-pt { display:inline-block; background:#D9822B; color:#fff; font-weight:bold; font-size:12px; padding:5px 14px; border-radius:999px; margin:0 0 10px; letter-spacing:.2px; }
   /* Trang chủ: 4 thẻ chức năng (logo + tên), rê chuột hiện tóm tắt mục đích; logo Sao Mai góc dưới trái */
-  #manTrangChu { align-items:center; justify-content:flex-start; padding-top:40px; position:relative; background:#fff; margin:0 -12px; }
-  .tc-dau { text-align:center; margin-bottom:30px; }
-  .tc-dau .logo-dinh { display:inline-block; width:96px; margin-bottom:12px; } .tc-dau .logo-dinh img { width:100%; height:auto; display:block; }
+  #manTrangChu { align-items:center; justify-content:center; padding-top:0; padding-bottom:44px; position:relative; background:#fff; margin:0 -12px; }
+  /* Đầu trang chủ: logo Sao Mai bên trái, vạch dọc mảnh, tên + mô tả bên phải — một khối căn giữa */
+  .tc-dau { display:flex; align-items:center; gap:22px; margin-bottom:34px; }
+  .tc-dau .logo-dinh { display:block; width:84px; flex-shrink:0; } .tc-dau .logo-dinh img { width:100%; height:auto; display:block; }
+  .tc-dau .vach { width:1px; align-self:stretch; background:var(--vien-nhat); }
+  .tc-dau .chu { text-align:left; }
+  .tc-dau .chu small { display:block; color:var(--cobalt); font-size:11.5px; font-weight:bold; letter-spacing:.6px; margin-bottom:4px; }
   /* Thanh đáy trang chủ: phiên bản app căn phải */
   .tc-day { position:absolute; left:0; right:0; bottom:0; height:30px; display:flex; align-items:center; justify-content:flex-end; padding:0 28px; background:var(--nen); border-top:1px solid var(--vien-nhat); font-size:12px; color:var(--chu-phu); }
   .tc-day b { color:var(--chu); font-weight:normal; margin-left:4px; }
   .tc-day { justify-content:space-between; gap:18px; } .tc-day > span { display:flex; gap:16px; align-items:center; }
   .tc-day a { color:var(--chu-phu); text-decoration:none; } .tc-day a:hover { color:var(--cobalt); text-decoration:underline; }
   /* Dải điểm nổi bật dưới các ô chức năng */
-  .tc-diem { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px 34px; margin-top:56px; padding-top:22px; border-top:1px solid var(--vien-nhat); width:780px; }
+  .tc-diem { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px 34px; margin-top:64px; padding-top:24px; border-top:1px solid var(--vien-nhat); width:780px; }
   .tc-diem div { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--chu-phu); line-height:1.4; }
   .tc-diem svg { width:22px; height:22px; flex-shrink:0; fill:none; stroke:#3C4858; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
   .tc-diem b { color:var(--chu); display:block; font-size:12.5px; }
   .tc-dau small { display:block; color:var(--chu-phu); font-size:12px; letter-spacing:.3px; margin-bottom:6px; }
-  .tc-dau h1 { font-size:20px; margin:0 0 6px; }
+  .tc-dau h1 { font-size:22px; margin:0 0 6px; }
   .tc-dau p { margin:0; color:var(--chu-phu); font-size:12.5px; }
   .tc-luoi { display:flex; gap:22px; justify-content:center; }
-  .tc-the { position:relative; width:148px; height:148px; background:#fff; border:1px solid var(--vien); border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; cursor:pointer; transition:border-color .15s, box-shadow .15s, transform .15s; font:inherit; color:var(--chu); }
-  .tc-the svg { width:60px; height:60px; fill:none; stroke:#3C4858; stroke-linejoin:round; stroke-linecap:round; transition:stroke .15s; }
-  .tc-the b { font-size:14px; }
+  .tc-the { position:relative; width:132px; height:128px; background:#fff; border:1px solid var(--vien); border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; cursor:pointer; transition:border-color .15s, box-shadow .15s, transform .15s; font:inherit; color:var(--chu); }
+  .tc-the svg { width:46px; height:46px; fill:none; stroke:#3C4858; stroke-linejoin:round; stroke-linecap:round; transition:stroke .15s; }
+  .tc-the b { font-size:13.5px; }
   .tc-the:hover, .tc-the:focus-visible { border-color:var(--cobalt); box-shadow:0 6px 18px rgba(0,71,171,.12); transform:translateY(-2px); outline:none; }
   .tc-the:hover svg, .tc-the:focus-visible svg { stroke:var(--cobalt); }
   .tc-the .tom { position:absolute; left:50%; top:calc(100% + 12px); width:236px; transform:translate(-50%, 4px); background:#2B3440; color:#fff; font-size:12px; line-height:1.5; text-align:left; padding:9px 12px; border-radius:5px; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; z-index:5; font-weight:normal; }
@@ -679,8 +683,12 @@
   <div class="man an" id="manTrangChu">
     <div class="tc-dau">
       <a class="logo-dinh" href="https://saomaiso.com" target="_blank" rel="noopener" title="saomaiso.com"><img alt="Sao Mai" class="logo-gt"></a>
-      <h1>Hỗ trợ số hoá hồ sơ</h1>
-      <p>Chọn chức năng để bắt đầu — rê chuột lên từng ô để xem tóm tắt.</p>
+      <span class="vach"></span>
+      <div class="chu">
+        <small>GIẢI PHÁP SỐ SAO MAI</small>
+        <h1>Hỗ trợ số hoá hồ sơ</h1>
+        <p>Đếm trang, tách văn bản, sinh mục lục cho hồ sơ số hoá.<br>Chọn chức năng để bắt đầu — rê chuột lên từng ô để xem tóm tắt.</p>
+      </div>
     </div>
     <div class="tc-luoi">
       <button class="tc-the" data-den="dem" aria-describedby="tom-dem"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M27 30V23H69V81H62" stroke-width="2.2"/><path d="M34 23V16H76V74H69" stroke-width="2.2"/><path d="M20 30H51L62 41V88H20Z" stroke-width="3"/><path d="M51 30V41H62" stroke-width="3"/><text x="41" y="69" text-anchor="middle" font-size="19" font-weight="bold" fill="#3C4858" stroke="none">A4</text></svg><b>Đếm trang A4</b><span class="tom" id="tom-dem" role="tooltip">Đếm số trang mọi PDF trong thư mục (cả thư mục con), phân loại khổ A0–A7 và quy đổi ra số trang A4; cảnh báo trang sát ngưỡng, DPI bất thường, file đã ký số.</span></button>
