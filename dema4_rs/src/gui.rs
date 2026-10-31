@@ -61,7 +61,10 @@ enum Man {
     Dem,
     Tach,
     MucLuc,
+    BocTach,
+    ChuanTen,
     Ky,
+    Aip,
 }
 
 impl Man {
@@ -71,7 +74,10 @@ impl Man {
             Man::Dem => TIEU_DE,
             Man::Tach => "Tách văn bản PDF (Giải pháp số Sao Mai)",
             Man::MucLuc => crate::gui_muc_luc::TIEU_DE,
+            Man::BocTach => "Bóc tách dữ liệu (Giải pháp số Sao Mai)",
+            Man::ChuanTen => "Chuẩn hoá tên (Giải pháp số Sao Mai)",
             Man::Ky => "Ký văn bản (Giải pháp số Sao Mai)",
+            Man::Aip => "Đóng gói AIP (Giải pháp số Sao Mai)",
         }
     }
 }
@@ -230,7 +236,7 @@ impl UngDungChinh {
                 ui.add_enabled_ui(!khoa, |ui| {
                     egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::MenuLuoi, 14.0, xam), "Chức năng", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
-                        for (man, ten, icon) in [(Man::TrangChu, "Trang chủ", BieuTuong::TrangChu), (Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
+                        for (man, ten, icon) in [(Man::TrangChu, "Trang chủ", BieuTuong::TrangChu), (Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::BocTach, "Bóc tách dữ liệu", BieuTuong::BocTach), (Man::ChuanTen, "Chuẩn hoá tên", BieuTuong::ChuanTen), (Man::Ky, "Ký văn bản", BieuTuong::But), (Man::Aip, "Đóng gói AIP", BieuTuong::GoiAip)] {
                             if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
                                 self.chuyen_man(man);
                                 ui.close();
@@ -308,7 +314,10 @@ impl eframe::App for UngDungChinh {
                         ChonChucNang::Dem => Man::Dem,
                         ChonChucNang::Tach => Man::Tach,
                         ChonChucNang::MucLuc => Man::MucLuc,
+                        ChonChucNang::BocTach => Man::BocTach,
+                        ChonChucNang::ChuanTen => Man::ChuanTen,
                         ChonChucNang::Ky => Man::Ky,
+                        ChonChucNang::Aip => Man::Aip,
                     });
                 }
             }
@@ -327,9 +336,16 @@ impl eframe::App for UngDungChinh {
                     let _ = crate::cau_hinh::ghi(&self.cfg);
                 }
             }
-            Man::Ky => {
+            // Chức năng đang phát triển: chỉ màn giới thiệu (mờ, nhãn ĐANG PHÁT TRIỂN)
+            Man::BocTach | Man::ChuanTen | Man::Ky | Man::Aip => {
+                let gt = match self.man {
+                    Man::BocTach => &crate::gioi_thieu::BOC_TACH,
+                    Man::ChuanTen => &crate::gioi_thieu::CHUAN_TEN,
+                    Man::Aip => &crate::gioi_thieu::AIP,
+                    _ => &crate::gioi_thieu::KY,
+                };
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN)).show(ui, |ui| {
-                    crate::gioi_thieu::ve(ui, &crate::gioi_thieu::KY);
+                    crate::gioi_thieu::ve(ui, gt);
                 });
             }
         }
@@ -2130,8 +2146,11 @@ mod tests {
     #[ignore = "cần GPU"]
     fn chup_gioi_thieu() {
         let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
-        for (man, ten) in [(Man::TrangChu, "gt_trang_chu.png"), (Man::Dem, "gt_dem.png"), (Man::Tach, "gt_tach.png"), (Man::MucLuc, "gt_muc_luc.png"), (Man::Ky, "gt_ky.png")] {
-            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
+        for (man, ten) in [(Man::TrangChu, "gt_trang_chu.png"), (Man::Dem, "gt_dem.png"), (Man::Tach, "gt_tach.png"), (Man::MucLuc, "gt_muc_luc.png"), (Man::BocTach, "gt_boc_tach.png"), (Man::ChuanTen, "gt_chuan_ten.png"), (Man::Ky, "gt_ky.png"), (Man::Aip, "gt_aip.png")] {
+            // DEMA4_RONG / DEMA4_CAO: thử cỡ cửa sổ khác (mặc định app 1100 × 720)
+            let rong = std::env::var("DEMA4_RONG").ok().and_then(|v| v.parse().ok()).unwrap_or(1240.0);
+            let cao = std::env::var("DEMA4_CAO").ok().and_then(|v| v.parse().ok()).unwrap_or(820.0);
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(rong, cao)).with_pixels_per_point(1.5).build_eframe(move |cc| {
                 cai_giao_dien(&cc.egui_ctx);
                 UngDungChinh { man, cfg: crate::cau_hinh::CauHinh::default(), muc_luc: crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()), trang_chu: crate::trang_chu::TrangChu::thu("192.168.1.5"), ..Default::default() }
             });

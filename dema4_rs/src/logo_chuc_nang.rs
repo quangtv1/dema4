@@ -1,6 +1,7 @@
 //! Logo lớn của từng chức năng (màn giới thiệu): nét mảnh một màu kiểu cổ điển, không nền —
 //! Đếm trang A4 (chồng trang + "A4"), Tách văn bản (một văn bản rẽ nhánh thành hai),
-//! Sinh mục lục (trang danh sách đánh số), Ký văn bản (trang có chữ ký + bút).
+//! Sinh mục lục (trang danh sách đánh số), Bóc tách dữ liệu (văn bản → bảng), Chuẩn hoá tên (văn bản + ô tên có con trỏ),
+//! Ký văn bản (trang có chữ ký + bút), Đóng gói AIP (hộp gói).
 //! Các nét không chồng lên nhau nên không cần tô nền che (đặt được trên nền trắng hay xám).
 
 use eframe::egui::{self, Color32, Pos2, Rect, Shape, Stroke};
@@ -10,7 +11,10 @@ pub enum Logo {
     Dem,
     Tach,
     MucLuc,
+    BocTach,
+    ChuanTen,
     Ky,
+    Aip,
 }
 
 /// Màu nét chung của mọi logo.
@@ -82,6 +86,42 @@ pub fn ve_mau(p: &egui::Painter, o: Rect, logo: Logo, mau: Color32) {
                     p.circle_filled(q(0.61 + k as f32 * 0.035, y), s * 0.009, mau);
                 }
             }
+        }
+        Logo::BocTach => {
+            // Văn bản có dòng chữ → mũi tên → bảng 3 hàng 2 cột
+            trang(p, hcn(0.12, 0.14, 0.50, 0.86), s * 0.10, net);
+            for (y, x1) in [(0.36, 0.40), (0.46, 0.43), (0.56, 0.36), (0.66, 0.42)] {
+                p.line_segment([q(0.19, y), q(x1, y)], net_manh);
+            }
+            p.line_segment([q(0.54, 0.50), q(0.62, 0.50)], net);
+            p.add(Shape::line(vec![q(0.58, 0.45), q(0.63, 0.50), q(0.58, 0.55)], net));
+            p.rect_stroke(hcn(0.67, 0.30, 0.92, 0.70), 1.5, net, egui::StrokeKind::Middle);
+            for y in [0.433, 0.566] {
+                p.line_segment([q(0.67, y), q(0.92, y)], net_manh);
+            }
+            p.line_segment([q(0.77, 0.30), q(0.77, 0.70)], net_manh);
+        }
+        Logo::ChuanTen => {
+            // Văn bản có dòng chữ + ô tên có con trỏ gõ chữ (chữ I)
+            trang(p, hcn(0.12, 0.12, 0.50, 0.86), s * 0.10, net);
+            for (y, x1) in [(0.32, 0.38), (0.41, 0.42), (0.50, 0.34)] {
+                p.line_segment([q(0.19, y), q(x1, y)], net_manh);
+            }
+            p.rect_stroke(hcn(0.38, 0.58, 0.88, 0.78), 2.0, net, egui::StrokeKind::Middle);
+            p.line_segment([q(0.45, 0.68), q(0.66, 0.68)], net_manh);
+            p.line_segment([q(0.76, 0.61), q(0.76, 0.75)], net_manh);
+            for y in [0.61, 0.75] {
+                p.line_segment([q(0.73, y), q(0.79, y)], net_manh);
+            }
+        }
+        Logo::Aip => {
+            // Hộp gói nhìn nghiêng: nắp, cạnh giữa, dây buộc, nhãn 2 vạch
+            p.add(Shape::closed_line(vec![q(0.18, 0.34), q(0.50, 0.20), q(0.82, 0.34), q(0.82, 0.70), q(0.50, 0.84), q(0.18, 0.70)], net));
+            p.add(Shape::line(vec![q(0.18, 0.34), q(0.50, 0.48), q(0.82, 0.34)], net));
+            p.line_segment([q(0.50, 0.48), q(0.50, 0.84)], net);
+            p.add(Shape::line(vec![q(0.34, 0.27), q(0.66, 0.41), q(0.66, 0.52)], net_manh));
+            p.line_segment([q(0.26, 0.58), q(0.40, 0.64)], net_manh);
+            p.line_segment([q(0.26, 0.66), q(0.36, 0.70)], net_manh);
         }
         Logo::Ky => {
             // Trang có dòng chữ + chữ ký lượn sóng trên dòng ký; bút đặt ngoài mép phải, ngòi chạm cuối chữ ký

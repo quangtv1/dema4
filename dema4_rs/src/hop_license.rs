@@ -100,7 +100,7 @@ impl HopLicense {
             egui::Frame::new().inner_margin(Margin { left: LE as i8, right: LE as i8, top: 8, bottom: 14 }).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.spacing_mut().item_spacing.y = 7.0;
-                let mailto = format!("mailto:{EMAIL}?subject={}", ma_url(&format!("Cấp lượt dùng dema4 - {ma}")));
+                let mailto = format!("mailto:{EMAIL}?subject={}", ma_url(&format!("Cấp lượt chạy dema4 - {ma}")));
                 let dong: [(&'static str, &str, Option<&str>, bool); 4] = [
                     ("Mã máy", &ma, None, true),
                     ("Điện thoại", DIEN_THOAI, None, true),

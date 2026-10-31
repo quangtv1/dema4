@@ -1,4 +1,4 @@
-//! Màn mở mặc định (chưa có dữ liệu) của Đếm trang A4 / Tách văn bản / Sinh mục lục / Ký văn bản: tên chức năng, mô tả ngắn,
+//! Màn mở mặc định (chưa có dữ liệu) của từng chức năng (Đếm, Tách, Sinh mục lục; Bóc tách, Chuẩn hoá tên, Ký, Đóng gói AIP đang phát triển): tên chức năng, mô tả ngắn,
 //! 3 bước trong 3 thẻ vuông (vạch xanh mảnh mép trên, số thứ tự ô xám); logo nhỏ góc dưới phải về Trang chủ.
 //! Link trong lời giới thiệu ("Chọn", "Phân tích") trả về `Bam` để màn gọi đúng việc như bấm nút.
 
@@ -86,6 +86,45 @@ pub const KY: GioiThieu = GioiThieu {
     ],
     kho: false,
     logo: Logo::Ky,
+    dang_phat_trien: true,
+};
+
+pub const BOC_TACH: GioiThieu = GioiThieu {
+    tieu_de: "Bóc tách dữ liệu",
+    mo_ta: "Đọc văn bản PDF bằng AI để lấy số ký hiệu, ngày tháng, trích yếu, cơ quan ban hành, người ký…; kết quả ghi ra Excel và Google Sheet, dùng làm file biên mục cho Sinh mục lục.",
+    buoc: [
+        Buoc { ten: "Chọn nguồn văn bản", than: &[Doan::Chu("Thư mục trên máy, Google Drive, Google Cloud Storage hoặc kho S3.")] },
+        Buoc { ten: "Chọn mô hình đọc", than: &[Doan::Chu("Máy chủ nội bộ, ChatGPT, Gemini, Claude…; khai khoá ở Cấu hình.")] },
+        Buoc { ten: "Chọn loại tài liệu", than: &[Doan::Chu("Xem, thử đọc các trường rồi bấm Bắt đầu.")] },
+    ],
+    kho: false,
+    logo: Logo::BocTach,
+    dang_phat_trien: true,
+};
+
+pub const CHUAN_TEN: GioiThieu = GioiThieu {
+    tieu_de: "Chuẩn hoá tên",
+    mo_ta: "Đổi tên hàng loạt file văn bản theo một quy tắc thống nhất, lấy thông tin từ kết quả Bóc tách (số ký hiệu, ngày, loại văn bản…); bỏ ký tự không hợp lệ, xem trước rồi mới đổi.",
+    buoc: [
+        Buoc { ten: "Chọn thư mục", than: &[Doan::Chu("Thư mục văn bản cần đổi tên và file kết quả Bóc tách tương ứng.")] },
+        Buoc { ten: "Đặt quy tắc tên", than: &[Doan::Chu("Ghép biến, vd {so_ky_hieu}_{ngay_thang}; bỏ dấu, thay ký tự cấm, xử lý trùng tên.")] },
+        Buoc { ten: "Xem trước, đổi tên", than: &[Doan::Chu("Bảng tên cũ → tên mới; đổi hàng loạt, ghi log đối chiếu để hoàn tác.")] },
+    ],
+    kho: false,
+    logo: Logo::ChuanTen,
+    dang_phat_trien: true,
+};
+
+pub const AIP: GioiThieu = GioiThieu {
+    tieu_de: "Đóng gói AIP",
+    mo_ta: "Đóng gói hồ sơ lưu trữ thông tin số (AIP) để nộp lưu: gom văn bản PDF, siêu dữ liệu (kết quả Bóc tách) và mục lục thành gói chuẩn, kèm mã kiểm tra toàn vẹn.",
+    buoc: [
+        Buoc { ten: "Chọn hồ sơ", than: &[Doan::Chu("Thư mục văn bản đã tách, file biên mục / kết quả bóc tách.")] },
+        Buoc { ten: "Kiểm tra", than: &[Doan::Chu("Đủ văn bản, đủ siêu dữ liệu bắt buộc, định dạng PDF/A, chữ ký số.")] },
+        Buoc { ten: "Đóng gói", than: &[Doan::Chu("Tạo gói AIP cho từng hồ sơ, ghi mã kiểm tra, báo hồ sơ lỗi.")] },
+    ],
+    kho: false,
+    logo: Logo::Aip,
     dang_phat_trien: true,
 };
 

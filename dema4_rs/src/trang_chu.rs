@@ -1,5 +1,5 @@
 //! Trang chủ (màn mở mặc định): dải đầu nền xanh nhạt có lưới chấm (logo Sao Mai, tên, lời mời chọn chức năng),
-//! 4 ô chức năng (logo nét mảnh + tên; rê chuột → viền xanh + bong bóng tóm tắt; Ký văn bản mờ, nhãn "Đang phát triển"),
+//! 7 ô chức năng, mỗi hàng 4 (logo nét mảnh + tên; rê chuột → viền xanh + bong bóng tóm tắt; chức năng đang phát triển mờ, nhãn "Đang phát triển"),
 //! lưới 6 thông tin ngắn, thanh đáy: website · email | tên PC · MAC · IP · phiên bản.
 
 use eframe::egui::{self, Color32, Rect, Sense, Stroke, StrokeKind};
@@ -14,7 +14,10 @@ pub enum ChonChucNang {
     Dem,
     Tach,
     MucLuc,
+    BocTach,
+    ChuanTen,
     Ky,
+    Aip,
 }
 
 const TIEU_DE: &str = "Hỗ trợ nghiệp vụ số hóa tài liệu";
@@ -23,6 +26,8 @@ const CAO_DAY: f32 = 30.0;
 const RONG_O: f32 = 132.0;
 const CAO_O: f32 = 128.0;
 const KHE_O: f32 = 22.0;
+const KHE_HANG: f32 = 18.0;
+const O_MOI_HANG: usize = 4;
 const CO_LOGO: f32 = 46.0;
 const MAU_NET: Color32 = Color32::from_rgb(0x3C, 0x48, 0x58);
 const NEN_DAU: Color32 = Color32::from_rgb(0xF3, 0xF6, 0xFB);
@@ -38,11 +43,14 @@ struct O {
     dang_phat_trien: bool,
 }
 
-const CAC_O: [O; 4] = [
+const CAC_O: [O; 7] = [
     O { cn: ChonChucNang::Dem, logo: Logo::Dem, ten: "Đếm trang A4", tom: "Đếm số trang mọi PDF trong thư mục (cả thư mục con), phân loại khổ A0–A7 và quy đổi ra số trang A4; cảnh báo trang sát ngưỡng, DPI bất thường, file đã ký số.", dang_phat_trien: false },
     O { cn: ChonChucNang::Tach, logo: Logo::Tach, ten: "Tách văn bản", tom: "Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng, gợi ý trang bị xoay; người duyệt nhãn trước khi tách.", dang_phat_trien: false },
     O { cn: ChonChucNang::MucLuc, logo: Logo::MucLuc, ten: "Sinh mục lục", tom: "Sinh mục lục văn bản cho từng hồ sơ từ file biên mục Excel/CSV theo mẫu DOCX của đơn vị; xem trước từng hồ sơ, xuất DOCX hàng loạt.", dang_phat_trien: false },
+    O { cn: ChonChucNang::BocTach, logo: Logo::BocTach, ten: "Bóc tách dữ liệu", tom: "Đọc văn bản PDF bằng AI (máy chủ nội bộ, ChatGPT, Gemini, Claude) để lấy số ký hiệu, ngày, trích yếu, cơ quan ban hành, người ký; ghi ra Excel và Google Sheet. Chức năng đang phát triển.", dang_phat_trien: true },
+    O { cn: ChonChucNang::ChuanTen, logo: Logo::ChuanTen, ten: "Chuẩn hoá tên", tom: "Đổi tên hàng loạt file văn bản theo quy tắc thống nhất (số ký hiệu, ngày, loại văn bản… lấy từ kết quả Bóc tách); xem trước trước khi đổi. Chức năng đang phát triển.", dang_phat_trien: true },
     O { cn: ChonChucNang::Ky, logo: Logo::Ky, ten: "Ký văn bản", tom: "Ký số hàng loạt văn bản PDF đã tách bằng chứng thư số của đơn vị, chèn hình chữ ký. Chức năng đang phát triển.", dang_phat_trien: true },
+    O { cn: ChonChucNang::Aip, logo: Logo::Aip, ten: "Đóng gói AIP", tom: "Đóng gói hồ sơ lưu trữ thông tin số (AIP): gom văn bản PDF, siêu dữ liệu và mục lục thành gói chuẩn, kiểm tra toàn vẹn. Chức năng đang phát triển.", dang_phat_trien: true },
 ];
 
 /// Thông tin máy cho thanh đáy — đọc 1 lần khi dựng Trang chủ (IP nội bộ: hỏi hệ điều hành, không gửi gói tin).
@@ -76,11 +84,14 @@ impl TrangChu {
             let dau = Rect::from_min_size(vung.min, egui::vec2(vung.width(), CAO_DAU));
             dai_dau(ui, dau);
             let y_o = dau.bottom() + 46.0;
-            let rong_hang = 4.0 * RONG_O + 3.0 * KHE_O;
+            // Mỗi hàng 4 ô, hàng cuối căn trái thẳng cột hàng trên
+            let rong_hang = O_MOI_HANG as f32 * RONG_O + (O_MOI_HANG - 1) as f32 * KHE_O;
             let x0 = vung.center().x - rong_hang / 2.0;
+            let so_hang = CAC_O.len().div_ceil(O_MOI_HANG);
             let mut tom = None;
             for (i, o) in CAC_O.iter().enumerate() {
-                let r = Rect::from_min_size(egui::pos2(x0 + i as f32 * (RONG_O + KHE_O), y_o), egui::vec2(RONG_O, CAO_O));
+                let (hang, cot) = (i / O_MOI_HANG, i % O_MOI_HANG);
+                let r = Rect::from_min_size(egui::pos2(x0 + cot as f32 * (RONG_O + KHE_O), y_o + hang as f32 * (CAO_O + KHE_HANG)), egui::vec2(RONG_O, CAO_O));
                 let ph = ui.interact(r, ui.scope_id().with(("tc_o", i)), Sense::click());
                 ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, o.ten));
                 let re = ph.hovered() || ph.has_focus();
@@ -92,7 +103,7 @@ impl TrangChu {
                     chon = Some(o.cn);
                 }
             }
-            luoi_thong_tin(ui, vung.center().x, y_o + CAO_O + 44.0, license);
+            luoi_thong_tin(ui, vung.center().x, y_o + so_hang as f32 * CAO_O + (so_hang - 1) as f32 * KHE_HANG + 44.0, license);
             if let Some((r, chu)) = tom {
                 bong_bong(ui, r, chu);
             }
@@ -218,8 +229,8 @@ fn luoi_thong_tin(ui: &egui::Ui, giua: f32, y: f32, license: &crate::license::Ki
     let rong_ke = 780.0_f32.min(ui.max_rect().width() - 40.0);
     p.hline(egui::Rangef::new(giua - rong_ke / 2.0, giua + rong_ke / 2.0), y, Stroke::new(1.0, VIEN_NHAT));
     let luot = match license.luot() {
-        Some((dung, han)) => format!("Lượt dùng {dung} / {han}"),
-        None => "Lượt dùng".into(),
+        Some((dung, han)) => format!("Lượt chạy {dung} / {han}"),
+        None => "Lượt chạy".into(),
     };
     let muc: [(BieuTuong, String, &str); 6] = [
         (BieuTuong::ManHinh, "Xử lý ngay trên máy".into(), "File PDF / Excel không tải lên mạng"),
@@ -269,7 +280,7 @@ mod tests {
             }
         });
         h.run();
-        for (ten, cn) in [("Đếm trang A4", ChonChucNang::Dem), ("Tách văn bản", ChonChucNang::Tach), ("Sinh mục lục", ChonChucNang::MucLuc), ("Ký văn bản", ChonChucNang::Ky)] {
+        for (ten, cn) in [("Đếm trang A4", ChonChucNang::Dem), ("Tách văn bản", ChonChucNang::Tach), ("Sinh mục lục", ChonChucNang::MucLuc), ("Bóc tách dữ liệu", ChonChucNang::BocTach), ("Chuẩn hoá tên", ChonChucNang::ChuanTen), ("Ký văn bản", ChonChucNang::Ky), ("Đóng gói AIP", ChonChucNang::Aip)] {
             h.get_by_label(ten).click();
             h.run();
             assert_eq!(chon.take(), Some(cn), "{ten}");

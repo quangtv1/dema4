@@ -17,10 +17,13 @@ pub enum BieuTuong {
     ThongTin,
     CapNhat,
     HoiDap,
-    /// Menu Chức năng: Đếm (file-text), Tách (scissors), Ký (pen)
+    /// Menu Chức năng: Đếm (file-text), Tách (scissors), Ký (pen), Bóc tách (trang + bảng), Chuẩn hoá tên (trang + ô tên), Đóng gói AIP (hộp)
     TaiLieu,
     Keo,
     But,
+    BocTach,
+    ChuanTen,
+    GoiAip,
     /// Tab Văn bản / hộp phóng to
     TraiChevron,
     PhaiChevron,
@@ -119,14 +122,17 @@ fn svg_cua(bt: BieuTuong) -> Option<(&'static str, u8, f32)> {
         ManHinh => (r#"<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/>"#, 24, 1.5),
         Khien => (r#"<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>"#, 24, 1.5),
         DongHo => (r#"<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>"#, 24, 1.5),
+        BocTach => (r#"<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 3v5h5"/><rect x="13" y="12" width="8" height="9" rx="1"/><path d="M13 16.5h8M17 12v9"/>"#, 24, 1.8),
+        ChuanTen => (r#"<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M14 3v5h5"/><rect x="11" y="13" width="10" height="6" rx="1"/><path d="M18.5 14.5v3"/>"#, 24, 1.8),
+        GoiAip => (r#"<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>"#, 24, 1.8),
         DongLenh => (r#"<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7 9l3 3-3 3M12 15h5"/>"#, 24, 1.5),
     })
 }
 
-const TAT_CA: [BieuTuong; 49] = {
+const TAT_CA: [BieuTuong; 52] = {
     use BieuTuong::*;
     [
-        Dau, MuiTenXuong, HoanTac, LamLai, XoayPhai, Xoay180, ThongTin, CapNhat, HoiDap, TaiLieu, Keo, But, TraiChevron, PhaiChevron, Luoi, MotTrang, HaiTrang, BoKhoi, Dong, ChevronXuong, KinhTru, KinhCong, SapXep, MenuLuoi,
+        Dau, MuiTenXuong, HoanTac, LamLai, XoayPhai, Xoay180, ThongTin, CapNhat, HoiDap, TaiLieu, Keo, But, BocTach, ChuanTen, GoiAip, TraiChevron, PhaiChevron, Luoi, MotTrang, HaiTrang, BoKhoi, Dong, ChevronXuong, KinhTru, KinhCong, SapXep, MenuLuoi,
         BanhRang, ChongTrang, MaVach, TrangTrong, TrangHoi, XoayMenu, DanhSachSo, TangDan, GiamDan, ThungRac, TrangGach, ThuGon, MoRong, KinhLup, AnDong, HienDong, BoNhan, ChonTat, BoChon, KhoiPhuc,
         TrangChu, ManHinh, Khien, DongHo, DongLenh,
     ]
