@@ -380,8 +380,20 @@ impl ManMucLuc {
         self.kiem_tra_lai();
     }
 
-    /// Bỏ file biên mục đang chọn (mẫu giữ nguyên) — như lúc chưa chọn đường dẫn.
+    /// Về "chưa chọn mẫu": ô mẫu trống, trang mẫu / biến / kết quả để trắng.
+    fn bo_mau(&mut self) {
+        self.mau_chon.clear();
+        self.mau = None;
+        self.loi_mau = None;
+        self.mo = None;
+        self.sang = None;
+        self.tab = Tab::Mau;
+        self.cfg_doi = true;
+    }
+
+    /// Bỏ file biên mục đang chọn — dữ liệu, mẫu, kết quả để trắng như lúc chưa chọn đường dẫn.
     fn xoa_file(&mut self) {
+        self.bo_mau();
         self.file.clear();
         self.du_lieu = None;
         self.loi_doc = None;
@@ -415,6 +427,8 @@ impl ManMucLuc {
                     if let Some(p) = p {
                         self.file = p.display().to_string();
                         self.cfg_doi = true;
+                        // File mới: người dùng tự chọn mẫu lại (không mang mẫu cũ sang)
+                        self.bo_mau();
                         self.doc_du_lieu(Some(ctx), None);
                     }
                 }
@@ -619,22 +633,13 @@ impl ManMucLuc {
         ui.horizontal(|ui| {
             let nhan = Self::nhan_co_dinh(ui, "File biên mục:");
             let w = rong_o(ui);
-            let r = ui.add_enabled(!khoa, egui::TextEdit::singleline(&mut self.file).hint_text("Chọn file Excel (.xlsx .xlsb .xls) hoặc CSV").desired_width(w).margin(Margin { left: 14, right: 26, top: 4, bottom: 4 })).labelled_by(nhan.id);
+            let r = ui.add_enabled(!khoa, egui::TextEdit::singleline(&mut self.file).hint_text("Chọn file Excel (.xlsx .xlsb .xls) hoặc CSV").desired_width(w).margin(Margin { left: 14, ..crate::gui::LE_O_CO_NUT_XOA })).labelled_by(nhan.id);
             // Nút ⓧ cuối ô đường dẫn: xoá file đã chọn, về trạng thái chưa chọn
-            if !khoa && !self.file.is_empty() {
-                let c = egui::pos2(r.rect.right() - 13.0, r.rect.center().y);
-                let ph = ui.interact(Rect::from_center_size(c, egui::vec2(20.0, 20.0)), ui.scope_id().with("ml_xoa_file"), Sense::click());
-                ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Xoá đường dẫn"));
-                let mau = if ph.hovered() { CHU } else { Color32::from_gray(0x99) };
-                let net = Stroke::new(1.2, mau);
-                ui.painter().circle_stroke(c, 7.0, net);
-                ui.painter().line_segment([c + egui::vec2(-3.0, -3.0), c + egui::vec2(3.0, 3.0)], net);
-                ui.painter().line_segment([c + egui::vec2(3.0, -3.0), c + egui::vec2(-3.0, 3.0)], net);
-                if ph.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Xoá đường dẫn").clicked() {
-                    self.xoa_file();
-                }
+            if !khoa && !self.file.is_empty() && crate::gui::nut_xoa_trong_o(ui, r.rect, "Xoá đường dẫn") {
+                self.xoa_file();
             }
             if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) && !self.file.trim().is_empty() {
+                self.bo_mau();
                 self.doc_du_lieu(Some(ui.ctx()), None);
             }
             if ui.add_enabled(!khoa && self.chon_file.is_none(), nut("Chọn")).clicked() {
@@ -1210,7 +1215,7 @@ pub(crate) mod tests {
         m.xem_dong = true;
         m.xoa_file();
         assert!(m.file.is_empty() && m.du_lieu.is_none() && !m.xem_dong && m.dong_dau.is_empty() && m.kq.ho_so.is_empty() && m.cfg_doi);
-        assert_eq!(m.mau_chon, "1", "mẫu giữ nguyên");
+        assert!(m.mau_chon.is_empty() && m.mau.is_none(), "mẫu cũng bỏ");
     }
 
     fn thu_muc(ten: &str) -> PathBuf {

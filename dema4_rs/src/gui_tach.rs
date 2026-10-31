@@ -1088,13 +1088,29 @@ impl ManTach {
         self.hop_tach(&ctx, cfg);
     }
 
+    /// ⓧ ở ô thư mục: lưu nhãn + cache của thư mục đang mở (như khi đổi thư mục) rồi trở về trạng thái lúc mới mở chức năng.
+    fn dat_lai(&mut self) {
+        if self.phien.is_some() {
+            if self.chua_luu() {
+                self.luu_nhan();
+            }
+            self.ghi_cache();
+        }
+        *self = ManTach { license: self.license.clone(), ..Default::default() };
+    }
+
     fn hang_thu_muc(&mut self, ui: &mut egui::Ui, ch: &CauHinhPhanTich) {
         let dang_chay = self.chay.is_some();
         ui.horizontal(|ui| {
             let nhan = ui.label("Thư mục hồ sơ PDF:");
             let khoa = dang_chay || self.tach.is_some();
-            let o = egui::TextEdit::singleline(&mut self.thu_muc).desired_width(ui.available_width() - 2.0 * 86.0 - 12.0);
+            let o = egui::TextEdit::singleline(&mut self.thu_muc).desired_width(ui.available_width() - 2.0 * 86.0 - 12.0).margin(crate::gui::LE_O_CO_NUT_XOA);
             let r = ui.add_enabled(!khoa, o).labelled_by(nhan.id);
+            if !khoa && !self.thu_muc.is_empty() && crate::gui::nut_xoa_trong_o(ui, r.rect, "Xoá thư mục") {
+                self.dat_lai();
+                ui.ctx().request_repaint();
+                return;
+            }
             // Gõ xong (rời ô / Enter) mới quét, tránh quét cả ổ khi đang gõ dở "G:\"
             self.dang_go_tm = r.has_focus();
             if ui.add_enabled(!khoa && self.chon_tm.is_none(), nut("Chọn")).clicked() {
@@ -2182,6 +2198,15 @@ pub(super) fn ve_net_dut(painter: &egui::Painter, r: Rect, net: Stroke, dai: f32
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dat_lai_ve_luc_mo_chuc_nang() {
+        let license = crate::license::KiemTra::mac_dinh();
+        let mut man = ManTach { thu_muc: "/khong/co".into(), tab: Tab::VanBan, trai_gon: true, license: license.clone(), ..Default::default() };
+        man.dat_lai();
+        assert!(man.thu_muc.is_empty() && man.tab == Tab::HoSo && !man.trai_gon && man.phien.is_none());
+        assert!(Arc::ptr_eq(&man.license, &license), "giữ license");
+    }
 
     /// Phân tích lần đầu (chưa có cache) đi lần lượt từ hồ sơ số 1 theo đúng thứ tự cột trái (thứ tự cây thư mục).
     #[test]

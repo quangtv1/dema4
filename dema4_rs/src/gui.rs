@@ -708,6 +708,21 @@ fn nut_copy(ui: &mut egui::Ui, bat: bool) -> egui::Response {
     }
 }
 
+/// Lề ô đường dẫn có nút ⓧ ở cuối (chừa chỗ bên phải để chữ không chạy dưới nút).
+pub(crate) const LE_O_CO_NUT_XOA: Margin = Margin { left: 8, right: 26, top: 4, bottom: 4 };
+
+/// Nút ⓧ (x trong vòng tròn) ở cuối ô đường dẫn `o`; true khi bấm. Rê chuột → đậm lên.
+pub(crate) fn nut_xoa_trong_o(ui: &mut egui::Ui, o: egui::Rect, ten: &str) -> bool {
+    let c = egui::pos2(o.right() - 13.0, o.center().y);
+    let ph = ui.interact(egui::Rect::from_center_size(c, egui::vec2(20.0, 20.0)), ui.scope_id().with(("nut_xoa_o", ten)), egui::Sense::click());
+    ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, ten));
+    let net = Stroke::new(1.2, if ph.hovered() { CHU } else { Color32::from_gray(0x99) });
+    ui.painter().circle_stroke(c, 7.0, net);
+    ui.painter().line_segment([c + egui::vec2(-3.0, -3.0), c + egui::vec2(3.0, 3.0)], net);
+    ui.painter().line_segment([c + egui::vec2(3.0, -3.0), c + egui::vec2(-3.0, 3.0)], net);
+    ph.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(ten).clicked()
+}
+
 pub(crate) fn nut(chu: &str) -> egui::Button<'static> {
     egui::Button::new(chu.to_owned()).min_size(egui::vec2(RONG_NUT, 26.0))
 }
@@ -933,8 +948,13 @@ impl UngDung {
             let ranh = self.dang_dem.is_none();
             let nhan = ui.label("Chọn thư mục pdf:");
             let rong_o = ui.available_width() - 2.0 * (RONG_NUT + ui.spacing().item_spacing.x);
-            let o = egui::TextEdit::singleline(&mut self.thu_muc).desired_width(rong_o).margin(Margin::symmetric(5, 4));
+            let o = egui::TextEdit::singleline(&mut self.thu_muc).desired_width(rong_o).margin(LE_O_CO_NUT_XOA);
             let phan_hoi = ui.add_enabled(ranh, o).labelled_by(nhan.id);
+            // ⓧ: bỏ thư mục, xoá kết quả — như lúc mới mở chức năng
+            if ranh && !self.thu_muc.is_empty() && nut_xoa_trong_o(ui, phan_hoi.rect, "Xoá thư mục") {
+                self.thu_muc.clear();
+                self.xoa_ket_qua();
+            }
             if ranh && phan_hoi.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                 self.bat_dau_dem(&ctx);
             }
@@ -1995,6 +2015,25 @@ mod tests {
     }
 
     /// Chụp màn Sinh mục lục (fixture trong repo): mở đầu, tab Mẫu, đang sửa nguồn, tab Kết quả, popup đã sinh.
+    /// Ô thư mục có nút ⓧ ở màn Đếm và Tách (đường dẫn giả, không cần dữ liệu mẫu).
+    /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_o_thu_muc
+    #[test]
+    #[ignore = "cần GPU"]
+    fn chup_o_thu_muc() {
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        for (man, ten) in [(Man::Dem, "o_dem.png"), (Man::Tach, "o_tach.png")] {
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 300.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                let mut app = UngDungChinh { man, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
+                app.dem.thu_muc = r"D:\SoHoa\Ho_so_PDF".into();
+                app.tach.thu_muc = r"D:\SoHoa\Ho_so_PDF".into();
+                app
+            });
+            h.run_steps(3);
+            h.render().unwrap().save(thu_muc_anh.join(ten)).unwrap();
+        }
+    }
+
     /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_man_muc_luc
     #[test]
     #[ignore = "cần GPU"]
