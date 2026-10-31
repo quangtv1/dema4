@@ -40,6 +40,7 @@ pub fn danh_sach_sheet(p: &Path) -> Result<Vec<String>, String> {
 }
 
 /// `dong_tieu_de`: số dòng vật lý (1-based) của hàng tiêu đề.
+#[cfg(test)]
 pub fn doc(p: &Path, sheet: Option<&str>, dong_tieu_de: usize) -> Result<BangDuLieu, String> {
     tu_ma_tran(doc_ma_tran(p, sheet, dong_tieu_de)?, dong_tieu_de)
 }
