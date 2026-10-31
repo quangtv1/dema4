@@ -6,6 +6,8 @@
 - **Tách văn bản**: tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã Code 128), bỏ trang trắng, gợi ý trang scan bị xoay; duyệt và sửa nhãn trên giao diện trước khi tách.
 - **Sinh mục lục hồ sơ**: từ file biên mục Excel/CSV và mẫu DOCX của đơn vị, sinh mục lục văn bản cho từng hồ sơ (mỗi hồ sơ một file DOCX); xem mẫu, ghép biến với cột, xem trước từng hồ sơ trước khi sinh.
 
+Mở app vào **Trang chủ**: 4 ô chức năng (rê chuột xem tóm tắt, bấm để vào), thông tin nhanh (lượt dùng, định dạng hỗ trợ, phím F1…) và thanh đáy (website, email, tên máy, MAC, IP, phiên bản). Về Trang chủ: menu **Chức năng › Trang chủ** hoặc bấm logo Sao Mai góc dưới phải màn giới thiệu.
+
 Một file chạy duy nhất, không cần cài thêm gì.
 
 Tải bản mới nhất ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
@@ -19,7 +21,7 @@ File chạy chưa ký số với Apple / Microsoft nên lần đầu mở hệ �
 
 `dema4_rs/` — mã nguồn Rust (giao diện egui + chế độ dòng lệnh), build qua GitHub Actions. Bản gốc Python (PyQt5 + PyMuPDF) giữ cục bộ trong `temp/`, không đưa lên repo.
 
-Mỗi chức năng khi chưa có dữ liệu hiện màn giới thiệu 3 bước; link **Chọn** / **Phân tích** trong đó làm đúng việc của nút, logo góc dưới phải mở [saomaiso.com](https://saomaiso.com). Màn Tách: chọn thư mục xong thì tên hồ sơ hiện ngay ở cột trái, khung phải thay giới thiệu bằng số hồ sơ + nút **Phân tích**.
+Mỗi chức năng khi chưa có dữ liệu hiện màn giới thiệu 3 bước; link **Chọn** / **Phân tích** trong đó làm đúng việc của nút, logo góc dưới phải về Trang chủ. Màn Tách: chọn thư mục xong thì tên hồ sơ hiện ngay ở cột trái, khung phải thay giới thiệu bằng số hồ sơ + nút **Phân tích**.
 
 ![Tách văn bản: chọn thư mục xong](docs/anh/tach-mo-dau.png)
 
