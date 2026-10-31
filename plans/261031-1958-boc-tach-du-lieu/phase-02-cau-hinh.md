@@ -24,7 +24,7 @@ Tab thứ 4 "Bóc tách" trong hộp Cấu hình (rộng hơn khi mở tab này)
 - Khoá API / secret (quyết định #2): `src/boc_tach/khoa_cache.rs` — `ma_hoa(&str) -> String` / `giai_ma(&str) -> Option<String>`, AES-256-GCM, nonce ngẫu nhiên 12 byte, lưu dạng base64 `nonce‖bản mã` trong `.sm-dema4/boc_tach/khoa.bin` (quyền 0600 trên macOS). Khoá = SHA-256(`option_env!("DEMA4_KHOA_CACHE")` ‖ `license::ma_may()`). Thiếu biến khi build → không ghi khoá ra đĩa, ô Khoá API báo "Khoá chỉ dùng trong phiên này". Giải mã lỗi (máy khác / bản build khác) → coi như chưa có khoá, yêu cầu nhập lại. Không bao giờ đưa khoá vào log / thống kê / file cấu hình rõ.
 - CI: thêm secret `DEMA4_KHOA_CACHE` vào workflow build (Windows/macOS); không in giá trị ra log.
 - `gui_tach/hop_cau_hinh.rs`: `TabCauHinh::BocTach`, vẽ tách sang `gui_boc_tach/cau_hinh.rs` cho gọn.
-- Kiểm tra kết nối: gọi `GET /models` trên luồng nền (mọi nhà cung cấp; Claude nếu `/models` không có thì gửi 1 yêu cầu chữ nhỏ), hiện kết quả.
+- Kiểm tra kết nối: gọi `GET /models` trên luồng nền (chuẩn OpenAI hoặc Anthropic tuỳ nhà cung cấp), hiện kết quả.
 
 ## File liên quan
 - Sửa: `src/cau_hinh.rs`, `src/gui_tach/hop_cau_hinh.rs`, workflow CI (thêm secret).

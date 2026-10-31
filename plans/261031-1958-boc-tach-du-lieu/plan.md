@@ -36,19 +36,18 @@ Trang chủ 7 ô (Bóc tách đang để "Đang phát triển"), menu, màn gi�
 
 ## Phạm vi & mốc (chốt 2026-11-01: làm khung trước, chọn mô hình sau)
 
-- **Mô hình đọc:** 1 bộ gọi duy nhất chuẩn OpenAI `/chat/completions` (ảnh dạng `image_url` data URL). Ưu tiên kiểm thử 2 nơi:
-  - **Máy chủ GPU trong LAN** — vLLM / Ollama / LM Studio, `http://<ip>:<cổng>/v1`, khoá API tuỳ chọn. Model nào cũng được, lấy từ `GET /models`.
-  - **Gemini Flash** — địa chỉ tương thích OpenAI `https://generativelanguage.googleapis.com/v1beta/openai/`, model chọn từ danh sách (lọc `flash`), không cứng tên.
-  - ChatGPT, OpenRouter, Claude (Anthropic có địa chỉ tương thích OpenAI `https://api.anthropic.com/v1/`) dùng chung bộ gọi → giữ đủ 5 ô như prototype, không viết thêm client; chỉ thử nhanh trước phát hành.
+- **Mô hình đọc: đủ 5 nhà cung cấp như prototype, ngang nhau** — Nội bộ · ChatGPT · Gemini · Claude · OpenRouter, mỗi nhà cung cấp cấu hình đầy đủ (địa chỉ, khoá, model, kiểm tra kết nối, nâng cao). Hai bộ gọi: chuẩn OpenAI `/chat/completions` (Nội bộ, ChatGPT, OpenRouter, Gemini qua `https://generativelanguage.googleapis.com/v1beta/openai/`) và Anthropic `/v1/messages` (Claude). Cả 5 đều phải qua test gọi thật trước phát hành.
+- **Mỗi yêu cầu gửi đúng 1 trang (1 ảnh)**, đọc nhiều trang thì gửi nhiều yêu cầu rồi gộp theo trường. Lý do: máy chủ vLLM thử nghiệm chỉ nhận 1 ảnh/yêu cầu (`400 At most 1 image(s) may be provided in one request.`), cách này chạy được ở mọi nơi.
+- **Máy chủ thử nghiệm:** vLLM 0.6.1 trong LAN, model `5CD-AI/Vintern-1B-v3_5`, ngữ cảnh 8192 token. Địa chỉ chỉ truyền qua biến môi trường `DEMA4_BT_DIA_CHI` khi test, KHÔNG ghi vào repo (repo công khai).
 - **Chọn mô hình nội bộ mặc định:** để sau (không chặn bản đầu). Báo cáo ứng viên: [research](../reports/research-261101-0027-mo-hinh-thi-giac-chay-local-boc-tach-report.md).
-- **Mốc A — khung chạy được (GĐ 1–3):** cấu hình Nội bộ / Gemini, chọn thư mục + loại tài liệu, Thử đọc 1 file ra đúng trường. Xin chủ sản phẩm thử tay.
+- **Mốc A — khung chạy được (GĐ 1–3):** cấu hình đủ 5 nhà cung cấp, chọn thư mục + loại tài liệu, Thử đọc 1 file ra đúng trường. Xin chủ sản phẩm thử tay.
 - **Mốc B — dùng thật (GĐ 4–5):** chạy hàng loạt, Kết quả bóc, sửa tay, Excel + Sheet.
 - **Mốc C — phát hành (GĐ 6).** GĐ 7 (nguồn đám mây) sau phát hành.
 
 ## Tiêu chí hoàn thành bản đầu
 
 - Giao diện khớp prototype đã duyệt ở mọi trạng thái mẫu (so ảnh chụp kittest với ảnh prototype).
-- Chạy thật 33 file mẫu với máy chủ GPU trong LAN và Gemini Flash: đúng số trường, đúng file lỗi, chạy lại theo bộ lọc chỉ chạy file đang hiện.
+- Chạy thật 33 file mẫu với máy chủ nội bộ (vLLM) và ít nhất 1 dịch vụ đám mây; Thử đọc qua được cả 5 nhà cung cấp: đúng số trường, đúng file lỗi, chạy lại theo bộ lọc chỉ chạy file đang hiện.
 - Excel mở được, cột ngày/số ký hiệu dạng văn bản; file Excel nạp thẳng vào Sinh mục lục, biến tự ghép.
 - Sheet nhận 1 dòng sau mỗi file; mất mạng giữa chừng không mất kết quả đã đọc.
 - Khoá API / secret / khoá service account không xuất hiện trong log, thống kê, Telegram, repo.
@@ -60,5 +59,5 @@ Trang chủ 7 ô (Bóc tách đang để "Đang phát triển"), menu, màn gi�
 2. **Khoá API lưu trong cache, có mã hoá, khoá giải mã chỉ chủ sản phẩm biết:** AES-256-GCM (crate `aes-gcm`), khoá = SHA-256(bí mật lúc build ‖ `license::ma_may()`). Bí mật lúc build lấy từ biến môi trường `DEMA4_KHOA_CACHE` qua `option_env!` — đặt trong secret CI, KHÔNG nằm trong repo; build thiếu biến → không lưu khoá (chỉ giữ trong RAM phiên đó) và hiện nhắc. Gắn mã máy để chép file cache sang máy khác không giải mã được. Giới hạn: bí mật nằm trong file chạy nên người cố tình dịch ngược vẫn lấy được — đủ chống đọc trộm file cache / lộ khi gửi file cấu hình, không chống được người có quyền trên máy.
 3. **Đếm lượt:** mỗi lần Bắt đầu / Chạy lại = 1 lượt; **Thử đọc không trừ lượt**.
 4. Câu "Xử lý ngay trên máy" (Trang chủ) và câu thống kê trong README: sửa đúng như prototype khi Bóc tách mở dùng (giai đoạn 6).
-5. Mô hình nội bộ chạy trên máy chủ GPU trong LAN (vLLM / Ollama…), app chỉ gọi qua địa chỉ chuẩn OpenAI, không nhúng mô hình. Chọn model mặc định để sau.
-6. Dùng chung 1 bộ gọi chuẩn OpenAI cho cả 5 nhà cung cấp; ưu tiên kiểm thử Nội bộ (LAN) + Gemini Flash.
+5. Mô hình nội bộ chạy trên máy chủ GPU trong LAN (vLLM / Ollama…), app gọi qua địa chỉ chuẩn OpenAI, không nhúng mô hình. Chọn model mặc định để sau.
+6. Đủ 5 nhà cung cấp theo prototype; mỗi yêu cầu 1 trang.
