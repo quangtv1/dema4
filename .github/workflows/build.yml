@@ -57,8 +57,11 @@ jobs:
           choco install llvm --no-progress -y
           echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
 
+      # Bí mật mã hoá khoá API Bóc tách trong cache (option_env! lúc build); thiếu secret → app không lưu khoá ra đĩa
       - name: Build release
         run: cargo build --release
+        env:
+          DEMA4_KHOA_CACHE: ${{ secrets.DEMA4_KHOA_CACHE }}
 
       # Test phần tách văn bản: chạy thật zxing-cpp (C++) và ONNX Runtime liên kết tĩnh trên từng hệ điều hành
       - name: Test tách văn bản

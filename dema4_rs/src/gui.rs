@@ -74,7 +74,7 @@ impl Man {
             Man::Dem => TIEU_DE,
             Man::Tach => "Tách văn bản PDF (Giải pháp số Sao Mai)",
             Man::MucLuc => crate::gui_muc_luc::TIEU_DE,
-            Man::BocTach => "Bóc tách dữ liệu (Giải pháp số Sao Mai)",
+            Man::BocTach => crate::gui_boc_tach::TIEU_DE,
             Man::ChuanTen => "Chuẩn hoá tên (Giải pháp số Sao Mai)",
             Man::Ky => "Ký văn bản (Giải pháp số Sao Mai)",
             Man::Aip => "Đóng gói AIP (Giải pháp số Sao Mai)",
@@ -89,9 +89,12 @@ struct UngDungChinh {
     dem: UngDung,
     tach: crate::gui_tach::ManTach,
     muc_luc: crate::gui_muc_luc::ManMucLuc,
+    boc_tach: crate::gui_boc_tach::ManBocTach,
     trang_chu: crate::trang_chu::TrangChu,
     cfg: crate::cau_hinh::CauHinh,
     hop_cau_hinh: Option<crate::gui_tach::hop_cau_hinh::HopCauHinh>,
+    /// Khoá API / bí mật Bóc tách: nạp từ cache mã hoá khi mở app, ghi lại khi Lưu Cấu hình.
+    khoa_bt: std::collections::BTreeMap<String, String>,
     tro_giup: Option<crate::tro_giup::HopTroGiup>,
     /// Đóng app khi nhãn chưa lưu (lưu bằng tay): đang hỏi Lưu / Bỏ / Huỷ; `cho_dong` = đã trả lời, cho đóng.
     hoi_dong: bool,
@@ -109,7 +112,7 @@ impl Default for UngDungChinh {
         let mut muc_luc = crate::gui_muc_luc::ManMucLuc::moi(&cfg.muc_luc);
         muc_luc.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, trang_chu: Default::default(), cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach: Default::default(), trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
     }
 }
 
@@ -207,11 +210,14 @@ impl UngDungChinh {
         if man == Man::MucLuc && self.man != Man::MucLuc {
             self.muc_luc.dat_lai();
         }
+        if man == Man::BocTach && self.man != Man::BocTach {
+            self.boc_tach.dat_lai();
+        }
         self.man = man;
     }
 
     fn dang_chay(&self) -> bool {
-        self.dem.dang_dem.is_some() || self.tach.dang_chay() || self.muc_luc.dang_chay()
+        self.dem.dang_dem.is_some() || self.tach.dang_chay() || self.muc_luc.dang_chay() || self.boc_tach.dang_chay()
     }
 
     fn thanh_menu(&mut self, ui: &mut egui::Ui) {
@@ -252,10 +258,12 @@ impl UngDungChinh {
                     let tab = match self.man {
                         Man::Dem => TabCauHinh::Dem,
                         Man::MucLuc => TabCauHinh::MucLuc,
+                        Man::BocTach => TabCauHinh::BocTach,
                         _ => TabCauHinh::Tach,
                     };
                     let mut hop = HopCauHinh::moi(&self.cfg, tab);
                     hop.co_cache = self.tach.co_cache();
+                    hop.khoa = self.khoa_bt.clone();
                     self.hop_cau_hinh = Some(hop);
                 }
                 egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::HoiDap, 14.0, xam), "Trợ giúp", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
@@ -336,10 +344,23 @@ impl eframe::App for UngDungChinh {
                     let _ = crate::cau_hinh::ghi(&self.cfg);
                 }
             }
+            Man::BocTach => {
+                let khoa = self.khoa_bt.clone();
+                let mut cfg_doi = false;
+                egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN).inner_margin(Margin { left: 12, right: 12, top: 8, bottom: 0 })).show(ui, |ui| cfg_doi = self.boc_tach.ve(ui, &mut self.cfg.boc_tach, &khoa));
+                if cfg_doi {
+                    let _ = crate::cau_hinh::ghi(&self.cfg);
+                }
+                if std::mem::take(&mut self.boc_tach.mo_cau_hinh) {
+                    let mut hop = crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&self.cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::BocTach);
+                    hop.co_cache = self.tach.co_cache();
+                    hop.khoa = self.khoa_bt.clone();
+                    self.hop_cau_hinh = Some(hop);
+                }
+            }
             // Chức năng đang phát triển: chỉ màn giới thiệu (mờ, nhãn ĐANG PHÁT TRIỂN)
-            Man::BocTach | Man::ChuanTen | Man::Ky | Man::Aip => {
+            Man::ChuanTen | Man::Ky | Man::Aip => {
                 let gt = match self.man {
-                    Man::BocTach => &crate::gioi_thieu::BOC_TACH,
                     Man::ChuanTen => &crate::gioi_thieu::CHUAN_TEN,
                     Man::Aip => &crate::gioi_thieu::AIP,
                     _ => &crate::gioi_thieu::KY,
@@ -367,6 +388,10 @@ impl eframe::App for UngDungChinh {
                 KetQuaHop::Mo => {}
                 KetQuaHop::Huy => self.hop_cau_hinh = None,
                 KetQuaHop::Luu(moi) => {
+                    self.khoa_bt = std::mem::take(&mut hop.khoa);
+                    self.khoa_bt.retain(|_, v| !v.trim().is_empty());
+                    // Bản build không có bí mật: khoá chỉ giữ trong phiên (ô Khoá API đã báo)
+                    let _ = crate::boc_tach::khoa_cache::ghi(&self.khoa_bt);
                     self.ap_cau_hinh(moi, true);
                     self.hop_cau_hinh = None;
                 }
@@ -1556,6 +1581,7 @@ impl UngDung {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::boc_tach::mo_hinh::NhaCungCap;
 
     #[test]
     fn dinh_dang_so_kieu_viet_nam() {
@@ -1805,7 +1831,7 @@ mod tests {
             h.run();
             h.get_by_label("Cấu hình").click();
             h.run();
-            for tab in ["Đếm trang A4", "Tách PDF"] {
+            for tab in ["Đếm trang A4", "Tách PDF", "Bóc tách"] {
                 h.get_by_label(tab).click();
                 h.run();
                 for nut in ["Lưu", "Huỷ"] {
@@ -1814,6 +1840,42 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn cau_hinh_boc_tach_chon_ncc_mac_dinh_va_kiem_tra_ket_noi() {
+        use egui_kittest::kittest::Queryable;
+        let ds = serde_json::json!({ "object": "list", "data": [{ "id": "5CD-AI/Vintern-1B-v3_5" }] }).to_string();
+        let (dc, _nhan) = crate::boc_tach::mo_hinh::tests::may_chu_gia(vec![(200, vec![], ds)]);
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 720.0)).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut cfg = crate::cau_hinh::CauHinh::default();
+            cfg.boc_tach.mo_hinh_mut(NhaCungCap::NoiBo).dia_chi = dc.clone();
+            let mut app = UngDungChinh { man: Man::BocTach, cfg: cfg.clone(), khoa_bt: Default::default(), ..Default::default() };
+            app.hop_cau_hinh = Some(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::BocTach));
+            app
+        });
+        h.run();
+        h.get_by_label("Kiểm tra kết nối").click();
+        for _ in 0..50 {
+            h.run_steps(1);
+            if h.state().hop_cau_hinh.as_ref().unwrap().nhap.boc_tach.mo_hinh(NhaCungCap::NoiBo).model == "5CD-AI/Vintern-1B-v3_5" {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let hop = h.state().hop_cau_hinh.as_ref().unwrap();
+        assert_eq!(hop.nhap.boc_tach.mo_hinh(NhaCungCap::NoiBo).model, "5CD-AI/Vintern-1B-v3_5", "máy chủ 1 model → tự điền model");
+        h.get_by_label("Gemini").click();
+        h.run();
+        assert_eq!(h.state().hop_cau_hinh.as_ref().unwrap().bt.ncc, NhaCungCap::Gemini);
+        h.get_by_label("Đặt làm mặc định").click();
+        h.run();
+        assert_eq!(h.state().hop_cau_hinh.as_ref().unwrap().nhap.boc_tach.mac_dinh, Some(NhaCungCap::Gemini));
+        h.get_by_label("Lưu").click();
+        h.run();
+        assert!(h.state().hop_cau_hinh.is_none());
+        assert_eq!(h.state().cfg.boc_tach.mac_dinh, Some(NhaCungCap::Gemini));
     }
 
     #[test]
@@ -2157,6 +2219,102 @@ mod tests {
             h.run_steps(3);
             h.render().unwrap().save(thu_muc_anh.join(ten)).unwrap();
         }
+    }
+
+    /// Cấu hình › Bóc tách: Mô hình đọc (Nội bộ, Gemini có khoá, Nâng cao), Nguồn văn bản, Ghi kết quả.
+    /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_cau_hinh_boc_tach
+    #[test]
+    #[ignore = "cần GPU"]
+    fn chup_cau_hinh_boc_tach() {
+        use crate::gui_boc_tach::cau_hinh::Muc;
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        let mut cfg = crate::cau_hinh::CauHinh::default();
+        let b = &mut cfg.boc_tach;
+        (b.mo_hinh_mut(NhaCungCap::NoiBo).dia_chi, b.mo_hinh_mut(NhaCungCap::NoiBo).model) = ("http://192.168.1.5:8001/v1".into(), "5CD-AI/Vintern-1B-v3_5".into());
+        b.mo_hinh_mut(NhaCungCap::Gemini).model = "gemini-2.5-flash".into();
+        b.mac_dinh = Some(NhaCungCap::NoiBo);
+        b.sheet_link = "https://docs.google.com/spreadsheets/d/1AbC/edit".into();
+        let khoa: std::collections::BTreeMap<String, String> = [("gemini".to_string(), "khoa-minh-hoa".to_string())].into();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 860.0)).with_pixels_per_point(1.5).build_eframe({
+            let cfg = cfg.clone();
+            move |cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                UngDungChinh { man: Man::BocTach, cfg: cfg.clone(), ..Default::default() }
+            }
+        });
+        for (ten, muc, ncc, nang_cao) in [("cau_hinh_bt_noi_bo", Muc::MoHinh, NhaCungCap::NoiBo, false), ("cau_hinh_bt_gemini", Muc::MoHinh, NhaCungCap::Gemini, true), ("cau_hinh_bt_nguon", Muc::Nguon, NhaCungCap::NoiBo, false), ("cau_hinh_bt_ghi", Muc::Ghi, NhaCungCap::NoiBo, false)] {
+            let mut hop = crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::BocTach);
+            hop.khoa = khoa.clone();
+            (hop.bt.muc, hop.bt.ncc) = (muc, ncc);
+            if nang_cao {
+                hop.bt.mo_nang_cao();
+            }
+            h.state_mut().hop_cau_hinh = Some(hop);
+            h.run_steps(3);
+            h.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
+        }
+    }
+
+    /// Màn Bóc tách với 3 PDF tổng hợp + máy chủ giả: giới thiệu, tab Trường dữ liệu, sau Thử đọc, popup Câu lệnh / Chỉnh sửa loại.
+    /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_man_boc_tach
+    #[test]
+    #[ignore = "cần GPU"]
+    fn chup_man_boc_tach() {
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        let d = std::env::temp_dir().join(format!("dema4_chup_bt_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(d.join("HS-01")).unwrap();
+        for (f, n) in [("HS-01/HS01_VB01.pdf", 4), ("HS-01/HS01_VB02.pdf", 2), ("HS-01/HS01_VB03.pdf", 3)] {
+            crate::tach_vb::tach::tests::tao_pdf(&d.join(f), n);
+        }
+        let tl = |s: &str| serde_json::json!({ "choices": [{ "message": { "content": s }, "finish_reason": "stop" }] }).to_string();
+        let dau = r#"{"loai_van_ban": "Tờ trình", "so_ky_hieu": "Số 15/TTr-TCKH", "ngay_thang": "20 tháng 01 năm 2015", "tac_gia": "Phòng Tài chính - Kế hoạch", "trich_yeu": "Phê duyệt dự toán kinh phí", "nguoi_ky": ""}"#;
+        let cuoi = r#"{"loai_van_ban": "", "so_ky_hieu": "", "ngay_thang": "", "tac_gia": "", "trich_yeu": "", "nguoi_ky": "Trần Thị B"}"#;
+        let (dc, _n) = crate::boc_tach::mo_hinh::tests::may_chu_gia(vec![(200, vec![], tl(dau)), (200, vec![], tl(cuoi))]);
+        let mut cfg = crate::cau_hinh::CauHinh::default();
+        (cfg.boc_tach.mo_hinh_mut(NhaCungCap::NoiBo).dia_chi, cfg.boc_tach.mo_hinh_mut(NhaCungCap::NoiBo).model) = (dc, "5CD-AI/Vintern-1B-v3_5".into());
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            UngDungChinh { man: Man::BocTach, cfg: cfg.clone(), khoa_bt: Default::default(), ..Default::default() }
+        });
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("bt_gioi_thieu.png")).unwrap();
+        let ctx = h.ctx.clone();
+        h.state_mut().boc_tach.chon_thu_muc(r"/tmp/SoHoa/Van_ban".into(), &ctx);
+        h.state_mut().boc_tach.chon_thu_muc(d.display().to_string(), &ctx);
+        for _ in 0..40 {
+            h.run_steps(1);
+            if !h.state().boc_tach.files.is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        h.state_mut().boc_tach.ncc = Some(NhaCungCap::NoiBo);
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("bt_gioi_thieu_2_buoc.png")).unwrap();
+        h.state_mut().boc_tach.loai = Some(0);
+        h.state_mut().boc_tach.truong.i_file = 2;
+        h.state_mut().boc_tach.truong.chon = 1;
+        for _ in 0..20 {
+            h.run_steps(1);
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        h.render().unwrap().save(thu_muc_anh.join("bt_truong.png")).unwrap();
+        use egui_kittest::kittest::Queryable;
+        h.get_by_label("Thử đọc").click();
+        for _ in 0..60 {
+            h.run_steps(1);
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        h.render().unwrap().save(thu_muc_anh.join("bt_truong_thu.png")).unwrap();
+        h.get_by_label("Câu lệnh").click();
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("bt_cau_lenh.png")).unwrap();
+        h.state_mut().boc_tach.hop = None;
+        h.get_by_label("Chỉnh sửa loại tài liệu").click();
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("bt_sua_loai.png")).unwrap();
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     /// Ô thư mục có nút ⓧ ở màn Đếm và Tách (đường dẫn giả, không cần dữ liệu mẫu).

@@ -286,7 +286,7 @@ impl Default for ManTach {
 
 /// Hộp chọn thư mục: Windows chạy ở luồng riêng để cửa sổ app không đứng hình lúc hộp thoại mở / duyệt ổ mạng;
 /// macOS bắt buộc mở trên luồng chính (rfd) nên mở trực tiếp.
-fn chon_thu_muc_nen(hien_tai: &str, ctx: &egui::Context) -> Receiver<Option<PathBuf>> {
+pub(crate) fn chon_thu_muc_nen(hien_tai: &str, ctx: &egui::Context) -> Receiver<Option<PathBuf>> {
     let (gui, nhan) = mpsc::channel();
     let dau = PathBuf::from(hien_tai.trim());
     let ctx = ctx.clone();

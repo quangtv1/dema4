@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Cấu hình › Bóc tách + khoá + kiểm tra kết nối"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 ---

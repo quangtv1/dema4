@@ -1,6 +1,6 @@
 ---
 title: "Bóc tách dữ liệu — chức năng thứ 4 (từ prototype đã duyệt)"
-status: pending
+status: in-progress
 created: 2026-10-31
 updated: 2026-11-01
 blockedBy: []
@@ -26,9 +26,9 @@ Trang chủ 7 ô (Bóc tách đang để "Đang phát triển"), menu, màn gi�
 
 | # | Giai đoạn | File | Phụ thuộc | Trạng thái |
 |---|---|---|---|---|
-| 1 | Lõi bóc tách (không giao diện): loại tài liệu, render ảnh, câu lệnh, gọi mô hình, gộp + chuẩn hoá | [phase-01-loi-boc-tach.md](phase-01-loi-boc-tach.md) | — | pending |
-| 2 | Cấu hình › Bóc tách + khoá + kiểm tra kết nối | [phase-02-cau-hinh.md](phase-02-cau-hinh.md) | 1 | pending |
-| 3 | Khung màn hình + tab Trường dữ liệu + popup | [phase-03-man-truong-du-lieu.md](phase-03-man-truong-du-lieu.md) | 1, 2 | pending |
+| 1 | Lõi bóc tách (không giao diện): loại tài liệu, render ảnh, câu lệnh, gọi mô hình, gộp + chuẩn hoá | [phase-01-loi-boc-tach.md](phase-01-loi-boc-tach.md) | — | completed |
+| 2 | Cấu hình › Bóc tách + khoá + kiểm tra kết nối | [phase-02-cau-hinh.md](phase-02-cau-hinh.md) | 1 | completed |
+| 3 | Khung màn hình + tab Trường dữ liệu + popup | [phase-03-man-truong-du-lieu.md](phase-03-man-truong-du-lieu.md) | 1, 2 | completed |
 | 4 | Tab Kết quả bóc + chạy hàng loạt + popup xong | [phase-04-ket-qua-boc.md](phase-04-ket-qua-boc.md) | 3 | pending |
 | 5 | Đầu ra: Excel + Google Sheet | [phase-05-dau-ra.md](phase-05-dau-ra.md) | 1 | pending |
 | 6 | License, thống kê, trạm, Trang chủ, tài liệu, phát hành | [phase-06-tich-hop-phat-hanh.md](phase-06-tich-hop-phat-hanh.md) | 3–5 | pending |

@@ -1,4 +1,4 @@
-//! Hộp Cấu hình (menu Cấu hình): 2 tab, thân cao cố định để hộp không nhảy khi đổi tab.
+//! Hộp Cấu hình (menu Cấu hình): 4 tab (Đếm, Tách PDF, Sinh mục lục, Bóc tách), thân cao cố định để hộp không nhảy khi đổi tab.
 //! Tab Tách PDF: nhóm 1 "Tự động nhận dạng khi Phân tích", nhóm 2 "Kết quả tách".
 
 use eframe::egui::{self, Align, Color32, CornerRadius, Margin, Rect, RichText, Sense, Stroke, StrokeKind};
@@ -22,6 +22,8 @@ macro_rules! dong {
 }
 
 const RONG_HOP: f32 = 560.0;
+/// Tab Bóc tách rộng hơn: 5 ô nhà cung cấp trên 1 hàng.
+const RONG_HOP_BOC_TACH: f32 = 780.0;
 const CAO_THAN: f32 = 470.0;
 /// Cột nhãn tab Tách PDF (vừa "☑ Trang trắng ⓘ"); ô bắt đầu ở `LE_O`.
 const RONG_NHAN: f32 = 118.0;
@@ -37,6 +39,7 @@ pub enum TabCauHinh {
     Dem,
     Tach,
     MucLuc,
+    BocTach,
 }
 
 pub enum KetQuaHop {
@@ -69,6 +72,9 @@ pub struct HopCauHinh {
     /// Thư mục đang mở còn cache phân tích (bật nút Xoá cache); `xoa_cache` = vừa bấm, app xoá rồi cập nhật `co_cache`.
     pub co_cache: bool,
     pub xoa_cache: bool,
+    pub bt: crate::gui_boc_tach::cau_hinh::TabBocTach,
+    /// Khoá API / bí mật Bóc tách đang sửa (app nạp vào khi mở, lấy ra khi Lưu; không nằm trong `CauHinh`).
+    pub khoa: std::collections::BTreeMap<String, String>,
 }
 
 fn so_o(v: f32) -> String {
@@ -148,6 +154,8 @@ impl HopCauHinh {
             tay_chon: None,
             co_cache: false,
             xoa_cache: false,
+            bt: crate::gui_boc_tach::cau_hinh::TabBocTach::moi(&cfg.boc_tach),
+            khoa: Default::default(),
         };
         h.dong_bo_o();
         h
@@ -190,10 +198,11 @@ impl HopCauHinh {
 
     pub fn ve(&mut self, ctx: &egui::Context) -> KetQuaHop {
         let mut kq = KetQuaHop::Mo;
-        let phan_hoi = kh::hop(ctx, "hop_cau_hinh", RONG_HOP, "Cấu hình", |ui| {
+        let rong = if self.tab == TabCauHinh::BocTach { RONG_HOP_BOC_TACH } else { RONG_HOP };
+        let phan_hoi = kh::hop(ctx, "hop_cau_hinh", rong, "Cấu hình", |ui| {
             let co_cache = self.co_cache;
             let mut bam_xoa = false;
-            kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF"), (TabCauHinh::MucLuc, "Sinh mục lục")], &mut self.tab, |ui| {
+            kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF"), (TabCauHinh::MucLuc, "Sinh mục lục"), (TabCauHinh::BocTach, "Bóc tách")], &mut self.tab, |ui| {
                 // Canh phải, thẳng hàng 2 tab: chỉ bấm được khi thư mục đang mở còn cache
                 let nut = egui::Button::new(RichText::new("Xoá cache").size(12.0)).min_size(egui::vec2(0.0, 22.0));
                 bam_xoa = ui
@@ -209,6 +218,7 @@ impl HopCauHinh {
                 TabCauHinh::Tach => self.tab_tach(ui),
                 TabCauHinh::Dem => self.tab_dem(ui),
                 TabCauHinh::MucLuc => self.tab_muc_luc(ui),
+                TabCauHinh::BocTach => self.bt.ve(ui, &mut self.nhap.boc_tach, &mut self.khoa),
             });
             let loi = self.loi();
             kh::chan(ui, |ui| {
@@ -217,6 +227,7 @@ impl HopCauHinh {
                         TabCauHinh::Tach => mac_dinh_tach(&self.nhap),
                         TabCauHinh::Dem => mac_dinh_dem(&self.nhap),
                         TabCauHinh::MucLuc => mac_dinh_muc_luc(&self.nhap),
+                        TabCauHinh::BocTach => crate::gui_boc_tach::cau_hinh::mac_dinh(&self.nhap),
                     };
                     self.dong_bo_o();
                 }

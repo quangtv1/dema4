@@ -69,6 +69,18 @@ pub enum BieuTuong {
     Khien,
     DongHo,
     DongLenh,
+    /// Cấu hình › Bóc tách: sơ đồ luồng (thư mục, mô hình đọc, bảng kết quả), nhà cung cấp, nguồn đám mây
+    ThuMuc,
+    MoHinhDoc,
+    BangKetQua,
+    MayChu,
+    NccOpenAi,
+    NccGemini,
+    NccClaude,
+    NccOpenRouter,
+    GgDrive,
+    DamMay,
+    KhoS3,
 }
 
 /// (path SVG, cạnh viewBox, độ dày nét) — chép nguyên từ prototype.
@@ -126,15 +138,26 @@ fn svg_cua(bt: BieuTuong) -> Option<(&'static str, u8, f32)> {
         ChuanTen => (r#"<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M14 3v5h5"/><rect x="11" y="13" width="10" height="6" rx="1"/><path d="M18.5 14.5v3"/>"#, 24, 1.8),
         GoiAip => (r#"<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>"#, 24, 1.8),
         DongLenh => (r#"<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7 9l3 3-3 3M12 15h5"/>"#, 24, 1.5),
+        ThuMuc => (r#"<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>"#, 24, 1.6),
+        MoHinhDoc => (r#"<rect x="4" y="7" width="16" height="12" rx="2"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/>"#, 24, 1.6),
+        BangKetQua => (r#"<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16"/>"#, 24, 1.6),
+        MayChu => (r#"<rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01"/>"#, 24, 1.6),
+        NccOpenAi => (r#"<circle cx="12" cy="12" r="8"/><path d="M8.5 10.5h7M8.5 13.5h4.5"/>"#, 24, 1.6),
+        NccGemini => (r#"<path d="M12 3c.8 4.6 4.4 8.2 9 9-4.6.8-8.2 4.4-9 9-.8-4.6-4.4-8.2-9-9 4.6-.8 8.2-4.4 9-9z"/>"#, 24, 1.6),
+        NccClaude => (r#"<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>"#, 24, 1.6),
+        NccOpenRouter => (r#"<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 12h3l4-5M11.5 12l4 5"/>"#, 24, 1.6),
+        GgDrive => (r#"<path d="M8 3h8l6 10-4 7H6l-4-7z"/><path d="M8 3l6 10H2M16 3l-6 10M10 13h12"/>"#, 24, 1.6),
+        DamMay => (r#"<path d="M6 19a4 4 0 0 1-.6-7.96A6 6 0 0 1 17 9a4.5 4.5 0 0 1 1 8.9V19z"/>"#, 24, 1.6),
+        KhoS3 => (r#"<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>"#, 24, 1.6),
     })
 }
 
-const TAT_CA: [BieuTuong; 52] = {
+const TAT_CA: [BieuTuong; 63] = {
     use BieuTuong::*;
     [
         Dau, MuiTenXuong, HoanTac, LamLai, XoayPhai, Xoay180, ThongTin, CapNhat, HoiDap, TaiLieu, Keo, But, BocTach, ChuanTen, GoiAip, TraiChevron, PhaiChevron, Luoi, MotTrang, HaiTrang, BoKhoi, Dong, ChevronXuong, KinhTru, KinhCong, SapXep, MenuLuoi,
         BanhRang, ChongTrang, MaVach, TrangTrong, TrangHoi, XoayMenu, DanhSachSo, TangDan, GiamDan, ThungRac, TrangGach, ThuGon, MoRong, KinhLup, AnDong, HienDong, BoNhan, ChonTat, BoChon, KhoiPhuc,
-        TrangChu, ManHinh, Khien, DongHo, DongLenh,
+        TrangChu, ManHinh, Khien, DongHo, DongLenh, ThuMuc, MoHinhDoc, BangKetQua, MayChu, NccOpenAi, NccGemini, NccClaude, NccOpenRouter, GgDrive, DamMay, KhoS3,
     ]
 };
 

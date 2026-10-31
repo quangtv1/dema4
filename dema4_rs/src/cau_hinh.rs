@@ -4,6 +4,7 @@
 //! Đặt cạnh file chạy; thư mục đó không ghi được → thư mục người dùng (`%APPDATA%\sm-dema4\`,
 //! macOS `~/Library/Application Support/sm-dema4/`). Khoá thiếu / sai → giá trị mặc định, không báo lỗi.
 
+use crate::boc_tach::mo_hinh::NhaCungCap;
 use crate::dem_pdf::HE_SO_MAC_DINH;
 use crate::tach_vb::tach::MAU_TEN_MAC_DINH;
 use std::path::{Path, PathBuf};
@@ -84,6 +85,7 @@ pub struct CauHinh {
     pub che_do_vb: CheDoVb,
     pub an_dong_thu_muc: bool,
     pub muc_luc: CauHinhMucLuc,
+    pub boc_tach: CauHinhBocTach,
 }
 
 /// Cấu hình + lựa chọn gần nhất của màn Sinh mục lục (khoá `ml_*` trong file).
@@ -106,6 +108,104 @@ pub struct CauHinhMucLuc {
 }
 
 pub const RONG_TRAI_ML: (f32, f32) = (220.0, 600.0);
+
+/// Thông số 1 nhà cung cấp mô hình đọc (khoá `bt_<mã>_*`). Khoá API không ở đây: lưu mã hoá trong `boc_tach::khoa_cache`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MoHinhBocTach {
+    /// Trống = địa chỉ mặc định của dịch vụ đám mây (Nội bộ bắt buộc nhập).
+    pub dia_chi: String,
+    pub model: String,
+    pub song_song: u32,
+    pub cho_s: u32,
+}
+
+impl MoHinhBocTach {
+    pub fn mac_dinh(n: NhaCungCap) -> Self {
+        Self { dia_chi: String::new(), model: String::new(), song_song: n.song_song_mac_dinh() as u32, cho_s: n.cho_mac_dinh_s() as u32 }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CachGhiSheet {
+    ServiceAccount,
+    AppsScript,
+}
+
+pub const SONG_SONG_KHOANG: (u32, u32) = (1, 16);
+pub const CHO_KHOANG: (u32, u32) = (10, 600);
+pub const DPI_KHOANG: (u32, u32) = (72, 400);
+pub const CANH_KHOANG: (u32, u32) = (512, 4096);
+pub const JPEG_KHOANG: (u32, u32) = (30, 100);
+pub const TOKEN_KHOANG: (u32, u32) = (256, 16384);
+
+/// Cấu hình + lựa chọn gần nhất của màn Bóc tách (khoá `bt_*` trong file).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CauHinhBocTach {
+    /// Theo thứ tự `NhaCungCap::TAT_CA`.
+    pub mo_hinh: [MoHinhBocTach; 5],
+    /// ★ Mặc định: đứng đầu danh sách Mô hình đọc ở màn chính.
+    pub mac_dinh: Option<NhaCungCap>,
+    pub dpi: u32,
+    pub canh_toi_da: u32,
+    pub jpeg: u32,
+    pub max_tokens: u32,
+    /// Thư mục ghi Excel; trống = cạnh thư mục nguồn.
+    pub thu_muc_excel: String,
+    pub sheet_link: String,
+    pub sheet_tab: String,
+    pub sheet_cach: CachGhiSheet,
+    /// File khoá JSON service account (đường dẫn; nội dung không chép vào cấu hình).
+    pub sheet_file_khoa: String,
+    /// Ô "Google Sheet" ở dòng Ghi ra (Excel luôn tạo).
+    pub ghi_sheet: bool,
+}
+
+impl Default for CauHinhBocTach {
+    fn default() -> Self {
+        Self {
+            mo_hinh: NhaCungCap::TAT_CA.map(MoHinhBocTach::mac_dinh),
+            mac_dinh: None,
+            dpi: 200,
+            canh_toi_da: 2048,
+            jpeg: 90,
+            max_tokens: 2048,
+            thu_muc_excel: String::new(),
+            sheet_link: String::new(),
+            sheet_tab: "Boc_tach".into(),
+            sheet_cach: CachGhiSheet::ServiceAccount,
+            sheet_file_khoa: String::new(),
+            ghi_sheet: false,
+        }
+    }
+}
+
+impl CauHinhBocTach {
+    pub fn mo_hinh(&self, n: NhaCungCap) -> &MoHinhBocTach {
+        &self.mo_hinh[n.chi_so()]
+    }
+
+    pub fn mo_hinh_mut(&mut self, n: NhaCungCap) -> &mut MoHinhBocTach {
+        &mut self.mo_hinh[n.chi_so()]
+    }
+
+    /// Đủ thông số để gọi: có model; Nội bộ có địa chỉ; dịch vụ đám mây có khoá.
+    pub fn da_cai(&self, n: NhaCungCap, khoa: &str) -> bool {
+        let m = self.mo_hinh(n);
+        !m.model.trim().is_empty() && if n.la_dam_may() { !khoa.trim().is_empty() } else { !m.dia_chi.trim().is_empty() }
+    }
+
+    pub fn anh(&self) -> crate::boc_tach::anh::CauHinhAnh {
+        crate::boc_tach::anh::CauHinhAnh { dpi: self.dpi as f32, canh_toi_da: self.canh_toi_da, chat_luong: self.jpeg as u8 }
+    }
+
+    pub fn ket_noi(&self, n: NhaCungCap, khoa: &str) -> crate::boc_tach::mo_hinh::KetNoi {
+        let m = self.mo_hinh(n);
+        let mut k = crate::boc_tach::mo_hinh::KetNoi::moi(n, &m.dia_chi, khoa, &m.model);
+        k.cho_toi_da = std::time::Duration::from_secs(m.cho_s as u64);
+        k.max_tokens = self.max_tokens;
+        k
+    }
+}
 
 impl Default for CauHinhMucLuc {
     fn default() -> Self {
@@ -150,8 +250,57 @@ impl Default for CauHinh {
             che_do_vb: CheDoVb::Luoi,
             an_dong_thu_muc: false,
             muc_luc: CauHinhMucLuc::default(),
+            boc_tach: CauHinhBocTach::default(),
         }
     }
+}
+
+fn doc_boc_tach(b: &mut CauHinhBocTach, k: &str, v: &str) {
+    let so = |(tu, den): (u32, u32)| v.parse::<u32>().ok().filter(|x| (tu..=den).contains(x));
+    let bool_ = || match v {
+        "1" => Some(true),
+        "0" => Some(false),
+        _ => None,
+    };
+    match k {
+        "mac_dinh" => b.mac_dinh = NhaCungCap::tu_ma(v),
+        "dpi" => b.dpi = so(DPI_KHOANG).unwrap_or(b.dpi),
+        "canh_toi_da" => b.canh_toi_da = so(CANH_KHOANG).unwrap_or(b.canh_toi_da),
+        "jpeg" => b.jpeg = so(JPEG_KHOANG).unwrap_or(b.jpeg),
+        "max_tokens" => b.max_tokens = so(TOKEN_KHOANG).unwrap_or(b.max_tokens),
+        "thu_muc_excel" => b.thu_muc_excel = v.into(),
+        "sheet_link" => b.sheet_link = v.into(),
+        "sheet_tab" => b.sheet_tab = v.into(),
+        "sheet_cach" => b.sheet_cach = if v == "apps_script" { CachGhiSheet::AppsScript } else { CachGhiSheet::ServiceAccount },
+        "sheet_file_khoa" => b.sheet_file_khoa = v.into(),
+        "ghi_sheet" => b.ghi_sheet = bool_().unwrap_or(b.ghi_sheet),
+        _ => {
+            // bt_<mã nhà cung cấp>_<thông số>
+            let Some(n) = NhaCungCap::TAT_CA.into_iter().find(|n| k.starts_with(n.ma()) && k[n.ma().len()..].starts_with('_')) else { return };
+            let m = b.mo_hinh_mut(n);
+            match &k[n.ma().len() + 1..] {
+                "dia_chi" => m.dia_chi = v.into(),
+                "model" => m.model = v.into(),
+                "song_song" => m.song_song = so(SONG_SONG_KHOANG).unwrap_or(m.song_song),
+                "cho" => m.cho_s = so(CHO_KHOANG).unwrap_or(m.cho_s),
+                _ => {}
+            }
+        }
+    }
+}
+
+fn ghi_boc_tach(b: &CauHinhBocTach) -> String {
+    let bool_ = |x: bool| if x { "1" } else { "0" };
+    let ma = |n: Option<NhaCungCap>| n.map_or("", NhaCungCap::ma);
+    let mut s = format!("bt_mac_dinh={}\nbt_dpi={}\nbt_canh_toi_da={}\nbt_jpeg={}\nbt_max_tokens={}\n", ma(b.mac_dinh), b.dpi, b.canh_toi_da, b.jpeg, b.max_tokens);
+    for n in NhaCungCap::TAT_CA {
+        let m = b.mo_hinh(n);
+        s += &format!("bt_{0}_dia_chi={1}\nbt_{0}_model={2}\nbt_{0}_song_song={3}\nbt_{0}_cho={4}\n", n.ma(), m.dia_chi, m.model, m.song_song, m.cho_s);
+    }
+    let cach = if b.sheet_cach == CachGhiSheet::AppsScript { "apps_script" } else { "service_account" };
+    s += &format!("bt_thu_muc_excel={}\nbt_sheet_link={}\nbt_sheet_tab={}\nbt_sheet_cach={cach}\nbt_sheet_file_khoa={}\n", b.thu_muc_excel, b.sheet_link, b.sheet_tab, b.sheet_file_khoa);
+    s += &format!("bt_ghi_sheet={}\n", bool_(b.ghi_sheet));
+    s
 }
 
 /// Giá trị không hợp lệ: hộp Cấu hình hiện đỏ và khoá Lưu; lúc đọc file thì nhóm đó về mặc định.
@@ -273,6 +422,7 @@ impl CauHinh {
                 "ml_dong_tieu_de" => c.muc_luc.dong_tieu_de = so().filter(|x| (1.0..=100_000.0).contains(x)).map_or(c.muc_luc.dong_tieu_de, |x| x as u32),
                 "ml_mau" => c.muc_luc.mau = v.to_string(),
                 "ml_bien" => c.muc_luc.bien = v.to_string(),
+                _ if k.starts_with("bt_") => doc_boc_tach(&mut c.boc_tach, &k[3..], v),
                 _ => {}
             }
         }
@@ -330,6 +480,7 @@ impl CauHinh {
         let m = &self.muc_luc;
         s += &format!("ml_thu_muc_ra={}\nml_mau_ten={}\nml_ghi_de={}\nml_rong_trai={}\n", m.thu_muc_ra, m.mau_ten, bool_(m.ghi_de), m.rong_trai);
         s += &format!("ml_file={}\nml_sheet={}\nml_dong_tieu_de={}\nml_mau={}\nml_bien={}\n", m.file, m.sheet, m.dong_tieu_de, m.mau, m.bien);
+        s += &ghi_boc_tach(&self.boc_tach);
         s
     }
 
@@ -514,6 +665,14 @@ mod tests {
                 mau: r"D:\Mẫu riêng.docx".into(),
                 bien: crate::muc_luc::RangBuoc { cot_nhom: "Số HS".into(), bien: vec![("a".into(), crate::muc_luc::Nguon::Hang("x=y".into()))] }.json(),
             },
+            boc_tach: {
+                let mut b = CauHinhBocTach { mac_dinh: Some(NhaCungCap::Gemini), dpi: 150, canh_toi_da: 1600, jpeg: 85, max_tokens: 4096, ..Default::default() };
+                *b.mo_hinh_mut(NhaCungCap::NoiBo) = MoHinhBocTach { dia_chi: "http://192.168.1.5:8001/v1".into(), model: "5CD-AI/Vintern-1B-v3_5".into(), song_song: 1, cho_s: 300 };
+                b.mo_hinh_mut(NhaCungCap::Gemini).model = "gemini-2.5-flash".into();
+                b.sheet_cach = CachGhiSheet::AppsScript;
+                (b.ghi_sheet, b.sheet_file_khoa) = (true, r"D:\khoa=1.json".into());
+                b
+            },
         };
         assert!(c.kiem_tra().is_empty(), "{:?}", c.kiem_tra());
         assert_eq!(CauHinh::phan_tich(&c.noi_dung()), c);
@@ -521,6 +680,17 @@ mod tests {
             let c = CauHinh { loai_ma: loai, ..Default::default() };
             assert_eq!(CauHinh::phan_tich(&c.noi_dung()).loai_ma, loai);
         }
+    }
+
+    #[test]
+    fn boc_tach_gia_tri_ngoai_khoang_ve_mac_dinh() {
+        let c = CauHinh::phan_tich("bt_dpi=9999\nbt_noi_bo_song_song=0\nbt_gemini_cho=5\nbt_mac_dinh=khong_co\nbt_claude_model=claude-haiku-4-5\nbt_open_router_x=1");
+        assert_eq!(c.boc_tach.dpi, 200);
+        assert_eq!(c.boc_tach.mo_hinh(NhaCungCap::NoiBo).song_song, 1);
+        assert_eq!(c.boc_tach.mo_hinh(NhaCungCap::Gemini).cho_s, 60);
+        assert_eq!(c.boc_tach.mac_dinh, None);
+        assert_eq!(c.boc_tach.mo_hinh(NhaCungCap::Claude).model, "claude-haiku-4-5");
+        assert!(!c.noi_dung().to_lowercase().contains("khoa_api"), "khoá API không bao giờ nằm trong file cấu hình");
     }
 
     #[test]

@@ -12,11 +12,16 @@ use crate::gui::{ChuDam, CHU, CHU_PHU, NEN, VIEN, XANH_COBALT};
 pub enum Bam {
     Chon,
     PhanTich,
+    /// Bóc tách: tới ô Mô hình đọc / Loại tài liệu / tab Trường dữ liệu.
+    MoHinh,
+    LoaiTaiLieu,
+    TruongDuLieu,
 }
 
 /// Một đoạn chữ trong thân thẻ bước: chữ thường hoặc link.
 pub enum Doan {
     Chu(&'static str),
+    Dam(&'static str),
     Link(&'static str, Bam),
 }
 
@@ -93,13 +98,13 @@ pub const BOC_TACH: GioiThieu = GioiThieu {
     tieu_de: "Bóc tách dữ liệu",
     mo_ta: "Đọc văn bản PDF bằng AI để lấy số ký hiệu, ngày tháng, trích yếu, cơ quan ban hành, người ký…; kết quả ghi ra Excel và Google Sheet, dùng làm file biên mục cho Sinh mục lục.",
     buoc: [
-        Buoc { ten: "Chọn nguồn văn bản", than: &[Doan::Chu("Thư mục trên máy, Google Drive, Google Cloud Storage hoặc kho S3.")] },
-        Buoc { ten: "Chọn mô hình đọc", than: &[Doan::Chu("Máy chủ nội bộ, ChatGPT, Gemini, Claude…; khai khoá ở Cấu hình.")] },
-        Buoc { ten: "Chọn loại tài liệu", than: &[Doan::Chu("Xem, thử đọc các trường rồi bấm Bắt đầu.")] },
+        Buoc { ten: "Chọn nguồn văn bản", than: &[Doan::Chu("Thư mục trên máy, Google Drive, Google Cloud Storage hoặc kho S3; bấm "), Doan::Link("Chọn", Bam::Chon), Doan::Chu(".")] },
+        Buoc { ten: "Chọn mô hình đọc", than: &[Doan::Chu("Máy chủ nội bộ, ChatGPT, Gemini, Claude… ở ô "), Doan::Link("Mô hình đọc", Bam::MoHinh), Doan::Chu("; khai khoá ở Cấu hình.")] },
+        Buoc { ten: "Chọn loại tài liệu", than: &[Doan::Chu("Chọn ở ô "), Doan::Link("Loại tài liệu", Bam::LoaiTaiLieu), Doan::Chu("; tab "), Doan::Link("Trường dữ liệu", Bam::TruongDuLieu), Doan::Chu(" xem, thử đọc, rồi bấm "), Doan::Dam("Bắt đầu"), Doan::Chu(".")] },
     ],
     kho: false,
     logo: Logo::BocTach,
-    dang_phat_trien: true,
+    dang_phat_trien: false,
 };
 
 pub const CHUAN_TEN: GioiThieu = GioiThieu {
@@ -142,6 +147,11 @@ pub fn ve(ui: &mut egui::Ui, gt: &GioiThieu) -> Option<Bam> {
 
 /// Như `ve`, làm nổi thẻ bước `noi_bat` (1-based) — bước người dùng cần làm tiếp.
 pub fn ve_noi_bat(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>) -> Option<Bam> {
+    ve_trang_thai(ui, gt, noi_bat, [false; 3])
+}
+
+/// Như `ve_noi_bat`, bước đã xong (`xong[i]`) hiện dấu ✓ nền xanh ở ô số.
+pub fn ve_trang_thai(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>, xong: [bool; 3]) -> Option<Bam> {
     let vung = ui.available_rect_before_wrap();
     let mut bam = None;
     let mut cho_nhan = None;
@@ -177,7 +187,7 @@ pub fn ve_noi_bat(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>) -> 
             ui.spacing_mut().item_spacing.x = KHE_THE;
             ui.add_space(((ui.available_width() - rong_hang) / 2.0).max(0.0));
             for (i, b) in gt.buoc.iter().enumerate() {
-                if let Some(x) = the_buoc(ui, i + 1, b, noi_bat == Some(i + 1)) {
+                if let Some(x) = the_buoc(ui, i + 1, b, noi_bat == Some(i + 1), xong[i]) {
                     bam = Some(x);
                 }
             }
@@ -213,7 +223,7 @@ fn nhan_dang_phat_trien(p: &egui::Painter, tam: egui::Pos2) {
 }
 
 /// 1 thẻ bước: ô số xám, tên đậm, thân chữ (có thể chứa link). `noi` = bước cần làm tiếp: viền xanh, ô số xanh.
-fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool) -> Option<Bam> {
+fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool, xong: bool) -> Option<Bam> {
     let mut bam = None;
     let khung = egui::Frame::new().fill(Color32::WHITE).stroke(if noi { Stroke::new(1.5, XANH_COBALT) } else { Stroke::new(1.0, VIEN) }).inner_margin(Margin { left: 10, right: 10, top: 10, bottom: 12 });
     let r = khung.show(ui, |ui| {
@@ -223,9 +233,15 @@ fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool) -> Option<Bam> {
         ui.set_min_height(CAO_THE);
         ui.spacing_mut().item_spacing.y = 0.0;
         let (o, _) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), Sense::hover());
-        let (nen, vien, chu) = if noi { (XANH_COBALT, XANH_COBALT, Color32::WHITE) } else { (NEN, VIEN, CHU_PHU) };
+        let (nen, vien, chu) = if xong { (crate::gui::XANH_LA, crate::gui::XANH_LA, Color32::WHITE) } else if noi { (XANH_COBALT, XANH_COBALT, Color32::WHITE) } else { (NEN, VIEN, CHU_PHU) };
         ui.painter().rect(o, 0.0, nen, Stroke::new(1.0, vien), StrokeKind::Inside);
-        ui.painter().text(o.center(), egui::Align2::CENTER_CENTER, so.to_string(), egui::FontId::proportional(12.0), chu);
+        if xong {
+            // Dấu ✓ vẽ nét (font giao diện không có ký tự ✓)
+            let c = o.center();
+            ui.painter().line(vec![c + egui::vec2(-5.0, 0.0), c + egui::vec2(-1.5, 3.5), c + egui::vec2(5.0, -4.0)], Stroke::new(1.8, Color32::WHITE));
+        } else {
+            ui.painter().text(o.center(), egui::Align2::CENTER_CENTER, so.to_string(), egui::FontId::proportional(12.0), chu);
+        }
         ui.add_space(6.0);
         ui.label(RichText::new(b.ten).size(12.0).color(CHU).dam());
         ui.add_space(2.0);
@@ -235,6 +251,9 @@ fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool) -> Option<Bam> {
                 match d {
                     Doan::Chu(c) => {
                         ui.label(RichText::new(*c).size(12.0).color(CHU));
+                    }
+                    Doan::Dam(c) => {
+                        ui.label(RichText::new(*c).size(12.0).color(CHU).dam());
                     }
                     Doan::Link(c, x) => {
                         if ui.add(egui::Link::new(RichText::new(*c).size(12.0).color(XANH_COBALT).underline())).clicked() {

@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Lõi bóc tách (không giao diện)"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 ---

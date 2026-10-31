@@ -45,7 +45,7 @@ pub enum Tab {
 }
 
 /// Ô chọn như prototype: nền `nen`, viền `vien`, bo 3 px; rê chuột viền đậm hơn.
-pub(super) fn kieu_o_chon(ui: &mut egui::Ui, nen: Color32, vien: Color32) {
+pub(crate) fn kieu_o_chon(ui: &mut egui::Ui, nen: Color32, vien: Color32) {
     let w = &mut ui.visuals_mut().widgets;
     for v in [&mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
         v.weak_bg_fill = nen;
@@ -58,7 +58,7 @@ pub(super) fn kieu_o_chon(ui: &mut egui::Ui, nen: Color32, vien: Color32) {
 }
 
 /// Mũi tên ⌄ nét mảnh của ô chọn (thay tam giác đặc mặc định của egui).
-pub(super) fn mui_ten_chon(ui: &egui::Ui, r: Rect, _: &egui::style::WidgetVisuals, _: bool) {
+pub(crate) fn mui_ten_chon(ui: &egui::Ui, r: Rect, _: &egui::style::WidgetVisuals, _: bool) {
     let c = r.center();
     let mau = if ui.is_enabled() { Color32::from_gray(0x55) } else { CHU_MO };
     ui.painter().add(egui::Shape::line(vec![c + egui::vec2(-4.5, -2.0), c + egui::vec2(0.0, 2.5), c + egui::vec2(4.5, -2.0)], Stroke::new(1.3, mau)));

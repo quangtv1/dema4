@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Khung màn hình + tab Trường dữ liệu + popup"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 2]
 ---

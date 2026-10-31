@@ -9,6 +9,8 @@
 //! - `dema4_rs --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]`: tách văn bản theo nhãn,
 //!   ghi `<cha>/<tên>_vanban/…` và `ketqua_tach.txt` trong thư mục dữ liệu ẩn của thư mục pdf (cạnh file chạy); chưa có nhãn thì phân tích tự động trước.
 
+#[allow(dead_code)] // nối dần vào màn Bóc tách
+mod boc_tach;
 #[allow(dead_code)] // nối dần vào màn Đếm / Tách
 mod cau_hinh;
 mod dem_pdf;
@@ -20,6 +22,7 @@ mod tram;
 mod hop_license;
 mod gui;
 mod gui_muc_luc;
+mod gui_boc_tach;
 #[allow(dead_code)] // nối dần vào giao diện
 mod gui_tach;
 #[allow(dead_code)] // dùng dần từ các phần phân tích / giao diện tách văn bản

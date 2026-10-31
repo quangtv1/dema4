@@ -35,6 +35,9 @@ zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
 quick-xml = "0.42"
 calamine = { version = "0.37.0", features = ["dates"] }
 encoding_rs = "0.8.44"
+serde = { version = "1.0.229", features = ["derive"] }
+jpeg-encoder = "0.7.1"
+aes-gcm = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_Console", "Win32_Storage_FileSystem", "Win32_System_Registry"] }
