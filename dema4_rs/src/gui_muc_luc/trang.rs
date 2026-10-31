@@ -108,11 +108,7 @@ pub fn ve(ui: &mut egui::Ui, id: &str, khoi: &[Khoi], kieu: &KieuVe, canh_bao: O
                 ui.add_space(le_ngang);
                 egui::Frame::new().fill(Color32::from_rgb(0xFF, 0xF6, 0xE0)).stroke(Stroke::new(1.0, Color32::from_rgb(0xE8, 0xC7, 0x7A))).inner_margin(egui::Margin::symmetric(10, 7)).show(ui, |ui| {
                     ui.set_width(rong_trang - 20.0);
-                    ui.horizontal(|ui| {
-                        let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), Sense::hover());
-                        dau_canh_bao(ui.painter(), r, Color32::from_rgb(0xB8, 0x5F, 0x00));
-                        ui.label(egui::RichText::new(cb).size(12.0).color(Color32::from_rgb(0x6B, 0x4A, 0x00)));
-                    });
+                    ui.label(egui::RichText::new(format!("Kiểm tra: {cb}")).size(12.0).color(Color32::from_rgb(0x6B, 0x4A, 0x00)));
                 });
             });
             ui.add_space(10.0);

@@ -813,11 +813,17 @@ impl ManMucLuc {
         ui.painter().hline(rect.x_range(), rect.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
         let co = self.co_du_lieu();
         let (tong_bien, chua) = self.mau.as_ref().map_or((0, 0), |m| (m.nhom.tong(), m.nhom.nhom.iter().flatten().filter(|b| m.nhom.loai(&self.rb, b) == Loai::ChuaGhep).count()));
-        let ds = [(Tab::Mau, if co { format!("Mẫu ({}/{} biến)", tong_bien - chua, tong_bien) } else { "Mẫu".into() }), (Tab::KetQua, if co { format!("Kết quả ({})", so_nguyen(self.kq.ho_so.len())) } else { "Kết quả".into() })];
+        let co_mau = self.mau.is_some();
+        let ds = [
+            (Tab::Mau, co_mau, if co { format!("Mẫu ({}/{} biến)", tong_bien - chua, tong_bien) } else if co_mau { format!("Mẫu ({tong_bien} biến)") } else { "Mẫu".into() }),
+            (Tab::KetQua, co, if co { format!("Kết quả ({})", so_nguyen(self.kq.ho_so.len())) } else { "Kết quả".into() }),
+        ];
         // 2 tab chia đôi bề rộng sidebar (co giãn theo sidebar)
         let rong = (self.rong_trai / 2.0).round();
-        for (i, (tab, chu)) in ds.iter().enumerate() {
-            let chon = co && self.tab == *tab;
+        for (i, (tab, co, chu)) in ds.iter().enumerate() {
+            let co = *co;
+            // Chưa có file: tab Mẫu là tab duy nhất xem được
+            let chon = co && (self.tab == *tab || (*tab == Tab::Mau && self.du_lieu.is_none()));
             let r = Rect::from_min_size(egui::pos2(rect.left() + i as f32 * rong, rect.top()), egui::vec2(rong, CAO_TAB));
             let ph = ui.interact(r, ui.scope_id().with(("ml_tab", i)), if co { Sense::click() } else { Sense::hover() });
             ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, co, chon, chu));
@@ -848,8 +854,9 @@ impl ManMucLuc {
         }
         let loi_chan = self.loi_doc.clone().or_else(|| self.loi_mau.clone()).or_else(|| self.kq.loi.first().cloned());
         let chu = match &loi_chan {
-            Some(l) => l.clone(),
-            None => phan.join(" · "),
+            Some(l) => format!("Kiểm tra: {l}"),
+            None if phan.is_empty() => String::new(),
+            None => format!("Kiểm tra: {}", phan.join(" · ")),
         };
         if !chu.is_empty() {
             let mau = if loi_chan.is_some() { DO } else { CAM };
@@ -859,7 +866,6 @@ impl ManMucLuc {
             let g = ui.fonts_mut(|f| f.layout_job(job));
             let r = Rect::from_min_size(egui::pos2(rect.right() - 12.0 - g.size().x, rect.center().y - g.size().y / 2.0), g.size());
             ui.painter().galley(r.min, g, mau);
-            trang::dau_canh_bao(ui.painter(), Rect::from_center_size(egui::pos2(r.left() - 10.0, r.center().y), egui::vec2(13.0, 13.0)), mau);
             let ph = ui.interact(r, ui.scope_id().with("ml_canh_bao"), Sense::click()).on_hover_text(&chu);
             if let Some(&i) = loi_hs.first() {
                 if ph.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
@@ -873,6 +879,18 @@ impl ManMucLuc {
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         let co = self.co_du_lieu();
         let mau_tab = co && self.tab == Tab::Mau;
+        // Có mẫu, chưa có file: bảng biến chỉ xem (Lấy từ chờ file biên mục)
+        if !co {
+            if let Some(m) = &self.mau {
+                let v = bang_bien::VaoBang { nhom: &m.nhom, rb: &self.rb, cot: &[], khac_nhau: &[], mo: None, sang: self.sang.as_deref(), chi_xem: true };
+                let mut re = None;
+                bang_bien::ve(ui, &v, &mut self.o_go, &mut re);
+                if ui.ui_contains_pointer() {
+                    self.sang = re;
+                }
+            }
+            return;
+        }
         // Chân sidebar chỉ ở tab Mẫu: hàng "Nhóm theo"
         if mau_tab {
             egui::Panel::bottom("ml_day_trai").exact_size(crate::gui_tach::cot_trai::CAO_DAY).frame(egui::Frame::new().fill(Color32::from_gray(0xFA))).show(ui, |ui| {
@@ -889,7 +907,7 @@ impl ManMucLuc {
             Tab::Mau => {
                 let (Some(m), Some(d)) = (&self.mau, &self.du_lieu) else { return };
                 let mut re = None;
-                let v = bang_bien::VaoBang { nhom: &m.nhom, rb: &self.rb, cot: &d.bang.tieu_de, khac_nhau: &d.khac_nhau, mo: self.mo.as_deref(), sang: self.sang.as_deref() };
+                let v = bang_bien::VaoBang { nhom: &m.nhom, rb: &self.rb, cot: &d.bang.tieu_de, khac_nhau: &d.khac_nhau, mo: self.mo.as_deref(), sang: self.sang.as_deref(), chi_xem: false };
                 let viec = bang_bien::ve(ui, &v, &mut self.o_go, &mut re);
                 if ui.ui_contains_pointer() {
                     self.sang = re;
@@ -990,7 +1008,7 @@ impl ManMucLuc {
     }
 
     fn khung_phai(&mut self, ui: &mut egui::Ui) {
-        if !self.co_du_lieu() {
+        if self.mau.is_none() {
             // Mẫu không đúng yêu cầu: vẫn hiện nội dung mẫu, dải cảnh báo phía trên
             if let Some(trang) = &self.trang_mau_loi {
                 let mau_chip = |_: &str| Loai::ChuaGhep.mau();
@@ -1011,11 +1029,14 @@ impl ManMucLuc {
             });
             return;
         }
-        match self.tab {
+        // Chọn mẫu trước file biên mục: chỉ xem tab Mẫu (màu theo vùng, chưa có "chưa ghép")
+        let co_file = self.du_lieu.is_some();
+        match if co_file { self.tab } else { Tab::Mau } {
             Tab::Mau => {
                 // Chú thích màu kèm số biến từng loại (loại không có biến thì ẩn); số chưa ghép đậm cam
                 let dem: Vec<(Loai, &str, usize)> = self.mau.as_ref().map_or_else(Vec::new, |m| {
-                    let so = |l: Loai| m.nhom.nhom.iter().flatten().filter(|b| m.nhom.loai(&self.rb, b) == l).count();
+                    let loai = |b: &str| if co_file { m.nhom.loai(&self.rb, b) } else { m.nhom.loai_vung(b) };
+                    let so = |l: Loai| m.nhom.nhom.iter().flatten().filter(|b| loai(b) == l).count();
                     [(Loai::ThongTin, "thông tin hồ sơ"), (Loai::Bang, "bảng văn bản"), (Loai::TuDong, "tự động"), (Loai::ChuaGhep, "chưa ghép")].into_iter().map(|(l, t)| (l, t, so(l))).filter(|x| x.2 > 0).collect()
                 });
                 self.thanh_cong_cu(ui, |_, ui| {
@@ -1027,18 +1048,19 @@ impl ManMucLuc {
                         ui.label(if loai == Loai::ChuaGhep { so.color(Color32::from_rgb(0xB8, 0x5F, 0x00)) } else { so.color(CHU) });
                         ui.add_space(6.0);
                     }
-                    ui.label(RichText::new("· bấm biến trên trang để sửa nguồn").size(11.5).color(CHU_MO));
+                    let goi_y = if co_file { "· bấm biến trên trang để sửa nguồn" } else { "· chọn file biên mục để ghép biến" };
+                    ui.label(RichText::new(goi_y).size(11.5).color(CHU_MO));
                 });
                 let Some(m) = &self.mau else { return };
                 let nhom = &m.nhom;
                 let rb = &self.rb;
-                let mau_chip = |t: &str| nhom.loai(rb, t).mau();
+                let mau_chip = |t: &str| if co_file { nhom.loai(rb, t).mau() } else { nhom.loai_vung(t).mau() };
                 let kieu = trang::KieuVe { zoom: self.zoom, mau_chip: Some(&mau_chip), sang: self.sang.as_deref() };
                 let ph = trang::ve(ui, "ml_trang_mau", &m.trang, &kieu, None);
                 if ui.ui_contains_pointer() {
                     self.sang = ph.re;
                 }
-                if let Some(b) = ph.bam {
+                if let Some(b) = ph.bam.filter(|_| co_file) {
                     if !m.nhom.nhom[2].contains(&b) {
                         self.o_go = match self.rb.nguon(&b) {
                             Some(Nguon::Hang(h)) => h.clone(),
@@ -1128,6 +1150,11 @@ impl ManMucLuc {
                     }
                 }
                 None if self.doc_nen.is_some() => job.append("Đang đọc file biên mục…", 0.0, thuong.clone()),
+                None if self.mau.is_some() && self.du_lieu.is_none() => {
+                    job.append("Đã chọn mẫu · chọn ", 0.0, thuong.clone());
+                    job.append("File biên mục", 0.0, dam.clone());
+                    job.append(" để ghép biến và sinh mục lục", 0.0, thuong.clone());
+                }
                 None if self.mau_chon.is_empty() && self.du_lieu.is_some() => {
                     job.append("Đã đọc ", 0.0, thuong.clone());
                     job.append(&so_nguyen(self.du_lieu.as_ref().map_or(0, |d| d.bang.dong.len())), 0.0, dam.clone());

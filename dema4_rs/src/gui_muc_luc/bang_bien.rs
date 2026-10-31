@@ -80,6 +80,8 @@ pub struct VaoBang<'a> {
     pub khac_nhau: &'a [usize],
     pub mo: Option<&'a str>,
     pub sang: Option<&'a str>,
+    /// Chưa có file biên mục: chỉ xem biến, ô Lấy từ không bấm được.
+    pub chi_xem: bool,
 }
 
 /// Chip `{bien}` vẽ tay (nền bo góc) trong ô `o`, căn trái giữa dọc.
@@ -226,16 +228,18 @@ pub fn ve(ui: &mut egui::Ui, v: &VaoBang, o_go: &mut String, re: &mut Option<Str
                 // Chip biến giữ màu của vùng; chưa ghép chỉ tô ô Lấy từ + dấu ! cuối dòng
                 chip(ui, Rect::from_min_max(egui::pos2(r.left() + 6.0, r.top()), egui::pos2(r.left() + RONG_COT_BIEN - 4.0, r.bottom())), b, v.nhom.loai_vung(b).mau());
                 let o = Rect::from_min_max(egui::pos2(r.left() + RONG_COT_BIEN, r.top() + 3.0), egui::pos2(r.right() - RONG_COT_CANH, r.bottom() - 3.0));
-                let tu_dong = (g == 2).then(|| if b == "tong_so_trang" { "tổng số trang" } else if b == "trang_so" { "số trang" } else { "tự động" });
+                let tu_dong = (g == 2).then(|| if b == "tong_so_trang" { "tổng số trang" } else if b == "trang_so" { "số trang" } else { "tự động" }).or(v.chi_xem.then_some("—"));
                 let mo = v.mo == Some(b.as_str());
                 let ph_o = ui.interact(o, ui.scope_id().with(("ml_o", b)), if tu_dong.is_some() { Sense::hover() } else { Sense::click() });
                 o_lay_tu(ui, o, v.rb.nguon(b), tu_dong, mo, ph_o.hovered());
-                if tu_dong.is_some() {
+                if v.chi_xem && g != 2 {
+                    ph_o.on_hover_text("Chọn file biên mục để ghép biến với cột dữ liệu");
+                } else if tu_dong.is_some() {
                     ph_o.on_hover_text("Word tự điền khi in");
                 } else if ph_o.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                     viec.push(if mo { Viec::DongSua } else { Viec::MoSua(b.clone()) });
                 }
-                if loai == Loai::ChuaGhep {
+                if loai == Loai::ChuaGhep && !v.chi_xem {
                     ui.painter().text(egui::pos2(r.right() - RONG_COT_CANH / 2.0, r.center().y), egui::Align2::CENTER_CENTER, "!", egui::FontId::new(13.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), CAM);
                 }
                 if mo {

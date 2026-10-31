@@ -79,7 +79,7 @@ impl ManMucLuc {
             }
             egui::ScrollArea::vertical().id_salt("ml_hop_bang").max_height(470.0).auto_shrink([false, true]).show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 0.0;
-                let v = VaoBang { nhom: &m.nhom, rb: &self.rb, cot: &d.bang.tieu_de, khac_nhau: &d.khac_nhau, mo: self.mo_hop.as_deref(), sang: None };
+                let v = VaoBang { nhom: &m.nhom, rb: &self.rb, cot: &d.bang.tieu_de, khac_nhau: &d.khac_nhau, mo: self.mo_hop.as_deref(), sang: None, chi_xem: false };
                 let ten_nhom = ["Thông tin hồ sơ (in một lần)", "Bảng văn bản (mỗi văn bản một dòng)", "Tự động"];
                 for (g, ds) in m.nhom.nhom.iter().enumerate() {
                     if ds.is_empty() {

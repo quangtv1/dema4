@@ -2156,6 +2156,11 @@ mod tests {
         h.state_mut().muc_luc.bo_mau_thu();
         h.run_steps(3);
         h.render().unwrap().save(thu_muc_anh.join("ml_10_bo_mau.png")).unwrap();
+        // Chọn mẫu trước file biên mục: tab Mẫu xem ngay
+        let mut h = tao(false);
+        h.state_mut().muc_luc.dat_mau_thu("1");
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_11_chi_mau.png")).unwrap();
         let _ = std::fs::remove_file(&rieng);
         let _ = std::fs::remove_file(&sai);
     }
