@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Đầu ra: Excel + Google Sheet"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 ---
@@ -14,7 +14,7 @@ dependencies: [1]
 - Tên cột trùng biến Sinh mục lục → file nạp thẳng làm file biên mục (test bằng `muc_luc::doc_bang`).
 - Google Sheet ghi thêm 1 dòng sau mỗi file:
   - Service account: JWT RS256 (`rsa` + `sha2` đã có) → token OAuth → Sheets API `values:append`; tạo tab + dòng tiêu đề nếu chưa có.
-  - Apps Script: POST JSON tới URL web app; cung cấp script mẫu (nút "Chép script mẫu").
+  - Apps Script: POST JSON tới URL web app; cung cấp script mẫu (nút "Chép script mẫu") — đặt ở `apps-script-mau/boc_tach.gs`, KHÔNG trong `apps-script/` (thư mục trạm license).
   - Lỗi mạng: xếp hàng gửi lại, không chặn bóc tách; báo số dòng chưa ghi.
 - "Ghi thử 1 dòng" trong Cấu hình.
 

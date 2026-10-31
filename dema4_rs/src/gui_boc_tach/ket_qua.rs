@@ -14,9 +14,11 @@ use eframe::egui::{self, Color32, Margin, Rect, RichText, Sense, Stroke};
 use super::xem_pdf::{XemPdf, NAC};
 use super::ManBocTach;
 use crate::boc_tach::chay::{chay_hang, SuKien};
+use crate::boc_tach::excel::{self, DongExcel};
+use crate::boc_tach::sheet::{self, CachGhi, DichSheet, HangDoi};
 use crate::boc_tach::loai_tai_lieu::LoaiTaiLieu;
 use crate::boc_tach::luu::{self, BanGhi};
-use crate::cau_hinh::CauHinhBocTach;
+use crate::cau_hinh::{CachGhiSheet, CauHinhBocTach};
 use crate::gui::{so_nguyen, CHU, CHU_MO, CHU_PHU, DO, NEN_TAB_CHON, NEN_TIEU_DE, VIEN, VIEN_NHAT};
 use crate::gui_tach::bieu_tuong::{self as bt, BieuTuong};
 use crate::gui_tach::khung_hop as kh;
@@ -83,6 +85,8 @@ pub(crate) struct TongKet {
     thoi_gian: Duration,
     so_file_chay: usize,
     dung_som: Option<String>,
+    excel: Option<Result<PathBuf, String>>,
+    tab_sheet: Option<String>,
 }
 
 pub(crate) struct TabKetQua {
@@ -122,6 +126,21 @@ pub(crate) fn khop_loc(ten: &str, tt: &TrangThai, loc: &str, n_truong: usize) ->
     theo_tt || (!dang_so(&q).is_empty() && dang_so(ten).contains(&dang_so(&q)))
 }
 
+/// Đích Google Sheet theo Cấu hình (khoá service account đọc từ file, URL Apps Script từ kho khoá).
+pub(crate) fn tao_dich_sheet(cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>) -> Result<DichSheet, String> {
+    let cach = match cfg.sheet_cach {
+        CachGhiSheet::ServiceAccount => {
+            if cfg.sheet_file_khoa.trim().is_empty() {
+                return Err("Chưa chọn file khoá service account (Cấu hình › Bóc tách › Ghi kết quả)".into());
+            }
+            let (email, khoa_pem) = sheet::doc_khoa_sa(&cfg.sheet_file_khoa)?;
+            CachGhi::ServiceAccount { email, khoa_pem }
+        }
+        CachGhiSheet::AppsScript => CachGhi::AppsScript { url: khoa.get(super::cau_hinh::KHOA_APPS_SCRIPT).cloned().unwrap_or_default() },
+    };
+    DichSheet::moi(cach, &cfg.sheet_link, &cfg.sheet_tab)
+}
+
 fn giay(d: Duration) -> String {
     format!("{:.1}", d.as_secs_f32()).replace('.', ",")
 }
@@ -136,6 +155,7 @@ impl ManBocTach {
             return;
         }
         let ds = luu::doc(&luu::file_jsonl(Path::new(self.thu_muc.trim())), &loai.ten);
+        self.excel = None;
         for (i, f) in self.files.iter().enumerate() {
             if let Some(b) = ds.get(&f.ten) {
                 self.tt[i] = match &b.loi {
@@ -165,6 +185,7 @@ impl ManBocTach {
         let song_song = cfg.mo_hinh(n).song_song as usize;
         let anh = cfg.anh();
         let files: Vec<(usize, PathBuf)> = ds.iter().map(|&i| (i, self.files[i].duong_dan.clone())).collect();
+        self.tao_sheet(cfg, khoa);
         let dung = Arc::new(AtomicBool::new(false));
         let (gui, nhan) = mpsc::channel();
         let (d2, ctx2) = (dung.clone(), ctx.clone());
@@ -178,7 +199,7 @@ impl ManBocTach {
         self.chay = Some(DangChay { nhan, dung, bat_dau: Instant::now(), ds, xong: 0, truong_boc: 0, bat_dau_file: HashMap::new(), dung_som: None, mo_hinh: super::cau_hinh::ten_mo_hinh(cfg, n) });
     }
 
-    pub(crate) fn nhan_chay(&mut self, ctx: &egui::Context) {
+    pub(crate) fn nhan_chay(&mut self, ctx: &egui::Context, cfg: &CauHinhBocTach) {
         let Some(loai) = self.loai_chon().cloned() else { return };
         let goc = PathBuf::from(self.thu_muc.trim());
         let f_jsonl = luu::file_jsonl(&goc);
@@ -206,20 +227,29 @@ impl ManBocTach {
                     c.xong += 1;
                     c.truong_boc += kq.so_co();
                     self.tt[i] = TrangThai::Xong(b);
+                    self.day_sheet(i, &loai);
                 }
                 SuKien::Loi(i, e) => {
                     let _ = luu::ghi_them(&f_jsonl, &BanGhi::loi(&self.files[i].ten, &loai, self.files[i].so_trang, &e));
                     c.xong += 1;
                     self.tt[i] = TrangThai::Loi(e);
+                    self.day_sheet(i, &loai);
                 }
                 SuKien::DungSom(l) => c.dung_som = Some(l),
                 SuKien::HetHang => {
                     let c = self.chay.take().unwrap();
                     self.thoi_gian_chay = Some(c.bat_dau.elapsed());
+                    self.ghi_excel(cfg);
                     self.tong_ket = Some(self.tinh_tong_ket(&c, &loai));
                     return;
                 }
             }
+        }
+    }
+
+    fn day_sheet(&self, i: usize, loai: &LoaiTaiLieu) {
+        if let (Some(h), Some(d)) = (&self.sheet, self.dong_excel(i, loai)) {
+            h.them(excel::dong_chu(&d, true));
         }
     }
 
@@ -239,7 +269,65 @@ impl ManBocTach {
         }
         let trang = c.ds.iter().filter(|&&i| matches!(self.tt[i], TrangThai::Xong(_))).map(|&i| loai.trang_doc.cac_trang(self.files[i].so_trang).len()).sum();
         let ten_nguon = Path::new(self.thu_muc.trim()).file_name().map_or_else(|| self.thu_muc.clone(), |s| s.to_string_lossy().into_owned());
-        TongKet { ten_nguon, tong: self.files.len(), ok, loi, trang, loai: loai.ten.clone(), truong_co: co, truong_tong: ok * loai.truong.len(), thieu, mo_hinh: c.mo_hinh.clone(), thoi_gian: c.bat_dau.elapsed(), so_file_chay: c.xong, dung_som: c.dung_som.clone() }
+        TongKet {
+            ten_nguon,
+            tong: self.files.len(),
+            ok,
+            loi,
+            trang,
+            loai: loai.ten.clone(),
+            truong_co: co,
+            truong_tong: ok * loai.truong.len(),
+            thieu,
+            mo_hinh: c.mo_hinh.clone(),
+            thoi_gian: c.bat_dau.elapsed(),
+            so_file_chay: c.xong,
+            dung_som: c.dung_som.clone(),
+            excel: self.excel.clone(),
+            tab_sheet: self.sheet.as_ref().map(|_| self.tab_sheet.clone()),
+        }
+    }
+
+    /// Dòng Excel / Sheet của file `i` (đã đọc xong hoặc lỗi).
+    fn dong_excel(&self, i: usize, loai: &LoaiTaiLieu) -> Option<DongExcel> {
+        let f = &self.files[i];
+        let goc = Path::new(self.thu_muc.trim());
+        // Hồ sơ = thư mục chứa file (file ở ngay thư mục nguồn → tên thư mục nguồn)
+        let ho_so = Path::new(&f.ten).parent().and_then(|p| p.file_name()).or_else(|| goc.file_name()).map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+        let (gia_tri, loi) = match self.tt.get(i)? {
+            TrangThai::Xong(b) => (b.theo_truong(loai), None),
+            TrangThai::Loi(e) => (vec![String::new(); loai.truong.len()], Some(e.clone())),
+            _ => return None,
+        };
+        Some(DongExcel { ten_file: f.ten.clone(), ho_so, so_trang: f.so_trang, gia_tri, loi })
+    }
+
+    /// Ghi lại toàn bộ Excel từ kết quả hiện có (chạy xong / Lưu sửa tay).
+    pub(crate) fn ghi_excel(&mut self, cfg: &CauHinhBocTach) {
+        let Some(loai) = self.loai_chon().cloned() else { return };
+        let dong: Vec<DongExcel> = (0..self.files.len()).filter_map(|i| self.dong_excel(i, &loai)).collect();
+        if dong.is_empty() {
+            return;
+        }
+        let f = excel::duong_dan(Path::new(self.thu_muc.trim()), &cfg.thu_muc_excel);
+        self.excel = Some(excel::ghi(&f, &loai, &dong));
+    }
+
+    /// Hàng đợi Google Sheet theo Cấu hình (ô Google Sheet đang bật); lỗi cấu hình → ghi vào `loi_sheet`.
+    fn tao_sheet(&mut self, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>) {
+        self.sheet = None;
+        self.loi_sheet = None;
+        let Some(loai) = self.loai_chon().cloned() else { return };
+        if !cfg.ghi_sheet {
+            return;
+        }
+        match tao_dich_sheet(cfg, khoa) {
+            Ok(d) => {
+                self.tab_sheet = if cfg.sheet_tab.trim().is_empty() { excel::TAB.into() } else { cfg.sheet_tab.trim().into() };
+                self.sheet = Some(HangDoi::moi(d, excel::tieu_de(&loai, true)));
+            }
+            Err(e) => self.loi_sheet = Some(e),
+        }
     }
 
     /// Dòng đáy khi đang chạy / sau khi chạy (None = chưa chạy lần nào trong danh sách này).
@@ -297,7 +385,7 @@ impl ManBocTach {
     }
 }
 
-pub(crate) fn ve(m: &mut ManBocTach, ui: &mut egui::Ui) {
+pub(crate) fn ve(m: &mut ManBocTach, ui: &mut egui::Ui, cfg: &CauHinhBocTach) {
     let Some(loai) = m.loai_chon().cloned() else { return };
     let hien = m.hien();
     if m.kq.i_xem >= m.files.len() {
@@ -308,7 +396,7 @@ pub(crate) fn ve(m: &mut ManBocTach, ui: &mut egui::Ui) {
     if m.kq.gon_bang {
         p = p.exact_size(CAO_DONG_BANG + 1.0);
     }
-    p.show(ui, |ui| bang_day(m, ui, &loai, &hien));
+    p.show(ui, |ui| bang_day(m, ui, &loai, &hien, cfg));
     let mut trai = egui::Panel::left("bt_kq_trai").frame(egui::Frame::new().fill(Color32::WHITE));
     trai = if m.kq.gon_trai { trai.exact_size(RONG_GON).resizable(false) } else { trai.resizable(true).default_size(300.0).size_range(200.0..=520.0) };
     trai.show(ui, |ui| {
@@ -316,7 +404,7 @@ pub(crate) fn ve(m: &mut ManBocTach, ui: &mut egui::Ui) {
         ui.painter().vline(r.right() - 0.5, r.y_range(), Stroke::new(1.0, VIEN_NHAT));
         sidebar(m, ui, &loai, &hien);
     });
-    egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| chi_tiet(m, ui, &loai));
+    egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| chi_tiet(m, ui, &loai, cfg));
     m.kq.cuon_toi = false;
 }
 
@@ -411,7 +499,7 @@ fn sidebar(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, hien: &[us
 }
 
 /// Chi tiết: thanh "‹ n / N › tên file · Đã đọc: 2,4 s" · thu phóng · Lưu; PDF | các trường.
-fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu) {
+fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &CauHinhBocTach) {
     let i = m.kq.i_xem;
     let n_file = m.files.len();
     let Some(fp) = m.files.get(i).cloned() else { return };
@@ -481,6 +569,11 @@ fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu) {
     ui.allocate_rect(thanh, Sense::hover());
     if luu {
         luu_sua(m, loai, i, &fp.ten, fp.so_trang);
+        // Lưu ghi lại Excel + dòng của file đó trên Sheet
+        m.ghi_excel(cfg);
+        if let (Some(h), Some(d)) = (&m.sheet, m.dong_excel(i, loai)) {
+            h.ghi_de(d.ten_file.clone(), excel::dong_chu(&d, true));
+        }
     }
     if let Some(k) = toi {
         m.kq.i_xem = k;
@@ -550,7 +643,7 @@ fn luu_sua(m: &mut ManBocTach, loai: &LoaiTaiLieu, i: usize, ten: &str, so_trang
 }
 
 /// Bảng "Kết quả bóc" ở đáy: # | Tên file | Số trang | các trường; tiêu đề "Mở Excel · Mở GSheet"; thu / mở.
-fn bang_day(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, hien: &[usize]) {
+fn bang_day(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, hien: &[usize], cfg: &CauHinhBocTach) {
     let khung = ui.max_rect();
     let dau = Rect::from_min_size(khung.min, egui::vec2(khung.width(), CAO_DONG_BANG));
     let ph_dau = ui.interact(Rect::from_min_max(dau.min, egui::pos2(dau.right() - 260.0, dau.bottom())), ui.scope_id().with("bt_kq_dau"), Sense::click());
@@ -588,9 +681,33 @@ fn bang_day(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, hien: &[u
     }
     let mut con = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_max(egui::pos2(dau.right() - 300.0, dau.top()), egui::pos2(o_dong.left() - 8.0, dau.bottom()))).layout(egui::Layout::right_to_left(egui::Align::Center)));
     con.spacing_mut().item_spacing.x = 4.0;
-    con.add_enabled(false, egui::Label::new(RichText::new("Mở GSheet").size(12.0))).on_disabled_hover_text("Ghi Google Sheet có ở bước tiếp theo");
+    let co_sheet = !cfg.sheet_link.trim().is_empty();
+    let tt_sheet = m.sheet.as_ref().map(HangDoi::trang_thai);
+    let goi_sheet = match (&tt_sheet, &m.loi_sheet) {
+        (_, Some(e)) => format!("Không ghi được Google Sheet: {e}"),
+        (Some(t), _) if t.loi.is_some() => format!("Đã ghi {} dòng, chờ gửi lại {} dòng: {}", t.da_gui, t.cho, t.loi.as_deref().unwrap_or("")),
+        (Some(t), _) => format!("Đã ghi {} dòng lên Google Sheet{}", t.da_gui, if t.cho > 0 { format!(", đang gửi {}", t.cho) } else { String::new() }),
+        _ => "Mở Google Sheet trên trình duyệt".into(),
+    };
+    let mau_sheet = if m.loi_sheet.is_some() || tt_sheet.as_ref().is_some_and(|t| t.loi.is_some()) { DO } else { CHU };
+    if lien_ket(&mut con, "Mở GSheet", co_sheet, mau_sheet).on_hover_text(&goi_sheet).on_disabled_hover_text("Chưa khai link Google Sheet ở Cấu hình › Bóc tách").clicked() {
+        con.ctx().open_url(egui::OpenUrl::new_tab(cfg.sheet_link.trim()));
+    }
     con.label(RichText::new("·").size(12.0).color(CHU_PHU));
-    con.add_enabled(false, egui::Label::new(RichText::new("Mở Excel").size(12.0))).on_disabled_hover_text("Ghi Excel có ở bước tiếp theo");
+    match &m.excel {
+        Some(Ok(p)) => {
+            let ten = p.file_name().map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+            if lien_ket(&mut con, &format!("Mở Excel: {ten}"), p.exists(), CHU).on_hover_text(p.display().to_string()).clicked() {
+                crate::gui::mo_bang_he_dieu_hanh(p);
+            }
+        }
+        Some(Err(e)) => {
+            lien_ket(&mut con, "Mở Excel", false, DO).on_disabled_hover_text(format!("Không ghi được Excel: {e}"));
+        }
+        None => {
+            lien_ket(&mut con, "Mở Excel", false, CHU).on_disabled_hover_text("File Excel tạo khi bóc xong");
+        }
+    }
     if m.kq.gon_bang {
         ui.allocate_rect(khung, Sense::hover());
         return;
@@ -681,6 +798,16 @@ fn bang_day(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, hien: &[u
     ui.allocate_rect(khung, Sense::hover());
 }
 
+/// Link chữ ở tiêu đề bảng: rê → gạch chân, con trỏ tay; tắt → chữ mờ.
+fn lien_ket(ui: &mut egui::Ui, chu: &str, bat: bool, mau: Color32) -> egui::Response {
+    let ph = ui.add_enabled(bat, egui::Label::new(RichText::new(chu).size(12.0).color(if bat { mau } else { CHU_MO })).sense(Sense::click()));
+    if bat && ph.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        ui.painter().hline(ph.rect.x_range(), ph.rect.bottom() - 1.0, Stroke::new(1.0, mau));
+    }
+    ph
+}
+
 /// Popup "Đã bóc tách xong": trả `Some(true)` = Xem file lỗi, `Some(false)` = Đóng.
 pub(crate) fn ve_tong_ket(ctx: &egui::Context, t: &TongKet, link_sheet: &str) -> Option<bool> {
     let mut kq = None;
@@ -691,14 +818,19 @@ pub(crate) fn ve_tong_ket(ctx: &egui::Context, t: &TongKet, link_sheet: &str) ->
         job
     };
     let ph = kh::hop(ctx, "bt_tong_ket", 440.0, tieu_de, |ui| {
-        kh::than(ui, "bt_than_tong_ket", 190.0, Margin::same(14), |ui| {
+        kh::than(ui, "bt_than_tong_ket", 230.0, Margin::same(14), |ui| {
             let dong = |ui: &mut egui::Ui, nhan: &str, f: &dyn Fn(&mut egui::text::LayoutJob)| {
                 ui.horizontal(|ui| {
                     let (r, _) = ui.allocate_exact_size(egui::vec2(100.0, 18.0), Sense::hover());
                     ui.painter().text(r.left_center(), egui::Align2::LEFT_CENTER, nhan, egui::FontId::proportional(12.0), CHU_PHU);
                     let mut job = egui::text::LayoutJob::default();
                     f(&mut job);
-                    ui.label(job);
+                    // Đường dẫn dài xuống dòng, không kéo rộng popup
+                    job.wrap.max_width = 440.0 - 28.0 - 100.0 - 12.0;
+                    job.wrap.break_anywhere = true;
+                    // Dựng sẵn galley: Label nhận LayoutJob sẽ ghi đè chế độ ngắt dòng của hàng ngang
+                    let g = ui.fonts_mut(|f| f.layout_job(job));
+                    ui.label(g);
                 });
             };
             let dam = crate::gui_tach::chu_dong(CHU, true);
@@ -713,6 +845,13 @@ pub(crate) fn ve_tong_ket(ctx: &egui::Context, t: &TongKet, link_sheet: &str) ->
             dong(ui, "Mô hình đọc", &|j| j.append(&t.mo_hinh, 0.0, dam.clone()));
             let tb = if t.so_file_chay > 0 { format!(" · TB {} s / file", giay(t.thoi_gian / t.so_file_chay as u32)) } else { String::new() };
             dong(ui, "Thời gian", &|j| j.append(&format!("{}{tb}", crate::gui_tach::gio_phut_giay(t.thoi_gian)), 0.0, dam.clone()));
+            let excel = match &t.excel {
+                Some(Ok(p)) => p.display().to_string(),
+                Some(Err(e)) => format!("Excel lỗi: {e}"),
+                None => "—".into(),
+            };
+            let sheet = t.tab_sheet.as_ref().map(|tab| format!("\nGoogle Sheet › tab {tab}"));
+            dong(ui, "Ghi ra", &|j| j.append(&format!("{excel}{}", sheet.clone().unwrap_or_default()), 0.0, crate::gui_tach::chu_dong(CHU, false)));
             if let Some(l) = &t.dung_som {
                 dong(ui, "Dừng sớm", &|j| j.append(l, 0.0, crate::gui_tach::chu_dong(DO, false)));
             }
@@ -731,7 +870,12 @@ pub(crate) fn ve_tong_ket(ctx: &egui::Context, t: &TongKet, link_sheet: &str) ->
                 if ui.add_enabled(co_sheet, kh::nut_chan("Mở GSheet")).on_disabled_hover_text("Chưa khai link Google Sheet").clicked() {
                     ui.ctx().open_url(egui::OpenUrl::new_tab(link_sheet.trim()));
                 }
-                ui.add_enabled(false, kh::nut_chan("Mở Excel")).on_disabled_hover_text("Ghi Excel có ở bước tiếp theo");
+                let p_excel = t.excel.as_ref().and_then(|k| k.as_ref().ok()).filter(|p| p.exists());
+                if ui.add_enabled(p_excel.is_some(), kh::nut_chan("Mở Excel")).on_disabled_hover_text("Không có file Excel").clicked() {
+                    if let Some(p) = p_excel {
+                        crate::gui::mo_bang_he_dieu_hanh(p);
+                    }
+                }
             });
         });
     });

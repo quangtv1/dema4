@@ -20,6 +20,8 @@ const NEN_CANH_BAO: Color32 = Color32::from_rgb(0xFF, 0xF8, 0xE5);
 const VIEN_CANH_BAO: Color32 = Color32::from_rgb(0xF0, 0xD8, 0x9A);
 /// Khoá Apps Script nằm cùng kho khoá API (URL Web app ghi được vào Sheet nên coi như bí mật).
 pub const KHOA_APPS_SCRIPT: &str = "apps_script";
+/// Script mẫu cho cách ghi Apps Script (nút "Chép script mẫu").
+const SCRIPT_MAU: &str = include_str!("../../apps-script-mau/boc_tach.gs");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Muc {
@@ -40,6 +42,9 @@ pub struct TabBocTach {
     ds_model: HashMap<NhaCungCap, Vec<String>>,
     /// (đường dẫn file khoá service account, email đọc được trong file).
     email_sa: (String, Option<String>),
+    ghi_thu: Option<mpsc::Receiver<Result<String, String>>>,
+    kq_ghi_thu: Option<Result<String, String>>,
+    da_chep_script: bool,
 }
 
 /// Mặc định tab Bóc tách: chỉ phần Nâng cao (ảnh gửi đi, token, song song, chờ); giữ nhà cung cấp, model, Sheet, lựa chọn gần nhất.
@@ -85,6 +90,9 @@ impl TabBocTach {
             kq_kiem_tra: HashMap::new(),
             ds_model: HashMap::new(),
             email_sa: (String::new(), None),
+            ghi_thu: None,
+            kq_ghi_thu: None,
+            da_chep_script: false,
         }
     }
 
@@ -399,12 +407,58 @@ impl TabBocTach {
                     let url = khoa.entry(KHOA_APPS_SCRIPT.to_string()).or_default();
                     ui.add(kh::o_nhap(url).desired_width(ui.available_width()).hint_text("https://script.google.com/macros/s/…/exec"));
                 });
-                goi_y(ui, "Dán script mẫu vào Sheet (Tiện ích › Apps Script), triển khai Web app rồi dán URL");
+                ui.horizontal(|ui| {
+                    ui.add_space(RONG_NHAN + 8.0);
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    ui.label(RichText::new("Dán script mẫu vào Sheet (Tiện ích › Apps Script), triển khai Web app rồi dán URL ·").size(11.5).color(CHU_PHU));
+                    if lien_ket(ui, if self.da_chep_script { "Đã chép" } else { "Chép script mẫu" }, VIEN_TAB_CHON).on_hover_text("Chép script Apps Script mẫu vào clipboard").clicked() {
+                        ui.ctx().copy_text(SCRIPT_MAU.to_string());
+                        self.da_chep_script = true;
+                    }
+                });
+            }
+        }
+        // Ghi thử 1 dòng (luồng nền) vào tab đã khai
+        if let Some(n) = &self.ghi_thu {
+            match n.try_recv() {
+                Ok(kq) => {
+                    self.kq_ghi_thu = Some(kq);
+                    self.ghi_thu = None;
+                }
+                Err(mpsc::TryRecvError::Empty) => ui.ctx().request_repaint_after(Duration::from_millis(100)),
+                Err(mpsc::TryRecvError::Disconnected) => self.ghi_thu = None,
             }
         }
         ui.horizontal(|ui| {
             ui.add_space(RONG_NHAN + 8.0);
-            ui.add_enabled(false, egui::Button::new("Ghi thử 1 dòng").min_size(egui::vec2(0.0, 24.0))).on_disabled_hover_text("Có khi hoàn thành phần ghi Google Sheet");
+            let dang = self.ghi_thu.is_some();
+            if ui.add_enabled(!dang, egui::Button::new(if dang { "Đang ghi…" } else { "Ghi thử 1 dòng" }).min_size(egui::vec2(0.0, 24.0))).on_hover_text("Ghi 1 dòng thử vào tab đã khai để kiểm tra quyền ghi").clicked() {
+                let (gui, nhan) = mpsc::channel();
+                let (ch2, khoa2, ctx) = (ch.clone(), khoa.clone(), ui.ctx().clone());
+                std::thread::spawn(move || {
+                    let kq = super::ket_qua::tao_dich_sheet(&ch2, &khoa2).and_then(|d| {
+                        let loai = &crate::boc_tach::loai_tai_lieu::co_san()[0];
+                        let mut dong = vec![String::new(); crate::boc_tach::excel::tieu_de(loai, true).len()];
+                        dong[0] = format!("Ghi thử dema4 · {}", chrono::Local::now().format("%d/%m/%Y %H:%M"));
+                        d.them(&crate::boc_tach::excel::tieu_de(loai, true), &[dong]).map(|_| if ch2.sheet_tab.trim().is_empty() { crate::boc_tach::excel::TAB.to_string() } else { ch2.sheet_tab.trim().to_string() })
+                    });
+                    let _ = gui.send(kq);
+                    ctx.request_repaint();
+                });
+                self.kq_ghi_thu = None;
+                self.ghi_thu = Some(nhan);
+            }
+            match &self.kq_ghi_thu {
+                Some(Ok(tab)) => {
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(11.0, 14.0), Sense::hover());
+                    ui.painter().circle_filled(r.center(), 3.5, XANH_LA);
+                    ui.label(RichText::new(format!("Đã ghi vào tab {tab}")).size(12.0).color(XANH_LA));
+                }
+                Some(Err(e)) => {
+                    ui.add(egui::Label::new(RichText::new(e).size(12.0).color(DO)).wrap());
+                }
+                None => {}
+            }
         });
     }
 }

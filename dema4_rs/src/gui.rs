@@ -1960,6 +1960,43 @@ mod tests {
     }
 
     #[test]
+    fn boc_tach_ghi_excel_va_google_sheet_qua_apps_script() {
+        use crate::gui_boc_tach::ket_qua::TrangThai;
+        use egui_kittest::kittest::Queryable;
+        let (d, mut cfg) = boc_tach_thu("excel_sheet", vec![Ok(BT_DAU), Ok(BT_CUOI), Err(500), Ok(BT_DAU), Ok(BT_CUOI)]);
+        let ok = serde_json::json!({ "ok": true }).to_string();
+        let (dc_as, nhan_as) = crate::boc_tach::mo_hinh::tests::may_chu_gia((0..6).map(|_| (200, vec![], ok.clone())).collect());
+        (cfg.boc_tach.ghi_sheet, cfg.boc_tach.sheet_cach) = (true, crate::cau_hinh::CachGhiSheet::AppsScript);
+        let khoa: std::collections::BTreeMap<String, String> = [("apps_script".to_string(), format!("{dc_as}/exec"))].into();
+        let goc = d.display().to_string();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            UngDungChinh { man: Man::BocTach, cfg: cfg.clone(), khoa_bt: khoa.clone(), ..Default::default() }
+        });
+        let ctx = h.ctx.clone();
+        let _ = std::fs::remove_file(crate::boc_tach::luu::file_jsonl(&d));
+        h.state_mut().boc_tach.chon_thu_muc(goc, &ctx);
+        cho_boc_tach(&mut h, |s| s.boc_tach.files.len() == 3);
+        (h.state_mut().boc_tach.ncc, h.state_mut().boc_tach.loai) = (Some(NhaCungCap::NoiBo), Some(0));
+        h.run_steps(2);
+        h.get_by_label("Bắt đầu").click();
+        cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && s.boc_tach.tt.iter().all(|t| !matches!(t, TrangThai::Cho)));
+        cho_boc_tach(&mut h, |s| s.boc_tach.sheet.as_ref().is_some_and(|q| q.trang_thai().da_gui == 3));
+        // Excel cạnh thư mục nguồn: 3 dòng (1 lỗi), ngày giữ dạng chữ
+        let f = crate::boc_tach::excel::duong_dan(&d, "");
+        assert!(matches!(&h.state().boc_tach.excel, Some(Ok(p)) if *p == f));
+        let bang = crate::muc_luc::doc_bang::doc(&f, None, 1).unwrap();
+        assert_eq!(bang.dong.len(), 3);
+        assert_eq!((bang.dong[0][0].as_str(), bang.dong[0][5].as_str(), bang.dong[0][8].as_str()), ("VB01.pdf", "20/01/2015", "Trần Thị B"));
+        assert!(bang.dong[1][9].contains("500"));
+        let yc: String = nhan_as.try_iter().collect();
+        assert!(yc.contains("\"tab\":\"Boc_tach\"") && yc.contains("VB01.pdf") && yc.contains("VB03.pdf") && yc.contains("Lỗi bóc tách"));
+        let _ = std::fs::remove_file(&f);
+        let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
     fn luong_dem_chet_khong_lam_sap_giao_dien() {
         let mut app = UngDung::default();
         let (gui, nhan) = mpsc::channel::<SuKien>();

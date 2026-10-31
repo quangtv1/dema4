@@ -86,6 +86,12 @@ pub struct ManBocTach {
     pub(crate) chay: Option<ket_qua::DangChay>,
     pub(crate) kq: ket_qua::TabKetQua,
     pub(crate) tong_ket: Option<ket_qua::TongKet>,
+    /// File Excel đã ghi lần gần nhất (hoặc lỗi ghi).
+    pub(crate) excel: Option<Result<PathBuf, String>>,
+    /// Hàng đợi Google Sheet của lần chạy (giữ sau khi chạy để gửi lại / ghi đè khi Lưu).
+    pub(crate) sheet: Option<crate::boc_tach::sheet::HangDoi>,
+    pub(crate) loi_sheet: Option<String>,
+    pub(crate) tab_sheet: String,
     /// Thời gian lần chạy gần nhất (dòng đáy).
     pub(crate) thoi_gian_chay: Option<Duration>,
     /// Bấm Bắt đầu / Chạy lại: danh sách file cần chạy (xử lý sau khi vẽ, cần Cấu hình + khoá).
@@ -117,6 +123,10 @@ impl Default for ManBocTach {
             kq: Default::default(),
             tong_ket: None,
             thoi_gian_chay: None,
+            excel: None,
+            sheet: None,
+            loi_sheet: None,
+            tab_sheet: String::new(),
             yeu_cau_chay: None,
             da_mac_dinh: false,
         }
@@ -227,7 +237,7 @@ impl ManBocTach {
             self.ncc = cfg.mac_dinh.filter(|n| cfg.da_cai(*n, khoa.get(n.ma()).map_or("", String::as_str)));
         }
         self.nhan_nen(&ctx);
-        self.nhan_chay(&ctx);
+        self.nhan_chay(&ctx, cfg);
         let mut cfg_doi = false;
         if !self.gon {
             // Đang chạy: khoá khối đầu vào (đổi nguồn / loại / mô hình giữa chừng làm sai kết quả)
@@ -245,7 +255,7 @@ impl ManBocTach {
             }
             match self.tab {
                 Tab::Truong => truong::ve(self, ui, cfg, khoa),
-                Tab::KetQua => ket_qua::ve(self, ui),
+                Tab::KetQua => ket_qua::ve(self, ui, cfg),
             }
         });
         if let Some(ds) = self.yeu_cau_chay.take() {
