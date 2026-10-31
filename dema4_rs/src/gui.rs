@@ -1950,6 +1950,12 @@ mod tests {
         harness.state_mut().hop_cau_hinh = Some(hop);
         harness.run_steps(3);
         harness.render().unwrap().save(thu_muc_anh.join("tach_4_cau_hinh_dem.png")).unwrap();
+        // Hộp Cấu hình với giá trị mặc định, đủ 3 tab (ảnh README)
+        for (ten, tab) in [("cau_hinh_dem", crate::gui_tach::hop_cau_hinh::TabCauHinh::Dem), ("cau_hinh_tach", crate::gui_tach::hop_cau_hinh::TabCauHinh::Tach), ("cau_hinh_muc_luc", crate::gui_tach::hop_cau_hinh::TabCauHinh::MucLuc)] {
+            harness.state_mut().hop_cau_hinh = Some(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, tab));
+            harness.run_steps(3);
+            harness.render().unwrap().save(thu_muc_anh.join(format!("{ten}.png"))).unwrap();
+        }
         harness.state_mut().hop_cau_hinh = None;
         harness.state_mut().tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(crate::tro_giup::TabHuongDan::Tach));
         harness.run_steps(3);
@@ -1957,7 +1963,7 @@ mod tests {
         // Tab Văn bản: Lưới, 1 trang 100 %, 2 trang 75 %, hộp phóng to
         harness.state_mut().tro_giup = None;
         harness.state_mut().tach.tab = crate::gui_tach::Tab::VanBan;
-        harness.state_mut().tach.vb = 1;
+        harness.state_mut().tach.vb = std::env::var("DEMA4_VB").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
         for (ten, che_do, ty_le) in [("tach_6_vb_luoi", crate::cau_hinh::CheDoVb::Luoi, 100), ("tach_7_vb_1trang", crate::cau_hinh::CheDoVb::MotTrang, 100), ("tach_8_vb_2trang", crate::cau_hinh::CheDoVb::HaiTrang, 75)] {
             harness.state_mut().cfg.che_do_vb = che_do;
             harness.state_mut().cfg.ty_le_vb = ty_le;

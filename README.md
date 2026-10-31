@@ -56,7 +56,11 @@ Nhãn, cache và log nằm trong thư mục ẩn `.sm-dema4/` cạnh file chạy
 
 Menu **Cấu hình** (3 tab Đếm trang A4 / Tách PDF / Sinh mục lục), lưu ở file ẩn `.dema4_saomai.cfg` cạnh file chạy.
 
+![Cấu hình Đếm trang A4](docs/anh/cau-hinh-dem.png)
+
 ![Cấu hình Tách PDF](docs/anh/cau-hinh-tach.png)
+
+![Cấu hình Sinh mục lục](docs/anh/cau-hinh-muc-luc.png)
 
 ## Dòng lệnh
 
