@@ -92,7 +92,7 @@ Không có file nhãn → tự phân tích (Cấu hình mặc định), ghi `ind
 
 Menu **Chức năng › Sinh mục lục** (chi tiết trong **Trợ giúp › Hướng dẫn sử dụng**, F1).
 
-1. **File biên mục**: Excel (.xlsx .xlsb .xls) hoặc CSV, mỗi văn bản một dòng, các dòng cùng hồ sơ nằm liền nhau; chọn sheet trong ô **Chọn sheet** và **Dòng tiêu đề** (số dòng như Excel hiển thị). Nút ⌄ cuối dòng xổ ra dòng tiêu đề và dòng dữ liệu đầu tiên để kiểm tra chọn đúng dòng.
+1. **File biên mục**: Excel (.xlsx .xlsb .xls) hoặc CSV, mỗi văn bản một dòng, các dòng cùng hồ sơ nằm liền nhau; chọn sheet trong ô **Chọn sheet** và **Dòng tiêu đề** (số dòng như Excel hiển thị). Nút ⌄ cuối dòng xổ ra 10 dòng đầu của sheet kèm số dòng; dòng tô nền là Dòng tiêu đề, dữ liệu lấy từ dòng ngay sau. Nút ⓧ cuối ô đường dẫn bỏ file đã chọn.
 2. **Mẫu mục lục** (bắt buộc tự chọn, chọn xong mở tab **Mẫu**): 4 mẫu có sẵn (Quảng Trị, Quảng Ninh, Đống Đa, Vĩnh Phúc) hoặc mẫu DOCX riêng của đơn vị; biến viết dạng `{ten_bien}`, hàng có nhiều biến nhất trong bảng là hàng mẫu (mỗi văn bản một hàng).
 3. Tab **Mẫu**: biến tự khớp với cột cùng tên (bỏ dấu, không phân biệt hoa thường); bấm ô **Lấy từ** để chọn cột khác hoặc gõ giá trị cố định. **Nhóm theo** (chân sidebar) = cột tách hồ sơ, kèm số giá trị khác nhau của từng cột. Rê chuột lên dòng biến để thấy vị trí trên trang mẫu; hộp **Ghép biến…** sửa nhiều biến cùng lúc, kèm giá trị của hồ sơ đang xem.
 4. Tab **Kết quả**: xem trước mục lục từng hồ sơ (bản mô phỏng chữ + bảng); hồ sơ có ô trống ở cột đã ghép được đánh dấu cảnh báo.

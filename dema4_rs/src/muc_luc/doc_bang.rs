@@ -41,13 +41,18 @@ pub fn danh_sach_sheet(p: &Path) -> Result<Vec<String>, String> {
 
 /// `dong_tieu_de`: số dòng vật lý (1-based) của hàng tiêu đề.
 pub fn doc(p: &Path, sheet: Option<&str>, dong_tieu_de: usize) -> Result<BangDuLieu, String> {
-    let dong_tieu_de = dong_tieu_de.max(1);
-    let ma_tran = if la_csv(p) { doc_csv(p, dong_tieu_de)? } else { doc_excel(p, sheet)? };
-    tu_ma_tran(ma_tran, dong_tieu_de)
+    tu_ma_tran(doc_ma_tran(p, sheet, dong_tieu_de)?, dong_tieu_de)
+}
+
+/// Ô thô theo dòng vật lý (`[i]` = dòng i + 1), chưa tách tiêu đề — để xem nhanh các dòng đầu sheet.
+/// `dong_tieu_de` chỉ dùng dò dấu phân cách của CSV.
+pub fn doc_ma_tran(p: &Path, sheet: Option<&str>, dong_tieu_de: usize) -> Result<Vec<Vec<String>>, String> {
+    if la_csv(p) { doc_csv(p, dong_tieu_de.max(1)) } else { doc_excel(p, sheet) }
 }
 
 /// `ma_tran[i]` = dòng vật lý i + 1 (dòng trống = vec rỗng).
-fn tu_ma_tran(ma_tran: Vec<Vec<String>>, dong_tieu_de: usize) -> Result<BangDuLieu, String> {
+pub fn tu_ma_tran(ma_tran: Vec<Vec<String>>, dong_tieu_de: usize) -> Result<BangDuLieu, String> {
+    let dong_tieu_de = dong_tieu_de.max(1);
     if ma_tran.len() < dong_tieu_de {
         return Err(format!("Không đủ dữ liệu: file không có tới dòng {dong_tieu_de}."));
     }
