@@ -123,8 +123,8 @@
   .tc-day { justify-content:space-between; gap:18px; } .tc-day > span { display:flex; gap:16px; align-items:center; }
   .tc-day a { color:var(--chu-phu); text-decoration:none; } .tc-day a:hover { color:var(--cobalt); text-decoration:underline; }
   /* Dải điểm nổi bật dưới các ô chức năng */
-  .tc-diem { display:flex; gap:34px; justify-content:center; margin-top:78px; padding-top:22px; border-top:1px solid var(--vien-nhat); width:720px; }
-  .tc-diem div { display:flex; align-items:center; gap:9px; font-size:12px; color:var(--chu-phu); line-height:1.4; max-width:220px; }
+  .tc-diem { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px 34px; margin-top:56px; padding-top:22px; border-top:1px solid var(--vien-nhat); width:780px; }
+  .tc-diem div { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--chu-phu); line-height:1.4; }
   .tc-diem svg { width:22px; height:22px; flex-shrink:0; fill:none; stroke:#3C4858; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
   .tc-diem b { color:var(--chu); display:block; font-size:12.5px; }
   .tc-dau small { display:block; color:var(--chu-phu); font-size:12px; letter-spacing:.3px; margin-bottom:6px; }
@@ -691,11 +691,14 @@
     <div class="tc-diem">
       <div><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg><span><b>Xử lý ngay trên máy</b>File PDF / Excel không tải lên mạng</span></div>
       <div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span><b>Giữ nguyên file gốc</b>Kết quả ghi ra thư mục riêng</span></div>
-      <div><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b>Đã dùng 7 / 210 lượt</b>Dùng chung Đếm · Tách · Sinh mục lục</span></div>
+      <div><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b>Lượt dùng 7 / 210</b>Dùng chung mọi chức năng</span></div>
+      <div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg><span><b>Định dạng hỗ trợ</b>PDF scan · Excel · CSV · DOCX</span></div>
+      <div><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.3 2.2-2.3 3.5"/><path d="M12 17.5h.01"/></svg><span><b>Hướng dẫn sử dụng</b>Nhấn F1 hoặc Trợ giúp › Hướng dẫn</span></div>
+      <div><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7 9l3 3-3 3M12 15h5"/></svg><span><b>Chạy hàng loạt</b>Đếm / Tách bằng dòng lệnh</span></div>
     </div>
     <div class="tc-day">
-      <span><a href="https://saomaiso.com" target="_blank" rel="noopener">saomaiso.com</a><span>Điện thoại 0979 824 615</span><a href="mailto:hotro@saomaiso.com">hotro@saomaiso.com</a></span>
-      <span><span>Mã máy<b>SM-2145-6787-A9FB</b></span><span>Phiên bản<b>1.0.0</b></span></span>
+      <span><span>Website:<a href="https://saomaiso.com" target="_blank" rel="noopener" style="margin-left:4px;color:var(--chu)">saomaiso.com</a></span><span>Email:<a href="mailto:hotro@saomaiso.com" style="margin-left:4px;color:var(--chu)">hotro@saomaiso.com</a></span></span>
+      <span><span>Mã máy:<b>SM-2145-6787-A9FB</b></span><span>Phiên bản:<b>1.0.0</b></span></span>
     </div>
   </div>
 
