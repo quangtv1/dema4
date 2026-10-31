@@ -111,8 +111,10 @@ impl Default for UngDungChinh {
         tach.license = dem.license.clone();
         let mut muc_luc = crate::gui_muc_luc::ManMucLuc::moi(&cfg.muc_luc);
         muc_luc.license = dem.license.clone();
+        let mut boc_tach = crate::gui_boc_tach::ManBocTach::default();
+        boc_tach.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach: Default::default(), trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
     }
 }
 
@@ -121,6 +123,7 @@ impl UngDungChinh {
         match self.man {
             Man::Tach => crate::tro_giup::TabHuongDan::Tach,
             Man::MucLuc => crate::tro_giup::TabHuongDan::MucLuc,
+            Man::BocTach => crate::tro_giup::TabHuongDan::BocTach,
             _ => crate::tro_giup::TabHuongDan::Dem,
         }
     }
@@ -1880,8 +1883,10 @@ mod tests {
 
     /// Thư mục 3 PDF tổng hợp + máy chủ giả trả lần lượt `phan_hoi` (nội dung JSON hoặc mã lỗi).
     fn boc_tach_thu(ten: &str, phan_hoi: Vec<Result<&str, u16>>) -> (PathBuf, crate::cau_hinh::CauHinh) {
-        let d = std::env::temp_dir().join(format!("dema4_bt_{ten}_{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
+        // Thư mục nguồn tên "Van_ban" trong thư mục tạm riêng → Excel "Van_ban_boc_tach.xlsx" như dùng thật
+        let goc = std::env::temp_dir().join(format!("dema4_bt_{ten}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        let d = goc.join("Van_ban");
         std::fs::create_dir_all(&d).unwrap();
         for (f, n) in [("VB01.pdf", 4), ("VB02.pdf", 2), ("VB03.pdf", 3)] {
             crate::tach_vb::tach::tests::tao_pdf(&d.join(f), n);
@@ -1895,7 +1900,7 @@ mod tests {
             .collect();
         let (dc, _n) = crate::boc_tach::mo_hinh::tests::may_chu_gia(ph);
         let mut cfg = crate::cau_hinh::CauHinh::default();
-        (cfg.boc_tach.mo_hinh_mut(NhaCungCap::NoiBo).dia_chi, cfg.boc_tach.mo_hinh_mut(NhaCungCap::NoiBo).model) = (dc, "m".into());
+        (cfg.boc_tach.mo_hinh_mut(NhaCungCap::NoiBo).dia_chi, cfg.boc_tach.mo_hinh_mut(NhaCungCap::NoiBo).model) = (dc, "5CD-AI/Vintern-1B-v3_5".into());
         (d, cfg)
     }
 
@@ -1956,7 +1961,7 @@ mod tests {
         assert!(matches!(&h.state().boc_tach.tt[0], TrangThai::Xong(_)));
         assert!(matches!(&h.state().boc_tach.tt[1], TrangThai::Loi(_)));
         let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
-        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
     }
 
     #[test]
@@ -1994,6 +1999,86 @@ mod tests {
         let _ = std::fs::remove_file(&f);
         let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Màn Bóc tách với license giả hạn mức `han` (đã kiểm tra với trạm giả).
+    fn boc_tach_license(ten: &str, han: u32, phan_hoi: Vec<Result<&'static str, u16>>) -> (PathBuf, egui_kittest::Harness<'static, UngDungChinh>, Arc<crate::license::KiemTra>) {
+        let (d, cfg) = boc_tach_thu(ten, phan_hoi);
+        let kt = crate::license::KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(han)));
+        kt.mo_app();
+        kt.moc().recv().unwrap();
+        let kt2 = kt.clone();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut app = UngDungChinh { man: Man::BocTach, cfg: cfg.clone(), khoa_bt: Default::default(), ..Default::default() };
+            app.boc_tach.license = kt2.clone();
+            app
+        });
+        let ctx = h.ctx.clone();
+        let _ = std::fs::remove_file(crate::boc_tach::luu::file_jsonl(&d));
+        h.state_mut().boc_tach.chon_thu_muc(d.display().to_string(), &ctx);
+        cho_boc_tach(&mut h, |s| s.boc_tach.files.len() == 3);
+        (h.state_mut().boc_tach.ncc, h.state_mut().boc_tach.loai) = (Some(NhaCungCap::NoiBo), Some(0));
+        h.run_steps(2);
+        (d, h, kt)
+    }
+
+    #[test]
+    fn boc_tach_het_luot_hien_popup_khong_chay() {
+        use egui_kittest::kittest::Queryable;
+        let (d, mut h, _) = boc_tach_license("het_luot", 0, vec![]);
+        h.get_by_label("Bắt đầu").click();
+        h.run_steps(3);
+        assert!(h.state().boc_tach.hop_license.is_some(), "hết lượt → popup license");
+        assert!(!h.state().boc_tach.dang_chay());
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
+    }
+
+    #[test]
+    fn boc_tach_tru_1_luot_va_hoan_luot_khi_moi_file_loi() {
+        use crate::gui_boc_tach::ket_qua::TrangThai;
+        use egui_kittest::kittest::Queryable;
+        // Lần 1: có file đọc được → trừ 1 lượt, gửi thống kê
+        let (d, mut h, kt) = boc_tach_license("tru_luot", 5, vec![Ok(BT_DAU), Ok(BT_CUOI), Err(500), Err(500), Err(500), Err(500), Err(500)]);
+        let truoc = kt.luot().unwrap().0;
+        h.get_by_label("Bắt đầu").click();
+        cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && s.boc_tach.tt.iter().all(|t| !matches!(t, TrangThai::Cho)));
+        h.run_steps(2);
+        assert!(h.state().boc_tach.tong_ket.is_some());
+        let _ = kt.moc().recv_timeout(Duration::from_secs(5));
+        assert_eq!(kt.luot().unwrap().0, truoc + 1, "1 lần Bắt đầu = 1 lượt");
+        // Lần 2: lọc file lỗi, chạy lại, vẫn lỗi hết → hoàn lượt
+        h.get_by_label("Xem file lỗi").click();
+        h.run_steps(2);
+        h.get_by_label("Chạy lại (2)").click();
+        cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && s.boc_tach.tong_ket.is_some());
+        let _ = kt.moc().recv_timeout(Duration::from_secs(5));
+        assert_eq!(kt.luot().unwrap().0, truoc + 1, "không file nào đọc được → hoàn lượt");
+        let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
+    }
+
+    #[test]
+    fn boc_tach_reocr_doc_lai_1_file_cap_nhat_bang_va_excel() {
+        use crate::gui_boc_tach::ket_qua::TrangThai;
+        use egui_kittest::kittest::Queryable;
+        // Chạy: VB01 đọc được, VB02 lỗi 500, VB03 đọc được; ReOCR VB02 (2 trang) đọc được
+        let (d, mut h, _) = boc_tach_license("reocr", 10, vec![Ok(BT_DAU), Ok(BT_CUOI), Err(500), Ok(BT_DAU), Ok(BT_CUOI), Ok(BT_DAU), Ok(BT_CUOI)]);
+        h.get_by_label("Bắt đầu").click();
+        cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && s.boc_tach.tt.iter().all(|t| !matches!(t, TrangThai::Cho)));
+        h.state_mut().boc_tach.tong_ket = None;
+        h.state_mut().boc_tach.kq.i_xem = 1;
+        h.run_steps(3);
+        assert!(matches!(h.state().boc_tach.tt[1], TrangThai::Loi(_)));
+        h.get_by_label("ReOCR").click();
+        cho_boc_tach(&mut h, |s| s.boc_tach.kq.doc_lai.is_none() && matches!(s.boc_tach.tt[1], TrangThai::Xong(_)));
+        assert!(matches!(&h.state().boc_tach.tt[1], TrangThai::Xong(b) if b.gia_tri["so_ky_hieu"] == "15/TTr-TCKH"));
+        let ds = crate::boc_tach::luu::doc(&crate::boc_tach::luu::file_jsonl(&d), "Văn bản hành chính");
+        assert!(ds["VB02.pdf"].loi.is_none(), "jsonl ghi bản đọc lại");
+        let bang = crate::muc_luc::doc_bang::doc(&crate::boc_tach::excel::duong_dan(&d, ""), None, 1).unwrap();
+        assert_eq!(bang.dong[1][4], "15/TTr-TCKH", "Excel cập nhật dòng VB02");
+        let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
     }
 
     #[test]
@@ -2408,6 +2493,7 @@ mod tests {
             std::thread::sleep(Duration::from_millis(30));
         }
         h.state_mut().boc_tach.ncc = Some(NhaCungCap::NoiBo);
+        h.state_mut().boc_tach.thu_muc = r"D:\SoHoa\Van_ban".into();
         h.run_steps(3);
         h.render().unwrap().save(thu_muc_anh.join("bt_gioi_thieu_2_buoc.png")).unwrap();
         h.state_mut().boc_tach.loai = Some(0);
@@ -2463,8 +2549,15 @@ mod tests {
         }
         h.render().unwrap().save(thu_muc_anh.join("bt_xong.png")).unwrap();
         h.state_mut().boc_tach.tong_ket = None;
+        // Ảnh tài liệu: đường dẫn trung tính (chỉ đổi chữ hiển thị, không chạy gì thêm)
+        let that = std::mem::replace(&mut h.state_mut().boc_tach.thu_muc, r"D:\SoHoa\Van_ban".into());
         h.run_steps(3);
         h.render().unwrap().save(thu_muc_anh.join("bt_ket_qua.png")).unwrap();
+        h.state_mut().boc_tach.thu_muc = that;
+        h.state_mut().boc_tach.kq.xem.hai_trang = true;
+        h.run_steps(5);
+        h.render().unwrap().save(thu_muc_anh.join("bt_hai_trang.png")).unwrap();
+        h.state_mut().boc_tach.kq.xem.hai_trang = false;
         h.state_mut().boc_tach.kq.loc = "lỗi".into();
         h.state_mut().boc_tach.kq.i_xem = 1;
         h.run_steps(5);
@@ -2475,7 +2568,7 @@ mod tests {
         h.run_steps(5);
         h.render().unwrap().save(thu_muc_anh.join("bt_dang_boc.png")).unwrap();
         let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
-        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
     }
 
     /// Ô thư mục có nút ⓧ ở màn Đếm và Tách (đường dẫn giả, không cần dữ liệu mẫu).

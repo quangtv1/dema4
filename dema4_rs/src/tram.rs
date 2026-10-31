@@ -193,6 +193,23 @@ pub fn so_lieu_muc_luc(du_lieu: &str, mau: &str, ho_so: usize, van_ban: usize, t
     }})
 }
 
+/// Số liệu 1 lần Bóc tách: chỉ số đếm + tên mô hình đọc (không nội dung văn bản, không khoá API).
+#[allow(clippy::too_many_arguments)]
+pub fn so_lieu_boc_tach(thu_muc: &str, loai: &str, mo_hinh: &str, van_ban: usize, ok: usize, loi: usize, trang: usize, truong: (usize, usize), thoi_gian: Duration) -> Value {
+    json!({ "so_lieu": {
+        "thu_muc": duong_dan_tuyet_doi(thu_muc),
+        "loai": loai,
+        "mo_hinh": mo_hinh,
+        "van_ban": van_ban,
+        "ok": ok,
+        "loi": loi,
+        "trang": trang,
+        "truong_co": truong.0,
+        "truong_tong": truong.1,
+        "thoi_gian_ms": thoi_gian.as_millis() as u64,
+    }})
+}
+
 /// Số liệu 1 lần Tách + thống kê ngưỡng trắng (tin, file CSV, 1 hàng tab "Ngưỡng trắng" — trạm ghi).
 pub fn so_lieu_tach(may: &ThongTinMay, thu_muc: &str, sl: &crate::telegram::SoLieuTach, thoi_gian: Duration, thong_ke: Option<&crate::tach_vb::thong_ke_nguong::ThongKeNguong>, nguong: (f32, f32)) -> Value {
     use crate::tach_vb::thong_ke_nguong as tkn;

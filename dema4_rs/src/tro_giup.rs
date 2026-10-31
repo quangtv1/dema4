@@ -63,6 +63,7 @@ pub enum TabHuongDan {
     Dem,
     Tach,
     MucLuc,
+    BocTach,
 }
 
 pub enum HopTroGiup {
@@ -113,7 +114,7 @@ impl HopTroGiup {
                 })
             }
             HopTroGiup::HuongDan(tab) => kh::hop(ctx, "hop_tro_giup", RONG, "Hướng dẫn sử dụng", |ui| {
-                kh::hang_tab(ui, &[(TabHuongDan::Dem, "Đếm trang A4"), (TabHuongDan::Tach, "Tách văn bản"), (TabHuongDan::MucLuc, "Sinh mục lục")], tab);
+                kh::hang_tab(ui, &[(TabHuongDan::Dem, "Đếm trang A4"), (TabHuongDan::Tach, "Tách văn bản"), (TabHuongDan::MucLuc, "Sinh mục lục"), (TabHuongDan::BocTach, "Bóc tách dữ liệu")], tab);
                 kh::than(ui, "than_huong_dan", CAO_THAN, Margin { left: 22, right: 22, top: 4, bottom: 16 }, |ui| {
                     ve_khoi(
                         ui,
@@ -121,6 +122,7 @@ impl HopTroGiup {
                             TabHuongDan::Dem => HD_DEM,
                             TabHuongDan::Tach => HD_TACH,
                             TabHuongDan::MucLuc => HD_MUC_LUC,
+                            TabHuongDan::BocTach => HD_BOC_TACH,
                         },
                     );
                 });
@@ -255,6 +257,24 @@ const HD_MUC_LUC: &[Khoi] = &[
         ("Chưa ghép", "Giữ nguyên `{bien}` trong file kết quả. Rê chuột lên dòng biến để thấy vị trí trên trang mẫu."),
     ]),
     Khoi::Ghi("File kết quả mặc định nằm trong thư mục ẩn `.sm-dema4/muc_luc/<tên file biên mục>` cạnh file ứng dụng — mở bằng *Mở thư mục* trong popup kết quả, hoặc đặt thư mục khác ở *Cấu hình › Sinh mục lục*. Trang xem trước là bản mô phỏng (chữ + bảng); xuất PDF có ở bản sau."),
+];
+
+const HD_BOC_TACH: &[Khoi] = &[
+    Khoi::Muc("Các bước"),
+    Khoi::Buoc(&[
+        "*Nguồn văn bản*: bấm *Chọn* thư mục PDF (gồm cả thư mục con); thư mục Google Drive for Desktop, ổ mạng chọn như thư mục trên máy.",
+        "*Mô hình đọc*: chọn mô hình đã khai ở *Cấu hình › Bóc tách* (máy chủ nội bộ vLLM / Ollama / LM Studio, ChatGPT, Gemini, Claude, OpenRouter); *Kiểm tra* để thử kết nối.",
+        "*Loại tài liệu*: Văn bản hành chính, Hồ sơ đất đai, Hợp đồng hoặc loại riêng. Tab *Trường dữ liệu*: xem các trường, *Câu lệnh* gửi mô hình; bút chì (hoặc bấm đúp 1 dòng) để sửa tên cột, mô tả, chuẩn hoá, thứ tự.",
+        "*Thử đọc* file đang xem để kiểm tra kết quả — không trừ lượt chạy.",
+        "*Bắt đầu*: đọc mọi file; tab *Kết quả bóc* hiện từng file, sửa tay ô sai rồi *Lưu*. Lọc (ô tìm: tên file, `lỗi`, `5/6`…) rồi *Chạy lại (n)* để đọc lại các file đang hiện.",
+    ]),
+    Khoi::Muc("Kết quả"),
+    Khoi::Bang(&[
+        ("Excel", "`<tên thư mục>_boc_tach.xlsx` cạnh thư mục nguồn (hoặc thư mục đặt ở Cấu hình): mỗi file 1 dòng, nạp thẳng vào Sinh mục lục làm file biên mục."),
+        ("Google Sheet", "Bật ô *Google Sheet*: ghi thêm 1 dòng sau mỗi file (khoá service account hoặc Apps Script, khai ở Cấu hình). Mất mạng thì tự gửi lại sau."),
+        ("Lượt chạy", "Mỗi lần *Bắt đầu* / *Chạy lại* có ít nhất 1 file đọc được = 1 lượt; *Thử đọc* không tính."),
+    ]),
+    Khoi::Ghi("Mỗi trang cần đọc được gửi tới mô hình đọc đã chọn: máy chủ nội bộ thì ảnh không ra khỏi mạng đơn vị; dịch vụ đám mây (ChatGPT, Gemini, Claude, OpenRouter) thì ảnh gửi tới máy chủ của hãng — không dùng cho tài liệu mật. Khoá API lưu mã hoá trên máy."),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

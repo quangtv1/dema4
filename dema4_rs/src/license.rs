@@ -12,6 +12,7 @@ pub enum ChucNang {
     Dem,
     Tach,
     MucLuc,
+    BocTach,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,6 +73,7 @@ impl ChucNang {
             ChucNang::Dem => "dem",
             ChucNang::Tach => "tach",
             ChucNang::MucLuc => "muc_luc",
+            ChucNang::BocTach => "boc_tach",
         }
     }
     fn tu_ma(s: &str) -> Option<Self> {
@@ -79,6 +81,7 @@ impl ChucNang {
             "dem" => Some(ChucNang::Dem),
             "tach" => Some(ChucNang::Tach),
             "muc_luc" => Some(ChucNang::MucLuc),
+            "boc_tach" => Some(ChucNang::BocTach),
             _ => None,
         }
     }

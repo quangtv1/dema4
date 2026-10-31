@@ -68,6 +68,9 @@ pub(crate) struct DangChay {
     bat_dau_file: HashMap<usize, Instant>,
     dung_som: Option<String>,
     mo_hinh: String,
+    /// Lượt license của lần chạy: ≥ 1 file đọc được mới tính, không thì hoàn lượt.
+    lan: crate::license::LanChay,
+    ok: usize,
 }
 
 /// Số liệu popup "Đã bóc tách xong".
@@ -87,6 +90,8 @@ pub(crate) struct TongKet {
     dung_som: Option<String>,
     excel: Option<Result<PathBuf, String>>,
     tab_sheet: Option<String>,
+    /// Đã gửi thống kê lên trạm → hiện câu "Thông tin bóc tách đã được ghi lại".
+    co_telegram: bool,
 }
 
 pub(crate) struct TabKetQua {
@@ -100,11 +105,13 @@ pub(crate) struct TabKetQua {
     cuon_toi: bool,
     rong_cot: BTreeMap<String, f32>,
     o_so: String,
+    /// ReOCR: đọc lại 1 file (chỉ số file, kết quả từ luồng nền).
+    pub doc_lai: Option<(usize, Receiver<Result<crate::boc_tach::chay::KetQua, String>>)>,
 }
 
 impl Default for TabKetQua {
     fn default() -> Self {
-        Self { i_xem: 0, loc: String::new(), gon_trai: false, gon_bang: false, xem: XemPdf::moi(), sua: None, cuon_toi: false, rong_cot: BTreeMap::new(), o_so: String::new() }
+        Self { i_xem: 0, loc: String::new(), gon_trai: false, gon_bang: false, xem: XemPdf::moi(), sua: None, cuon_toi: false, rong_cot: BTreeMap::new(), o_so: String::new(), doc_lai: None }
     }
 }
 
@@ -181,6 +188,15 @@ impl ManBocTach {
         if ds.is_empty() {
             return;
         }
+        // 1 lượt cho mỗi lần Bắt đầu / Chạy lại; hết lượt → popup license, bấm chạy được thì chạy lại đúng danh sách này
+        let lan = match self.license.bat_dau(crate::license::ChucNang::BocTach) {
+            Ok(lan) => lan,
+            Err(qd) => {
+                self.hop_license = Some(crate::hop_license::HopLicense::moi(qd));
+                self.cho_chay = Some(ds);
+                return;
+            }
+        };
         let kn = cfg.ket_noi(n, khoa.get(n.ma()).map_or("", String::as_str));
         let song_song = cfg.mo_hinh(n).song_song as usize;
         let anh = cfg.anh();
@@ -196,7 +212,7 @@ impl ManBocTach {
         self.kq.sua = None;
         self.tong_ket = None;
         self.tab = super::Tab::KetQua;
-        self.chay = Some(DangChay { nhan, dung, bat_dau: Instant::now(), ds, xong: 0, truong_boc: 0, bat_dau_file: HashMap::new(), dung_som: None, mo_hinh: super::cau_hinh::ten_mo_hinh(cfg, n) });
+        self.chay = Some(DangChay { nhan, dung, bat_dau: Instant::now(), ds, xong: 0, truong_boc: 0, bat_dau_file: HashMap::new(), dung_som: None, mo_hinh: super::cau_hinh::ten_mo_hinh(cfg, n), lan, ok: 0 });
     }
 
     pub(crate) fn nhan_chay(&mut self, ctx: &egui::Context, cfg: &CauHinhBocTach) {
@@ -225,6 +241,7 @@ impl ManBocTach {
                     let b = BanGhi::tu_ket_qua(&self.files[i].ten, &loai, &kq);
                     let _ = luu::ghi_them(&f_jsonl, &b);
                     c.xong += 1;
+                    c.ok += 1;
                     c.truong_boc += kq.so_co();
                     self.tt[i] = TrangThai::Xong(b);
                     self.day_sheet(i, &loai);
@@ -240,7 +257,14 @@ impl ManBocTach {
                     let c = self.chay.take().unwrap();
                     self.thoi_gian_chay = Some(c.bat_dau.elapsed());
                     self.ghi_excel(cfg);
-                    self.tong_ket = Some(self.tinh_tong_ket(&c, &loai));
+                    self.license.ket_thuc(&c.lan, c.ok > 0);
+                    let mut tk = self.tinh_tong_ket(&c, &loai);
+                    tk.co_telegram = c.ok > 0 && {
+                        let (thu_muc, ten_loai, mo_hinh) = (self.thu_muc.trim().to_string(), loai.ten.clone(), c.mo_hinh.clone());
+                        let (van_ban, ok, loi, trang, truong, tg) = (c.ds.len(), c.ok, c.xong - c.ok, tk.trang, (tk.truong_co, tk.truong_tong), tk.thoi_gian);
+                        self.license.thong_ke("thong_ke_boc_tach", move |_| crate::tram::so_lieu_boc_tach(&thu_muc, &ten_loai, &mo_hinh, van_ban, ok, loi, trang, truong, tg))
+                    };
+                    self.tong_ket = Some(tk);
                     return;
                 }
             }
@@ -285,6 +309,57 @@ impl ManBocTach {
             dung_som: c.dung_som.clone(),
             excel: self.excel.clone(),
             tab_sheet: self.sheet.as_ref().map(|_| self.tab_sheet.clone()),
+            co_telegram: false,
+        }
+    }
+
+    /// ReOCR: đọc lại file `i` bằng mô hình đang chọn (luồng nền); kết quả thay vào bảng + chi tiết.
+    fn doc_lai(&mut self, i: usize, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>, ctx: &egui::Context) {
+        let (Some(loai), Some(n), Some(f)) = (self.loai_chon().cloned(), self.ncc, self.files.get(i)) else { return };
+        let kn = cfg.ket_noi(n, khoa.get(n.ma()).map_or("", String::as_str));
+        let (pdf, anh, ctx2) = (f.duong_dan.clone(), cfg.anh(), ctx.clone());
+        let (gui, nhan) = mpsc::channel();
+        std::thread::spawn(move || {
+            let kq = crate::boc_tach::chay::doc_file(&pdf, &loai, &anh, &kn, &AtomicBool::new(false)).map_err(|e| e.to_string());
+            let _ = gui.send(kq);
+            ctx2.request_repaint();
+        });
+        self.tt[i] = TrangThai::Dang;
+        self.kq.sua = None;
+        self.kq.doc_lai = Some((i, nhan));
+    }
+
+    /// Nhận kết quả ReOCR: ghi jsonl, Excel, ghi đè dòng Sheet của file đó.
+    pub(crate) fn nhan_doc_lai(&mut self, ctx: &egui::Context, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>) {
+        let Some((i, nhan)) = &self.kq.doc_lai else { return };
+        let i = *i;
+        let kq = match nhan.try_recv() {
+            Ok(kq) => kq,
+            Err(TryRecvError::Empty) => {
+                ctx.request_repaint_after(Duration::from_millis(100));
+                return;
+            }
+            Err(TryRecvError::Disconnected) => Err("Đọc lại dừng bất thường".into()),
+        };
+        self.kq.doc_lai = None;
+        let Some(loai) = self.loai_chon().cloned() else { return };
+        let ten = self.files[i].ten.clone();
+        let b = match kq {
+            Ok(kq) => BanGhi::tu_ket_qua(&ten, &loai, &kq),
+            Err(e) => BanGhi::loi(&ten, &loai, self.files[i].so_trang, &e),
+        };
+        let _ = luu::ghi_them(&luu::file_jsonl(Path::new(self.thu_muc.trim())), &b);
+        self.tt[i] = match &b.loi {
+            Some(e) => TrangThai::Loi(e.clone()),
+            None => TrangThai::Xong(b),
+        };
+        self.kq.sua = None;
+        self.ghi_excel(cfg);
+        if self.sheet.is_none() {
+            self.tao_sheet(cfg, khoa);
+        }
+        if let (Some(h), Some(d)) = (&self.sheet, self.dong_excel(i, &loai)) {
+            h.ghi_de(d.ten_file.clone(), excel::dong_chu(&d, true));
         }
     }
 
@@ -385,7 +460,7 @@ impl ManBocTach {
     }
 }
 
-pub(crate) fn ve(m: &mut ManBocTach, ui: &mut egui::Ui, cfg: &CauHinhBocTach) {
+pub(crate) fn ve(m: &mut ManBocTach, ui: &mut egui::Ui, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>) {
     let Some(loai) = m.loai_chon().cloned() else { return };
     let hien = m.hien();
     if m.kq.i_xem >= m.files.len() {
@@ -404,7 +479,7 @@ pub(crate) fn ve(m: &mut ManBocTach, ui: &mut egui::Ui, cfg: &CauHinhBocTach) {
         ui.painter().vline(r.right() - 0.5, r.y_range(), Stroke::new(1.0, VIEN_NHAT));
         sidebar(m, ui, &loai, &hien);
     });
-    egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| chi_tiet(m, ui, &loai, cfg));
+    egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| chi_tiet(m, ui, &loai, cfg, khoa));
     m.kq.cuon_toi = false;
 }
 
@@ -499,7 +574,7 @@ fn sidebar(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, hien: &[us
 }
 
 /// Chi tiết: thanh "‹ n / N › tên file · Đã đọc: 2,4 s" · thu phóng · Lưu; PDF | các trường.
-fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &CauHinhBocTach) {
+fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>) {
     let i = m.kq.i_xem;
     let n_file = m.files.len();
     let Some(fp) = m.files.get(i).cloned() else { return };
@@ -553,10 +628,34 @@ fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &Cau
     job.wrap = egui::text::TextWrapping::truncate_at_width(rong_chu);
     con.add(egui::Label::new(job).sense(Sense::hover())).on_hover_text(format!("{} · {tt_chu}", fp.ten));
     let mut luu = false;
+    let mut ocr_lai = false;
+    let co_mo_hinh = m.ncc.is_some_and(|n| cfg.da_cai(n, khoa.get(n.ma()).map_or("", String::as_str)));
+    let ranh = m.chay.is_none() && m.kq.doc_lai.is_none();
     con.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
         luu = ui.add_enabled(doi, egui::Button::new(RichText::new("Lưu").size(12.0)).min_size(egui::vec2(76.0, 22.0))).on_hover_text("Lưu giá trị sửa tay (ghi lại kết quả của file này)").on_disabled_hover_text("Sửa ô bên dưới để bật Lưu").clicked();
+        ui.add_space(4.0);
+        let dang_lai = m.kq.doc_lai.as_ref().is_some_and(|(j, _)| *j == i);
+        let goi_y_ocr = if !co_mo_hinh { "Chọn mô hình đọc trước" } else if m.chay.is_some() { "Đang chạy hàng loạt" } else { "Đang đọc lại file khác" };
+        ocr_lai = ui
+            .add_enabled(ranh && co_mo_hinh, egui::Button::new(RichText::new(if dang_lai { "Đang đọc…" } else { "ReOCR" }).size(12.0)).min_size(egui::vec2(76.0, 22.0)))
+            .on_hover_text("Đọc lại file này bằng mô hình đang chọn; cập nhật bảng, chi tiết, Excel và Sheet (bỏ giá trị sửa tay chưa Lưu)")
+            .on_disabled_hover_text(if dang_lai { "Đang đọc lại file này" } else { goi_y_ocr })
+            .clicked();
         ui.add_space(8.0);
+        // Cách xem trang: 2 trang / 1 trang (100% = vừa khít bề ngang khung PDF)
+        for (hai, icon, ten) in [(true, BieuTuong::HaiTrang, "2 trang cạnh nhau, vừa bề ngang khung"), (false, BieuTuong::MotTrang, "1 trang mỗi hàng, cuộn dọc")] {
+            let ph = bt::nut(ui, icon, ten, true);
+            if m.kq.xem.hai_trang == hai {
+                ui.painter().rect_stroke(ph.rect.shrink(1.0), 3.0, Stroke::new(1.0, crate::gui::VIEN_TAB_CHON), egui::StrokeKind::Inside);
+            }
+            ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, m.kq.xem.hai_trang == hai, ten));
+            if ph.clicked() {
+                m.kq.xem.hai_trang = hai;
+                m.kq.xem.nac = 3;
+            }
+        }
+        ui.add_space(6.0);
         let x = &mut m.kq.xem;
         if bt::nut(ui, BieuTuong::KinhCong, "Phóng to", x.nac + 1 < NAC.len()).clicked() {
             x.nac += 1;
@@ -574,6 +673,9 @@ fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &Cau
         if let (Some(h), Some(d)) = (&m.sheet, m.dong_excel(i, loai)) {
             h.ghi_de(d.ten_file.clone(), excel::dong_chu(&d, true));
         }
+    }
+    if ocr_lai {
+        m.doc_lai(i, cfg, khoa, ui.ctx());
     }
     if let Some(k) = toi {
         m.kq.i_xem = k;
@@ -855,8 +957,10 @@ pub(crate) fn ve_tong_ket(ctx: &egui::Context, t: &TongKet, link_sheet: &str) ->
             if let Some(l) = &t.dung_som {
                 dong(ui, "Dừng sớm", &|j| j.append(l, 0.0, crate::gui_tach::chu_dong(DO, false)));
             }
-            ui.add_space(6.0);
-            ui.label(RichText::new("Thông tin bóc tách đã được ghi lại").size(11.0).color(CHU_PHU));
+            if t.co_telegram {
+                ui.add_space(6.0);
+                ui.label(RichText::new("Thông tin bóc tách đã được ghi lại").size(11.0).color(CHU_PHU));
+            }
         });
         kh::chan(ui, |ui| {
             if t.loi > 0 && ui.add(kh::nut_chan("Xem file lỗi")).on_hover_text("Lọc danh sách: chỉ file lỗi").clicked() {

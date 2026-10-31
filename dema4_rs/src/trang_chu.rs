@@ -243,12 +243,13 @@ fn luoi_thong_tin(ui: &egui::Ui, giua: f32, y: f32, license: &crate::license::Ki
     let gal: Vec<_> = muc.iter().map(|(_, a, b)| (p.layout_no_wrap(a.clone(), font(12.5, true), CHU), p.layout_no_wrap((*b).into(), font(12.0, false), CHU_PHU))).collect();
     const ICON: f32 = 22.0;
     const KHE_ICON: f32 = 10.0;
-    const KHE_COT: f32 = 60.0;
     let rong_cot: Vec<f32> = (0..3).map(|c| [c, c + 3].iter().map(|&i| ICON + KHE_ICON + gal[i].0.size().x.max(gal[i].1.size().x)).fold(0.0, f32::max)).collect();
-    let tong = rong_cot.iter().sum::<f32>() + 2.0 * KHE_COT;
+    // Cột trái thẳng mép trái đường kẻ, cột phải thẳng mép phải: khe giữa các cột chia đều phần còn lại
+    let khe_cot = ((rong_ke - rong_cot.iter().sum::<f32>()) / 2.0).max(16.0);
+    let tong = rong_cot.iter().sum::<f32>() + 2.0 * khe_cot;
     for (i, ((a, b), (icon, _, _))) in gal.into_iter().zip(muc.iter()).enumerate() {
         let (cot, hang) = (i % 3, i / 3);
-        let x = giua - tong / 2.0 + rong_cot[..cot].iter().sum::<f32>() + cot as f32 * KHE_COT;
+        let x = giua - tong / 2.0 + rong_cot[..cot].iter().sum::<f32>() + cot as f32 * khe_cot;
         let cao = a.size().y + 2.0 + b.size().y;
         let y_giua = y + 22.0 + hang as f32 * 54.0 + 17.0;
         bieu_tuong::ve(p, Rect::from_center_size(egui::pos2(x + ICON / 2.0, y_giua), egui::vec2(ICON, ICON)), *icon, MAU_NET);

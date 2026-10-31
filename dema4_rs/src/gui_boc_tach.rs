@@ -98,6 +98,10 @@ pub struct ManBocTach {
     yeu_cau_chay: Option<Vec<usize>>,
     /// Đã chọn sẵn mô hình ★ Mặc định (1 lần mỗi lần mở màn).
     da_mac_dinh: bool,
+    pub license: std::sync::Arc<crate::license::KiemTra>,
+    pub(crate) hop_license: Option<crate::hop_license::HopLicense>,
+    /// Danh sách file chờ chạy khi popup license cho phép chạy.
+    cho_chay: Option<Vec<usize>>,
 }
 
 impl Default for ManBocTach {
@@ -129,6 +133,9 @@ impl Default for ManBocTach {
             tab_sheet: String::new(),
             yeu_cau_chay: None,
             da_mac_dinh: false,
+            license: crate::license::KiemTra::mac_dinh(),
+            hop_license: None,
+            cho_chay: None,
         }
     }
 }
@@ -136,11 +143,12 @@ impl Default for ManBocTach {
 impl ManBocTach {
     /// Mở lại như lần đầu (chuyển từ chức năng khác sang).
     pub fn dat_lai(&mut self) {
-        *self = Self::default();
+        let license = self.license.clone();
+        *self = Self { license, ..Self::default() };
     }
 
     pub fn dang_chay(&self) -> bool {
-        self.chay.is_some()
+        self.chay.is_some() || self.kq.doc_lai.is_some()
     }
 
     pub fn loai_chon(&self) -> Option<&LoaiTaiLieu> {
@@ -238,6 +246,7 @@ impl ManBocTach {
         }
         self.nhan_nen(&ctx);
         self.nhan_chay(&ctx, cfg);
+        self.nhan_doc_lai(&ctx, cfg, khoa);
         let mut cfg_doi = false;
         if !self.gon {
             // Đang chạy: khoá khối đầu vào (đổi nguồn / loại / mô hình giữa chừng làm sai kết quả)
@@ -255,13 +264,29 @@ impl ManBocTach {
             }
             match self.tab {
                 Tab::Truong => truong::ve(self, ui, cfg, khoa),
-                Tab::KetQua => ket_qua::ve(self, ui, cfg),
+                Tab::KetQua => ket_qua::ve(self, ui, cfg, khoa),
             }
         });
         if let Some(ds) = self.yeu_cau_chay.take() {
             self.bat_dau(ds, cfg, khoa, &ctx);
         }
         self.cac_hop(&ctx, cfg);
+        if let Some(h) = &mut self.hop_license {
+            use crate::hop_license::KetQuaHop;
+            match h.ve(&ctx, &self.license) {
+                KetQuaHop::Mo => {}
+                KetQuaHop::Dong => {
+                    self.hop_license = None;
+                    self.cho_chay = None;
+                }
+                KetQuaHop::DuocChay => {
+                    self.hop_license = None;
+                    if let Some(ds) = self.cho_chay.take() {
+                        self.bat_dau(ds, cfg, khoa, &ctx);
+                    }
+                }
+            }
+        }
         cfg_doi
     }
 
@@ -271,9 +296,7 @@ impl ManBocTach {
         let r = ui.available_rect_before_wrap();
         ui.painter().vline(r.left() - 0.5, r.y_range(), Stroke::new(1.0, VIEN_NHAT));
         egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| {
-            let xong = self.du_buoc();
-            let noi = xong.iter().position(|x| !x).map(|i| i + 1);
-            match crate::gioi_thieu::ve_trang_thai(ui, &crate::gioi_thieu::BOC_TACH, noi, xong) {
+            match crate::gioi_thieu::ve_trang_thai(ui, &crate::gioi_thieu::BOC_TACH, None, self.du_buoc()) {
                 Some(crate::gioi_thieu::Bam::Chon) if self.chon_tm.is_none() => self.chon_tm = Some(crate::gui_tach::chon_thu_muc_nen(&self.thu_muc, ui.ctx())),
                 Some(crate::gioi_thieu::Bam::MoHinh) => self.mo_o = Some("bt_mo_hinh"),
                 Some(crate::gioi_thieu::Bam::LoaiTaiLieu) | Some(crate::gioi_thieu::Bam::TruongDuLieu) => self.mo_o = Some("bt_loai"),
@@ -326,14 +349,14 @@ impl ManBocTach {
                 self.chon_tm = Some(crate::gui_tach::chon_thu_muc_nen(&self.thu_muc, ui.ctx()));
             }
             ui.add_space(10.0);
-            ui.allocate_ui_with_layout(egui::vec2(RONG_KHOI_PHAI, 26.0), Layout::right_to_left(Align::Center), |ui| {
+            ui.allocate_ui_with_layout(egui::vec2(RONG_KHOI_PHAI, 26.0), Layout::left_to_right(Align::Center), |ui| {
                 let mut chon = None;
+                // Cột nhãn chung 2 dòng khối phải: "Loại tài liệu" / "Ghi ra" thẳng mép trái, ô chọn và ô tick Excel cùng 1 cột
+                nhan_khoi_phai(ui, "Loại tài liệu").on_hover_text("Mỗi loại tài liệu có bộ trường, mô tả, chuẩn hoá và trang đọc riêng");
                 ui.scope(|ui| {
                     kieu_o_chon(ui, Color32::WHITE, VIEN);
                     let hien = self.loai_chon().map_or_else(|| RichText::new("— Chọn loại tài liệu —"), |l| RichText::new(&l.ten));
-                    // Nhãn "Loại tài liệu" thẳng cột "Ghi ra" dòng dưới: ô chọn lấy hết phần còn lại của khối phải
-                    let rong_nhan = ui.fonts_mut(|f| f.layout_no_wrap("Loại tài liệu".into(), egui::FontId::proportional(13.0), CHU).size().x);
-                    let ph = egui::ComboBox::from_id_salt("bt_loai").icon(mui_ten_chon).width(RONG_KHOI_PHAI - rong_nhan - ui.spacing().item_spacing.x - 4.0).selected_text(hien).show_ui(ui, |ui| {
+                    let ph = egui::ComboBox::from_id_salt("bt_loai").icon(mui_ten_chon).width(ui.available_width() - 2.0).selected_text(hien).show_ui(ui, |ui| {
                         for (i, l) in self.ds_loai.iter().enumerate() {
                             if ui.selectable_label(self.loai == Some(i), &l.ten).clicked() {
                                 chon = Some(i);
@@ -346,7 +369,6 @@ impl ManBocTach {
                         egui::Popup::open_id(ui.ctx(), ph.response.id.with("popup"));
                     }
                 });
-                ui.label(RichText::new("Loại tài liệu").color(CHU_PHU)).on_hover_text("Mỗi loại tài liệu có bộ trường, mô tả, chuẩn hoá và trang đọc riêng");
                 if let Some(i) = chon {
                     self.loai = Some(i);
                     self.truong.chon = 0;
@@ -366,9 +388,10 @@ impl ManBocTach {
             let mut mo_ch = false;
             let o = ui.scope(|ui| {
                 kieu_o_chon(ui, Color32::WHITE, VIEN);
-                let hien = self.ncc.map_or_else(|| RichText::new("— Chọn mô hình đọc —"), |n| RichText::new(cau_hinh::ten_mo_hinh(cfg, n)));
+                let hien = self.ncc.map_or_else(|| RichText::new("— Chọn mô hình bóc tách —"), |n| RichText::new(cau_hinh::ten_mo_hinh(cfg, n)));
+                // Như ô Mẫu mục lục: không vẽ mũi tên (bấm cả ô mở danh sách), đuôi ô dành cho trạng thái + ⓧ.
                 // ComboBox vẽ hẹp hơn ô chữ cùng tham số ~2 px (đo trên ảnh chụp) → bù để thẳng ô đường dẫn dòng trên
-                let ph = egui::ComboBox::from_id_salt("bt_mo_hinh").icon(mui_ten_chon).width(w + 1.0).selected_text(hien).show_ui(ui, |ui| {
+                let ph = egui::ComboBox::from_id_salt("bt_mo_hinh").icon(|_, _, _, _| {}).width(w + 1.0).selected_text(hien).show_ui(ui, |ui| {
                     for n in &ds {
                         if ui.selectable_label(self.ncc == Some(*n), cau_hinh::ten_mo_hinh(cfg, *n)).clicked() {
                             chon = Some(*n);
@@ -390,7 +413,12 @@ impl ManBocTach {
                 ph.response.rect
             });
             let o = o.inner;
-            // Trạng thái kết nối trong ô, trước mũi tên
+            if self.ncc.is_some() && crate::gui::nut_xoa_trong_o(ui, o, "Bỏ chọn mô hình") {
+                self.ncc = None;
+                self.ket_noi = None;
+                self.truong.bo_ket_qua_thu();
+            }
+            // Trạng thái kết nối trong ô, trước ⓧ
             if let Some(KetNoi::Xong(n, kq)) = &self.ket_noi {
                 if Some(*n) == self.ncc {
                     let (chu, mau) = match kq {
@@ -424,11 +452,10 @@ impl ManBocTach {
             }
             ui.add_space(10.0);
             ui.allocate_ui_with_layout(egui::vec2(RONG_KHOI_PHAI, 26.0), Layout::left_to_right(Align::Center), |ui| {
-                ui.label(RichText::new("Ghi ra").color(CHU_PHU));
-                ui.add_space(6.0);
+                nhan_khoi_phai(ui, "Ghi ra");
                 let mut excel = true;
                 ui.add_enabled_ui(false, |ui| crate::gui_tach::khung_hop::o_tick(ui, &mut excel, "Excel")).response.on_disabled_hover_text("File Excel luôn được tạo");
-                ui.add_space(8.0);
+                ui.add_space(14.0);
                 if crate::gui_tach::khung_hop::o_tick(ui, &mut cfg.ghi_sheet, "Google Sheet").changed() {
                     cfg_doi = true;
                 }
@@ -545,7 +572,7 @@ impl ManBocTach {
                 let hien = if bat { self.hien() } else { vec![] };
                 let loc = !self.kq.loc.trim().is_empty();
                 let chu = if loc { format!("Chạy lại ({})", hien.len()) } else if da_chay { "Chạy lại".into() } else { "Bắt đầu".into() };
-                let bat = bat && !hien.is_empty();
+                let bat = bat && !hien.is_empty() && self.kq.doc_lai.is_none();
                 let goi_y = if !self.san_sang() { "Chọn nguồn văn bản, mô hình đọc và loại tài liệu trước".to_string() } else if loc { format!("Đọc lại {} file đang hiện theo bộ lọc", hien.len()) } else { "Đọc mọi file PDF trong thư mục".into() };
                 if ui.add_enabled(bat, nut_mau(&chu, if bat { XANH_LA } else { NUT_TAT }).min_size(egui::vec2(130.0, 28.0))).on_hover_text(&goi_y).on_disabled_hover_text(&goi_y).clicked() {
                     self.yeu_cau_chay = Some(hien);
@@ -628,6 +655,18 @@ impl ManBocTach {
             self.hop = None;
         }
     }
+}
+
+/// Bề rộng cột nhãn khối phải 2 dòng đầu vào.
+const RONG_NHAN_PHAI: f32 = 76.0;
+
+/// Nhãn xám cột trái khối phải ("Loại tài liệu" / "Ghi ra"), rộng cố định để 2 dòng thẳng cột.
+fn nhan_khoi_phai(ui: &mut egui::Ui, chu: &str) -> egui::Response {
+    ui.allocate_ui_with_layout(egui::vec2(RONG_NHAN_PHAI, 26.0), Layout::left_to_right(Align::Center), |ui| {
+        ui.set_min_width(RONG_NHAN_PHAI);
+        ui.label(RichText::new(chu).color(CHU_PHU))
+    })
+    .inner
 }
 
 /// Mọi file .pdf trong `goc` (gồm thư mục con), xếp theo đường dẫn; đếm số trang từng file.

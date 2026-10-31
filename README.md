@@ -5,7 +5,8 @@
 - **Đếm trang A4** — đếm trang mọi PDF trong thư mục, phân loại khổ A0–A7, quy đổi ra số trang A4.
 - **Tách văn bản** — tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), bỏ trang trắng, gợi ý trang xoay.
 - **Sinh mục lục hồ sơ** — từ file biên mục Excel/CSV và mẫu DOCX, sinh mục lục cho từng hồ sơ.
-- **Ký văn bản** — đang phát triển.
+- **Bóc tách dữ liệu** — đọc văn bản PDF bằng mô hình AI (máy chủ nội bộ hoặc ChatGPT / Gemini / Claude / OpenRouter) lấy số ký hiệu, ngày, trích yếu, tác giả, người ký…; ghi Excel và Google Sheet.
+- **Chuẩn hoá tên**, **Ký văn bản**, **Đóng gói AIP** — đang phát triển.
 
 Một file chạy duy nhất, không cần cài đặt. Tải ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
 
@@ -54,15 +55,31 @@ Ví dụ **Mẫu 04 – Vĩnh Phúc** với file biên mục có đủ cột (S�
 
 ![Mẫu 04 – Vĩnh Phúc: tab Kết quả](docs/anh/muc-luc-mau-04-ket-qua.png)
 
+## Bóc tách dữ liệu
+
+1. **Nguồn văn bản**: chọn thư mục PDF (gồm thư mục con).
+2. **Mô hình đọc**: mô hình đã khai ở **Cấu hình › Bóc tách** — máy chủ nội bộ (vLLM / Ollama / LM Studio, địa chỉ chuẩn OpenAI `http://<máy>:<cổng>/v1`), ChatGPT, Gemini, Claude, OpenRouter.
+3. **Loại tài liệu**: Văn bản hành chính, Hồ sơ đất đai, Hợp đồng hoặc loại riêng. Tab **Trường dữ liệu** xem các trường và câu lệnh gửi mô hình, sửa tên cột / mô tả / chuẩn hoá; **Thử đọc** file đang xem (không trừ lượt chạy).
+4. **Bắt đầu**: tab **Kết quả bóc** hiện từng file (PDF bên trái, các trường bên phải), sửa tay rồi **Lưu**; lọc `lỗi` / `5/6` rồi **Chạy lại (n)** chỉ đọc lại các file đang hiện.
+5. Kết quả: `<thư mục>_boc_tach.xlsx` cạnh thư mục nguồn — mỗi file 1 dòng, nạp thẳng vào **Sinh mục lục** làm file biên mục; bật **Google Sheet** để ghi thêm 1 dòng sau mỗi file (khoá service account hoặc Apps Script — script mẫu `dema4_rs/apps-script-mau/boc_tach.gs`).
+
+Mỗi trang cần đọc được gửi tới mô hình đọc đã chọn: máy chủ nội bộ thì ảnh không ra khỏi mạng đơn vị; dịch vụ đám mây thì ảnh gửi tới máy chủ của hãng (không dùng cho tài liệu mật). Khoá API lưu mã hoá trên máy.
+
+![Bóc tách: tab Trường dữ liệu sau Thử đọc](docs/anh/boc-tach-truong.png)
+
+![Bóc tách: tab Kết quả bóc](docs/anh/boc-tach-ket-qua.png)
+
 ## Cấu hình
 
-Menu **Cấu hình** (3 tab Đếm trang A4 / Tách PDF / Sinh mục lục), lưu ở file ẩn `.dema4_saomai.cfg` cạnh file chạy.
+Menu **Cấu hình** (4 tab Đếm trang A4 / Tách PDF / Sinh mục lục / Bóc tách), lưu ở file ẩn `.dema4_saomai.cfg` cạnh file chạy.
 
 ![Cấu hình Đếm trang A4](docs/anh/cau-hinh-dem.png)
 
 ![Cấu hình Tách PDF](docs/anh/cau-hinh-tach.png)
 
 ![Cấu hình Sinh mục lục](docs/anh/cau-hinh-muc-luc.png)
+
+![Cấu hình Bóc tách](docs/anh/cau-hinh-boc-tach.png)
 
 ## Dòng lệnh
 
@@ -77,7 +94,7 @@ dema4_saomai --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư 
 
 ![Hướng dẫn sử dụng](docs/anh/huong-dan.png)
 
-Sau mỗi lần chạy xong, app gửi số liệu thống kê (không gửi nội dung tài liệu) về Sao Mai và báo trong popup kết quả.
+Sau mỗi lần chạy xong, app gửi số liệu thống kê (không gửi nội dung tài liệu) về Sao Mai và báo trong popup kết quả. Riêng **Bóc tách** gửi ảnh trang PDF tới mô hình đọc do người dùng chọn để lấy dữ liệu; thống kê gửi về Sao Mai chỉ gồm số file / trang / trường và tên mô hình.
 
 ## Build từ mã nguồn
 
@@ -92,4 +109,4 @@ GitHub Actions tự build macOS (arm64) và Windows (x64); tag `vX.Y.Z` tạo Re
 
 ## Giấy phép thành phần
 
-MuPDF (AGPL) · zxing-cpp (Apache 2.0) · ONNX Runtime (MIT) · PP-LCNet_x1_0_doc_ori của PaddleOCR (Apache 2.0, `dema4_rs/assets/NOTICE-doc_ori.txt`) · egui (MIT / Apache 2.0).
+MuPDF (AGPL) · zxing-cpp (Apache 2.0) · ONNX Runtime (MIT) · PP-LCNet_x1_0_doc_ori của PaddleOCR (Apache 2.0, `dema4_rs/assets/NOTICE-doc_ori.txt`) · egui (MIT / Apache 2.0) · rust_xlsxwriter, aes-gcm (MIT / Apache 2.0) · jpeg-encoder (MIT / Apache 2.0; *this software is based in part on the work of the Independent JPEG Group*).

@@ -31,7 +31,7 @@ Trang chủ 7 ô (Bóc tách đang để "Đang phát triển"), menu, màn gi�
 | 3 | Khung màn hình + tab Trường dữ liệu + popup | [phase-03-man-truong-du-lieu.md](phase-03-man-truong-du-lieu.md) | 1, 2 | completed |
 | 4 | Tab Kết quả bóc + chạy hàng loạt + popup xong | [phase-04-ket-qua-boc.md](phase-04-ket-qua-boc.md) | 3 | completed |
 | 5 | Đầu ra: Excel + Google Sheet | [phase-05-dau-ra.md](phase-05-dau-ra.md) | 1 | completed |
-| 6 | License, thống kê, trạm, Trang chủ, tài liệu, phát hành | [phase-06-tich-hop-phat-hanh.md](phase-06-tich-hop-phat-hanh.md) | 3–5 | pending |
+| 6 | License, thống kê, trạm, Trang chủ, tài liệu, phát hành | [phase-06-tich-hop-phat-hanh.md](phase-06-tich-hop-phat-hanh.md) | 3–5 | completed (trạm @13, v2.1.0) |
 | 7 | Nguồn đám mây: S3/GCS, Google Drive (sau bản đầu) | [phase-07-nguon-dam-may.md](phase-07-nguon-dam-may.md) | 6 | pending |
 
 ## Phạm vi & mốc (chốt 2026-11-01: làm khung trước, chọn mô hình sau)

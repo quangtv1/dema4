@@ -15,7 +15,7 @@ var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7
 var SO_COT_MAY = 14;
 // Số mã lần gần nhất giữ trong dòng máy để chống trùng (app gửi lại tối đa vài lần chưa được xác nhận)
 var GIU_MA_LAN = 20;
-var TEN_CN = { dem: 'Đếm', tach: 'Tách', muc_luc: 'Mục lục' };
+var TEN_CN = { dem: 'Đếm', tach: 'Tách', muc_luc: 'Mục lục', boc_tach: 'Bóc tách' };
 
 /** Bỏ ký tự điều khiển, cắt `toiDa` ký tự. */
 function sachChu(s, toiDa) {
@@ -118,7 +118,7 @@ function chuyenDongCu(r) {
 function xuLy(yc, kho, bayGio) {
   yc = yc || {};
   var hd = yc.hanh_dong;
-  if (['kiem_tra', 'ghi_lan', 'thong_ke_dem', 'thong_ke_tach', 'thong_ke_muc_luc'].indexOf(hd) < 0) return { ok: false, loi: 'hanh_dong' };
+  if (['kiem_tra', 'ghi_lan', 'thong_ke_dem', 'thong_ke_tach', 'thong_ke_muc_luc', 'thong_ke_boc_tach'].indexOf(hd) < 0) return { ok: false, loi: 'hanh_dong' };
   if (!MAU_MA_MAY.test(String(yc.ma_may))) return { ok: false, loi: 'ma_may' };
   var nonce = sachChu(yc.nonce, 64);
   if (!kho.choPhep('goi', GIOI_HAN_LOI_GOI_MOI_PHUT, 60)) return { ok: false, loi: 'ban' };
@@ -188,6 +188,7 @@ function thongKe(hd, yc, may, kho, bayGio) {
   var luc = thoiDiemTin(bayGio);
   var tin = hd === 'thong_ke_dem' ? tinDem(yc.ma_may, may, sl, luc, luot)
     : hd === 'thong_ke_muc_luc' ? tinMucLuc(yc.ma_may, may, sl, luc, luot)
+    : hd === 'thong_ke_boc_tach' ? tinBocTach(yc.ma_may, may, sl, luc, luot)
     : tinTach(yc.ma_may, may, sl, ng, luc, luot);
   var hang = { ma: maNgauNhien(), luc: 0, trang_thai: 'cho', so_lan_thu: 0, noi_dung: tin, ten_csv: '', csv: '' };
   if (hd === 'thong_ke_tach' && ng) {
@@ -238,7 +239,7 @@ function soanTin(tieuDe, maMay, may, dongChucNang) {
 
 function tinMayMoi(maMay, may, luc) {
   return soanTin('🆕 MÁY MỚI ĐĂNG KÝ', maMay, may, [
-    'Dùng thử: ' + HAN_MAC_DINH + ' lần (dùng chung Đếm · Tách · Sinh mục lục)',
+    'Dùng thử: ' + HAN_MAC_DINH + ' lần (dùng chung Đếm · Tách · Sinh mục lục · Bóc tách)',
     'Thời điểm: ' + luc,
   ]);
 }
@@ -332,6 +333,20 @@ function tinMucLuc(maMay, may, sl, luc, luot) {
     'Văn bản: ' + soNguyen(sl.van_ban),
     'File ra: ' + soNguyen(sl.docx) + ' DOCX · ' + soNguyen(sl.pdf) + ' PDF',
     'Lỗi: ' + soNguyen(sl.loi),
+    'Thời điểm: ' + luc,
+    'Thời gian chạy: ' + phutGiay(sl.thoi_gian_ms),
+  ]);
+}
+
+/** Bóc tách dữ liệu: chỉ số đếm + tên mô hình đọc — không có nội dung văn bản, không có khoá API. */
+function tinBocTach(maMay, may, sl, luc, luot) {
+  return soanTin(kemLuot('🧾 BÓC TÁCH DỮ LIỆU', luot), maMay, may, [
+    'Thư mục: ' + thuMucGon(sl.thu_muc),
+    'Loại tài liệu: ' + sachChu(sl.loai, 120),
+    'Mô hình đọc: ' + sachChu(sl.mo_hinh, 160),
+    'Văn bản: ' + soNguyen(sl.ok) + '/' + soNguyen(sl.van_ban) + ' file · lỗi ' + soNguyen(sl.loi),
+    'Trang đã đọc: ' + soNguyen(sl.trang),
+    'Trường: ' + soNguyen(sl.truong_co) + '/' + soNguyen(sl.truong_tong),
     'Thời điểm: ' + luc,
     'Thời gian chạy: ' + phutGiay(sl.thoi_gian_ms),
   ]);

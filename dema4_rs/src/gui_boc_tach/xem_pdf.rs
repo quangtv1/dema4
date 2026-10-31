@@ -37,6 +37,8 @@ pub struct XemPdf {
     gui: Sender<Tin>,
     nhan: Receiver<Ve>,
     pub nac: usize,
+    /// 2 trang cạnh nhau (100% = 2 trang vừa khít bề ngang khung); tắt = 1 trang mỗi hàng.
+    pub hai_trang: bool,
 }
 
 impl Default for XemPdf {
@@ -50,7 +52,7 @@ impl XemPdf {
         let (gui, nhan_tin) = mpsc::channel::<Tin>();
         let (gui_ve, nhan) = mpsc::channel::<Ve>();
         std::thread::spawn(move || luong_ve(nhan_tin, gui_ve));
-        Self { pdf: None, kich_thuoc: vec![], anh: HashMap::new(), cho: HashSet::new(), loi: None, the_he: 0, gui, nhan, nac: 3 }
+        Self { pdf: None, kich_thuoc: vec![], anh: HashMap::new(), cho: HashSet::new(), loi: None, the_he: 0, gui, nhan, nac: 3, hai_trang: false }
     }
 
     pub fn ty_le(&self) -> u16 {
@@ -104,17 +106,27 @@ impl XemPdf {
             return;
         }
         let ppp = ui.ctx().pixels_per_point();
-        let rong = ((khung.width() - 2.0 * LE) * self.ty_le() as f32 / 100.0).max(40.0);
-        let tong_cao: f32 = self.kich_thuoc.iter().map(|(w, h)| rong * h / w + KHE).sum::<f32>() + LE;
+        // Bố cục: mỗi hàng 1 hoặc 2 trang, trang rộng bằng nhau; hàng cao bằng trang cao nhất của hàng
+        let cot = if self.hai_trang { 2 } else { 1 };
+        let rong = ((khung.width() - 2.0 * LE - (cot - 1) as f32 * KHE) / cot as f32 * self.ty_le() as f32 / 100.0).max(40.0);
+        let rong_hang = cot as f32 * rong + (cot - 1) as f32 * KHE;
+        let mut vi_tri = Vec::with_capacity(self.kich_thuoc.len());
+        let mut y = LE;
+        for hang in self.kich_thuoc.chunks(cot) {
+            let cao = hang.iter().map(|(w, h)| rong * h / w).fold(0.0, f32::max);
+            for (k, (w, h)) in hang.iter().enumerate() {
+                vi_tri.push(Rect::from_min_size(egui::pos2(k as f32 * (rong + KHE), y), egui::vec2(rong, rong * h / w)));
+            }
+            y += cao + KHE;
+        }
+        let tong_cao = y + LE - KHE;
         let so = self.kich_thuoc.len();
         egui::ScrollArea::both().id_salt(("bt_xem_pdf", self.the_he)).auto_shrink([false, false]).show(ui, |ui| {
-            let (r, _) = ui.allocate_exact_size(egui::vec2((rong + 2.0 * LE).max(khung.width()), tong_cao), Sense::hover());
-            let x0 = r.left() + ((r.width() - rong) / 2.0).max(LE);
-            let mut y = r.top() + LE;
+            let (r, _) = ui.allocate_exact_size(egui::vec2((rong_hang + 2.0 * LE).max(khung.width()), tong_cao), Sense::hover());
+            let goc = egui::vec2(r.left() + ((r.width() - rong_hang) / 2.0).max(LE), r.top());
             let mut can = Vec::new();
-            for (i, (w, h)) in self.kich_thuoc.iter().enumerate() {
-                let o = Rect::from_min_size(egui::pos2(x0, y), egui::vec2(rong, rong * h / w));
-                y += o.height() + KHE;
+            for (i, o) in vi_tri.iter().enumerate() {
+                let o = o.translate(goc);
                 if !ui.is_rect_visible(o) {
                     continue;
                 }

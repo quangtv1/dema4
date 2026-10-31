@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "License, thống kê, trạm, Trang chủ, tài liệu, phát hành"
-status: pending
+status: completed
 priority: P1
 dependencies: [3, 4, 5]
 ---

@@ -56,7 +56,7 @@ test('moi_chuc_nang_tinh_chung_mot_luot', () => {
   const r = goi(k, { hanh_dong: 'kiem_tra' });
   assert.equal(r.du_lieu.da_dung, 5);
   // Khoá cũ theo chức năng = số tổng → app bản cũ cũng chặn theo tổng
-  for (const c of ['dem', 'tach', 'muc_luc']) assert.deepEqual([r.du_lieu['han_' + c], r.du_lieu['da_dung_' + c]], [10, 5], c);
+  for (const c of ['dem', 'tach', 'muc_luc', 'boc_tach']) assert.deepEqual([r.du_lieu['han_' + c], r.du_lieu['da_dung_' + c]], [10, 5], c);
 });
 
 test('chi_giu_ma_lan_gan_nhat', () => {
@@ -123,7 +123,7 @@ test('tin_tach_chu_thuong_hai_phan', () => {
 
 test('tin_may_moi_va_het_luot', () => {
   assert.equal(L.tinMayMoi(MA, MAY_TIN, '30.10.2026, 20:00:00'),
-    '🆕 MÁY MỚI ĐĂNG KÝ\n\n' + PHAN_MAY + '- Dùng thử: 10 lần (dùng chung Đếm · Tách · Sinh mục lục)\n- Thời điểm: 30.10.2026, 20:00:00');
+    '🆕 MÁY MỚI ĐĂNG KÝ\n\n' + PHAN_MAY + '- Dùng thử: 10 lần (dùng chung Đếm · Tách · Sinh mục lục · Bóc tách)\n- Thời điểm: 30.10.2026, 20:00:00');
   assert.equal(L.tinHetLuot(MA, MAY_TIN, 'tach', 10, 10, 'dung_thu', '30.10.2026, 20:05:00'),
     '⛔ HẾT LƯỢT\n\n' + PHAN_MAY + '- Lần cuối: Tách\n- Đã dùng: 10/10\n- Trạng thái: Dùng thử\n- Thời điểm: 30.10.2026, 20:05:00\n- Cấp thêm: tab 1_license → sửa Hạn mức (tổng mới) + Trạng thái Đã cấp');
 });
@@ -226,4 +226,17 @@ test('muc_luc_tin_thong_ke_va_het_luot', () => {
   const tin = k.hangDoi.slice(-1)[0].noi_dung;
   assert.equal(tin.split('\n')[0], '📑 SINH MỤC LỤC (1/1)');
   for (const d of ['- Dữ liệu: /a/Bien_muc.xlsx', '- Mẫu: Mẫu 01 – Quảng Trị', '- Hồ sơ: 22', '- Văn bản: 326', '- File ra: 22 DOCX · 0 PDF', '- Lỗi: 1']) assert.ok(tin.includes(d), d);
+});
+
+test('boc_tach_dem_luot_va_tin_thong_ke', () => {
+  const k = khoGia();
+  goi(k, { hanh_dong: 'kiem_tra' });
+  const r = goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(951), cn: 'boc_tach', nguon: 'online' }] });
+  assert.equal(r.ok, true);
+  const tk = goi(k, { hanh_dong: 'thong_ke_boc_tach', so_lieu: { thu_muc: '/tmp/SoHoa/Van_ban', loai: 'Văn bản hành chính', mo_hinh: 'Máy chủ nội bộ · 5CD-AI/Vintern-1B-v3_5', van_ban: 33, ok: 31, loi: 2, trang: 60, truong_co: 181, truong_tong: 186, thoi_gian_ms: 70000 } });
+  assert.equal(tk.ok, true);
+  const tin = k.hangDoi.slice(-1)[0].noi_dung;
+  assert.ok(tin.split('\n')[0].startsWith('🧾 BÓC TÁCH DỮ LIỆU'));
+  for (const d of ['- Loại tài liệu: Văn bản hành chính', '- Mô hình đọc: Máy chủ nội bộ · 5CD-AI/Vintern-1B-v3_5', '- Văn bản: 31/33 file · lỗi 2', '- Trang đã đọc: 60', '- Trường: 181/186']) assert.ok(tin.includes(d), d);
+  assert.equal(goi(k, { hanh_dong: 'thong_ke_bat_ky', so_lieu: {} }).loi, 'hanh_dong');
 });
