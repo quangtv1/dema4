@@ -13,7 +13,7 @@ Tab thứ 4 "Bóc tách" trong hộp Cấu hình (rộng hơn khi mở tab này)
 
 ## Yêu cầu
 - Sơ đồ luồng 3 ô: Nguồn văn bản → Mô hình đọc → Ghi kết quả (ô là nút chuyển mục; dòng phụ tóm tắt lựa chọn).
-- Mô hình đọc: ① 5 ô nhà cung cấp 1 hàng (Nội bộ · ChatGPT · Gemini · Claude · OpenRouter), dòng dưới = model đã cài hoặc "Chưa cài đặt" (xám nghiêng); "★ Mặc định / Đặt làm mặc định · Xoá" cuối hàng bước 1. ② Địa chỉ (tự điền + khoá ô cho dịch vụ đám mây), Khoá API (ô che), nhắc chỗ lấy khoá. ③ Model (danh sách) + Kiểm tra kết nối → "✓ Kết nối được · n model đọc được ảnh · t s". Cảnh báo gửi ảnh ra ngoài với dịch vụ đám mây. "▸ Nâng cao": song song, chờ tối đa, ảnh gửi đi (DPI, cạnh, JPEG).
+- Mô hình đọc: ① 5 ô nhà cung cấp 1 hàng (Nội bộ · ChatGPT · Gemini · Claude · OpenRouter), dòng dưới = model đã cài hoặc "Chưa cài đặt" (xám nghiêng); "★ Mặc định / Đặt làm mặc định · Xoá" cuối hàng bước 1. ② Địa chỉ (tự điền + khoá ô cho dịch vụ đám mây; Nội bộ: người dùng nhập `http://<ip máy GPU>:<cổng>/v1`, gợi ý `:8000` vLLM / `:11434` Ollama), Khoá API (ô che), nhắc chỗ lấy khoá. ③ Model (danh sách) + Kiểm tra kết nối → "✓ Kết nối được · n model đọc được ảnh · t s". Cảnh báo gửi ảnh ra ngoài với dịch vụ đám mây. "▸ Nâng cao": song song, chờ tối đa, ảnh gửi đi (DPI, cạnh, JPEG).
 - Nguồn văn bản: ô Máy tính / Google Drive / GCS / Kho S3 (giai đoạn 7 mới bật Drive/GCS/S3; bản đầu hiện mờ "Sắp có" — sửa prototype trước khi làm, xin duyệt).
 - Ghi kết quả: thư mục Excel; Google Sheet (link, tab, cách ghi Service account / Apps Script, file khoá JSON + email cần chia sẻ, Ghi thử 1 dòng).
 - Cấu hình sửa đúng mô hình đang chọn ở màn chính.
@@ -24,7 +24,7 @@ Tab thứ 4 "Bóc tách" trong hộp Cấu hình (rộng hơn khi mở tab này)
 - Khoá API / secret (quyết định #2): `src/boc_tach/khoa_cache.rs` — `ma_hoa(&str) -> String` / `giai_ma(&str) -> Option<String>`, AES-256-GCM, nonce ngẫu nhiên 12 byte, lưu dạng base64 `nonce‖bản mã` trong `.sm-dema4/boc_tach/khoa.bin` (quyền 0600 trên macOS). Khoá = SHA-256(`option_env!("DEMA4_KHOA_CACHE")` ‖ `license::ma_may()`). Thiếu biến khi build → không ghi khoá ra đĩa, ô Khoá API báo "Khoá chỉ dùng trong phiên này". Giải mã lỗi (máy khác / bản build khác) → coi như chưa có khoá, yêu cầu nhập lại. Không bao giờ đưa khoá vào log / thống kê / file cấu hình rõ.
 - CI: thêm secret `DEMA4_KHOA_CACHE` vào workflow build (Windows/macOS); không in giá trị ra log.
 - `gui_tach/hop_cau_hinh.rs`: `TabCauHinh::BocTach`, vẽ tách sang `gui_boc_tach/cau_hinh.rs` cho gọn.
-- Kiểm tra kết nối: gọi `GET /models` (chuẩn OpenAI) hoặc 1 yêu cầu nhỏ (Anthropic) trên luồng nền, hiện kết quả.
+- Kiểm tra kết nối: gọi `GET /models` trên luồng nền (mọi nhà cung cấp; Claude nếu `/models` không có thì gửi 1 yêu cầu chữ nhỏ), hiện kết quả.
 
 ## File liên quan
 - Sửa: `src/cau_hinh.rs`, `src/gui_tach/hop_cau_hinh.rs`, workflow CI (thêm secret).
