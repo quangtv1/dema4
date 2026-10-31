@@ -33,6 +33,8 @@ pub struct GioiThieu {
     pub kho: bool,
     /// Logo lớn trên tiêu đề — nhìn là biết đang ở chức năng nào.
     pub logo: Logo,
+    /// Chức năng chưa dùng được: cả màn mờ đi, nhãn "ĐANG PHÁT TRIỂN" nổi dưới tiêu đề.
+    pub dang_phat_trien: bool,
 }
 
 pub const TACH: GioiThieu = GioiThieu {
@@ -45,6 +47,7 @@ pub const TACH: GioiThieu = GioiThieu {
     ],
     kho: false,
     logo: Logo::Tach,
+    dang_phat_trien: false,
 };
 
 pub const DEM: GioiThieu = GioiThieu {
@@ -57,6 +60,7 @@ pub const DEM: GioiThieu = GioiThieu {
     ],
     kho: true,
     logo: Logo::Dem,
+    dang_phat_trien: false,
 };
 
 pub const MUC_LUC: GioiThieu = GioiThieu {
@@ -69,11 +73,12 @@ pub const MUC_LUC: GioiThieu = GioiThieu {
     ],
     kho: false,
     logo: Logo::MucLuc,
+    dang_phat_trien: false,
 };
 
 pub const KY: GioiThieu = GioiThieu {
     tieu_de: "Ký văn bản",
-    mo_ta: "Ký số hàng loạt các văn bản PDF đã tách bằng chứng thư số của đơn vị; chèn hình chữ ký, kiểm tra file đã ký. Chức năng đang phát triển.",
+    mo_ta: "Ký số hàng loạt các văn bản PDF đã tách bằng chứng thư số của đơn vị; chèn hình chữ ký, kiểm tra file đã ký.",
     buoc: [
         Buoc { ten: "Chọn thư mục", than: &[Doan::Chu("Thư mục văn bản đã tách (kết quả của Tách văn bản).")] },
         Buoc { ten: "Chọn chứng thư", than: &[Doan::Chu("USB token hoặc chứng thư trong máy; vị trí, kích thước chữ ký.")] },
@@ -81,6 +86,7 @@ pub const KY: GioiThieu = GioiThieu {
     ],
     kho: false,
     logo: Logo::Ky,
+    dang_phat_trien: true,
 };
 
 const RONG_MO_TA: f32 = 560.0;
@@ -100,8 +106,12 @@ pub fn ve(ui: &mut egui::Ui, gt: &GioiThieu) -> Option<Bam> {
 pub fn ve_noi_bat(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>) -> Option<Bam> {
     let vung = ui.available_rect_before_wrap();
     let mut bam = None;
+    let mut cho_nhan = None;
     ui.scope(|ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
+        if gt.dang_phat_trien {
+            ui.multiply_opacity(0.4);
+        }
         ui.add_space(36.0);
         ui.vertical_centered(|ui| {
             let (o, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), KICH_LOGO + 4.0), Sense::hover());
@@ -111,6 +121,12 @@ pub fn ve_noi_bat(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>) -> 
             let (r, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 22.0), Sense::hover());
             ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, gt.tieu_de, egui::FontId::new(17.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), CHU);
             ui.add_space(4.0);
+            if gt.dang_phat_trien {
+                // Chừa chỗ cho nhãn; vẽ sau, ngoài phần bị làm mờ
+                let (o, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 30.0), Sense::hover());
+                cho_nhan = Some(o);
+                ui.add_space(4.0);
+            }
             ui.allocate_ui_with_layout(egui::vec2(RONG_MO_TA.min(ui.available_width()), 0.0), egui::Layout::top_down(Align::Center), |ui| {
                 ui.add(egui::Label::new(RichText::new(gt.mo_ta).size(12.0).color(CHU_PHU)).halign(Align::Center).wrap());
             });
@@ -141,8 +157,20 @@ pub fn ve_noi_bat(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>) -> 
             });
         }
     });
+    if let Some(o) = cho_nhan {
+        nhan_dang_phat_trien(&ui.ctx().layer_painter(ui.layer_id()), o.center());
+    }
     logo_goc(ui, vung);
     bam
+}
+
+/// Nhãn "ĐANG PHÁT TRIỂN": viên thuốc nền cam, chữ trắng đậm — giữ nguyên độ đậm khi cả màn bị làm mờ.
+fn nhan_dang_phat_trien(p: &egui::Painter, tam: egui::Pos2) {
+    let f = egui::FontId::new(12.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into()));
+    let g = p.layout_no_wrap("ĐANG PHÁT TRIỂN".into(), f, Color32::WHITE);
+    let r = Rect::from_center_size(tam, g.size() + egui::vec2(28.0, 10.0));
+    p.rect_filled(r, r.height() / 2.0, Color32::from_rgb(0xD9, 0x82, 0x2B));
+    p.galley(r.center() - g.size() / 2.0, g, Color32::WHITE);
 }
 
 /// 1 thẻ bước: ô số xám, tên đậm, thân chữ (có thể chứa link). `noi` = bước cần làm tiếp: viền xanh, ô số xanh.
