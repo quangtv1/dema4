@@ -255,7 +255,7 @@ const HD_MUC_LUC: &[Khoi] = &[
         "*Chọn* file biên mục Excel (.xlsx .xlsb .xls) hoặc CSV; chọn *Sheet* và *Dòng tiêu đề* (số dòng như Excel hiển thị); nút xổ cuối dòng hiện 10 dòng đầu sheet, dòng tô nền là dòng tiêu đề (dữ liệu lấy từ dòng sau). Mỗi văn bản một dòng, các dòng cùng hồ sơ nằm liền nhau.",
         "Chọn *Mẫu mục lục* (chưa chọn thì chưa ghép được): 4 mẫu có sẵn hoặc *Chọn* mẫu DOCX riêng của đơn vị (biến viết dạng `{ten_bien}`).",
         "Tab *Mẫu*: biến tự khớp với cột cùng tên; bấm ô *Lấy từ* để chọn cột khác hoặc gõ giá trị cố định rồi [Enter]. *Nhóm theo* (chân sidebar) = cột tách hồ sơ.",
-        "Tab *Kết quả*: xem trước mục lục từng hồ sơ; dấu cảnh báo tam giác = hồ sơ có ô trống ở cột đã ghép.",
+        "Tab *Kết quả*: xem trước mục lục từng hồ sơ; dấu *!* = hồ sơ có ô trống ở cột đã ghép.",
         "*Sinh mục lục* → mỗi hồ sơ một file DOCX, tên theo mẫu ở Cấu hình (mặc định `MLHS_{so_ho_so}`).",
     ]),
     Khoi::Muc("Màu biến"),

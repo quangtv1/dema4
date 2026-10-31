@@ -21,14 +21,9 @@ const LE_O: f32 = 3.0;
 pub const NEN_SANG: Color32 = Color32::from_rgb(0xFF, 0xE0, 0x66);
 pub const CHU_SANG: Color32 = Color32::from_rgb(0x3A, 0x2E, 0x00);
 
-/// Tam giác cảnh báo vẽ tay (font giao diện không có ký tự ⚠), căn giữa ô `r`.
-pub fn tam_giac_canh_bao(p: &egui::Painter, r: Rect, mau: Color32) {
-    let c = r.center();
-    let s = r.width().min(r.height()) * 0.5;
-    let dinh = [egui::pos2(c.x, c.y - s), egui::pos2(c.x + s * 1.05, c.y + s * 0.8), egui::pos2(c.x - s * 1.05, c.y + s * 0.8)];
-    p.add(egui::Shape::closed_line(dinh.to_vec(), Stroke::new(1.3, mau)));
-    p.line_segment([egui::pos2(c.x, c.y - s * 0.35), egui::pos2(c.x, c.y + s * 0.25)], Stroke::new(1.3, mau));
-    p.circle_filled(egui::pos2(c.x, c.y + s * 0.52), 0.9, mau);
+/// Dấu cảnh báo "!" đậm, căn giữa ô `r` (cùng kiểu dấu ! cuối dòng biến chưa ghép).
+pub fn dau_canh_bao(p: &egui::Painter, r: Rect, mau: Color32) {
+    p.text(r.center(), egui::Align2::CENTER_CENTER, "!", egui::FontId::new(13.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), mau);
 }
 
 #[derive(Default)]
@@ -115,7 +110,7 @@ pub fn ve(ui: &mut egui::Ui, id: &str, khoi: &[Khoi], kieu: &KieuVe, canh_bao: O
                     ui.set_width(rong_trang - 20.0);
                     ui.horizontal(|ui| {
                         let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), Sense::hover());
-                        tam_giac_canh_bao(ui.painter(), r, Color32::from_rgb(0xB8, 0x5F, 0x00));
+                        dau_canh_bao(ui.painter(), r, Color32::from_rgb(0xB8, 0x5F, 0x00));
                         ui.label(egui::RichText::new(cb).size(12.0).color(Color32::from_rgb(0x6B, 0x4A, 0x00)));
                     });
                 });

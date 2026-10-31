@@ -51,6 +51,17 @@ impl NhomBien {
         }
     }
 
+    /// Loại theo vùng của biến (không xét đã ghép hay chưa) — màu chip ở sidebar.
+    pub fn loai_vung(&self, b: &str) -> Loai {
+        if self.nhom[2].iter().any(|x| x == b) {
+            Loai::TuDong
+        } else if self.nhom[1].iter().any(|x| x == b) {
+            Loai::Bang
+        } else {
+            Loai::ThongTin
+        }
+    }
+
     pub fn tong(&self) -> usize {
         self.nhom.iter().map(Vec::len).sum()
     }
@@ -81,21 +92,13 @@ pub(super) fn chip(ui: &egui::Ui, o: Rect, ten: &str, (nen, chu): (Color32, Colo
 
 /// Nền dải đầu (tiêu đề bảng biến, thanh công cụ khung xem bên phải) — cùng một màu.
 pub const NEN_DAI_DAU: Color32 = Color32::from_gray(0xFA);
-/// Đường kẻ mờ chia cột trong bảng biến.
-const KE_COT: Color32 = Color32::from_gray(0xEC);
-
-/// Kẻ dọc mờ giữa cột Biến | Lấy từ | ! trên khoảng y của `r`.
-fn ke_cot(ui: &egui::Ui, r: Rect) {
-    for x in [r.left() + RONG_COT_BIEN - 3.0, r.right() - RONG_COT_CANH + 2.0] {
-        ui.painter().vline(x.round() + 0.5, r.y_range(), Stroke::new(1.0, KE_COT));
-    }
-}
+/// Kẻ mờ ngăn giữa các vùng biến (thông tin hồ sơ · bảng văn bản · tự động).
+const KE_VUNG: Color32 = Color32::from_gray(0xE4);
 
 fn hang_tieu_de(ui: &mut egui::Ui) {
     let (r, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), CAO_DAU), Sense::hover());
     ui.painter().rect_filled(r, 0.0, NEN_DAI_DAU);
     ui.painter().hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
-    ke_cot(ui, r);
     let f = egui::FontId::proportional(12.0);
     ui.painter().text(egui::pos2(r.left() + 6.0, r.center().y), egui::Align2::LEFT_CENTER, "Biến", f.clone(), CHU_PHU);
     ui.painter().text(egui::pos2(r.left() + RONG_COT_BIEN + 6.0, r.center().y), egui::Align2::LEFT_CENTER, "Lấy từ", f, CHU_PHU);
@@ -196,12 +199,20 @@ pub fn ve(ui: &mut egui::Ui, v: &VaoBang, o_go: &mut String, re: &mut Option<Str
     let mut vung_mo: Vec<Rect> = Vec::new();
     egui::ScrollArea::vertical().id_salt("ml_bang_bien").auto_shrink([false; 2]).show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
-        let ten_nhom = ["Thông tin hồ sơ", "Bảng văn bản", "Tự động"];
+        // Các vùng không có tiêu đề: phân biệt bằng màu chip, giữa hai vùng một kẻ mờ
+        let mut vung_truoc = false;
+        ui.add_space(4.0);
         for (g, ds) in v.nhom.nhom.iter().enumerate() {
             if ds.is_empty() {
                 continue;
             }
-            hang_nhom(ui, ten_nhom[g]);
+            if vung_truoc {
+                ui.add_space(5.0);
+                let x = ui.available_rect_before_wrap().x_range();
+                ui.painter().hline(egui::Rangef::new(x.min + 6.0, x.max - 6.0), ui.cursor().top() + 0.5, Stroke::new(1.0, KE_VUNG));
+                ui.add_space(6.0);
+            }
+            vung_truoc = true;
             for b in ds {
                 let (r, ph) = ui.allocate_exact_size(egui::vec2(ui.available_width(), CAO_DONG), Sense::hover());
                 let dang_re = ph.hovered() || v.sang == Some(b.as_str());
@@ -211,10 +222,9 @@ pub fn ve(ui: &mut egui::Ui, v: &VaoBang, o_go: &mut String, re: &mut Option<Str
                 if dang_re {
                     ui.painter().rect_filled(r, 0.0, Color32::from_rgb(0xE6, 0xF0, 0xFB));
                 }
-                ui.painter().hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, Color32::from_gray(0xF0)));
-                ke_cot(ui, r);
                 let loai = v.nhom.loai(v.rb, b);
-                chip(ui, Rect::from_min_max(egui::pos2(r.left() + 6.0, r.top()), egui::pos2(r.left() + RONG_COT_BIEN - 4.0, r.bottom())), b, loai.mau());
+                // Chip biến giữ màu của vùng; chưa ghép chỉ tô ô Lấy từ + dấu ! cuối dòng
+                chip(ui, Rect::from_min_max(egui::pos2(r.left() + 6.0, r.top()), egui::pos2(r.left() + RONG_COT_BIEN - 4.0, r.bottom())), b, v.nhom.loai_vung(b).mau());
                 let o = Rect::from_min_max(egui::pos2(r.left() + RONG_COT_BIEN, r.top() + 3.0), egui::pos2(r.right() - RONG_COT_CANH, r.bottom() - 3.0));
                 let tu_dong = (g == 2).then(|| if b == "tong_so_trang" { "tổng số trang" } else if b == "trang_so" { "số trang" } else { "tự động" });
                 let mo = v.mo == Some(b.as_str());
@@ -268,7 +278,7 @@ pub fn hang_nhom_theo(ui: &mut egui::Ui, cot: &[String], khac_nhau: &[usize], hi
             egui::ComboBox::from_id_salt("ml_nhom_theo")
                 .icon(super::mui_ten_chon)
                 .width(rong)
-                .selected_text(RichText::new(format!("      {hien}")).size(12.0).color(Color32::from_rgb(0x2C, 0x3E, 0x55)))
+                .selected_text(RichText::new(hien).size(12.0).color(Color32::from_rgb(0x2C, 0x3E, 0x55)))
                 .show_ui(ui, |ui| {
                     for (i, c) in cot.iter().enumerate().filter(|(_, c)| !c.trim().is_empty()) {
                         if ui.selectable_label(c == hien_tai, ten(i, c)).clicked() {
@@ -279,9 +289,6 @@ pub fn hang_nhom_theo(ui: &mut egui::Ui, cot: &[String], khac_nhau: &[usize], hi
                 .response
                 .labelled_by(nhan.id)
                 .on_hover_text(goi_y);
-            // Biểu tượng danh sách ở đầu ô chọn (font giao diện không có ký tự ☰)
-            let o = ui.min_rect();
-            crate::gui_tach::bieu_tuong::ve(ui.painter(), Rect::from_center_size(egui::pos2(o.left() + 13.0, o.center().y), egui::vec2(13.0, 13.0)), crate::gui_tach::bieu_tuong::BieuTuong::DanhSachSo, Color32::from_rgb(0x2C, 0x3E, 0x55));
         });
     });
     chon

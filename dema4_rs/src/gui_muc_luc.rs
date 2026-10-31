@@ -174,7 +174,6 @@ pub struct ManMucLuc {
     canh_bao_hs: Vec<Option<String>>,
     pub tab: Tab,
     pub hs: usize,
-    tim_hs: String,
     pub mo: Option<String>,
     o_go: String,
     sang: Option<String>,
@@ -225,7 +224,6 @@ impl ManMucLuc {
             canh_bao_hs: Vec::new(),
             tab: Tab::Mau,
             hs: 0,
-            tim_hs: String::new(),
             mo: None,
             o_go: String::new(),
             sang: None,
@@ -825,7 +823,7 @@ impl ManMucLuc {
             ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, co, chon, chu));
             if chon {
                 ui.painter().rect_filled(r, 0.0, crate::gui::NEN_TAB_CHON);
-                ui.painter().hline(r.x_range(), r.bottom() - 1.0, Stroke::new(2.0, VIEN_TAB_CHON));
+                ui.painter().hline(r.x_range(), r.bottom() - 1.0, Stroke::new(1.0, VIEN_TAB_CHON));
             } else if co && ph.hovered() {
                 ui.painter().rect_filled(r, 0.0, crate::gui::NUT_HOVER);
             }
@@ -861,7 +859,7 @@ impl ManMucLuc {
             let g = ui.fonts_mut(|f| f.layout_job(job));
             let r = Rect::from_min_size(egui::pos2(rect.right() - 12.0 - g.size().x, rect.center().y - g.size().y / 2.0), g.size());
             ui.painter().galley(r.min, g, mau);
-            trang::tam_giac_canh_bao(ui.painter(), Rect::from_center_size(egui::pos2(r.left() - 10.0, r.center().y), egui::vec2(13.0, 13.0)), mau);
+            trang::dau_canh_bao(ui.painter(), Rect::from_center_size(egui::pos2(r.left() - 10.0, r.center().y), egui::vec2(13.0, 13.0)), mau);
             let ph = ui.interact(r, ui.scope_id().with("ml_canh_bao"), Sense::click()).on_hover_text(&chu);
             if let Some(&i) = loi_hs.first() {
                 if ph.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
@@ -875,20 +873,15 @@ impl ManMucLuc {
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         let co = self.co_du_lieu();
         let mau_tab = co && self.tab == Tab::Mau;
-        egui::Panel::bottom("ml_day_trai").exact_size(crate::gui_tach::cot_trai::CAO_DAY).frame(egui::Frame::new().fill(Color32::from_gray(0xFA))).show(ui, |ui| {
-            if mau_tab {
+        // Chân sidebar chỉ ở tab Mẫu: hàng "Nhóm theo"
+        if mau_tab {
+            egui::Panel::bottom("ml_day_trai").exact_size(crate::gui_tach::cot_trai::CAO_DAY).frame(egui::Frame::new().fill(Color32::from_gray(0xFA))).show(ui, |ui| {
                 let d = self.du_lieu.as_ref().expect("có dữ liệu");
                 if let Some(c) = bang_bien::hang_nhom_theo(ui, &d.bang.tieu_de, &d.khac_nhau, &self.rb.cot_nhom) {
                     self.dat_nhom(&c);
                 }
-            } else {
-                ui.painter().hline(ui.max_rect().x_range(), ui.max_rect().top() + 0.5, Stroke::new(1.0, VIEN_NHAT));
-                ui.horizontal_centered(|ui| {
-                    ui.add_space(6.0);
-                    ui.add_enabled(co, egui::TextEdit::singleline(&mut self.tim_hs).hint_text("Tìm hồ sơ").desired_width(ui.available_width() - 8.0).frame(egui::Frame::NONE));
-                });
-            }
-        });
+            });
+        }
         if !co {
             return;
         }
@@ -922,8 +915,12 @@ impl ManMucLuc {
     fn bang_ho_so(&mut self, ui: &mut egui::Ui) {
         use crate::gui_tach::{bat_dau_bang, ke_duoi, o_so, CAO_DAU_BANG, CAO_DONG_BANG, VACH_DONG};
         use egui_extras::{Column, TableBuilder};
-        let hien: Vec<usize> = (0..self.kq.ho_so.len()).filter(|&i| crate::gui_tach::cot_trai::khop_tim(&self.kq.ho_so[i].khoa, &self.tim_hs)).collect();
+        let hien: Vec<usize> = (0..self.kq.ho_so.len()).collect();
+        // Dải tiêu đề bảng hồ sơ cùng nền tiêu đề bảng biến (tab Mẫu)
+        let dau = Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), CAO_DAU_BANG));
         bat_dau_bang(ui);
+        ui.painter().rect_filled(dau, 0.0, bang_bien::NEN_DAI_DAU);
+        ui.painter().hline(dau.x_range(), dau.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
         let mut chon = None;
         TableBuilder::new(ui)
             .id_salt("ml_ho_so")
@@ -959,7 +956,7 @@ impl ManMucLuc {
                         ke_duoi(ui, VACH_DONG);
                         if let Some(c) = &self.canh_bao_hs[i] {
                             let r = Rect::from_center_size(ui.max_rect().center(), egui::vec2(13.0, 13.0));
-                            trang::tam_giac_canh_bao(ui.painter(), r, CAM);
+                            trang::dau_canh_bao(ui.painter(), r, CAM);
                             ui.interact(ui.max_rect(), ui.scope_id().with(("ml_canh_hs", i)), Sense::hover()).on_hover_text(c);
                         }
                     });
@@ -1016,15 +1013,21 @@ impl ManMucLuc {
         }
         match self.tab {
             Tab::Mau => {
-                let b = self.mau.as_ref().map(|m| (m.db.bang + 1, m.db.hang_mau + 1)).unwrap_or((1, 1));
+                // Chú thích màu kèm số biến từng loại (loại không có biến thì ẩn); số chưa ghép đậm cam
+                let dem: Vec<(Loai, &str, usize)> = self.mau.as_ref().map_or_else(Vec::new, |m| {
+                    let so = |l: Loai| m.nhom.nhom.iter().flatten().filter(|b| m.nhom.loai(&self.rb, b) == l).count();
+                    [(Loai::ThongTin, "thông tin hồ sơ"), (Loai::Bang, "bảng văn bản"), (Loai::TuDong, "tự động"), (Loai::ChuaGhep, "chưa ghép")].into_iter().map(|(l, t)| (l, t, so(l))).filter(|x| x.2 > 0).collect()
+                });
                 self.thanh_cong_cu(ui, |_, ui| {
-                    ui.label(RichText::new(format!("Hàng mẫu: bảng {}, dòng {}", b.0, b.1)).size(12.0).color(CHU_PHU));
-                    ui.add_space(8.0);
-                    for (loai, ten) in [(Loai::ThongTin, "thông tin hồ sơ"), (Loai::Bang, "bảng văn bản"), (Loai::TuDong, "tự động"), (Loai::ChuaGhep, "chưa ghép")] {
+                    for (loai, ten, so) in dem {
                         let (r, _) = ui.allocate_exact_size(egui::vec2(10.0, 10.0), Sense::hover());
                         ui.painter().rect_filled(r, 2.0, loai.mau().0);
                         ui.label(RichText::new(ten).size(11.5).color(CHU_PHU));
+                        let so = crate::gui::ChuDam::dam(RichText::new(so.to_string()).size(11.5));
+                        ui.label(if loai == Loai::ChuaGhep { so.color(Color32::from_rgb(0xB8, 0x5F, 0x00)) } else { so.color(CHU) });
+                        ui.add_space(6.0);
                     }
+                    ui.label(RichText::new("· bấm biến trên trang để sửa nguồn").size(11.5).color(CHU_MO));
                 });
                 let Some(m) = &self.mau else { return };
                 let nhom = &m.nhom;
