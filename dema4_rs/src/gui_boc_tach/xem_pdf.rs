@@ -163,7 +163,7 @@ fn luong_ve(nhan: Receiver<Tin>, gui: Sender<Ve>) {
     let mut dang: Option<(u64, mupdf::Document)> = None;
     while let Ok(tin) = nhan.recv() {
         match tin {
-            Tin::Mo(t, p) => match mupdf::Document::open(p.as_path()) {
+            Tin::Mo(t, p) => match mupdf::Document::open(p.to_string_lossy().as_ref()) {
                 Ok(doc) => {
                     let n = doc.page_count().unwrap_or(0).max(0) as usize;
                     let k = (0..n)

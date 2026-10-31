@@ -60,7 +60,7 @@ fn goi(mo_hinh: &dyn MoHinhDoc, cl: &str, jpeg: &[u8], dung: &AtomicBool) -> Res
 /// Gộp: trường nhắc "trang cuối" lấy ở trang cuối đã đọc, còn lại ở trang đầu; trống thì lấy trang khác đầu tiên có giá trị.
 pub fn doc_file(pdf: &Path, loai: &LoaiTaiLieu, anh: &CauHinhAnh, mo_hinh: &dyn MoHinhDoc, dung: &AtomicBool) -> Result<KetQua, LoiDoc> {
     let bat_dau = Instant::now();
-    let doc = mupdf::Document::open(pdf).map_err(|e| LoiDoc::TraLoi(format!("Không mở được PDF: {e}")))?;
+    let doc = mupdf::Document::open(pdf.to_string_lossy().as_ref()).map_err(|e| LoiDoc::TraLoi(format!("Không mở được PDF: {e}")))?;
     let so_trang = doc.page_count().map_err(|e| LoiDoc::TraLoi(format!("Không đọc được số trang: {e}")))? as usize;
     let trang = loai.trang_doc.cac_trang(so_trang);
     if trang.is_empty() {

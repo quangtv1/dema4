@@ -685,7 +685,7 @@ fn quet_pdf(goc: &Path) -> Result<Vec<FilePdf>, String> {
     Ok(ds
         .into_iter()
         .map(|p| {
-            let so_trang = mupdf::Document::open(p.as_path()).and_then(|d| d.page_count()).map_or(0, |n| n.max(0) as usize);
+            let so_trang = mupdf::Document::open(p.to_string_lossy().as_ref()).and_then(|d| d.page_count()).map_or(0, |n| n.max(0) as usize);
             let ten = p.strip_prefix(goc).unwrap_or(&p).to_string_lossy().into_owned();
             FilePdf { duong_dan: p, ten, so_trang }
         })
