@@ -1,5 +1,5 @@
 //! Logo lớn của từng chức năng (màn giới thiệu): nét mảnh một màu kiểu cổ điển, không nền —
-//! Đếm trang A4 (chồng trang + "A4"), Tách văn bản (trang cắt đôi theo đường nét đứt),
+//! Đếm trang A4 (chồng trang + "A4"), Tách văn bản (một văn bản rẽ nhánh thành hai),
 //! Sinh mục lục (trang danh sách đánh số), Ký văn bản (trang có chữ ký + bút).
 //! Các nét không chồng lên nhau nên không cần tô nền che (đặt được trên nền trắng hay xám).
 
@@ -43,20 +43,26 @@ pub fn ve(p: &egui::Painter, o: Rect, logo: Logo) {
             p.text(q((l + r) / 2.0, 0.62), egui::Align2::CENTER_CENTER, "A4", dam(0.19), MAU);
         }
         Logo::Tach => {
-            // Trang cắt chéo: nửa trên lệch lên trái, nửa dưới lệch xuống phải, nét đứt giữa khe cắt
-            let (l, r, t, b) = (0.27, 0.71, 0.14, 0.88);
-            let cat = |x: f32| 0.55 - (x - l) * 0.28;
-            let (dx, dy) = (0.045, 0.035);
-            p.add(Shape::closed_line(vec![q(l - dx, t - dy), q(r - dx, t - dy), q(r - dx, cat(r) - dy), q(l - dx, cat(l) - dy)], net));
-            p.add(Shape::closed_line(vec![q(l + dx, cat(l) + dy), q(r + dx, cat(r) + dy), q(r + dx, b + dy), q(l + dx, b + dy)], net));
-            for (y, x1) in [(0.24, 0.55), (0.33, 0.48)] {
-                p.line_segment([q(l + 0.04, y), q(x1, y)], net_manh);
+            // Một văn bản bên trái → mũi tên rẽ nhánh chữ Y → hai văn bản nhỏ bên phải
+            trang(p, hcn(0.06, 0.26, 0.40, 0.74), s * 0.09, net);
+            for (y, x1) in [(0.42, 0.30), (0.51, 0.33), (0.60, 0.26)] {
+                p.line_segment([q(0.13, y), q(x1, y)], net_manh);
             }
-            for (y, x1) in [(0.70, 0.66), (0.79, 0.58)] {
-                p.line_segment([q(l + 0.13, y), q(x1, y)], net_manh);
+            for t in [0.10, 0.56] {
+                trang(p, hcn(0.68, t, 0.94, t + 0.34), s * 0.07, net);
+                for (dy, x1) in [(0.13, 0.86), (0.21, 0.82)] {
+                    p.line_segment([q(0.74, t + dy), q(x1, t + dy)], net_manh);
+                }
             }
-            let (a, z) = (q(0.10, cat(0.10)), q(0.90, cat(0.90)));
-            p.extend(Shape::dashed_line(&[a, z], net_manh, s * 0.045, s * 0.035));
+            // Thân mũi tên rồi tách hai nhánh, đầu mũi tên chĩa vào hai văn bản con
+            let (goc, re) = (q(0.44, 0.50), q(0.51, 0.50));
+            p.line_segment([goc, re], net);
+            for y in [0.27, 0.73] {
+                let ngon = q(0.64, y);
+                p.add(Shape::line(vec![re, q(0.56, y), ngon], net));
+                let (lui, cao) = (s * 0.065, s * 0.06);
+                p.add(Shape::line(vec![ngon + egui::vec2(-lui, -cao), ngon, ngon + egui::vec2(-lui, cao)], net));
+            }
         }
         Logo::MucLuc => {
             // Trang danh sách: tiêu đề, 3 dòng có ô số 1-2-3, vạch chữ, chấm dẫn tới số trang
