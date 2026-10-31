@@ -4,6 +4,7 @@
 
 use eframe::egui::{self, Align, Color32, Margin, Rect, RichText, Sense, Stroke, StrokeKind};
 
+use crate::logo_chuc_nang::{self, Logo};
 use crate::gui::{ChuDam, CHU, CHU_PHU, NEN, VIEN, XANH_COBALT};
 
 /// Link người dùng bấm trong lời giới thiệu.
@@ -30,6 +31,8 @@ pub struct GioiThieu {
     pub buoc: [Buoc; 3],
     /// Dãy nhãn khổ A0–A7 dưới các bước (màn Đếm).
     pub kho: bool,
+    /// Logo lớn trên tiêu đề — nhìn là biết đang ở chức năng nào.
+    pub logo: Logo,
 }
 
 pub const TACH: GioiThieu = GioiThieu {
@@ -41,6 +44,7 @@ pub const TACH: GioiThieu = GioiThieu {
         Buoc { ten: "Tách", than: &[Doan::Chu("Mỗi hồ sơ một thư mục, văn bản đặt tên theo mẫu, có log kết quả.")] },
     ],
     kho: false,
+    logo: Logo::Tach,
 };
 
 pub const DEM: GioiThieu = GioiThieu {
@@ -52,6 +56,7 @@ pub const DEM: GioiThieu = GioiThieu {
         Buoc { ten: "Lấy kết quả", than: &[Doan::Chu("Tự lưu _dem.txt · Mở kết quả · Copy dán vào Excel.")] },
     ],
     kho: true,
+    logo: Logo::Dem,
 };
 
 pub const MUC_LUC: GioiThieu = GioiThieu {
@@ -63,6 +68,7 @@ pub const MUC_LUC: GioiThieu = GioiThieu {
         Buoc { ten: "Sinh mục lục", than: &[Doan::Chu("Tab Kết quả xem từng hồ sơ; mỗi hồ sơ một file DOCX.")] },
     ],
     kho: false,
+    logo: Logo::MucLuc,
 };
 
 pub const KY: GioiThieu = GioiThieu {
@@ -74,9 +80,11 @@ pub const KY: GioiThieu = GioiThieu {
         Buoc { ten: "Ký", than: &[Doan::Chu("Ký lần lượt từng file, báo file lỗi, ghi log kết quả.")] },
     ],
     kho: false,
+    logo: Logo::Ky,
 };
 
 const RONG_MO_TA: f32 = 560.0;
+const KICH_LOGO: f32 = 76.0;
 const RONG_THE: f32 = 160.0;
 const KHE_THE: f32 = 14.0;
 const CAO_THE: f32 = 96.0;
@@ -94,8 +102,11 @@ pub fn ve_noi_bat(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>) -> 
     let mut bam = None;
     ui.scope(|ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
-        ui.add_space(56.0);
+        ui.add_space(36.0);
         ui.vertical_centered(|ui| {
+            let (o, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), KICH_LOGO + 4.0), Sense::hover());
+            logo_chuc_nang::ve(ui.painter(), Rect::from_center_size(egui::pos2(o.center().x, o.top() + KICH_LOGO / 2.0), egui::vec2(KICH_LOGO, KICH_LOGO)), gt.logo);
+            ui.add_space(14.0);
             // Tiêu đề vẽ thẳng (không phải widget) để không trùng nhãn menu / tab cùng tên khi tìm theo accessibility
             let (r, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 22.0), Sense::hover());
             ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, gt.tieu_de, egui::FontId::new(17.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), CHU);

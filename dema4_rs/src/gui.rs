@@ -2076,6 +2076,22 @@ mod tests {
     }
 
     /// Chụp màn Sinh mục lục (fixture trong repo): mở đầu, tab Mẫu, đang sửa nguồn, tab Kết quả, popup đã sinh.
+    /// Màn giới thiệu 4 chức năng (logo lớn trên tiêu đề).
+    /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_gioi_thieu
+    #[test]
+    #[ignore = "cần GPU"]
+    fn chup_gioi_thieu() {
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        for (man, ten) in [(Man::Dem, "gt_dem.png"), (Man::Tach, "gt_tach.png"), (Man::MucLuc, "gt_muc_luc.png"), (Man::Ky, "gt_ky.png")] {
+            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
+                cai_giao_dien(&cc.egui_ctx);
+                UngDungChinh { man, cfg: crate::cau_hinh::CauHinh::default(), muc_luc: crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()), ..Default::default() }
+            });
+            h.run_steps(3);
+            h.render().unwrap().save(thu_muc_anh.join(ten)).unwrap();
+        }
+    }
+
     /// Ô thư mục có nút ⓧ ở màn Đếm và Tách (đường dẫn giả, không cần dữ liệu mẫu).
     /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_o_thu_muc
     #[test]
