@@ -120,6 +120,13 @@
   /* Thanh đáy trang chủ: phiên bản app căn phải */
   .tc-day { position:absolute; left:0; right:0; bottom:0; height:30px; display:flex; align-items:center; justify-content:flex-end; padding:0 28px; background:var(--nen); border-top:1px solid var(--vien-nhat); font-size:12px; color:var(--chu-phu); }
   .tc-day b { color:var(--chu); font-weight:normal; margin-left:4px; }
+  .tc-day { justify-content:space-between; gap:18px; } .tc-day > span { display:flex; gap:16px; align-items:center; }
+  .tc-day a { color:var(--chu-phu); text-decoration:none; } .tc-day a:hover { color:var(--cobalt); text-decoration:underline; }
+  /* Dải điểm nổi bật dưới các ô chức năng */
+  .tc-diem { display:flex; gap:34px; justify-content:center; margin-top:78px; padding-top:22px; border-top:1px solid var(--vien-nhat); width:720px; }
+  .tc-diem div { display:flex; align-items:center; gap:9px; font-size:12px; color:var(--chu-phu); line-height:1.4; max-width:220px; }
+  .tc-diem svg { width:22px; height:22px; flex-shrink:0; fill:none; stroke:#3C4858; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .tc-diem b { color:var(--chu); display:block; font-size:12.5px; }
   .tc-dau small { display:block; color:var(--chu-phu); font-size:12px; letter-spacing:.3px; margin-bottom:6px; }
   .tc-dau h1 { font-size:20px; margin:0 0 6px; }
   .tc-dau p { margin:0; color:var(--chu-phu); font-size:12.5px; }
@@ -681,7 +688,15 @@
       <button class="tc-the" data-den="mucluc" aria-describedby="tom-mucluc"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M20 12H68L80 24V88H20Z" stroke-width="3"/><path d="M68 12V24H80" stroke-width="3"/><path d="M33 26H57" stroke-width="3"/><rect x="28.5" y="36.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="44.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">1</text><path d="M44 42H57" stroke-width="2.2"/><circle cx="61.0" cy="42" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="42" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="42" r="0.9" fill="#3C4858" stroke="none"/><rect x="28.5" y="51.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="59.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">2</text><path d="M44 57H57" stroke-width="2.2"/><circle cx="61.0" cy="57" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="57" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="57" r="0.9" fill="#3C4858" stroke="none"/><rect x="28.5" y="66.5" width="11" height="11" rx="1.5" stroke-width="2.2"/><text x="34" y="74.8" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#3C4858" stroke="none">3</text><path d="M44 72H57" stroke-width="2.2"/><circle cx="61.0" cy="72" r="0.9" fill="#3C4858" stroke="none"/><circle cx="64.5" cy="72" r="0.9" fill="#3C4858" stroke="none"/><circle cx="68.0" cy="72" r="0.9" fill="#3C4858" stroke="none"/></svg><b>Sinh mục lục</b><span class="tom" id="tom-mucluc" role="tooltip">Sinh mục lục văn bản cho từng hồ sơ từ file biên mục Excel/CSV theo mẫu DOCX của đơn vị; xem trước từng hồ sơ, xuất DOCX hàng loạt.</span></button>
       <button class="tc-the pt" data-den="ky" aria-describedby="tom-ky"><svg class="" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 12H49L60 23V88H14Z" stroke-width="3"/><path d="M49 12V23H60" stroke-width="3"/><path d="M23 27H44" stroke-width="2.2"/><path d="M23 36H48" stroke-width="2.2"/><path d="M23 45H38" stroke-width="2.2"/><path d="M22.0 65.0 L23.1 63.5 L24.2 62.3 L25.3 61.3 L26.4 60.9 L27.5 60.9 L28.6 61.3 L29.8 62.2 L30.9 63.3 L32.0 64.7 L33.1 66.0 L34.2 67.1 L35.3 68.0 L36.4 68.5 L37.5 68.6 L38.6 68.3 L39.7 67.6 L40.8 66.7 L41.9 65.6 L43.0 64.5 L44.1 63.5 L45.2 62.7 L46.4 62.1 L47.5 62.0 L48.6 62.2 L49.7 62.7 L50.8 63.4 L51.9 64.3 L53.0 65.2" stroke-width="3"/><path d="M22 75H52" stroke-width="2.2"/><path d="M86.0 27.0 L64.5 56.2 L62.0 68.0 L72.6 62.1 L94.0 33.0Z" stroke-width="3"/><path d="M64.5 56.2L72.6 62.1" stroke-width="2.2"/><path d="M81.8 32.7L89.9 38.6" stroke-width="2.2"/></svg><b>Ký văn bản</b><span class="nhan-pt">Đang phát triển</span><span class="tom" id="tom-ky" role="tooltip">Ký số hàng loạt văn bản PDF đã tách bằng chứng thư số của đơn vị, chèn hình chữ ký. Chức năng đang phát triển.</span></button>
     </div>
-    <div class="tc-day">Phiên bản<b>1.0.0</b></div>
+    <div class="tc-diem">
+      <div><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg><span><b>Xử lý ngay trên máy</b>File PDF / Excel không tải lên mạng</span></div>
+      <div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span><b>Giữ nguyên file gốc</b>Kết quả ghi ra thư mục riêng</span></div>
+      <div><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b>Đã dùng 7 / 210 lượt</b>Dùng chung Đếm · Tách · Sinh mục lục</span></div>
+    </div>
+    <div class="tc-day">
+      <span><a href="https://saomaiso.com" target="_blank" rel="noopener">saomaiso.com</a><span>Điện thoại 0979 824 615</span><a href="mailto:hotro@saomaiso.com">hotro@saomaiso.com</a></span>
+      <span><span>Mã máy<b>SM-2145-6787-A9FB</b></span><span>Phiên bản<b>1.0.0</b></span></span>
+    </div>
   </div>
 
   <!-- Màn Tách văn bản -->
