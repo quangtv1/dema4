@@ -114,18 +114,20 @@
   .gioithieu.pt > *:not(.nhan-pt) { opacity:.4; }
   .nhan-pt { display:inline-block; background:#D9822B; color:#fff; font-weight:bold; font-size:12px; padding:5px 14px; border-radius:999px; margin:0 0 10px; letter-spacing:.2px; }
   /* Trang chủ: 4 thẻ chức năng (logo + tên), rê chuột hiện tóm tắt mục đích; logo Sao Mai góc dưới trái */
-  #manTrangChu { align-items:center; justify-content:center; padding-top:0; padding-bottom:30px; position:relative; background:#fff; margin:0 -12px; }
+  #manTrangChu { align-items:center; justify-content:flex-start; padding-top:0; padding-bottom:30px; position:relative; background:#fff; margin:0 -12px; }
   /* Đầu trang chủ: dải nền xanh rất nhạt chạy hết bề ngang, hoạ tiết lưới chấm mờ; logo Sao Mai giữa, tên + mô tả bên dưới */
-  .tc-dau { position:absolute; left:0; right:0; top:0; height:206px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+  .tc-dau { position:absolute; left:0; right:0; top:0; height:160px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
     background:#F3F6FB radial-gradient(#D5DEEB 1px, transparent 1.2px) 0 0 / 18px 18px; border-bottom:1px solid #E1E7F0; }
-  .tc-dau .logo-dinh { display:block; width:78px; margin-bottom:10px; } .tc-dau .logo-dinh img { width:100%; height:auto; display:block; }
+  .tc-dau .logo-dinh { display:block; width:60px; margin-bottom:8px; } .tc-dau .logo-dinh img { width:100%; height:auto; display:block; }
   .tc-dau .vach, .tc-dau small { display:none; }
   .tc-dau p { margin:0; color:var(--chu-phu); font-size:12.5px; }
   .tc-than { display:flex; flex-direction:column; align-items:center; margin-top:206px; }
+  .tc-dau h1 { font-size:19px !important; margin:0 0 4px !important; }
   /* Thanh đáy trang chủ: liên hệ bên trái, thông tin máy + phiên bản bên phải */
   .tc-day { position:absolute; left:0; right:0; bottom:0; height:30px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:0 28px; background:var(--nen); border-top:1px solid var(--vien-nhat); font-size:12px; color:var(--chu-phu); }
   .tc-day b { color:var(--chu); font-weight:normal; margin-left:4px; }
-  .tc-day > span { display:flex; gap:16px; align-items:center; }
+  .tc-day > span { display:flex; align-items:center; }
+  .tc-day > span > span { padding:0 12px; border-left:1px solid #D5D5D5; line-height:12px; } .tc-day > span > span:first-child { border-left:0; padding-left:0; } .tc-day > span > span:last-child { padding-right:0; }
   .tc-day a { color:var(--chu-phu); text-decoration:none; } .tc-day a:hover { color:var(--cobalt); text-decoration:underline; }
   /* Lưới thông tin dưới các ô chức năng */
   .tc-diem { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px 34px; margin-top:44px; padding-top:22px; border-top:1px solid var(--vien-nhat); width:780px; }
@@ -704,7 +706,7 @@
     </div>
     <div class="tc-day">
       <span><span>Website:<a href="https://saomaiso.com" target="_blank" rel="noopener" style="margin-left:4px;color:var(--chu)">saomaiso.com</a></span><span>Email:<a href="mailto:hotro@saomaiso.com" style="margin-left:4px;color:var(--chu)">hotro@saomaiso.com</a></span></span>
-      <span><span>Địa chỉ MAC:<b>AA:BB:CC:DD:EE:FF</b></span><span>IP nội bộ:<b>192.168.1.5</b></span><span>Phiên bản:<b>1.0.0</b></span></span>
+      <span><span>MAC:<b>aa:bb:cc:dd:ee:ff</b></span><span>IP:<b>192.168.1.5</b></span><span>Phiên bản:<b>1.0.0</b></span></span>
     </div>
   </div>
 
