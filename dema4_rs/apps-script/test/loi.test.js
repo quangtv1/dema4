@@ -26,7 +26,8 @@ test('dang_ky_may_moi', () => {
   const k = khoGia();
   const r = goi(k, { hanh_dong: 'kiem_tra' });
   assert.equal(r.ok, true);
-  assert.deepEqual([r.du_lieu.han_dem, r.du_lieu.han_tach, r.du_lieu.da_dung_dem, r.du_lieu.da_dung_tach, r.du_lieu.trang_thai], [10, 10, 0, 0, 'dung_thu']);
+  assert.deepEqual([r.du_lieu.han, r.du_lieu.da_dung, r.du_lieu.trang_thai], [10, 0, 'dung_thu']);
+  assert.equal(k.may[0].length, L.SO_COT_MAY, 'dòng máy mới 14 cột');
   assert.equal(r.du_lieu.ma_may, MA); assert.equal(r.du_lieu.nonce, 'n1');
   goi(k, { hanh_dong: 'kiem_tra', may: Object.assign({}, MAY, { ten: 'TEN-MOI', ip_public: '1.2.3.4' }) });
   assert.equal(k.may.length, 1, 'không tạo dòng thứ 2');
@@ -38,45 +39,50 @@ test('ghi_lan_chong_trung', () => {
   const k = khoGia();
   const lan = [{ ma_lan: ML(1), cn: 'dem', nguon: 'online' }];
   let r = goi(k, { hanh_dong: 'ghi_lan', lan });
-  assert.equal(r.du_lieu.da_dung_dem, 1);
+  assert.equal(r.du_lieu.da_dung, 1);
   r = goi(k, { hanh_dong: 'ghi_lan', lan });
-  assert.equal(r.du_lieu.da_dung_dem, 1, 'cùng mã lần → không cộng');
+  assert.equal(r.du_lieu.da_dung, 1, 'cùng mã lần → không cộng');
   assert.deepEqual(r.du_lieu.da_ghi, [ML(1)], 'mã đã ghi vẫn báo để app xoá khỏi sổ');
   const bon = [2, 3, 4, 5].map((i) => ({ ma_lan: ML(i), cn: 'tach', nguon: 'bu_offline' }));
   assert.equal(goi(k, { hanh_dong: 'ghi_lan', lan: bon }).ok, false, 'quá 3 lần / lời gọi bị từ chối');
-  assert.equal(k.may[0][15], ML(1), 'mã lần lưu ở cột ẩn của dòng máy');
+  assert.equal(k.may[0][13], ML(1), 'mã lần lưu ở cột ẩn N của dòng máy');
 });
 
-test('tong_luu_trong_dong', () => {
+test('moi_chuc_nang_tinh_chung_mot_luot', () => {
   const k = khoGia();
-  for (let i = 0; i < 10; i++) goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(100 + i), cn: 'tach', nguon: 'online' }] });
-  assert.equal(k.may[0][9], 10, 'cột Đã dùng Tách = 10');
+  const cn = ['dem', 'tach', 'muc_luc', 'tach', 'dem'];
+  cn.forEach((c, i) => goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(100 + i), cn: c, nguon: 'online' }] }));
+  assert.equal(k.may[0][8], 5, 'cột I Đã dùng = tổng mọi chức năng');
   const r = goi(k, { hanh_dong: 'kiem_tra' });
-  assert.equal(r.du_lieu.da_dung_tach, 10);
+  assert.equal(r.du_lieu.da_dung, 5);
+  // Khoá cũ theo chức năng = số tổng → app bản cũ cũng chặn theo tổng
+  for (const c of ['dem', 'tach', 'muc_luc']) assert.deepEqual([r.du_lieu['han_' + c], r.du_lieu['da_dung_' + c]], [10, 5], c);
 });
 
 test('chi_giu_ma_lan_gan_nhat', () => {
   const k = khoGia();
   for (let i = 0; i < L.GIU_MA_LAN + 5; i++) goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(200 + i), cn: 'dem', nguon: 'online' }] });
-  const giu = k.may[0][15].split(',');
+  const giu = k.may[0][13].split(',');
   assert.equal(giu.length, L.GIU_MA_LAN, 'ô không phình mãi');
   assert.equal(giu[giu.length - 1], ML(200 + L.GIU_MA_LAN + 4));
   const r = goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(200 + L.GIU_MA_LAN + 4), cn: 'dem', nguon: 'online' }] });
-  assert.equal(r.du_lieu.da_dung_dem, L.GIU_MA_LAN + 5, 'gửi lại lần gần nhất không cộng');
+  assert.equal(r.du_lieu.da_dung, L.GIU_MA_LAN + 5, 'gửi lại lần gần nhất không cộng');
 });
 
 test('han_muc_va_trang_thai_tu_sheet', () => {
   const k = khoGia();
   goi(k, { hanh_dong: 'kiem_tra' });
-  k.may[0][10] = 200; k.may[0][11] = ''; k.may[0][12] = 'Đã cấp';
+  k.may[0][9] = 200; k.may[0][10] = 'Đã cấp';
   let r = goi(k, { hanh_dong: 'kiem_tra' });
-  assert.deepEqual([r.du_lieu.han_dem, r.du_lieu.han_tach, r.du_lieu.trang_thai], [200, 10, 'da_cap']);
+  assert.deepEqual([r.du_lieu.han, r.du_lieu.han_tach, r.du_lieu.trang_thai], [200, 200, 'da_cap']);
   for (const [o, ma] of [['Khoá', 'khoa'], ['Khóa', 'khoa'], ['Dùng thử', 'dung_thu'], ['', 'dung_thu'], ['abc', 'khoa'], ['đã cấp', 'khoa']]) {
-    k.may[0][12] = o;
+    k.may[0][10] = o;
     assert.equal(goi(k, { hanh_dong: 'kiem_tra' }).du_lieu.trang_thai, ma, `"${o}"`);
   }
-  k.may[0][10] = 'nhiều';
-  assert.equal(goi(k, { hanh_dong: 'kiem_tra' }).du_lieu.han_dem, 0, 'hạn mức không phải số → 0');
+  k.may[0][9] = 'nhiều';
+  assert.equal(goi(k, { hanh_dong: 'kiem_tra' }).du_lieu.han, 0, 'hạn mức không phải số → 0');
+  k.may[0][9] = '';
+  assert.equal(goi(k, { hanh_dong: 'kiem_tra' }).du_lieu.han, 10, 'ô trống → 10 lần dùng thử');
 });
 
 test('kiem_dau_vao', () => {
@@ -117,9 +123,9 @@ test('tin_tach_chu_thuong_hai_phan', () => {
 
 test('tin_may_moi_va_het_luot', () => {
   assert.equal(L.tinMayMoi(MA, MAY_TIN, '30.10.2026, 20:00:00'),
-    '🆕 MÁY MỚI ĐĂNG KÝ\n\n' + PHAN_MAY + '- Dùng thử: 10 lần Đếm · 10 lần Tách · 10 lần Sinh mục lục\n- Thời điểm: 30.10.2026, 20:00:00');
+    '🆕 MÁY MỚI ĐĂNG KÝ\n\n' + PHAN_MAY + '- Dùng thử: 10 lần (dùng chung Đếm · Tách · Sinh mục lục)\n- Thời điểm: 30.10.2026, 20:00:00');
   assert.equal(L.tinHetLuot(MA, MAY_TIN, 'tach', 10, 10, 'dung_thu', '30.10.2026, 20:05:00'),
-    '⛔ HẾT LƯỢT TÁCH\n\n' + PHAN_MAY + '- Chức năng: Tách\n- Đã dùng: 10/10\n- Trạng thái: Dùng thử\n- Thời điểm: 30.10.2026, 20:05:00\n- Cấp thêm: tab 1_license → sửa Hạn mức Tách (tổng mới) + Trạng thái Đã cấp');
+    '⛔ HẾT LƯỢT\n\n' + PHAN_MAY + '- Lần cuối: Tách\n- Đã dùng: 10/10\n- Trạng thái: Dùng thử\n- Thời điểm: 30.10.2026, 20:05:00\n- Cấp thêm: tab 1_license → sửa Hạn mức (tổng mới) + Trạng thái Đã cấp');
 });
 
 test('thong_ke_xep_hang_doi', () => {
@@ -166,24 +172,24 @@ test('bao_may_moi_mot_lan', () => {
   goi(k, { hanh_dong: 'kiem_tra' });
   const moi = k.hangDoi.filter((h) => h.noi_dung.includes('MÁY MỚI'));
   assert.equal(moi.length, 1, 'chỉ báo lần đăng ký đầu');
-  assert.ok(moi[0].noi_dung.includes(MA) && moi[0].noi_dung.includes('PC-1') && moi[0].noi_dung.includes('10 lần Đếm · 10 lần Tách'), moi[0].noi_dung);
+  assert.ok(moi[0].noi_dung.includes(MA) && moi[0].noi_dung.includes('PC-1') && moi[0].noi_dung.includes('Dùng thử: 10 lần (dùng chung'), moi[0].noi_dung);
 });
 
 test('bao_het_luot_khi_cham_han', () => {
   const k = khoGia();
   goi(k, { hanh_dong: 'kiem_tra' });
-  k.may[0][10] = 2; // Hạn mức Đếm = 2
+  k.may[0][9] = 2; // Hạn mức (chung) = 2
   const het = () => k.hangDoi.filter((h) => h.noi_dung.includes('HẾT LƯỢT'));
   goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(301), cn: 'dem', nguon: 'online' }] });
   assert.equal(het().length, 0, 'còn 1 lượt → chưa báo');
-  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(302), cn: 'dem', nguon: 'online' }] });
-  assert.equal(het().length, 1);
-  assert.ok(het()[0].noi_dung.includes('HẾT LƯỢT ĐẾM') && het()[0].noi_dung.includes('2/2') && het()[0].noi_dung.includes(MA), het()[0].noi_dung);
-  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(302), cn: 'dem', nguon: 'online' }] });
+  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(302), cn: 'tach', nguon: 'online' }] });
+  assert.equal(het().length, 1, 'lần Tách làm chạm hạn mức chung');
+  assert.ok(het()[0].noi_dung.includes('Lần cuối: Tách') && het()[0].noi_dung.includes('2/2') && het()[0].noi_dung.includes(MA), het()[0].noi_dung);
+  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(302), cn: 'tach', nguon: 'online' }] });
   goi(k, { hanh_dong: 'kiem_tra' });
   assert.equal(het().length, 1, 'gửi lại / kiểm tra lại không báo thêm');
-  for (let i = 0; i < 10; i++) goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(400 + i), cn: 'tach', nguon: 'online' }] });
-  assert.equal(het().filter((h) => h.noi_dung.includes('HẾT LƯỢT TÁCH')).length, 1, 'Tách hết ở lần thứ 10 (mặc định)');
+  goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(303), cn: 'muc_luc', nguon: 'online' }] });
+  assert.equal(het().length, 1, 'đã quá hạn từ trước → không báo lại');
 });
 
 test('tin_dem_tach_co_tieu_de_rieng', () => {
@@ -193,44 +199,31 @@ test('tin_dem_tach_co_tieu_de_rieng', () => {
   assert.ok(k.hangDoi[0].noi_dung.startsWith('📊 ĐẾM TRANG A4\n\nThông tin máy tính\n- Mã máy: ' + MA), 'máy chưa đăng ký → không có (x/y)');
   assert.ok(k.hangDoi[1].noi_dung.startsWith('✂️ TÁCH VĂN BẢN\n\nThông tin máy tính\n- Mã máy: ' + MA), k.hangDoi[1].noi_dung);
   goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(501), cn: 'dem', nguon: 'online' }] });
-  k.may[0][10] = 50;
+  k.may[0][9] = 50;
   goi(k, { hanh_dong: 'thong_ke_dem', so_lieu: { thu_muc: '/x', so_file: 1, so_trang: 2, quy_a4: 2, canh_bao: 0, file_loi: 0, thoi_gian_ms: 1000 } });
   goi(k, { hanh_dong: 'thong_ke_tach', so_lieu: { thu_muc: '/y', ho_so: 1, van_ban: 2, so_trang: 3, bo_index: 0, bo_trang: 0, split: 0, sao_nguyen: 0, ho_so_loi: 0, thoi_gian_ms: 500 } });
   const cuoi = k.hangDoi.slice(-2).map((h) => h.noi_dung.split('\n')[0]);
-  assert.deepEqual(cuoi, ['📊 ĐẾM TRANG A4 (1/50)', '✂️ TÁCH VĂN BẢN (0/10)'], 'đã dùng / hạn mức lấy từ dòng máy');
+  assert.deepEqual(cuoi, ['📊 ĐẾM TRANG A4 (1/50)', '✂️ TÁCH VĂN BẢN (1/50)'], 'đã dùng / hạn mức chung lấy từ dòng máy');
 });
 
-test('muc_luc_tinh_rieng_cot_moi', () => {
-  const k = khoGia();
-  let r = goi(k, { hanh_dong: 'kiem_tra' });
-  assert.deepEqual([r.du_lieu.han_muc_luc, r.du_lieu.da_dung_muc_luc], [10, 0], 'mặc định 10 lượt Sinh mục lục');
-  assert.equal(k.may[0].length, 18, 'dòng máy mới đủ cột Q (Đã dùng Mục lục) / R (Hạn mức Mục lục)');
-  r = goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(900), cn: 'muc_luc', nguon: 'online' }] });
-  assert.deepEqual([r.du_lieu.da_dung_muc_luc, r.du_lieu.da_dung_dem, r.du_lieu.da_dung_tach], [1, 0, 0], 'tính riêng, không đụng Đếm/Tách');
-  assert.equal(k.may[0][16], 1, 'cột Q = Đã dùng Mục lục');
-  assert.equal(k.may[0][15], ML(900), 'cột ẩn P (Mã lần) giữ nguyên vị trí');
-  k.may[0][17] = 50;
-  assert.equal(goi(k, { hanh_dong: 'kiem_tra' }).du_lieu.han_muc_luc, 50, 'cột R = Hạn mức Mục lục');
-});
-
-test('muc_luc_dong_cu_thieu_cot', () => {
-  const k = khoGia();
-  goi(k, { hanh_dong: 'kiem_tra' });
-  k.may[0] = k.may[0].slice(0, 16); // dòng tạo bởi trạm cũ: chưa có Q/R
-  const r = goi(k, { hanh_dong: 'kiem_tra' });
-  assert.deepEqual([r.du_lieu.han_muc_luc, r.du_lieu.da_dung_muc_luc], [10, 0]);
+test('chuyen_bang_cu_cong_ba_chuc_nang', () => {
+  // Dòng bảng cũ 18 cột: I/J/Q đã dùng, K/L/R hạn mức (trống = 10), M trạng thái, N đơn vị, O ghi chú, P mã lần
+  const cu = [MA, 'PC', 'MAC', 'ip1', 'ip2', '1.0.0', 'ngay', 'cuoi', 37, 2, 200, '', 'Đã cấp', 'Sở X', 'HĐ 1', 'abc', 4, 50];
+  assert.deepEqual(L.chuyenDongCu(cu), [MA, 'PC', 'MAC', 'ip1', 'ip2', '1.0.0', 'ngay', 'cuoi', 43, 260, 'Đã cấp', 'Sở X', 'HĐ 1', 'abc']);
+  const cu16 = cu.slice(0, 16); // dòng do trạm cũ tạo chưa có cột Mục lục → 0 đã dùng, hạn mức 10
+  assert.deepEqual(L.chuyenDongCu(cu16).slice(8, 10), [39, 220]);
+  assert.equal(L.TIEU_DE_COT_J_CU, 'Đã dùng Tách');
 });
 
 test('muc_luc_tin_thong_ke_va_het_luot', () => {
   const k = khoGia();
   goi(k, { hanh_dong: 'kiem_tra' });
-  k.may[0][17] = 1;
+  k.may[0][9] = 1;
   goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(901), cn: 'muc_luc', nguon: 'online' }] });
-  assert.equal(k.hangDoi.slice(-1)[0].noi_dung.split('\n')[0], '⛔ HẾT LƯỢT MỤC LỤC');
+  assert.equal(k.hangDoi.slice(-1)[0].noi_dung.split('\n')[0], '⛔ HẾT LƯỢT');
   const tk = goi(k, { hanh_dong: 'thong_ke_muc_luc', so_lieu: { du_lieu: '/a/Bien_muc.xlsx', mau: 'Mẫu 01 – Quảng Trị', ho_so: 22, van_ban: 326, docx: 22, pdf: 0, loi: 1, thoi_gian_ms: 16000 } });
   assert.equal(tk.ok, true);
   const tin = k.hangDoi.slice(-1)[0].noi_dung;
   assert.equal(tin.split('\n')[0], '📑 SINH MỤC LỤC (1/1)');
   for (const d of ['- Dữ liệu: /a/Bien_muc.xlsx', '- Mẫu: Mẫu 01 – Quảng Trị', '- Hồ sơ: 22', '- Văn bản: 326', '- File ra: 22 DOCX · 0 PDF', '- Lỗi: 1']) assert.ok(tin.includes(d), d);
-  assert.ok(L.tinMayMoi(MA, MAY, 'x').includes('10 lần Sinh mục lục'));
 });

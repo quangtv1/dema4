@@ -1,7 +1,7 @@
 //! Kết nối trạm license (Google Apps Script): gọi HTTPS, kiểm chữ ký RSA câu trả lời, gửi số liệu thống kê.
 //! App không giữ khoá ghi Sheet hay token Telegram — chỉ URL trạm + khoá công khai (`assets/license_pub.pem`).
 
-use crate::license::{HanMuc, LanChay, TraLoiKy, TrangThaiMay};
+use crate::license::{LanChay, TraLoiKy, TrangThaiMay};
 use base64::Engine;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -132,8 +132,6 @@ pub fn doc_tra_loi(tl: &TraLoiKy, khoa: &rsa::RsaPublicKey, ma_may: &str, nonce:
     giai_du_lieu(tl, ma_may, nonce)
 }
 
-/// Lượt dùng thử Sinh mục lục khi trạm chưa gửi trường này (khớp `HAN_MAC_DINH` của trạm).
-const HAN_MUC_LUC_MAC_DINH: u32 = 10;
 
 /// Phần dữ liệu (đã kiểm chữ ký) → trạng thái máy; sai mã máy / nonce → lỗi.
 fn giai_du_lieu(tl: &TraLoiKy, ma_may: &str, nonce: Option<&str>) -> Result<KetQuaTram, String> {
@@ -144,12 +142,20 @@ fn giai_du_lieu(tl: &TraLoiKy, ma_may: &str, nonce: Option<&str>) -> Result<KetQ
     if nonce.is_some_and(|n| v["nonce"].as_str() != Some(n)) {
         return Err("câu trả lời không khớp lời gọi".into());
     }
-    let so = |k: &str| v[k].as_u64().map(|x| x.min(u32::MAX as u64) as u32).ok_or_else(|| format!("thiếu {k}"));
-    // Trạm cũ chưa có trường Sinh mục lục → hạn mức dùng thử mặc định, chưa dùng lần nào
-    let so_hoac = |k: &str, md: u32| v[k].as_u64().map_or(md, |x| x.min(u32::MAX as u64) as u32);
+    let so = |k: &str| v[k].as_u64().map(|x| x.min(u32::MAX as u64) as u32);
+    // Trạm hạn mức chung gửi `han` / `da_dung`; trả lời ký cũ (lưu đĩa từ trạm theo từng chức năng) → cộng các chức năng
+    let tong = |k: &str| -> Result<u32, String> {
+        match so(k) {
+            Some(x) => Ok(x),
+            None => {
+                let (dem, tach) = (so(&format!("{k}_dem")).ok_or_else(|| format!("thiếu {k}"))?, so(&format!("{k}_tach")).ok_or_else(|| format!("thiếu {k}"))?);
+                Ok(dem.saturating_add(tach).saturating_add(so(&format!("{k}_muc_luc")).unwrap_or(0)))
+            }
+        }
+    };
     let may = TrangThaiMay {
-        han: HanMuc { dem: so("han_dem")?, tach: so("han_tach")?, muc_luc: so_hoac("han_muc_luc", HAN_MUC_LUC_MAC_DINH) },
-        da_dung: HanMuc { dem: so("da_dung_dem")?, tach: so("da_dung_tach")?, muc_luc: so_hoac("da_dung_muc_luc", 0) },
+        han: tong("han")?,
+        da_dung: tong("da_dung")?,
         trang_thai: crate::license::trang_thai_tu_ma(v["trang_thai"].as_str().unwrap_or("")),
     };
     let da_ghi = v["da_ghi"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
@@ -231,14 +237,14 @@ pub fn so_lieu_tach(may: &ThongTinMay, thu_muc: &str, sl: &crate::telegram::SoLi
 /// Kho giả cho test: giữ hạn mức / đã dùng trong bộ nhớ, chống trùng theo mã lần như trạm, đếm lời gọi.
 #[cfg(test)]
 pub struct KhoGia {
-    pub han: std::sync::Mutex<HanMuc>,
+    pub han: std::sync::Mutex<u32>,
     pub trang_thai: std::sync::Mutex<&'static str>,
     /// Mọi lời gọi lỗi (mất mạng).
     pub mat_mang: std::sync::atomic::AtomicBool,
     /// Ghi xong rồi mới báo lỗi (giả hết thời gian chờ).
     pub loi_sau_ghi: std::sync::atomic::AtomicBool,
     pub cho: Duration,
-    dung: std::sync::Mutex<HanMuc>,
+    dung: std::sync::Mutex<u32>,
     da_ghi: std::sync::Mutex<std::collections::HashSet<String>>,
     pub so_goi: std::sync::atomic::AtomicUsize,
     dang_goi: std::sync::atomic::AtomicUsize,
@@ -250,9 +256,10 @@ pub struct KhoGia {
 
 #[cfg(test)]
 impl KhoGia {
-    pub fn moi(dem: u32, tach: u32) -> Self {
+    /// `han`: tổng hạn mức chung mọi chức năng.
+    pub fn moi(han: u32) -> Self {
         KhoGia {
-            han: std::sync::Mutex::new(HanMuc { dem, tach, muc_luc: tach }),
+            han: std::sync::Mutex::new(han),
             trang_thai: std::sync::Mutex::new("dung_thu"),
             mat_mang: Default::default(),
             loi_sau_ghi: Default::default(),
@@ -267,7 +274,7 @@ impl KhoGia {
         }
     }
 
-    pub fn da_dung(&self) -> HanMuc {
+    pub fn da_dung(&self) -> u32 {
         *self.dung.lock().unwrap()
     }
 
@@ -285,7 +292,7 @@ impl KhoGia {
 
     fn tra_loi(&self, may: &ThongTinMay, da_ghi: Vec<String>) -> KetQuaTram {
         let (han, dung) = (*self.han.lock().unwrap(), self.da_dung());
-        let du_lieu = json!({ "ma_may": may.ma, "nonce": "", "han_dem": han.dem, "han_tach": han.tach, "da_dung_dem": dung.dem, "da_dung_tach": dung.tach, "han_muc_luc": han.muc_luc, "da_dung_muc_luc": dung.muc_luc, "trang_thai": *self.trang_thai.lock().unwrap(), "da_ghi": da_ghi });
+        let du_lieu = json!({ "ma_may": may.ma, "nonce": "", "han": han, "da_dung": dung, "trang_thai": *self.trang_thai.lock().unwrap(), "da_ghi": da_ghi });
         giai_du_lieu(&TraLoiKy { du_lieu: du_lieu.to_string(), chu_ky: "gia".into() }, &may.ma, None).unwrap()
     }
 }
@@ -301,12 +308,7 @@ impl KhoLicense for KhoGia {
             let mut ghi = Vec::new();
             for l in lan {
                 if self.da_ghi.lock().unwrap().insert(l.ma.clone()) {
-                    let mut d = self.dung.lock().unwrap();
-                    match l.cn {
-                        crate::license::ChucNang::Dem => d.dem += 1,
-                        crate::license::ChucNang::Tach => d.tach += 1,
-                        crate::license::ChucNang::MucLuc => d.muc_luc += 1,
-                    }
+                    *self.dung.lock().unwrap() += 1;
                 }
                 ghi.push(l.ma.clone());
             }
@@ -353,12 +355,11 @@ mod tests {
     fn chu_ky_hop_le() {
         let (k, pk) = cap_khoa();
         let kq = doc_tra_loi(&ky(&k, DL), &pk, "SM-2145-6787-A9FB", Some("n1")).unwrap();
-        assert_eq!((kq.may.han.dem, kq.may.han.tach, kq.may.da_dung.dem, kq.may.da_dung.tach, kq.may.trang_thai), (200, 2, 37, 1, TrangThai::DaCap));
+        assert_eq!((kq.may.han, kq.may.da_dung, kq.may.trang_thai), (202, 38, TrangThai::DaCap), "trả lời ký cũ theo chức năng → cộng tổng");
         assert_eq!(kq.da_ghi, ["0000000000000000000000000000000a"]);
-        assert_eq!((kq.may.han.muc_luc, kq.may.da_dung.muc_luc), (10, 0), "trạm cũ chưa gửi Sinh mục lục → mặc định");
-        let moi = DL.replace("\"trang_thai\"", "\"han_muc_luc\":50,\"da_dung_muc_luc\":7,\"trang_thai\"");
+        let moi = DL.replace("\"trang_thai\"", "\"han\":50,\"da_dung\":7,\"trang_thai\"");
         let kq = doc_tra_loi(&ky(&k, &moi), &pk, "SM-2145-6787-A9FB", Some("n1")).unwrap();
-        assert_eq!((kq.may.han.muc_luc, kq.may.da_dung.muc_luc), (50, 7));
+        assert_eq!((kq.may.han, kq.may.da_dung), (50, 7), "trạm hạn mức chung: đọc han / da_dung");
         assert!(doc_tra_loi(&ky(&k, DL), &pk, "SM-2145-6787-A9FB", None).is_ok(), "đọc lại từ đĩa: không kiểm nonce");
     }
 
@@ -389,7 +390,7 @@ mod tests {
         let khoa = rsa::RsaPublicKey::from_public_key_pem(KHOA_CONG_KHAI_PEM.trim()).expect("khoá công khai nhúng hợp lệ");
         let tl = TraLoiKy { du_lieu: "{\"ma_may\":\"SM-0000-0000-0000\",\"nonce\":\"thu1\",\"han_dem\":2,\"han_tach\":2,\"da_dung_dem\":0,\"da_dung_tach\":0,\"trang_thai\":\"dung_thu\",\"da_ghi\":[]}".into(), chu_ky: "ZwEMMvTPwXdWL9ADG/PuSChGAlUdWCU7ScsUztQvmFEXXwHAGH/SsGbDyG6U2Z7/5lJ4x0FkifvFekvPDNNOoWpCDeCzR2YkOEcIR784pD0atoW50OQ0948vqCU2kkU2G9p8e7Hye1vPpOHyrRYXdutg+V9N2P+HTpkw6JTj4AcSp0ypp0b801aDNsE10bkOwEDzZqP/xXL/2aJXfRBnhFW7zboCKAUZ6k9Y+Ts1U4DHMa+60CQ+EyOqleRzB1yxWIZpPbJZfE7+xrfq6EF48/f1XBYnusfHrsx/YZiArvuRfEwNHIL7i/HX9BW830rh0mqPPVcTcleNKFSab8viKg==".into() };
         let kq = doc_tra_loi(&tl, &khoa, "SM-0000-0000-0000", Some("thu1")).unwrap();
-        assert_eq!((kq.may.han.dem, kq.may.han.tach, kq.may.trang_thai), (2, 2, crate::license::TrangThai::DungThu));
+        assert_eq!((kq.may.han, kq.may.trang_thai), (4, crate::license::TrangThai::DungThu));
         assert!(KhoTram::moi().is_some(), "URL + khoá đã điền");
     }
 

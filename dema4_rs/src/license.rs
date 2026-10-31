@@ -1,4 +1,4 @@
-//! License giới hạn số lần Đếm / Tách / Sinh mục lục — phần lõi không gọi mạng: mã máy, quyết định cho chạy / chặn,
+//! License giới hạn tổng số lần dùng (Đếm / Tách / Sinh mục lục chung một hạn mức) — phần lõi không gọi mạng: mã máy, quyết định cho chạy / chặn,
 //! sổ lượt trên đĩa (đặt chỗ trước khi chạy, lần chạy chờ trạm xác nhận, câu trả lời có chữ ký gần nhất).
 
 use std::collections::HashSet;
@@ -21,17 +21,11 @@ pub enum TrangThai {
     Khoa,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct HanMuc {
-    pub dem: u32,
-    pub tach: u32,
-    pub muc_luc: u32,
-}
-
+/// Trạng thái máy theo trạm: một hạn mức + một số đã dùng chung cho mọi chức năng.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TrangThaiMay {
-    pub han: HanMuc,
-    pub da_dung: HanMuc,
+    pub han: u32,
+    pub da_dung: u32,
     pub trang_thai: TrangThai,
 }
 
@@ -80,14 +74,6 @@ impl ChucNang {
             ChucNang::MucLuc => "muc_luc",
         }
     }
-    /// Tên hiển thị trong popup / thông báo hết lượt.
-    pub fn ten(self) -> &'static str {
-        match self {
-            ChucNang::Dem => "Đếm",
-            ChucNang::Tach => "Tách",
-            ChucNang::MucLuc => "Sinh mục lục",
-        }
-    }
     fn tu_ma(s: &str) -> Option<Self> {
         match s {
             "dem" => Some(ChucNang::Dem),
@@ -96,16 +82,9 @@ impl ChucNang {
             _ => None,
         }
     }
-    fn cua(self, h: &HanMuc) -> u32 {
-        match self {
-            ChucNang::Dem => h.dem,
-            ChucNang::Tach => h.tach,
-            ChucNang::MucLuc => h.muc_luc,
-        }
-    }
 }
 
-/// Số lần tối đa chạy khi chưa được trạm xác nhận (mất mạng / trạm lỗi), mỗi chức năng.
+/// Số lần tối đa chạy khi chưa được trạm xác nhận (mất mạng / trạm lỗi), tính chung mọi chức năng.
 pub const TOI_DA_OFFLINE: u32 = 2;
 
 /// `SM-XXXX-XXXX-XXXX` = 12 ký tự hex đầu của SHA-256(ID hệ điều hành).
@@ -159,11 +138,12 @@ pub fn ngau_nhien_hex() -> String {
 }
 
 /// Cho / chặn **không gọi mạng**. `da_ky`: câu trả lời trạm gần nhất (đã kiểm chữ ký); `cho_ghi`: lần chạy
-/// trạm chưa xác nhận (kể cả đặt chỗ đang chạy). Quá `TOI_DA_OFFLINE` lần chưa xác nhận → chặn (mất mạng).
+/// trạm chưa xác nhận (kể cả đặt chỗ đang chạy), mọi chức năng. Quá `TOI_DA_OFFLINE` lần chưa xác nhận → chặn
+/// (mất mạng). `cn` chỉ để báo chức năng bị chặn — hạn mức dùng chung.
 pub fn quyet_dinh(da_ky: Option<&TrangThaiMay>, cho_ghi: &[LanChay], cn: ChucNang) -> QuyetDinh {
-    let chua_xac_nhan = cho_ghi.iter().filter(|l| l.cn == cn).count() as u32;
+    let chua_xac_nhan = cho_ghi.len() as u32;
     if let Some(m) = da_ky {
-        if m.trang_thai == TrangThai::Khoa || cn.cua(&m.da_dung) + chua_xac_nhan >= cn.cua(&m.han) {
+        if m.trang_thai == TrangThai::Khoa || m.da_dung + chua_xac_nhan >= m.han {
             return QuyetDinh::HetLuot(cn);
         }
     }
@@ -458,7 +438,7 @@ impl KiemTra {
     /// Mặc định của giao diện: app thật dùng trạm thật; test dùng kho giả hạn mức lớn.
     pub fn mac_dinh() -> Arc<KiemTra> {
         #[cfg(test)]
-        return KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(1_000_000, 1_000_000)));
+        return KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(1_000_000)));
         #[cfg(not(test))]
         KiemTra::that()
     }
@@ -564,8 +544,8 @@ mod tests {
         (SoLuot::moi(vec![d.join("a"), d.join("b")]), d)
     }
 
-    fn may(han: (u32, u32), dung: (u32, u32), tt: TrangThai) -> TrangThaiMay {
-        TrangThaiMay { han: HanMuc { dem: han.0, tach: han.1, muc_luc: han.1 }, da_dung: HanMuc { dem: dung.0, tach: dung.1, muc_luc: 0 }, trang_thai: tt }
+    fn may(han: u32, da_dung: u32, trang_thai: TrangThai) -> TrangThaiMay {
+        TrangThaiMay { han, da_dung, trang_thai }
     }
 
     fn lan(cn: ChucNang) -> LanChay {
@@ -588,16 +568,15 @@ mod tests {
     #[test]
     fn quyet_dinh_theo_tra_loi_ky() {
         use ChucNang::*;
-        assert_eq!(quyet_dinh(Some(&may((2, 2), (1, 0), TrangThai::DungThu)), &[], Dem), QuyetDinh::Cho);
-        assert_eq!(quyet_dinh(Some(&may((2, 2), (2, 0), TrangThai::DungThu)), &[], Dem), QuyetDinh::HetLuot(Dem));
-        assert_eq!(quyet_dinh(Some(&may((2, 2), (2, 0), TrangThai::DungThu)), &[], Tach), QuyetDinh::Cho, "Đếm, Tách tính riêng");
-        let ml = TrangThaiMay { han: HanMuc { dem: 9, tach: 9, muc_luc: 1 }, da_dung: HanMuc { dem: 0, tach: 0, muc_luc: 1 }, trang_thai: TrangThai::DungThu };
-        assert_eq!(quyet_dinh(Some(&ml), &[], MucLuc), QuyetDinh::HetLuot(MucLuc), "Sinh mục lục tính riêng");
-        assert_eq!((quyet_dinh(Some(&ml), &[], Dem), quyet_dinh(Some(&ml), &[], Tach)), (QuyetDinh::Cho, QuyetDinh::Cho));
-        assert_eq!(quyet_dinh(None, &[lan(MucLuc), lan(MucLuc)], MucLuc), QuyetDinh::HetLuotOffline(MucLuc));
-        assert_eq!(quyet_dinh(Some(&may((100, 100), (0, 0), TrangThai::Khoa)), &[], Dem), QuyetDinh::HetLuot(Dem), "Khoá còn lượt vẫn chặn");
-        assert_eq!(quyet_dinh(Some(&may((2, 2), (1, 0), TrangThai::DungThu)), &[lan(Dem)], Dem), QuyetDinh::HetLuot(Dem), "lần chờ ghi cộng vào đã dùng");
-        assert_eq!(quyet_dinh(Some(&may((100, 2), (5, 0), TrangThai::DaCap)), &[lan(Dem)], Dem), QuyetDinh::Cho);
+        assert_eq!(quyet_dinh(Some(&may(2, 1, TrangThai::DungThu)), &[], Dem), QuyetDinh::Cho);
+        assert_eq!(quyet_dinh(Some(&may(2, 2, TrangThai::DungThu)), &[], Dem), QuyetDinh::HetLuot(Dem));
+        for cn in [Tach, MucLuc] {
+            assert_eq!(quyet_dinh(Some(&may(2, 2, TrangThai::DungThu)), &[], cn), QuyetDinh::HetLuot(cn), "hạn mức chung: hết là hết mọi chức năng");
+        }
+        assert_eq!(quyet_dinh(None, &[lan(MucLuc), lan(Dem)], Tach), QuyetDinh::HetLuotOffline(Tach), "lần chưa xác nhận tính chung");
+        assert_eq!(quyet_dinh(Some(&may(100, 0, TrangThai::Khoa)), &[], Dem), QuyetDinh::HetLuot(Dem), "Khoá còn lượt vẫn chặn");
+        assert_eq!(quyet_dinh(Some(&may(2, 1, TrangThai::DungThu)), &[lan(Tach)], Dem), QuyetDinh::HetLuot(Dem), "lần chờ ghi của chức năng khác cũng cộng vào");
+        assert_eq!(quyet_dinh(Some(&may(100, 5, TrangThai::DaCap)), &[lan(Dem)], Dem), QuyetDinh::Cho);
     }
 
     #[test]
@@ -606,9 +585,9 @@ mod tests {
         assert_eq!(quyet_dinh(None, &[], Dem), QuyetDinh::Cho);
         assert_eq!(quyet_dinh(None, &[lan(Dem)], Dem), QuyetDinh::Cho);
         assert_eq!(quyet_dinh(None, &[lan(Dem), lan(Dem)], Dem), QuyetDinh::HetLuotOffline(Dem));
-        assert_eq!(quyet_dinh(None, &[lan(Dem), lan(Dem)], Tach), QuyetDinh::Cho);
+        assert_eq!(quyet_dinh(None, &[lan(Dem), lan(Dem)], Tach), QuyetDinh::HetLuotOffline(Tach), "luật offline tính chung");
         // Có trả lời ký nhưng 2 lần chưa được trạm xác nhận (mất mạng) → chặn dù hạn mức lớn
-        assert_eq!(quyet_dinh(Some(&may((100, 100), (0, 0), TrangThai::DaCap)), &[lan(Dem), lan(Dem)], Dem), QuyetDinh::HetLuotOffline(Dem));
+        assert_eq!(quyet_dinh(Some(&may(100, 0, TrangThai::DaCap)), &[lan(Dem), lan(Dem)], Dem), QuyetDinh::HetLuotOffline(Dem));
     }
 
     #[test]
@@ -691,19 +670,19 @@ mod tests {
 
         #[test]
         fn may_moi_cho_2_lan_roi_chan() {
-            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kho = Arc::new(KhoGia::moi(2));
             let kt = KiemTra::gia(kho.clone());
             kt.mo_app();
             cho(&kt);
-            assert!(chay(&kt, ChucNang::Dem) && chay(&kt, ChucNang::Dem));
+            assert!(chay(&kt, ChucNang::Dem) && chay(&kt, ChucNang::Tach), "Đếm 1 + Tách 1 = 2 lượt chung");
+            assert_eq!(kt.bat_dau(ChucNang::MucLuc).unwrap_err(), QuyetDinh::HetLuot(ChucNang::MucLuc));
             assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuot(ChucNang::Dem));
-            assert!(chay(&kt, ChucNang::Tach), "Tách tính riêng");
-            assert_eq!(kho.da_dung(), HanMuc { dem: 2, tach: 1, muc_luc: 0 });
+            assert_eq!(kho.da_dung(), 2);
         }
 
         #[test]
         fn quyet_dinh_khong_goi_mang() {
-            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kho = Arc::new(KhoGia::moi(2));
             let kt = KiemTra::gia(kho.clone());
             let t = Instant::now();
             for _ in 0..100 {
@@ -715,7 +694,7 @@ mod tests {
 
         #[test]
         fn thoat_giua_chung_van_bi_tinh() {
-            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kho = Arc::new(KhoGia::moi(2));
             let kt = KiemTra::gia(kho.clone());
             kho.mat_mang.store(true, SeqCst);
             let _bo_do = kt.bat_dau(ChucNang::Tach).unwrap(); // app chết giữa chừng: không ket_thuc
@@ -724,47 +703,47 @@ mod tests {
             kho.mat_mang.store(false, SeqCst);
             kt2.mo_app();
             cho(&kt2);
-            assert_eq!(kho.da_dung().tach, 1, "lần bỏ dở gửi trạm khi mở lại");
+            assert_eq!(kho.da_dung(), 1, "lần bỏ dở gửi trạm khi mở lại");
             assert!(kt2.chung.so.cho_ghi().is_empty());
         }
 
         #[test]
         fn dung_khong_co_ket_qua_hoan_luot() {
-            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kho = Arc::new(KhoGia::moi(2));
             let kt = KiemTra::gia(kho.clone());
             for _ in 0..5 {
                 let l = kt.bat_dau(ChucNang::Dem).unwrap();
                 kt.ket_thuc(&l, false);
             }
             cho(&kt);
-            assert_eq!((kho.da_dung().dem, kho.so_goi.load(SeqCst)), (0, 1), "chỉ 1 lần hỏi trạm (chưa có trả lời ký), không ghi lượt nào");
+            assert_eq!((kho.da_dung(), kho.so_goi.load(SeqCst)), (0, 1), "chỉ 1 lần hỏi trạm (chưa có trả lời ký), không ghi lượt nào");
         }
 
         #[test]
         fn dung_co_ket_qua_tinh_luot() {
-            let kho = Arc::new(KhoGia::moi(2, 2));
+            let kho = Arc::new(KhoGia::moi(2));
             let kt = KiemTra::gia(kho.clone());
             assert!(chay(&kt, ChucNang::Tach));
-            assert_eq!(kho.da_dung().tach, 1);
+            assert_eq!(kho.da_dung(), 1);
             assert!(kt.chung.so.cho_ghi().is_empty(), "trạm xác nhận → xoá khỏi sổ");
         }
 
         #[test]
         fn timeout_khong_dem_trung() {
-            let kho = Arc::new(KhoGia::moi(5, 5));
+            let kho = Arc::new(KhoGia::moi(5));
             let kt = KiemTra::gia(kho.clone());
             kho.loi_sau_ghi.store(true, SeqCst);
             assert!(chay(&kt, ChucNang::Dem));
             assert_eq!(kt.chung.so.cho_ghi().len(), 1, "lỗi → giữ lại để gửi lại");
             kt.mo_app();
             cho(&kt);
-            assert_eq!(kho.da_dung().dem, 1, "gửi lại cùng mã lần không cộng thêm");
+            assert_eq!(kho.da_dung(), 1, "gửi lại cùng mã lần không cộng thêm");
             assert!(kt.chung.so.cho_ghi().is_empty());
         }
 
         #[test]
         fn mot_luong_gui() {
-            let mut k = KhoGia::moi(100, 100);
+            let mut k = KhoGia::moi(100);
             k.cho = Duration::from_millis(30);
             let kho = Arc::new(k);
             let kt = KiemTra::gia(kho.clone());
@@ -777,7 +756,7 @@ mod tests {
             kt.thong_ke("thong_ke_dem", |_| serde_json::json!({}));
             cho(&kt);
             assert_eq!(kho.dong_thoi_toi_da.load(SeqCst), 1);
-            assert_eq!(kho.da_dung().dem, 2);
+            assert_eq!(kho.da_dung(), 2);
             assert_eq!(kt.quyet_dinh(ChucNang::Dem), QuyetDinh::Cho, "đã xác nhận → chạy tiếp được");
             assert_eq!(*kho.thong_ke_da_gui.lock().unwrap(), ["thong_ke_dem"]);
         }
@@ -785,7 +764,7 @@ mod tests {
         #[test]
         fn ip_doc_lai_moi_loi_goi() {
             use std::sync::atomic::AtomicUsize;
-            let kho = Arc::new(KhoGia::moi(9, 9));
+            let kho = Arc::new(KhoGia::moi(9));
             let n = Arc::new(AtomicUsize::new(0));
             let n2 = n.clone();
             let d = std::env::temp_dir().join(format!("dema4_kiem_tra_ip_{}", std::process::id()));
@@ -799,7 +778,7 @@ mod tests {
 
         #[test]
         fn khoa_sau_lan_chay_ke() {
-            let kho = Arc::new(KhoGia::moi(100, 100));
+            let kho = Arc::new(KhoGia::moi(100));
             let kt = KiemTra::gia(kho.clone());
             kt.mo_app();
             cho(&kt);
@@ -810,7 +789,7 @@ mod tests {
 
         #[test]
         fn khoa_offline_van_khoa() {
-            let kho = Arc::new(KhoGia::moi(100, 100));
+            let kho = Arc::new(KhoGia::moi(100));
             let kt = KiemTra::gia(kho.clone());
             *kho.trang_thai.lock().unwrap() = "khoa";
             kt.mo_app();
@@ -825,7 +804,7 @@ mod tests {
         /// Xoá / sửa câu trả lời ký trên đĩa không mở thêm lượt: có trạm thì hỏi trạm trước khi quyết định.
         #[test]
         fn xoa_tra_loi_tren_dia_khong_vuot_han() {
-            let kho = Arc::new(KhoGia::moi(0, 0));
+            let kho = Arc::new(KhoGia::moi(0));
             let kt = KiemTra::gia(kho.clone());
             assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuot(ChucNang::Dem));
             assert_eq!(kho.so_goi.load(SeqCst), 1, "hỏi trạm đúng 1 lần, lần sau dùng trả lời đã có");
@@ -836,7 +815,7 @@ mod tests {
         /// Mất mạng thật: không có trả lời ký → luật offline (máy mới vẫn dùng thử được 2 lần).
         #[test]
         fn mat_mang_khong_co_tra_loi_van_cho_2_lan() {
-            let kho = Arc::new(KhoGia::moi(0, 0));
+            let kho = Arc::new(KhoGia::moi(0));
             kho.mat_mang.store(true, SeqCst);
             let kt = KiemTra::gia(kho.clone());
             assert!(chay(&kt, ChucNang::Dem) && chay(&kt, ChucNang::Dem));

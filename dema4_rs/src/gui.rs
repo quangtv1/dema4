@@ -1617,7 +1617,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&goc);
         std::fs::create_dir_all(&goc).unwrap();
         crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 1);
-        let kho = Arc::new(crate::tram::KhoGia::moi(0, 5));
+        let kho = Arc::new(crate::tram::KhoGia::moi(0));
         let kt = crate::license::KiemTra::gia(kho.clone());
         kt.mo_app();
         kt.moc().recv().unwrap();
@@ -1634,11 +1634,11 @@ mod tests {
         // Nút Đếm ở thanh chọn thư mục (nút đầu tiên có nhãn "Đếm")
         h.get_all_by_label("Đếm").next().unwrap().click();
         h.run();
-        h.get_by_label("Lý do: Số lần Đếm còn lại (");
+        h.get_by_label("Lý do: Số lần dùng còn lại (");
         h.get_by_label(&ma);
         h.get_by_label(crate::hop_license::DIEN_THOAI);
         assert!(h.state().dem.dang_dem.is_none(), "hết lượt: không chạy đếm");
-        *kho.han.lock().unwrap() = crate::license::HanMuc { dem: 5, tach: 5, muc_luc: 5 };
+        *kho.han.lock().unwrap() = 5;
         h.get_by_label("Kiểm tra lại").click();
         let bat_dau = Instant::now();
         while h.state().dem.hop_license.is_some() {

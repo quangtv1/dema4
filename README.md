@@ -10,7 +10,7 @@ Một file chạy duy nhất, không cần cài thêm gì.
 
 Tải bản mới nhất ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
 
-Mỗi máy dùng thử **10 lần Đếm**, **10 lần Tách** và **10 lần Sinh mục lục**; cần thêm lượt liên hệ Sao Mai — xem [Lượt dùng](#lượt-dùng-license).
+Mỗi máy dùng thử **10 lần**, dùng chung cho Đếm, Tách và Sinh mục lục; cần thêm lượt liên hệ Sao Mai — xem [Lượt dùng](#lượt-dùng-license).
 
 File chạy chưa ký số với Apple / Microsoft nên lần đầu mở hệ điều hành sẽ cảnh báo:
 
@@ -155,12 +155,12 @@ Hệ số và ranh giới khổ đọc từ `.dema4_saomai.cfg` (không có file
 
 ## Lượt dùng (license)
 
-- Mỗi máy được **10 lần Đếm**, **10 lần Tách** và **10 lần Sinh mục lục** dùng thử. Chỉ lần chạy **có kết quả** mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt. Áp dụng cho cả giao diện và dòng lệnh (hết lượt: in lý do + mã máy, mã thoát `3`).
-- Nhóm Telegram nhận thông báo khi có **máy mới đăng ký**, sau mỗi lần **Đếm / Tách / Sinh mục lục**, và khi máy **hết lượt** một chức năng (mỗi loại một mẫu tin riêng).
+- Mỗi máy có **một hạn mức chung** (dùng thử **10 lần**): mỗi lần Đếm, Tách hay Sinh mục lục đều tính 1 lượt. Chỉ lần chạy **có kết quả** mới bị tính (kể cả khi bấm Dừng); không ra kết quả thì hoàn lượt. Áp dụng cho cả giao diện và dòng lệnh (hết lượt: in lý do + mã máy, mã thoát `3`).
+- Nhóm Telegram nhận thông báo khi có **máy mới đăng ký**, sau mỗi lần **Đếm / Tách / Sinh mục lục**, và khi máy **hết lượt** (mỗi loại một mẫu tin riêng).
 - Hết lượt → popup **Liên hệ Sao Mai** (mã máy, điện thoại **0979824615**, email **hotro@saomaiso.com**, saomaiso.com). Sao Mai cấp thêm lượt trên Sheet → bấm **Kiểm tra lại**.
 - **Mã máy** `SM-XXXX-XXXX-XXXX` lấy từ ID hệ điều hành (không đổi khi đổi tên máy), xem ở **Trợ giúp › Thông tin**.
 - Bấm Đếm / Tách quyết định ngay, không chờ mạng. Mất mạng: chạy được tối đa 2 lần chưa được máy chủ xác nhận, có mạng lại app tự ghi bù. Bị **Khoá** thì mất mạng vẫn khoá.
-- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `1_license` (mỗi máy 1 dòng, cộng dồn lượt đã dùng); câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `1_license` → sửa **Hạn mức Đếm / Tách / Mục lục** + Trạng thái **Đã cấp** (hướng dẫn ở ghi chú ô A1, ý nghĩa cột ở ghi chú từng ô tiêu đề).
+- Máy chủ là trạm Google Apps Script (`dema4_rs/apps-script/`) ghi tab `1_license` (mỗi máy 1 dòng: cột **Đã dùng** cộng dồn mọi chức năng, cột **Hạn mức** là tổng số lần được phép); câu trả lời có chữ ký RSA, app chỉ giữ khoá công khai. Cấp lượt: tab `1_license` → sửa **Hạn mức** (tổng mới) + Trạng thái **Đã cấp** (hướng dẫn ở ghi chú ô A1, ý nghĩa cột ở ghi chú từng ô tiêu đề).
 
 ![Liên hệ Sao Mai](docs/anh/het-luot.png)
 

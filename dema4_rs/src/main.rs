@@ -65,8 +65,8 @@ fn main() {
 /// Hết lượt: in lý do + cách liên hệ + mã máy, mã thoát 3.
 fn bat_dau_luot(kt: &license::KiemTra, cn: license::ChucNang) -> Result<license::LanChay, i32> {
     kt.bat_dau(cn).map_err(|qd| {
-        let ten = cn.ten();
-        eprintln!("Số lần {ten} còn lại (0). Liên hệ với Sao Mai để được hỗ trợ: {} · {} · Mã máy: {}", hop_license::DIEN_THOAI, hop_license::EMAIL, kt.ma_may());
+        // Hạn mức dùng chung mọi chức năng
+        eprintln!("Số lần dùng còn lại (0). Liên hệ với Sao Mai để được hỗ trợ: {} · {} · Mã máy: {}", hop_license::DIEN_THOAI, hop_license::EMAIL, kt.ma_may());
         if matches!(qd, license::QuyetDinh::HetLuotOffline(_)) {
             eprintln!("Chưa kết nối được máy chủ — kết nối mạng rồi chạy lại.");
         }
@@ -215,8 +215,8 @@ mod tests {
     }
 
     /// Hạn mức đã biết từ trạm (giả): mở app → đọc trạng thái ký.
-    fn kt_han(dem: u32, tach: u32) -> Arc<KiemTra> {
-        let kt = KiemTra::gia(Arc::new(KhoGia::moi(dem, tach)));
+    fn kt_han(han: u32) -> Arc<KiemTra> {
+        let kt = KiemTra::gia(Arc::new(KhoGia::moi(han)));
         kt.mo_app();
         kt.moc().recv().unwrap();
         kt
@@ -228,7 +228,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&goc);
         std::fs::create_dir_all(&goc).unwrap();
         crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 1);
-        let kt = kt_han(2, 2);
+        let kt = kt_han(2);
         let tm = goc.to_string_lossy().into_owned();
         assert_eq!(chay_dong_lenh(&kt, &tm, false, false, true), 0);
         assert_eq!(chay_dong_lenh(&kt, &tm, false, false, true), 0);
@@ -243,7 +243,7 @@ mod tests {
         let nguon = goc.join("nguon");
         std::fs::create_dir_all(&nguon).unwrap();
         crate::tach_vb::tach::tests::tao_pdf(&nguon.join("c.pdf"), 2);
-        assert_eq!(chay_tach(&kt_han(5, 0), &[nguon.to_string_lossy().into_owned()]), 3);
+        assert_eq!(chay_tach(&kt_han(0), &[nguon.to_string_lossy().into_owned()]), 3);
         assert!(!goc.join("nguon_vanban").exists(), "hết lượt: không tạo thư mục kết quả");
         let _ = std::fs::remove_dir_all(crate::tach_vb::phien::thu_muc_an(&nguon));
         let _ = std::fs::remove_dir_all(&goc);

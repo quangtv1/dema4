@@ -61,7 +61,6 @@ impl HopLicense {
             self.da_chep = None;
         }
         let ma = kt.ma_may().to_string();
-        let ten_cn = self.chuc_nang().ten();
         let mut kq = KetQuaHop::Mo;
         let phan_hoi = kh::hop(ctx, "hop_license", RONG, "Liên hệ Sao Mai", |ui| {
             egui::Frame::new().inner_margin(Margin { left: 16, right: 16, top: 14, bottom: 0 }).show(ui, |ui| {
@@ -84,7 +83,7 @@ impl HopLicense {
                         ui.spacing_mut().item_spacing.y = 4.0;
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = 0.0;
-                            ui.label(RichText::new(format!("Lý do: Số lần {ten_cn} còn lại (")).size(13.0).color(CHU));
+                            ui.label(RichText::new("Lý do: Số lần dùng còn lại (").size(13.0).color(CHU));
                             ui.label(RichText::new("0").size(13.0).color(DO).dam());
                             ui.label(RichText::new(")").size(13.0).color(CHU));
                         });

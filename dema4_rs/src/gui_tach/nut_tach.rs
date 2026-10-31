@@ -555,7 +555,7 @@ mod tests {
         crate::tach_vb::tach::tests::tao_pdf(&nguon.join("a.pdf"), 3);
         let cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
         let ch = cfg.cau_hinh_phan_tich();
-        let kt = crate::license::KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(5, 0)));
+        let kt = crate::license::KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(0)));
         kt.mo_app();
         kt.moc().recv().unwrap();
         let mut man = ManTach { thu_muc: nguon.display().to_string(), license: kt, ..Default::default() };

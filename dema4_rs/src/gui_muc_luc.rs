@@ -1292,7 +1292,7 @@ pub(crate) mod tests {
 
     /// Màn đã nạp fixture + mẫu 01, license giả (`han_ml` lượt Sinh mục lục).
     pub fn man_thu(han_ml: u32) -> ManMucLuc {
-        let kt = crate::license::KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(5, han_ml)));
+        let kt = crate::license::KiemTra::gia(Arc::new(crate::tram::KhoGia::moi(han_ml)));
         kt.mo_app();
         kt.moc().recv().unwrap();
         let mut m = ManMucLuc { license: kt, ..ManMucLuc::tu_cau_hinh(&CauHinhMucLuc { mau: "1".into(), ..Default::default() }) };

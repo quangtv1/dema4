@@ -9,20 +9,13 @@ var TOI_DA_LAN_MOI_LOI_GOI = 3;
 var GIOI_HAN_DANG_KY_MOI_GIO = 30;
 var GIOI_HAN_LOI_GOI_MOI_PHUT = 120;
 var TOI_DA_HANG_DOI = 2000;
-var HAN_MAC_DINH = 10; // lượt dùng thử mỗi chức năng khi ô Hạn mức trống
-// Cột tab license (1-based)
-var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7, LAN_CUOI: 8, DUNG_DEM: 9, DUNG_TACH: 10, HAN_DEM: 11, HAN_TACH: 12, TRANG_THAI: 13, MA_LAN: 16, DUNG_MUC_LUC: 17, HAN_MUC_LUC: 18 };
-// Cột Mục lục thêm SAU cột ẩn Mã lần (P) để không xê dịch cột cũ; dòng do trạm cũ tạo có thể thiếu → mặc định
-var SO_COT_MAY = 18;
+var HAN_MAC_DINH = 10; // tổng lượt dùng thử (chung mọi chức năng) khi ô Hạn mức trống
+// Cột tab license (1-based). Một hạn mức + một số đã dùng chung cho Đếm / Tách / Sinh mục lục
+var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7, LAN_CUOI: 8, DUNG: 9, HAN: 10, TRANG_THAI: 11, DON_VI: 12, GHI_CHU: 13, MA_LAN: 14 };
+var SO_COT_MAY = 14;
 // Số mã lần gần nhất giữ trong dòng máy để chống trùng (app gửi lại tối đa vài lần chưa được xác nhận)
 var GIU_MA_LAN = 20;
 var TEN_CN = { dem: 'Đếm', tach: 'Tách', muc_luc: 'Mục lục' };
-// Cột Đã dùng / Hạn mức + khoá trong dữ liệu ký theo từng chức năng
-var CN = {
-  dem: { dung: COT.DUNG_DEM, han: COT.HAN_DEM },
-  tach: { dung: COT.DUNG_TACH, han: COT.HAN_TACH },
-  muc_luc: { dung: COT.DUNG_MUC_LUC, han: COT.HAN_MUC_LUC },
-};
 
 /** Bỏ ký tự điều khiển, cắt `toiDa` ký tự. */
 function sachChu(s, toiDa) {
@@ -65,7 +58,7 @@ function maTrangThai(o) {
   return 'khoa';
 }
 
-/** Ô hạn mức: trống → 2; không phải số → 0. */
+/** Ô hạn mức: trống → HAN_MAC_DINH; không phải số → 0. */
 function hanMuc(o) {
   if (o === '' || o == null) return HAN_MAC_DINH;
   var n = Number(o);
@@ -89,14 +82,33 @@ function maNgauNhien() {
   return s;
 }
 
-/** Trạng thái license của 1 dòng (mảng 15 ô). */
+/** Trạng thái license của 1 dòng: tổng hạn mức + tổng đã dùng (mọi chức năng). */
 function trangThaiDong(d) {
-  var tt = { trang_thai: maTrangThai(d[COT.TRANG_THAI - 1]) };
-  Object.keys(CN).forEach(function (cn) {
-    tt['han_' + cn] = hanMuc(d[CN[cn].han - 1]);
-    tt['da_dung_' + cn] = soKhongAm(d[CN[cn].dung - 1]);
-  });
-  return tt;
+  return { trang_thai: maTrangThai(d[COT.TRANG_THAI - 1]), han: hanMuc(d[COT.HAN - 1]), da_dung: soKhongAm(d[COT.DUNG - 1]) };
+}
+
+/**
+ * Dữ liệu ký gửi app: `han` / `da_dung` (tổng) + khoá cũ theo từng chức năng gán CÙNG số tổng — app bản cũ
+ * (đọc han_dem / da_dung_tach…) cũng chặn theo tổng mà không cần cập nhật.
+ */
+function duLieuKy(maMay, nonce, tt, daGhi) {
+  var du = { ma_may: maMay, nonce: nonce, trang_thai: tt.trang_thai, da_ghi: daGhi, han: tt.han, da_dung: tt.da_dung };
+  Object.keys(TEN_CN).forEach(function (cn) { du['han_' + cn] = tt.han; du['da_dung_' + cn] = tt.da_dung; });
+  return du;
+}
+
+/** Tiêu đề cột J (Đã dùng Tách) của bảng cũ — có nghĩa là bảng còn theo từng chức năng, cần chuyển. */
+var TIEU_DE_COT_J_CU = 'Đã dùng Tách';
+
+/**
+ * Dòng bảng cũ (18 cột: I/J/Q đã dùng Đếm/Tách/Mục lục, K/L/R hạn mức, M trạng thái, N đơn vị, O ghi chú, P mã lần)
+ * → dòng bảng mới 14 cột: Đã dùng = tổng 3 chức năng, Hạn mức = tổng 3 hạn mức cũ (ô trống tính HAN_MAC_DINH).
+ */
+function chuyenDongCu(r) {
+  var o = function (i) { return r[i] == null ? '' : r[i]; };
+  var dung = soKhongAm(o(8)) + soKhongAm(o(9)) + soKhongAm(o(16));
+  var han = hanMuc(o(10)) + hanMuc(o(11)) + hanMuc(o(17));
+  return [o(0), o(1), o(2), o(3), o(4), o(5), o(6), o(7), dung, han, o(12), o(13), o(14), o(15)];
 }
 
 /**
@@ -128,7 +140,7 @@ function xuLy(yc, kho, bayGio) {
   var tim = kho.timMay(yc.ma_may);
   if (!tim) {
     if (!kho.choPhep('dang_ky', GIOI_HAN_DANG_KY_MOI_GIO, 3600)) return { ok: false, loi: 'ban' };
-    kho.themMay([yc.ma_may, may.ten, may.mac, may.ip_noi_bo, may.ip_public, may.phien_ban, luc, luc, 0, 0, '', '', 'Dùng thử', '', '', '', 0, '']);
+    kho.themMay([yc.ma_may, may.ten, may.mac, may.ip_noi_bo, may.ip_public, may.phien_ban, luc, luc, 0, '', 'Dùng thử', '', '', '']);
     tim = kho.timMay(yc.ma_may);
     xepThongBao(kho, tinMayMoi(yc.ma_may, may, thoiDiemTin(bayGio)));
   }
@@ -140,34 +152,27 @@ function xuLy(yc, kho, bayGio) {
   cot[COT.LAN_CUOI] = luc;
 
   var daGhi = [];
-  var truoc = {}, dung = {};
-  Object.keys(CN).forEach(function (cn) { truoc[cn] = dung[cn] = soKhongAm(d[CN[cn].dung - 1]); });
+  var truoc = soKhongAm(d[COT.DUNG - 1]), dung = truoc, cnCuoi = null;
   // Chống trùng: mã lần đã ghi nằm ở cột ẩn "Mã lần gần đây" của chính dòng máy
   var daCo = String(d[COT.MA_LAN - 1] || '').split(',').filter(Boolean);
-  var them = 0;
   lan.forEach(function (l) {
     daGhi.push(l.ma_lan);
     if (daCo.indexOf(l.ma_lan) >= 0) return;
-    dung[l.cn]++;
+    dung++; // mỗi lần dùng bất kỳ chức năng nào = 1 lượt
+    cnCuoi = l.cn;
     daCo.push(l.ma_lan);
-    them++;
   });
-  if (them) {
-    Object.keys(CN).forEach(function (cn) { if (dung[cn] !== truoc[cn]) cot[CN[cn].dung] = dung[cn]; });
+  if (dung !== truoc) {
+    cot[COT.DUNG] = dung;
     cot[COT.MA_LAN] = daCo.slice(-GIU_MA_LAN).join(',');
   }
   kho.capNhatMay(tim.hang, cot);
-  Object.keys(CN).forEach(function (cn) { d[CN[cn].dung - 1] = dung[cn]; });
+  d[COT.DUNG - 1] = dung;
 
   var tt = trangThaiDong(d);
   // Lần chạy này làm chạm hạn mức → báo 1 lần (gửi lại / kiểm tra lại không báo thêm)
-  Object.keys(CN).forEach(function (cn) {
-    var han = tt['han_' + cn];
-    if (truoc[cn] < han && dung[cn] >= han) xepThongBao(kho, tinHetLuot(yc.ma_may, may, cn, dung[cn], han, tt.trang_thai, thoiDiemTin(bayGio)));
-  });
-  var du = { ma_may: yc.ma_may, nonce: nonce, trang_thai: tt.trang_thai, da_ghi: daGhi };
-  Object.keys(CN).forEach(function (cn) { du['han_' + cn] = tt['han_' + cn]; du['da_dung_' + cn] = tt['da_dung_' + cn]; });
-  return { ok: true, du_lieu: du };
+  if (truoc < tt.han && dung >= tt.han) xepThongBao(kho, tinHetLuot(yc.ma_may, may, cnCuoi, dung, tt.han, tt.trang_thai, thoiDiemTin(bayGio)));
+  return { ok: true, du_lieu: duLieuKy(yc.ma_may, nonce, tt, daGhi) };
 }
 
 function thongKe(hd, yc, may, kho, bayGio) {
@@ -178,8 +183,7 @@ function thongKe(hd, yc, may, kho, bayGio) {
   var tim = kho.timMay(yc.ma_may), luot = null;
   if (tim) {
     var tt = trangThaiDong(tim.giaTri);
-    var cn = hd.slice('thong_ke_'.length);
-    luot = { da_dung: tt['da_dung_' + cn], han: tt['han_' + cn] };
+    luot = { da_dung: tt.da_dung, han: tt.han };
   }
   var luc = thoiDiemTin(bayGio);
   var tin = hd === 'thong_ke_dem' ? tinDem(yc.ma_may, may, sl, luc, luot)
@@ -234,19 +238,20 @@ function soanTin(tieuDe, maMay, may, dongChucNang) {
 
 function tinMayMoi(maMay, may, luc) {
   return soanTin('🆕 MÁY MỚI ĐĂNG KÝ', maMay, may, [
-    'Dùng thử: ' + HAN_MAC_DINH + ' lần Đếm · ' + HAN_MAC_DINH + ' lần Tách · ' + HAN_MAC_DINH + ' lần Sinh mục lục',
+    'Dùng thử: ' + HAN_MAC_DINH + ' lần (dùng chung Đếm · Tách · Sinh mục lục)',
     'Thời điểm: ' + luc,
   ]);
 }
 
+/** `cn`: chức năng của lần chạy làm chạm hạn mức (hạn mức dùng chung mọi chức năng). */
 function tinHetLuot(maMay, may, cn, daDung, han, trangThai, luc) {
   var tenTT = { dung_thu: 'Dùng thử', da_cap: 'Đã cấp', khoa: 'Khoá' }[trangThai] || trangThai;
-  return soanTin('⛔ HẾT LƯỢT ' + TEN_CN[cn].toUpperCase(), maMay, may, [
-    'Chức năng: ' + TEN_CN[cn],
+  return soanTin('⛔ HẾT LƯỢT', maMay, may, [
+    'Lần cuối: ' + (TEN_CN[cn] || '?'),
     'Đã dùng: ' + daDung + '/' + han,
     'Trạng thái: ' + tenTT,
     'Thời điểm: ' + luc,
-    'Cấp thêm: tab 1_license → sửa Hạn mức ' + TEN_CN[cn] + ' (tổng mới) + Trạng thái Đã cấp',
+    'Cấp thêm: tab 1_license → sửa Hạn mức (tổng mới) + Trạng thái Đã cấp',
   ]);
 }
 
@@ -355,5 +360,5 @@ function chonGui(ds, bayGioMs, nganSach) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { GIU_MA_LAN: GIU_MA_LAN, xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, tinDem: tinDem, tinTach: tinTach, tinMucLuc: tinMucLuc, tinMayMoi: tinMayMoi, tinHetLuot: tinHetLuot, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
+  module.exports = { chuyenDongCu: chuyenDongCu, TIEU_DE_COT_J_CU: TIEU_DE_COT_J_CU, GIU_MA_LAN: GIU_MA_LAN, HAN_MAC_DINH: HAN_MAC_DINH, SO_COT_MAY: SO_COT_MAY, xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, tinDem: tinDem, tinTach: tinTach, tinMucLuc: tinMucLuc, tinMayMoi: tinMayMoi, tinHetLuot: tinHetLuot, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
 }

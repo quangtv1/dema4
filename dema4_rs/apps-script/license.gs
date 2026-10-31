@@ -8,13 +8,14 @@ var TAB = {
   HANG_DOI: '3_hang_doi_telegram',
 };
 var TIEU_DE = {
-  MAY: ['Mã máy', 'Tên máy', 'MAC', 'IP nội bộ', 'IP public', 'Phiên bản', 'Ngày đăng ký', 'Lần dùng cuối', 'Đã dùng Đếm', 'Đã dùng Tách', 'Hạn mức Đếm', 'Hạn mức Tách', 'Trạng thái', 'Đơn vị', 'Ghi chú', 'Mã lần gần đây', 'Đã dùng Mục lục', 'Hạn mức Mục lục'],
+  MAY: ['Mã máy', 'Tên máy', 'MAC', 'IP nội bộ', 'IP public', 'Phiên bản', 'Ngày đăng ký', 'Lần dùng cuối', 'Đã dùng', 'Hạn mức', 'Trạng thái', 'Đơn vị', 'Ghi chú', 'Mã lần gần đây'],
   HANG_DOI: ['Mã', 'Thời điểm', 'Nội dung', 'Tên CSV', 'CSV', 'Số lần thử', 'Trạng thái', 'Lúc đánh dấu'],
 };
 /** Ghi chú (note) ô tiêu đề — thay cho tab mô tả. Ô A1 tab license kèm hướng dẫn cấp lượt. */
 var GHI_CHU = {
   MAY: [
     'Mã máy: băm từ ID hệ điều hành (không đổi khi đổi tên máy / card mạng). Khách đọc mã trên popup "Liên hệ Sao Mai".\n\n' +
+      'HẠN MỨC DÙNG CHUNG: mỗi lần Đếm, Tách hay Sinh mục lục đều tính 1 lượt vào cột Đã dùng.\n' +
       'CẤP THÊM LƯỢT: Ctrl/Cmd+F tìm mã máy → sửa Hạn mức thành TỔNG mới (vd đã dùng 37, cho thêm 100 → 137) → Trạng thái = Đã cấp → khách bấm "Kiểm tra lại".\n' +
       'KHOÁ: Trạng thái = Khoá (máy chạy tối đa thêm 1 lần rồi bị chặn). Mở khoá: chọn lại Đã cấp / Dùng thử.\n' +
       'MÁY NỘI BỘ: Hạn mức 100000 + Đã cấp.\n' +
@@ -27,16 +28,12 @@ var GHI_CHU = {
     'Phiên bản app ở lần liên lạc gần nhất (trạm ghi).',
     'Lần đầu máy gọi trạm (trạm ghi).',
     'Lần gần nhất máy gọi trạm (trạm ghi).',
-    'Tổng số lần Đếm đã dùng; +1 mỗi lần chạy có kết quả. Chữ đỏ = hết lượt. Không sửa tay.',
-    'Tổng số lần Tách đã dùng; +1 mỗi lần chạy có kết quả. Chữ đỏ = hết lượt. Không sửa tay.',
-    'TỔNG số lần Đếm được phép (không phải số cộng thêm). Trống = 10 (dùng thử). Sao Mai sửa.',
-    'TỔNG số lần Tách được phép (không phải số cộng thêm). Trống = 10 (dùng thử). Sao Mai sửa.',
+    'Tổng số lần đã dùng mọi chức năng (Đếm, Tách, Sinh mục lục); +1 mỗi lần chạy có kết quả. Chữ đỏ = hết lượt. Không sửa tay.',
+    'TỔNG số lần được phép, dùng chung mọi chức năng (không phải số cộng thêm). Trống = 10 (dùng thử). Sao Mai sửa.',
     'Dùng thử / Đã cấp / Khoá — chọn trong danh sách. Giá trị khác bị coi là Khoá. Sao Mai sửa.',
     'Tự do: đơn vị sử dụng. Sao Mai sửa.',
     'Tự do: số hợp đồng, ngày cấp… Sao Mai sửa.',
     '20 mã lần chạy gần nhất — trạm dùng để không cộng trùng khi app gửi lại. Cột ẩn, không sửa tay.',
-    'Tổng số lần Sinh mục lục đã dùng; +1 mỗi lần có file ra. Không sửa tay.',
-    'TỔNG số lần Sinh mục lục được phép (không phải số cộng thêm). Trống = 10 (dùng thử). Sao Mai sửa.',
   ],
   HANG_DOI: [
     'Mã dòng (trạm tạo). Tab ẩn: tin Telegram chờ gửi, trigger gửi mỗi phút (tối đa 15 lời gọi/lượt), tự dọn sau 7 ngày. ' +
@@ -59,33 +56,46 @@ function bang(ten, tieuDe, ghiChu) {
       tieuDe.forEach(function (t, i) { if (COT_CHU.indexOf(t) >= 0) sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat('@'); });
       if (ghiChu && ghiChu.length === tieuDe.length) sh.getRange(1, 1, 1, tieuDe.length).setNotes([ghiChu]);
     }
-    if (ten === TAB.MAY) {
-      var quyTac = SpreadsheetApp.newDataValidation().requireValueInList(['Dùng thử', 'Đã cấp', 'Khoá'], true).setAllowInvalid(false).build();
-      sh.getRange('M2:M').setDataValidation(quyTac);
-      sh.getRange('K1:O1').setBackground('#BF8F00');
-      sh.getRange('A1:J1').setBackground('#1F4E79');
-      sh.hideColumns(16);
-      tomCotMucLuc(sh);
-    }
+    if (ten === TAB.MAY) dinhDangBangMay(sh);
     if (ten === TAB.HANG_DOI) sh.hideSheet();
   }
   return sh;
 }
 
-/** Màu tiêu đề 2 cột Sinh mục lục: Q do trạm ghi (xanh), R do Sao Mai sửa (vàng) — như các cột Đếm/Tách. */
-function tomCotMucLuc(sh) {
-  sh.getRange(1, 17).setBackground('#1F4E79');
-  sh.getRange(1, 18).setBackground('#BF8F00');
+/** Trình bày tab license: danh sách Trạng thái, màu tiêu đề (xanh = trạm ghi, vàng = Sao Mai sửa), ẩn cột Mã lần,
+ *  chữ đỏ ô Đã dùng khi hết lượt. */
+function dinhDangBangMay(sh) {
+  var quyTac = SpreadsheetApp.newDataValidation().requireValueInList(['Dùng thử', 'Đã cấp', 'Khoá'], true).setAllowInvalid(false).build();
+  sh.getRange(2, COT.TRANG_THAI, sh.getMaxRows() - 1, 1).setDataValidation(quyTac);
+  sh.getRange(1, 1, 1, COT.DUNG).setBackground('#1F4E79').setFontColor('#FFFFFF');
+  sh.getRange(1, COT.HAN, 1, COT.GHI_CHU - COT.HAN + 1).setBackground('#BF8F00').setFontColor('#FFFFFF');
+  sh.getRange(1, COT.MA_LAN).setBackground('#1F4E79').setFontColor('#FFFFFF');
+  sh.hideColumns(COT.MA_LAN);
+  var vung = sh.getRange(2, COT.DUNG, sh.getMaxRows() - 1, 1);
+  var het = SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=AND($A2<>"",$I2>=IF($J2="",' + HAN_MAC_DINH + ',$J2))').setFontColor('#C00000').setBold(true).setRanges([vung]).build();
+  sh.setConditionalFormatRules([het]);
 }
 
-/** Tab license tạo bởi trạm cũ (16 cột) → thêm tiêu đề + ghi chú cột Q/R (dữ liệu cũ giữ nguyên, ô trống = mặc định). */
-function damBaoCotMucLuc(sh) {
-  if (sh.getMaxColumns() < SO_COT_MAY) sh.insertColumnsAfter(sh.getMaxColumns(), SO_COT_MAY - sh.getMaxColumns());
-  if (String(sh.getRange(1, 17).getValue()) !== '') return;
-  // Định dạng tiêu đề chép từ cột cùng loại của Đếm (I = Đã dùng, K = Hạn mức) để khớp cách trình bày hiện có
-  sh.getRange(1, COT.DUNG_DEM).copyFormatToRange(sh, 17, 17, 1, 1);
-  sh.getRange(1, COT.HAN_DEM).copyFormatToRange(sh, 18, 18, 1, 1);
-  sh.getRange(1, 17, 1, 2).setValues([TIEU_DE.MAY.slice(16, 18)]).setNotes([GHI_CHU.MAY.slice(16, 18)]);
+/**
+ * Bảng license cũ (cột riêng từng chức năng) → bảng hạn mức chung 14 cột. Chạy 1 lần trong khoá trạm ở lời gọi
+ * đầu tiên sau khi deploy: sao tab cũ thành "1_license_cu_<ngày>" (ẩn), cộng đã dùng / hạn mức của 3 chức năng.
+ */
+function chuyenBangCu(sh) {
+  if (String(sh.getRange(1, 10).getValue()).trim() !== TIEU_DE_COT_J_CU) return;
+  var ss = sh.getParent();
+  ss.insertSheet(TAB.MAY + '_cu_' + thoiDiem(new Date()).slice(0, 10), ss.getNumSheets(), { template: sh }).hideSheet();
+  var n = sh.getLastRow() - 1;
+  var cot = Math.max(sh.getLastColumn(), 18);
+  var moi = n > 0 ? sh.getRange(2, 1, n, cot).getValues().filter(function (r) { return String(r[0]).trim() !== ''; }).map(chuyenDongCu) : [];
+  sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).clear().clearNote().clearDataValidations();
+  sh.setConditionalFormatRules([]);
+  sh.showColumns(1, sh.getMaxColumns());
+  if (sh.getMaxColumns() > SO_COT_MAY) sh.deleteColumns(SO_COT_MAY + 1, sh.getMaxColumns() - SO_COT_MAY);
+  TIEU_DE.MAY.forEach(function (t, i) { if (COT_CHU.indexOf(t) >= 0) sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat('@'); });
+  sh.getRange(1, 1, 1, SO_COT_MAY).setValues([TIEU_DE.MAY]).setFontWeight('bold').setNotes([GHI_CHU.MAY]);
+  sh.setFrozenRows(1);
+  if (moi.length) sh.getRange(2, 1, moi.length, SO_COT_MAY).setValues(moi);
+  dinhDangBangMay(sh);
 }
 
 /** Ghi chú tiêu đề tab Ngưỡng trắng từ mô tả app gửi kèm: [Cột, Ý nghĩa, Cách đọc]. */
@@ -107,7 +117,7 @@ function themDong(sh, rows) {
 function khoSheet() {
   var cache = CacheService.getScriptCache();
   var may = bang(TAB.MAY, TIEU_DE.MAY, GHI_CHU.MAY);
-  damBaoCotMucLuc(may);
+  chuyenBangCu(may);
   var hangDoi = bang(TAB.HANG_DOI, TIEU_DE.HANG_DOI, GHI_CHU.HANG_DOI);
   return {
     timMay: function (ma) {
