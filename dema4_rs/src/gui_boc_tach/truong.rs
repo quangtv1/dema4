@@ -36,6 +36,11 @@ fn rong_mac_dinh(bien: &str) -> f32 {
     }
 }
 
+/// Bề rộng mặc định cột bảng Kết quả bóc (thêm cột #).
+pub(crate) fn rong_mac_dinh_kq(bien: &str) -> f32 {
+    if bien == "stt" { 44.0 } else { rong_mac_dinh(bien) }
+}
+
 struct DangThu {
     i_file: usize,
     nhan: Receiver<Result<KetQua, String>>,

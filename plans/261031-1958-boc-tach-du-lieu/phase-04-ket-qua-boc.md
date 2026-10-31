@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Tab Kết quả bóc + chạy hàng loạt + popup xong"
-status: pending
+status: completed
 priority: P1
 dependencies: [3]
 ---
@@ -19,7 +19,8 @@ dependencies: [3]
 ## Kiến trúc
 - `src/gui_boc_tach/ket_qua.rs` (sidebar + chi tiết + bảng đáy), `src/gui_boc_tach/hop_xong.rs`.
 - Trạng thái file `TrangThaiFile { Cho, DangBoc, Xong(KetQua), Loi(String) }` + bản sửa tay; kết quả ghi `jsonl` trong `.sm-dema4/boc_tach/<nguồn>/` sau mỗi file (nguồn sự thật, dựng lại Excel được).
-- License: `bat_dau(ChucNang::BocTach)` khi Bắt đầu / Chạy lại; hoàn lượt khi lỗi trước file đầu (như Sinh mục lục).
+- License: `bat_dau(ChucNang::BocTach)` khi Bắt đầu / Chạy lại; hoàn lượt khi lỗi trước file đầu (như Sinh mục lục). **Dời sang giai đoạn 6** cùng trạm (`TEN_CN` thêm `boc_tach`) — trạm phải triển khai trước app.
+- Đã làm (2026-11-01): `boc_tach/luu.rs` (jsonl, bản ghi sau thắng, chịu dòng ghi dở), `gui_boc_tach/ket_qua.rs`; Mở Excel / Mở GSheet chờ giai đoạn 5; câu "Thông tin bóc tách đã được ghi lại" đã có trong popup, ghi thống kê thật ở giai đoạn 6.
 
 ## Các bước
 1. Sidebar + lọc + thu gọn + kéo cột.

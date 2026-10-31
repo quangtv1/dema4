@@ -8,4 +8,5 @@ pub mod chuan_hoa;
 pub mod doc_json;
 pub mod khoa_cache;
 pub mod loai_tai_lieu;
+pub mod luu;
 pub mod mo_hinh;

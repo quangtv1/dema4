@@ -23,12 +23,12 @@ pub enum ChonChucNang {
 const TIEU_DE: &str = "Hỗ trợ nghiệp vụ số hóa tài liệu";
 const CAO_DAU: f32 = 160.0;
 const CAO_DAY: f32 = 30.0;
-const RONG_O: f32 = 132.0;
-const CAO_O: f32 = 128.0;
+const RONG_O: f32 = 118.0;
+const CAO_O: f32 = 108.0;
 const KHE_O: f32 = 22.0;
-const KHE_HANG: f32 = 18.0;
+const KHE_HANG: f32 = 16.0;
 const O_MOI_HANG: usize = 4;
-const CO_LOGO: f32 = 46.0;
+const CO_LOGO: f32 = 38.0;
 const MAU_NET: Color32 = Color32::from_rgb(0x3C, 0x48, 0x58);
 const NEN_DAU: Color32 = Color32::from_rgb(0xF3, 0xF6, 0xFB);
 const CHAM_DAU: Color32 = Color32::from_rgb(0xD5, 0xDE, 0xEB);
@@ -47,7 +47,7 @@ const CAC_O: [O; 7] = [
     O { cn: ChonChucNang::Dem, logo: Logo::Dem, ten: "Đếm trang A4", tom: "Đếm số trang mọi PDF trong thư mục (cả thư mục con), phân loại khổ A0–A7 và quy đổi ra số trang A4; cảnh báo trang sát ngưỡng, DPI bất thường, file đã ký số.", dang_phat_trien: false },
     O { cn: ChonChucNang::Tach, logo: Logo::Tach, ten: "Tách văn bản", tom: "Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng, gợi ý trang bị xoay; người duyệt nhãn trước khi tách.", dang_phat_trien: false },
     O { cn: ChonChucNang::MucLuc, logo: Logo::MucLuc, ten: "Sinh mục lục", tom: "Sinh mục lục văn bản cho từng hồ sơ từ file biên mục Excel/CSV theo mẫu DOCX của đơn vị; xem trước từng hồ sơ, xuất DOCX hàng loạt.", dang_phat_trien: false },
-    O { cn: ChonChucNang::BocTach, logo: Logo::BocTach, ten: "Bóc tách dữ liệu", tom: "Đọc văn bản PDF bằng AI (máy chủ nội bộ, ChatGPT, Gemini, Claude) để lấy số ký hiệu, ngày, trích yếu, cơ quan ban hành, người ký; ghi ra Excel và Google Sheet. Chức năng đang phát triển.", dang_phat_trien: true },
+    O { cn: ChonChucNang::BocTach, logo: Logo::BocTach, ten: "Bóc tách dữ liệu", tom: "Đọc văn bản PDF bằng AI (máy chủ nội bộ, ChatGPT, Gemini, Claude) để lấy số ký hiệu, ngày, trích yếu, cơ quan ban hành, người ký; ghi ra Excel và Google Sheet.", dang_phat_trien: false },
     O { cn: ChonChucNang::ChuanTen, logo: Logo::ChuanTen, ten: "Chuẩn hoá tên", tom: "Đổi tên hàng loạt file văn bản theo quy tắc thống nhất (số ký hiệu, ngày, loại văn bản… lấy từ kết quả Bóc tách); xem trước trước khi đổi. Chức năng đang phát triển.", dang_phat_trien: true },
     O { cn: ChonChucNang::Ky, logo: Logo::Ky, ten: "Ký văn bản", tom: "Ký số hàng loạt văn bản PDF đã tách bằng chứng thư số của đơn vị, chèn hình chữ ký. Chức năng đang phát triển.", dang_phat_trien: true },
     O { cn: ChonChucNang::Aip, logo: Logo::Aip, ten: "Đóng gói AIP", tom: "Đóng gói hồ sơ lưu trữ thông tin số (AIP): gom văn bản PDF, siêu dữ liệu và mục lục thành gói chuẩn, kiểm tra toàn vẹn. Chức năng đang phát triển.", dang_phat_trien: true },
@@ -83,7 +83,7 @@ impl TrangChu {
             let vung = ui.max_rect();
             let dau = Rect::from_min_size(vung.min, egui::vec2(vung.width(), CAO_DAU));
             dai_dau(ui, dau);
-            let y_o = dau.bottom() + 46.0;
+            let y_o = dau.bottom() + 30.0;
             // Mỗi hàng 4 ô, hàng cuối căn trái thẳng cột hàng trên
             let rong_hang = O_MOI_HANG as f32 * RONG_O + (O_MOI_HANG - 1) as f32 * KHE_O;
             let x0 = vung.center().x - rong_hang / 2.0;
@@ -103,7 +103,7 @@ impl TrangChu {
                     chon = Some(o.cn);
                 }
             }
-            luoi_thong_tin(ui, vung.center().x, y_o + so_hang as f32 * CAO_O + (so_hang - 1) as f32 * KHE_HANG + 44.0, license);
+            luoi_thong_tin(ui, vung.center().x, y_o + so_hang as f32 * CAO_O + (so_hang - 1) as f32 * KHE_HANG + 30.0, license);
             if let Some((r, chu)) = tom {
                 bong_bong(ui, r, chu);
             }
@@ -233,7 +233,7 @@ fn luoi_thong_tin(ui: &egui::Ui, giua: f32, y: f32, license: &crate::license::Ki
         None => "Lượt chạy".into(),
     };
     let muc: [(BieuTuong, String, &str); 6] = [
-        (BieuTuong::ManHinh, "Xử lý ngay trên máy".into(), "File PDF / Excel không tải lên mạng"),
+        (BieuTuong::ManHinh, "Xử lý ngay trên máy".into(), "Riêng Bóc tách gửi ảnh tới mô hình đọc đã chọn"),
         (BieuTuong::Khien, "Giữ nguyên file gốc".into(), "Kết quả ghi ra thư mục riêng"),
         (BieuTuong::DongHo, luot, "Dùng chung mọi chức năng"),
         (BieuTuong::TaiLieu, "Định dạng hỗ trợ".into(), "PDF scan · Excel · CSV · DOCX"),

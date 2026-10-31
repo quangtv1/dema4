@@ -18,6 +18,7 @@ use crate::gui_tach::bieu_tuong::{self as bt, BieuTuong};
 
 pub mod cau_hinh;
 mod hop_loai;
+pub(crate) mod ket_qua;
 mod truong;
 mod xem_pdf;
 
@@ -28,6 +29,7 @@ const RONG_NGUON: f32 = 150.0;
 const RONG_KHOI_PHAI: f32 = 354.0;
 const CAO_TAB: f32 = 30.0;
 const RONG_TAB: f32 = 170.0;
+const CAM: Color32 = Color32::from_rgb(0xB8, 0x5F, 0x00);
 const NUT_TAT: Color32 = Color32::from_rgb(0xB8, 0xB8, 0xB8);
 /// Giây đọc 1 trang khi chưa Thử đọc (ước tính thời gian ở dòng đáy).
 const GIAY_MOI_TRANG: f32 = 3.0;
@@ -79,6 +81,17 @@ pub struct ManBocTach {
     pub mo_cau_hinh: bool,
     /// Bấm link Mô hình đọc / Loại tài liệu ở màn giới thiệu → mở ô chọn tương ứng.
     mo_o: Option<&'static str>,
+    /// Trạng thái từng file (cùng thứ tự `files`).
+    pub(crate) tt: Vec<ket_qua::TrangThai>,
+    pub(crate) chay: Option<ket_qua::DangChay>,
+    pub(crate) kq: ket_qua::TabKetQua,
+    pub(crate) tong_ket: Option<ket_qua::TongKet>,
+    /// Thời gian lần chạy gần nhất (dòng đáy).
+    pub(crate) thoi_gian_chay: Option<Duration>,
+    /// Bấm Bắt đầu / Chạy lại: danh sách file cần chạy (xử lý sau khi vẽ, cần Cấu hình + khoá).
+    yeu_cau_chay: Option<Vec<usize>>,
+    /// Đã chọn sẵn mô hình ★ Mặc định (1 lần mỗi lần mở màn).
+    da_mac_dinh: bool,
 }
 
 impl Default for ManBocTach {
@@ -99,6 +112,13 @@ impl Default for ManBocTach {
             hop: None,
             mo_cau_hinh: false,
             mo_o: None,
+            tt: vec![],
+            chay: None,
+            kq: Default::default(),
+            tong_ket: None,
+            thoi_gian_chay: None,
+            yeu_cau_chay: None,
+            da_mac_dinh: false,
         }
     }
 }
@@ -110,7 +130,7 @@ impl ManBocTach {
     }
 
     pub fn dang_chay(&self) -> bool {
-        false
+        self.chay.is_some()
     }
 
     pub fn loai_chon(&self) -> Option<&LoaiTaiLieu> {
@@ -134,6 +154,7 @@ impl ManBocTach {
     pub fn chon_thu_muc(&mut self, thu_muc: String, ctx: &egui::Context) {
         self.thu_muc = thu_muc;
         self.files.clear();
+        self.tt.clear();
         self.loi_quet = None;
         self.truong.dat_lai_file();
         if self.thu_muc.trim().is_empty() {
@@ -160,6 +181,8 @@ impl ManBocTach {
                         Err(e) => self.loi_quet = Some(e),
                     }
                     self.truong.dat_lai_file();
+                    self.kq.i_xem = 0;
+                    self.nap_ket_qua();
                 }
                 Err(TryRecvError::Empty) => ctx.request_repaint_after(Duration::from_millis(100)),
                 Err(TryRecvError::Disconnected) => self.quet = None,
@@ -200,10 +223,16 @@ impl ManBocTach {
 
     pub fn ve(&mut self, ui: &mut egui::Ui, cfg: &mut CauHinhBocTach, khoa: &BTreeMap<String, String>) -> bool {
         let ctx = ui.ctx().clone();
+        if !std::mem::replace(&mut self.da_mac_dinh, true) {
+            self.ncc = cfg.mac_dinh.filter(|n| cfg.da_cai(*n, khoa.get(n.ma()).map_or("", String::as_str)));
+        }
         self.nhan_nen(&ctx);
+        self.nhan_chay(&ctx);
         let mut cfg_doi = false;
         if !self.gon {
-            cfg_doi |= self.hai_dong_dau_vao(ui, cfg, khoa);
+            // Đang chạy: khoá khối đầu vào (đổi nguồn / loại / mô hình giữa chừng làm sai kết quả)
+            let khoa_vao = self.dang_chay();
+            ui.add_enabled_ui(!khoa_vao, |ui| cfg_doi |= self.hai_dong_dau_vao(ui, cfg, khoa));
             ui.add_space(8.0);
         }
         egui::Panel::bottom("bt_day").frame(egui::Frame::new().fill(NEN).inner_margin(Margin { left: 0, right: 0, top: 8, bottom: 8 })).show(ui, |ui| self.dong_day(ui, cfg));
@@ -216,13 +245,13 @@ impl ManBocTach {
             }
             match self.tab {
                 Tab::Truong => truong::ve(self, ui, cfg, khoa),
-                Tab::KetQua => {
-                    let r = ui.available_rect_before_wrap();
-                    ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "Kết quả bóc: bấm Bắt đầu để đọc các file", egui::FontId::proportional(12.0), CHU_PHU);
-                }
+                Tab::KetQua => ket_qua::ve(self, ui),
             }
         });
-        self.cac_hop(&ctx);
+        if let Some(ds) = self.yeu_cau_chay.take() {
+            self.bat_dau(ds, cfg, khoa, &ctx);
+        }
+        self.cac_hop(&ctx, cfg);
         cfg_doi
     }
 
@@ -273,7 +302,8 @@ impl ManBocTach {
                     .response
                     .labelled_by(nhan.id);
             });
-            let w = rong_giua(ui) - RONG_NGUON - khe;
+            // Bề rộng còn lại đã trừ ô Máy tính → ô đường dẫn kết thúc thẳng ô Mô hình đọc dòng dưới
+            let w = rong_giua(ui);
             let r = ui.add(egui::TextEdit::singleline(&mut self.thu_muc).hint_text("Chọn thư mục PDF (gồm cả thư mục con)").desired_width(w).margin(Margin { left: 8, ..crate::gui::LE_O_CO_NUT_XOA }));
             if !self.thu_muc.is_empty() && crate::gui::nut_xoa_trong_o(ui, r.rect, "Xoá đường dẫn") {
                 self.chon_thu_muc(String::new(), ui.ctx());
@@ -291,7 +321,9 @@ impl ManBocTach {
                 ui.scope(|ui| {
                     kieu_o_chon(ui, Color32::WHITE, VIEN);
                     let hien = self.loai_chon().map_or_else(|| RichText::new("— Chọn loại tài liệu —"), |l| RichText::new(&l.ten));
-                    let ph = egui::ComboBox::from_id_salt("bt_loai").icon(mui_ten_chon).width(RONG_KHOI_PHAI - 92.0).selected_text(hien).show_ui(ui, |ui| {
+                    // Nhãn "Loại tài liệu" thẳng cột "Ghi ra" dòng dưới: ô chọn lấy hết phần còn lại của khối phải
+                    let rong_nhan = ui.fonts_mut(|f| f.layout_no_wrap("Loại tài liệu".into(), egui::FontId::proportional(13.0), CHU).size().x);
+                    let ph = egui::ComboBox::from_id_salt("bt_loai").icon(mui_ten_chon).width(RONG_KHOI_PHAI - rong_nhan - ui.spacing().item_spacing.x - 4.0).selected_text(hien).show_ui(ui, |ui| {
                         for (i, l) in self.ds_loai.iter().enumerate() {
                             if ui.selectable_label(self.loai == Some(i), &l.ten).clicked() {
                                 chon = Some(i);
@@ -309,6 +341,7 @@ impl ManBocTach {
                     self.loai = Some(i);
                     self.truong.chon = 0;
                     self.truong.bo_ket_qua_thu();
+                    self.nap_ket_qua();
                 }
             });
         });
@@ -324,7 +357,8 @@ impl ManBocTach {
             let o = ui.scope(|ui| {
                 kieu_o_chon(ui, Color32::WHITE, VIEN);
                 let hien = self.ncc.map_or_else(|| RichText::new("— Chọn mô hình đọc —"), |n| RichText::new(cau_hinh::ten_mo_hinh(cfg, n)));
-                let ph = egui::ComboBox::from_id_salt("bt_mo_hinh").icon(mui_ten_chon).width(w - 1.0).selected_text(hien).show_ui(ui, |ui| {
+                // ComboBox vẽ hẹp hơn ô chữ cùng tham số ~2 px (đo trên ảnh chụp) → bù để thẳng ô đường dẫn dòng trên
+                let ph = egui::ComboBox::from_id_salt("bt_mo_hinh").icon(mui_ten_chon).width(w + 1.0).selected_text(hien).show_ui(ui, |ui| {
                     for n in &ds {
                         if ui.selectable_label(self.ncc == Some(*n), cau_hinh::ten_mo_hinh(cfg, *n)).clicked() {
                             chon = Some(*n);
@@ -428,6 +462,20 @@ impl ManBocTach {
                 self.tab = *tab;
             }
         }
+        // Cảnh báo đầu khung: file lỗi / thiếu trường bắt buộc — bấm lọc file lỗi
+        if let Some(cb) = self.canh_bao().filter(|_| san) {
+            let x_trai = rect.left() + 2.0 * RONG_TAB + 20.0;
+            let mut job = egui::text::LayoutJob::single_section(cb.clone(), egui::TextFormat { font_id: egui::FontId::proportional(12.0), color: CAM, ..Default::default() });
+            job.wrap = egui::text::TextWrapping::truncate_at_width((rect.right() - 44.0 - x_trai).max(20.0));
+            let g = ui.fonts_mut(|f| f.layout_job(job));
+            let r = Rect::from_min_size(egui::pos2(rect.right() - 40.0 - g.size().x, rect.center().y - g.size().y / 2.0), g.size());
+            ui.painter().galley(r.min, g, CAM);
+            let ph = ui.interact(r, ui.scope_id().with("bt_canh_bao"), Sense::click()).on_hover_text(&cb);
+            if ph.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() && cb.contains("lỗi") {
+                self.tab = Tab::KetQua;
+                self.kq.loc = "lỗi".into();
+            }
+        }
         // Thu gọn / mở khối đầu vào
         let o = Rect::from_center_size(egui::pos2(rect.right() - 18.0, rect.center().y), egui::vec2(24.0, 24.0));
         let ph = ui.interact(o, ui.scope_id().with("bt_gon"), Sense::click());
@@ -447,7 +495,8 @@ impl ManBocTach {
         ui.horizontal(|ui| {
             let (thuong, dam) = (crate::gui_tach::chu_dong(CHU_PHU, false), crate::gui_tach::chu_dong(CHU, true));
             let mut job = egui::text::LayoutJob::default();
-            if self.quet.is_some() {
+            if self.dong_trang_thai(&mut job) {
+            } else if self.quet.is_some() {
                 job.append("Đang tìm file PDF…", 0.0, thuong.clone());
             } else if let Some(e) = &self.loi_quet {
                 job.append(e, 0.0, crate::gui_tach::chu_dong(DO, false));
@@ -474,14 +523,39 @@ impl ManBocTach {
                 ui.label(job);
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if let Some(c) = &self.chay {
+                    let dung = c.dung.load(std::sync::atomic::Ordering::Relaxed);
+                    if ui.add_enabled(!dung, nut_mau(if dung { "Đang dừng…" } else { "Dừng" }, DO).min_size(egui::vec2(130.0, 28.0))).on_hover_text("Dừng sau file đang đọc").clicked() {
+                        c.dung.store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    return;
+                }
                 let bat = self.san_sang();
-                let goi_y = if bat { "Đọc mọi file PDF trong thư mục" } else { "Chọn nguồn văn bản, mô hình đọc và loại tài liệu trước" };
-                ui.add_enabled(bat, nut_mau("Bắt đầu", if bat { XANH_LA } else { NUT_TAT }).min_size(egui::vec2(130.0, 28.0))).on_hover_text(goi_y).on_disabled_hover_text(goi_y);
+                let da_chay = self.tt.iter().any(|t| !matches!(t, ket_qua::TrangThai::Cho));
+                let hien = if bat { self.hien() } else { vec![] };
+                let loc = !self.kq.loc.trim().is_empty();
+                let chu = if loc { format!("Chạy lại ({})", hien.len()) } else if da_chay { "Chạy lại".into() } else { "Bắt đầu".into() };
+                let bat = bat && !hien.is_empty();
+                let goi_y = if !self.san_sang() { "Chọn nguồn văn bản, mô hình đọc và loại tài liệu trước".to_string() } else if loc { format!("Đọc lại {} file đang hiện theo bộ lọc", hien.len()) } else { "Đọc mọi file PDF trong thư mục".into() };
+                if ui.add_enabled(bat, nut_mau(&chu, if bat { XANH_LA } else { NUT_TAT }).min_size(egui::vec2(130.0, 28.0))).on_hover_text(&goi_y).on_disabled_hover_text(&goi_y).clicked() {
+                    self.yeu_cau_chay = Some(hien);
+                }
             });
         });
     }
 
-    fn cac_hop(&mut self, ctx: &egui::Context) {
+    fn cac_hop(&mut self, ctx: &egui::Context, cfg: &CauHinhBocTach) {
+        if let Some(t) = &self.tong_ket {
+            match ket_qua::ve_tong_ket(ctx, t, &cfg.sheet_link) {
+                Some(true) => {
+                    self.tong_ket = None;
+                    self.tab = Tab::KetQua;
+                    self.kq.loc = "lỗi".into();
+                }
+                Some(false) => self.tong_ket = None,
+                None => {}
+            }
+        }
         let Some(hop) = &mut self.hop else { return };
         let mut dong = false;
         let mut sau: Option<Hop> = None;
@@ -501,6 +575,7 @@ impl ManBocTach {
                     self.ds_loai[b.chi_so] = b.ket_qua();
                     let _ = loai_tai_lieu::ghi(&loai_tai_lieu::file_mac_dinh(), &self.ds_loai);
                     self.truong.bo_ket_qua_thu();
+                    self.nap_ket_qua();
                     dong = true;
                 }
                 hop_loai::HanhDong::Xoa => sau = Some(Hop::XacNhanXoa(b.clone())),

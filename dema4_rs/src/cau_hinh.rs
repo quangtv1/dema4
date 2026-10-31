@@ -143,7 +143,7 @@ pub const TOKEN_KHOANG: (u32, u32) = (256, 16384);
 pub struct CauHinhBocTach {
     /// Theo thứ tự `NhaCungCap::TAT_CA`.
     pub mo_hinh: [MoHinhBocTach; 5],
-    /// ★ Mặc định: đứng đầu danh sách Mô hình đọc ở màn chính.
+    /// ★ Mặc định: chọn sẵn và đứng đầu danh sách Mô hình đọc ở màn Bóc tách.
     pub mac_dinh: Option<NhaCungCap>,
     pub dpi: u32,
     pub canh_toi_da: u32,

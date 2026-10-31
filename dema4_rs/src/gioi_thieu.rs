@@ -183,15 +183,25 @@ pub fn ve_trang_thai(ui: &mut egui::Ui, gt: &GioiThieu, noi_bat: Option<usize>, 
         });
         // 3 thẻ bước, căn giữa theo bề rộng
         let rong_hang = 3.0 * RONG_THE + 2.0 * KHE_THE;
+        // 3 thẻ cao bằng nhau: lấy chiều cao thẻ cao nhất của khung hình trước
+        let id_cao = egui::Id::unique("gt_cao_the").with(gt.tieu_de);
+        let cao = ui.ctx().data(|d| d.get_temp::<f32>(id_cao)).unwrap_or(CAO_THE);
+        let mut cao_moi = CAO_THE;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = KHE_THE;
             ui.add_space(((ui.available_width() - rong_hang) / 2.0).max(0.0));
             for (i, b) in gt.buoc.iter().enumerate() {
-                if let Some(x) = the_buoc(ui, i + 1, b, noi_bat == Some(i + 1), xong[i]) {
-                    bam = Some(x);
+                let (x, h) = the_buoc(ui, i + 1, b, noi_bat == Some(i + 1), xong[i], cao);
+                cao_moi = cao_moi.max(h);
+                if x.is_some() {
+                    bam = x;
                 }
             }
         });
+        if (cao_moi - cao).abs() > 0.5 {
+            ui.ctx().data_mut(|d| d.insert_temp(id_cao, cao_moi));
+            ui.ctx().request_repaint();
+        }
         if gt.kho {
             ui.add_space(14.0);
             ui.horizontal(|ui| {
@@ -223,14 +233,17 @@ fn nhan_dang_phat_trien(p: &egui::Painter, tam: egui::Pos2) {
 }
 
 /// 1 thẻ bước: ô số xám, tên đậm, thân chữ (có thể chứa link). `noi` = bước cần làm tiếp: viền xanh, ô số xanh.
-fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool, xong: bool) -> Option<Bam> {
+/// Trả (link vừa bấm, chiều cao nội dung thẻ) — `cao_min` = chiều cao chung của hàng thẻ.
+fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool, xong: bool, cao_min: f32) -> (Option<Bam>, f32) {
     let mut bam = None;
+    let mut cao_noi_dung = CAO_THE;
     let khung = egui::Frame::new().fill(Color32::WHITE).stroke(if noi { Stroke::new(1.5, XANH_COBALT) } else { Stroke::new(1.0, VIEN) }).inner_margin(Margin { left: 10, right: 10, top: 10, bottom: 12 });
     let r = khung.show(ui, |ui| {
         // Thẻ nằm trong hàng ngang: nội dung bên trong phải xếp dọc
         ui.vertical(|ui| {
+        let tren = ui.cursor().top();
         ui.set_width(RONG_THE - 22.0);
-        ui.set_min_height(CAO_THE);
+        ui.set_min_height(cao_min);
         ui.spacing_mut().item_spacing.y = 0.0;
         let (o, _) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), Sense::hover());
         let (nen, vien, chu) = if xong { (crate::gui::XANH_LA, crate::gui::XANH_LA, Color32::WHITE) } else if noi { (XANH_COBALT, XANH_COBALT, Color32::WHITE) } else { (NEN, VIEN, CHU_PHU) };
@@ -263,12 +276,13 @@ fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool, xong: bool) -> Op
                 }
             }
         });
+        cao_noi_dung = ui.cursor().top() - tren;
         });
     });
     // Vạch xanh mảnh mép trên thẻ
     let rect = r.response.rect;
     ui.painter().rect_filled(Rect::from_min_size(rect.min, egui::vec2(rect.width(), if noi { 3.0 } else { 2.0 })), 0.0, XANH_COBALT);
-    bam
+    (bam, cao_noi_dung)
 }
 
 /// Cờ "về Trang chủ" (bấm logo góc dưới phải) — cửa sổ chính đọc và xoá sau mỗi khung hình.
