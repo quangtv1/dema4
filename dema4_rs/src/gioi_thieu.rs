@@ -1,5 +1,5 @@
 //! Màn mở mặc định (chưa có dữ liệu) của Đếm trang A4 / Tách văn bản / Sinh mục lục / Ký văn bản: tên chức năng, mô tả ngắn,
-//! 3 bước trong 3 thẻ vuông (vạch xanh mảnh mép trên, số thứ tự ô xám); logo nhỏ góc dưới phải mở saomaiso.com.
+//! 3 bước trong 3 thẻ vuông (vạch xanh mảnh mép trên, số thứ tự ô xám); logo nhỏ góc dưới phải về Trang chủ.
 //! Link trong lời giới thiệu ("Chọn", "Phân tích") trả về `Bam` để màn gọi đúng việc như bấm nút.
 
 use eframe::egui::{self, Align, Color32, Margin, Rect, RichText, Sense, Stroke, StrokeKind};
@@ -95,7 +95,6 @@ const RONG_THE: f32 = 160.0;
 const KHE_THE: f32 = 14.0;
 const CAO_THE: f32 = 96.0;
 const RONG_LOGO: f32 = 64.0;
-pub const WEB: &str = "https://saomaiso.com";
 
 /// Vẽ vào vùng còn trống của `ui`; trả link vừa bấm (nếu có).
 pub fn ve(ui: &mut egui::Ui, gt: &GioiThieu) -> Option<Bam> {
@@ -214,7 +213,12 @@ fn the_buoc(ui: &mut egui::Ui, so: usize, b: &Buoc, noi: bool) -> Option<Bam> {
     bam
 }
 
-/// Logo Sao Mai góc dưới phải vùng trống; bấm mở website.
+/// Cờ "về Trang chủ" (bấm logo góc dưới phải) — cửa sổ chính đọc và xoá sau mỗi khung hình.
+pub fn id_ve_trang_chu() -> egui::Id {
+    egui::Id::unique("gioi_thieu_ve_trang_chu")
+}
+
+/// Logo Sao Mai góc dưới phải vùng trống; bấm về Trang chủ.
 fn logo_goc(ui: &mut egui::Ui, vung: Rect) {
     let tex = crate::tro_giup::logo(ui.ctx());
     let [w, h] = tex.size();
@@ -224,8 +228,10 @@ fn logo_goc(ui: &mut egui::Ui, vung: Rect) {
         return; // vùng quá thấp (cửa sổ nhỏ): không đè logo lên nội dung
     }
     let anh = egui::Image::from_texture(egui::load::SizedTexture::new(tex.id(), kich)).sense(Sense::click());
-    let ph = ui.put(r, anh).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("saomaiso.com");
+    let ph = ui.put(r, anh);
+    ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, true, "Trang chủ"));
+    let ph = ph.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Trang chủ");
     if ph.clicked() {
-        ui.ctx().open_url(egui::OpenUrl::new_tab(WEB));
+        ui.ctx().data_mut(|d| d.insert_temp(id_ve_trang_chu(), true));
     }
 }

@@ -23,13 +23,18 @@ fn trang(p: &egui::Painter, r: Rect, gap: f32, net: Stroke) {
     p.add(Shape::line(vec![egui::pos2(r.right() - gap, r.top()), egui::pos2(r.right() - gap, r.top() + gap), egui::pos2(r.right(), r.top() + gap)], net));
 }
 
-/// Vẽ logo vào ô vuông `o`.
+/// Vẽ logo vào ô vuông `o` (màu nét chung).
 pub fn ve(p: &egui::Painter, o: Rect, logo: Logo) {
+    ve_mau(p, o, logo, MAU);
+}
+
+/// Như `ve`, màu nét tuỳ chọn (Trang chủ: rê chuột → xanh, chức năng chưa dùng được → mờ).
+pub fn ve_mau(p: &egui::Painter, o: Rect, logo: Logo, mau: Color32) {
     let s = o.width();
     let q = |x: f32, y: f32| -> Pos2 { egui::pos2(o.left() + x * s, o.top() + y * s) };
     let hcn = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(q(x0, y0), q(x1, y1));
-    let net = Stroke::new((s * 0.03).max(1.5), MAU);
-    let net_manh = Stroke::new((s * 0.022).max(1.2), MAU);
+    let net = Stroke::new((s * 0.03).max(1.5), mau);
+    let net_manh = Stroke::new((s * 0.022).max(1.2), mau);
     let dam = |co: f32| egui::FontId::new(s * co, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into()));
     match logo {
         Logo::Dem => {
@@ -40,7 +45,7 @@ pub fn ve(p: &egui::Painter, o: Rect, logo: Logo) {
                 p.add(Shape::line(vec![q(l + d, t - 0.07 * (k - 1) as f32), q(l + d, t - d), q(r + d, t - d), q(r + d, b - d), q(r + d - 0.07, b - d)], net_manh));
             }
             trang(p, hcn(l, t, r, b), s * 0.11, net);
-            p.text(q((l + r) / 2.0, 0.62), egui::Align2::CENTER_CENTER, "A4", dam(0.19), MAU);
+            p.text(q((l + r) / 2.0, 0.62), egui::Align2::CENTER_CENTER, "A4", dam(0.19), mau);
         }
         Logo::Tach => {
             // Một văn bản bên trái → mũi tên rẽ nhánh chữ Y → hai văn bản nhỏ bên phải
@@ -71,10 +76,10 @@ pub fn ve(p: &egui::Painter, o: Rect, logo: Logo) {
             for (i, y) in [0.42, 0.57, 0.72].into_iter().enumerate() {
                 let o_so = Rect::from_center_size(q(0.34, y), egui::vec2(s * 0.11, s * 0.11));
                 p.rect_stroke(o_so, 1.5, net_manh, egui::StrokeKind::Middle);
-                p.text(o_so.center(), egui::Align2::CENTER_CENTER, (i + 1).to_string(), dam(0.075), MAU);
+                p.text(o_so.center(), egui::Align2::CENTER_CENTER, (i + 1).to_string(), dam(0.075), mau);
                 p.line_segment([q(0.44, y), q(0.57, y)], net_manh);
                 for k in 0..3 {
-                    p.circle_filled(q(0.61 + k as f32 * 0.035, y), s * 0.009, MAU);
+                    p.circle_filled(q(0.61 + k as f32 * 0.035, y), s * 0.009, mau);
                 }
             }
         }

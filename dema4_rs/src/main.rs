@@ -26,6 +26,7 @@ mod gui_tach;
 mod tach_vb;
 mod telegram;
 mod tro_giup;
+mod trang_chu;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;

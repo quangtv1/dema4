@@ -57,6 +57,7 @@ pub fn chay() -> eframe::Result {
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum Man {
+    TrangChu,
     Dem,
     Tach,
     MucLuc,
@@ -66,6 +67,7 @@ enum Man {
 impl Man {
     fn tieu_de(self) -> &'static str {
         match self {
+            Man::TrangChu => "sm-dema4 (Giải pháp số Sao Mai)",
             Man::Dem => TIEU_DE,
             Man::Tach => "Tách văn bản PDF (Giải pháp số Sao Mai)",
             Man::MucLuc => crate::gui_muc_luc::TIEU_DE,
@@ -81,6 +83,7 @@ struct UngDungChinh {
     dem: UngDung,
     tach: crate::gui_tach::ManTach,
     muc_luc: crate::gui_muc_luc::ManMucLuc,
+    trang_chu: crate::trang_chu::TrangChu,
     cfg: crate::cau_hinh::CauHinh,
     hop_cau_hinh: Option<crate::gui_tach::hop_cau_hinh::HopCauHinh>,
     tro_giup: Option<crate::tro_giup::HopTroGiup>,
@@ -99,7 +102,8 @@ impl Default for UngDungChinh {
         tach.license = dem.license.clone();
         let mut muc_luc = crate::gui_muc_luc::ManMucLuc::moi(&cfg.muc_luc);
         muc_luc.license = dem.license.clone();
-        Self { man: Man::Dem, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
+        // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, trang_chu: Default::default(), cfg, hop_cau_hinh: None, tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
     }
 }
 
@@ -192,6 +196,14 @@ impl UngDungChinh {
         }
     }
 
+    /// Đổi màn. Sang Sinh mục lục từ màn khác: mở như lần đầu (không giữ file / mẫu cũ).
+    fn chuyen_man(&mut self, man: Man) {
+        if man == Man::MucLuc && self.man != Man::MucLuc {
+            self.muc_luc.dat_lai();
+        }
+        self.man = man;
+    }
+
     fn dang_chay(&self) -> bool {
         self.dem.dang_dem.is_some() || self.tach.dang_chay() || self.muc_luc.dang_chay()
     }
@@ -218,13 +230,9 @@ impl UngDungChinh {
                 ui.add_enabled_ui(!khoa, |ui| {
                     egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::MenuLuoi, 14.0, xam), "Chức năng", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
-                        for (man, ten, icon) in [(Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
+                        for (man, ten, icon) in [(Man::TrangChu, "Trang chủ", BieuTuong::TrangChu), (Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::Ky, "Ký văn bản", BieuTuong::But)] {
                             if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
-                                // Sang Sinh mục lục từ chức năng khác: mở như lần đầu (không giữ file / mẫu cũ)
-                                if man == Man::MucLuc && self.man != Man::MucLuc {
-                                    self.muc_luc.dat_lai();
-                                }
-                                self.man = man;
+                                self.chuyen_man(man);
                                 ui.close();
                             }
                         }
@@ -293,6 +301,17 @@ impl eframe::App for UngDungChinh {
         }
         self.thanh_menu(ui);
         match self.man {
+            Man::TrangChu => {
+                use crate::trang_chu::ChonChucNang;
+                if let Some(cn) = self.trang_chu.ve(ui, &self.dem.license) {
+                    self.chuyen_man(match cn {
+                        ChonChucNang::Dem => Man::Dem,
+                        ChonChucNang::Tach => Man::Tach,
+                        ChonChucNang::MucLuc => Man::MucLuc,
+                        ChonChucNang::Ky => Man::Ky,
+                    });
+                }
+            }
             Man::Dem => self.dem.ve(ui),
             Man::Tach => {
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN).inner_margin(Margin { left: 12, right: 12, top: 8, bottom: 0 })).show(ui, |ui| self.tach.ve(ui, &mut self.cfg));
@@ -313,6 +332,10 @@ impl eframe::App for UngDungChinh {
                     crate::gioi_thieu::ve(ui, &crate::gioi_thieu::KY);
                 });
             }
+        }
+        // Bấm logo Sao Mai góc dưới phải màn giới thiệu → về Trang chủ (không đổi màn khi đang chạy)
+        if ctx.data_mut(|d| d.remove_temp::<bool>(crate::gioi_thieu::id_ve_trang_chu())).unwrap_or(false) && !self.dang_chay() {
+            self.chuyen_man(Man::TrangChu);
         }
         if self.tro_giup.as_mut().is_some_and(|h| h.ve(&ctx)) {
             self.tro_giup = None;
@@ -353,7 +376,7 @@ impl ChuDam for RichText {
 }
 
 /// Tông xám, font hệ thống có dấu tiếng Việt; áp cho cả chế độ sáng và tối của hệ điều hành
-fn cai_giao_dien(ctx: &egui::Context) {
+pub(crate) fn cai_giao_dien(ctx: &egui::Context) {
     // Ưu tiên Arial trên mọi hệ điều hành
     const FONT_THUONG: [&str; 5] = [
         r"C:\Windows\Fonts\arial.ttf",
@@ -2076,13 +2099,32 @@ mod tests {
     }
 
     /// Chụp màn Sinh mục lục (fixture trong repo): mở đầu, tab Mẫu, đang sửa nguồn, tab Kết quả, popup đã sinh.
+    /// Mở app vào Trang chủ; bấm ô chức năng vào màn đó; bấm logo góc dưới phải màn giới thiệu → về Trang chủ.
+    #[test]
+    fn trang_chu_mo_mac_dinh_va_logo_goc_ve_trang_chu() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).build_eframe(|cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            UngDungChinh { cfg: crate::cau_hinh::CauHinh::default(), muc_luc: crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()), ..Default::default() }
+        });
+        h.run();
+        assert_eq!(h.state().man, Man::TrangChu);
+        h.get_by_label("Ký văn bản").click();
+        h.run();
+        assert_eq!(h.state().man, Man::Ky);
+        h.get_by_label("Trang chủ").click();
+        h.run();
+        h.run();
+        assert_eq!(h.state().man, Man::TrangChu, "logo góc dưới phải → Trang chủ");
+    }
+
     /// Màn giới thiệu 4 chức năng (logo lớn trên tiêu đề).
     /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_gioi_thieu
     #[test]
     #[ignore = "cần GPU"]
     fn chup_gioi_thieu() {
         let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
-        for (man, ten) in [(Man::Dem, "gt_dem.png"), (Man::Tach, "gt_tach.png"), (Man::MucLuc, "gt_muc_luc.png"), (Man::Ky, "gt_ky.png")] {
+        for (man, ten) in [(Man::TrangChu, "gt_trang_chu.png"), (Man::Dem, "gt_dem.png"), (Man::Tach, "gt_tach.png"), (Man::MucLuc, "gt_muc_luc.png"), (Man::Ky, "gt_ky.png")] {
             let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
                 cai_giao_dien(&cc.egui_ctx);
                 UngDungChinh { man, cfg: crate::cau_hinh::CauHinh::default(), muc_luc: crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()), ..Default::default() }

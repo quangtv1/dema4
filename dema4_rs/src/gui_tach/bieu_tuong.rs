@@ -60,6 +60,12 @@ pub enum BieuTuong {
     ChonTat,
     BoChon,
     KhoiPhuc,
+    /// Trang chủ: mục menu (nhà) + lưới thông tin (màn hình, khiên, đồng hồ, cửa sổ lệnh)
+    TrangChu,
+    ManHinh,
+    Khien,
+    DongHo,
+    DongLenh,
 }
 
 /// (path SVG, cạnh viewBox, độ dày nét) — chép nguyên từ prototype.
@@ -109,14 +115,20 @@ fn svg_cua(bt: BieuTuong) -> Option<(&'static str, u8, f32)> {
         ChonTat => (r#"<rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8.2 7 10.2 11 5.8"/>"#, 16, 1.3),
         BoChon => (r#"<rect x="2" y="2" width="12" height="12" rx="2"/>"#, 16, 1.3),
         KhoiPhuc => (r#"<path d="M2.5 3v3.5H6"/><path d="M2.8 6.5A5.5 5.5 0 1 1 3 10"/>"#, 16, 1.3),
+        TrangChu => (r#"<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>"#, 24, 1.8),
+        ManHinh => (r#"<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/>"#, 24, 1.5),
+        Khien => (r#"<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>"#, 24, 1.5),
+        DongHo => (r#"<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>"#, 24, 1.5),
+        DongLenh => (r#"<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7 9l3 3-3 3M12 15h5"/>"#, 24, 1.5),
     })
 }
 
-const TAT_CA: [BieuTuong; 44] = {
+const TAT_CA: [BieuTuong; 49] = {
     use BieuTuong::*;
     [
         Dau, MuiTenXuong, HoanTac, LamLai, XoayPhai, Xoay180, ThongTin, CapNhat, HoiDap, TaiLieu, Keo, But, TraiChevron, PhaiChevron, Luoi, MotTrang, HaiTrang, BoKhoi, Dong, ChevronXuong, KinhTru, KinhCong, SapXep, MenuLuoi,
         BanhRang, ChongTrang, MaVach, TrangTrong, TrangHoi, XoayMenu, DanhSachSo, TangDan, GiamDan, ThungRac, TrangGach, ThuGon, MoRong, KinhLup, AnDong, HienDong, BoNhan, ChonTat, BoChon, KhoiPhuc,
+        TrangChu, ManHinh, Khien, DongHo, DongLenh,
     ]
 };
 

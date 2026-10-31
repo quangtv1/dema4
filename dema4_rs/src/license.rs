@@ -447,6 +447,19 @@ impl KiemTra {
         &self.chung.ma
     }
 
+    pub fn ten_pc(&self) -> &str {
+        &self.chung.ten
+    }
+
+    pub fn mac(&self) -> &str {
+        &self.chung.mac
+    }
+
+    /// (đã dùng, hạn mức) theo trả lời ký gần nhất của trạm (không đọc đĩa — gọi được mỗi khung hình); chưa có → None.
+    pub fn luot(&self) -> Option<(u32, u32)> {
+        self.chung.da_ky.lock().unwrap().map(|m| (m.da_dung, m.han))
+    }
+
     fn gui(&self, v: Viec) {
         let _ = self.viec.lock().unwrap().send(v);
     }
