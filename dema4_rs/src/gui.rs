@@ -2225,6 +2225,17 @@ mod tests {
         h.state_mut().muc_luc.dat_mau_thu("1");
         h.run_steps(3);
         h.render().unwrap().save(thu_muc_anh.join("ml_11_chi_mau.png")).unwrap();
+        // Mẫu 04 – Vĩnh Phúc: tab Mẫu và tab Kết quả sau khi ghép biến (ảnh README)
+        let mut h = tao(true);
+        // Dữ liệu minh hoạ tổng hợp (đủ cột cho mọi biến của mẫu 04), đường dẫn hiển thị trung tính
+        h.state_mut().muc_luc.nap_thu(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests_data/muc_luc/bien_muc_minh_hoa.xlsx"), "Bien muc", 1);
+        h.state_mut().muc_luc.file = r"D:\SoHoa\Bien_muc\Bien_muc_tong_hop.xlsx".into();
+        h.state_mut().muc_luc.dat_mau_thu("4");
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_12_mau04_mau.png")).unwrap();
+        h.state_mut().muc_luc.tab = crate::gui_muc_luc::Tab::KetQua;
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("ml_13_mau04_ket_qua.png")).unwrap();
         let _ = std::fs::remove_file(&rieng);
         let _ = std::fs::remove_file(&sai);
     }

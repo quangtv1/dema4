@@ -52,6 +52,12 @@ Nhãn, cache và log nằm trong thư mục ẩn `.sm-dema4/` cạnh file chạy
 
 ![Sinh mục lục: tab Kết quả](docs/anh/muc-luc-ket-qua.png)
 
+Ví dụ **Mẫu 04 – Vĩnh Phúc** với file biên mục có đủ cột (Số hồ sơ, Tên hồ sơ, STT, Số ký hiệu, Ngày tháng, Trích yếu, Tác giả, Tờ số, Ghi chú): 11/11 biến tự ghép, tab Kết quả ra mục lục từng hồ sơ.
+
+![Mẫu 04 – Vĩnh Phúc: tab Mẫu đã ghép đủ biến](docs/anh/muc-luc-mau-04-mau.png)
+
+![Mẫu 04 – Vĩnh Phúc: tab Kết quả](docs/anh/muc-luc-mau-04-ket-qua.png)
+
 ## Cấu hình
 
 Menu **Cấu hình** (3 tab Đếm trang A4 / Tách PDF / Sinh mục lục), lưu ở file ẩn `.dema4_saomai.cfg` cạnh file chạy.
