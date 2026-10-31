@@ -84,7 +84,7 @@ pub const KY: GioiThieu = GioiThieu {
 };
 
 const RONG_MO_TA: f32 = 560.0;
-const KICH_LOGO: f32 = 76.0;
+const KICH_LOGO: f32 = 68.0;
 const RONG_THE: f32 = 160.0;
 const KHE_THE: f32 = 14.0;
 const CAO_THE: f32 = 96.0;
