@@ -48,10 +48,6 @@ Nhãn, cache và log nằm trong thư mục ẩn `.sm-dema4/` cạnh file chạy
 4. **Tab Kết quả**: xem trước mục lục từng hồ sơ.
 5. **Sinh mục lục** → mỗi hồ sơ một file DOCX (tên mặc định `MLHS_{so_ho_so}`).
 
-![Sinh mục lục: tab Mẫu](docs/anh/muc-luc-mau.png)
-
-![Sinh mục lục: tab Kết quả](docs/anh/muc-luc-ket-qua.png)
-
 Ví dụ **Mẫu 04 – Vĩnh Phúc** với file biên mục có đủ cột (Số hồ sơ, Tên hồ sơ, STT, Số ký hiệu, Ngày tháng, Trích yếu, Tác giả, Tờ số, Ghi chú): 11/11 biến tự ghép, tab Kết quả ra mục lục từng hồ sơ.
 
 ![Mẫu 04 – Vĩnh Phúc: tab Mẫu đã ghép đủ biến](docs/anh/muc-luc-mau-04-mau.png)
