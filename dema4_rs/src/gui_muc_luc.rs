@@ -738,11 +738,12 @@ impl ManMucLuc {
             let mut xoa_mau = false;
             // Mẫu riêng: hiện đường dẫn đầy đủ (dài thì cắt bớt đầu, giữ tên file) + ⓧ; mẫu có sẵn: tên + link "Lưu mẫu"
             let rieng = !self.mau_chon.is_empty() && self.mau_chon.parse::<usize>().is_err();
-            let hien = if rieng { rut_gon_trai(ui, &self.mau_chon, w - 64.0) } else { ten_mau(&self.mau_chon) };
+            let hien = if rieng { rut_gon_trai(ui, &self.mau_chon, w - 44.0) } else { ten_mau(&self.mau_chon) };
             ui.add_enabled_ui(!khoa, |ui| {
                 kieu_o_chon(ui, Color32::WHITE, VIEN);
                 // ComboBox vẽ rộng hơn ô chữ cùng tham số 1 px (đo trên ảnh chụp ở nhiều cỡ) → trừ để thẳng ô đường dẫn dòng trên
-                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(mui_ten_chon).width(w - 1.0).selected_text(hien).show_ui(ui, |ui| {
+                // Không vẽ mũi tên (bấm cả ô vẫn mở danh sách); đuôi ô dành cho "Lưu mẫu" + ⓧ
+                let ph = egui::ComboBox::from_id_salt("ml_mau").icon(|_, _, _, _| {}).width(w - 1.0).selected_text(hien).show_ui(ui, |ui| {
                     for (i, (ten, _)) in mau::MAU_CO_SAN.iter().enumerate() {
                         let ma = (i + 1).to_string();
                         if ui.selectable_label(self.mau_chon == ma, *ten).clicked() {
@@ -762,14 +763,14 @@ impl ManMucLuc {
                     return;
                 }
                 // ⓧ bỏ mẫu (mọi mẫu) ngay trước mũi tên; mẫu có sẵn thêm link "Lưu mẫu" bên trái ⓧ
-                xoa_mau = !khoa && crate::gui::nut_xoa_tai(ui, egui::pos2(o.right() - 34.0, o.center().y), "Bỏ mẫu");
+                xoa_mau = !khoa && crate::gui::nut_xoa_trong_o(ui, o, "Bỏ mẫu");
                 if rieng {
                     return;
                 }
                 // Link "Lưu mẫu": chữ xám, rê chuột → đen + gạch chân
                 let f = egui::FontId::proportional(12.0);
                 let rong_chu = ui.fonts_mut(|x| x.layout_no_wrap("Lưu mẫu".into(), f.clone(), CHU).size().x);
-                let r = Rect::from_center_size(egui::pos2(o.right() - 52.0 - rong_chu / 2.0, o.center().y), egui::vec2(rong_chu + 8.0, 18.0));
+                let r = Rect::from_center_size(egui::pos2(o.right() - 32.0 - rong_chu / 2.0, o.center().y), egui::vec2(rong_chu + 8.0, 18.0));
                 let link = ui.interact(r, ui.scope_id().with("ml_luu_mau"), if khoa { Sense::hover() } else { Sense::click() });
                 link.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, !khoa, "Lưu mẫu"));
                 let re = link.hovered() && !khoa;
