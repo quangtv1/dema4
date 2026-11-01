@@ -1256,10 +1256,15 @@ impl UngDung {
                     ui.allocate_ui_with_layout(ui.available_size(), Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
                         ui.label(RichText::new(chu).color(CHU_PHU));
                     });
-                } else if crate::gioi_thieu::ve(ui, &crate::gioi_thieu::DEM) == Some(crate::gioi_thieu::Bam::Chon) {
-                    // Link "Chọn" trong giới thiệu = nút Chọn
-                    if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục chứa PDF").pick_folder() {
-                        self.chon_thu_muc(p.display().to_string(), ui.ctx());
+                } else {
+                    let bam = crate::gioi_thieu::ve(ui, &crate::gioi_thieu::DEM);
+                    // Khung trắng kéo hết chiều cao (như các màn khác), không dừng ngay dưới khối giới thiệu
+                    ui.allocate_space(ui.available_size());
+                    if bam == Some(crate::gioi_thieu::Bam::Chon) {
+                        // Link "Chọn" trong giới thiệu = nút Chọn
+                        if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục chứa PDF").pick_folder() {
+                            self.chon_thu_muc(p.display().to_string(), ui.ctx());
+                        }
                     }
                 }
                 return;

@@ -292,15 +292,13 @@ pub fn id_ve_trang_chu() -> egui::Id {
 
 /// Logo Sao Mai góc dưới phải vùng trống; bấm về Trang chủ.
 fn logo_goc(ui: &mut egui::Ui, vung: Rect) {
-    let tex = crate::tro_giup::logo(ui.ctx());
-    let [w, h] = tex.size();
-    let kich = egui::vec2(RONG_LOGO, RONG_LOGO * h as f32 / w.max(1) as f32);
+    let kich = crate::logo_sao_mai::kich(RONG_LOGO);
     let r = Rect::from_min_size(egui::pos2(vung.right() - 20.0 - kich.x, vung.bottom() - 16.0 - kich.y), kich);
     if r.min.y < vung.top() + 300.0 {
         return; // vùng quá thấp (cửa sổ nhỏ): không đè logo lên nội dung
     }
-    let anh = egui::Image::from_texture(egui::load::SizedTexture::new(tex.id(), kich)).sense(Sense::click());
-    let ph = ui.put(r, anh);
+    let ph = ui.interact(r, ui.scope_id().with("logo_goc"), Sense::click());
+    crate::logo_sao_mai::ve_tinh(ui.painter(), r);
     ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, true, "Trang chủ"));
     let ph = ph.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Trang chủ");
     if ph.clicked() {

@@ -181,6 +181,9 @@ pub struct ManMucLuc {
     trang_kq: Option<(usize, u64, Vec<Khoi>)>,
     phien_rb: u64,
     rong_trai: f32,
+    /// Cột trái co lại khi chưa có đủ File biên mục + Mẫu mục lục, tự mở khi đủ (chỉ đổi lúc trạng thái đủ đổi).
+    trai_gon: bool,
+    du_truoc: Option<bool>,
     sinh: Option<DangSinh>,
     da_sinh: Option<DaSinh>,
     hop_license: Option<crate::hop_license::HopLicense>,
@@ -231,6 +234,8 @@ impl ManMucLuc {
             trang_kq: None,
             phien_rb: 0,
             rong_trai: c.rong_trai,
+            trai_gon: false,
+            du_truoc: None,
             sinh: None,
             da_sinh: None,
             hop_license: None,
@@ -546,17 +551,28 @@ impl ManMucLuc {
         egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, VIEN)).inner_margin(1)).show(ui, |ui| {
             self.thanh_tab(ui);
             ui.add_space(-ui.spacing().item_spacing.y);
-            let trai = egui::Panel::left("ml_trai")
-                .resizable(true)
-                .default_size(self.rong_trai)
-                .size_range(RONG_TRAI_ML.0..=RONG_TRAI_ML.1)
-                .frame(egui::Frame::new().fill(Color32::WHITE))
-                .show(ui, |ui| self.sidebar(ui));
+            let du = self.du_lieu.is_some() && self.mau.is_some();
+            if self.du_truoc != Some(du) {
+                self.trai_gon = !du;
+                self.du_truoc = Some(du);
+            }
+            let trai = if self.trai_gon {
+                egui::Panel::left("ml_trai_gon").resizable(false).exact_size(crate::gui_tach::cot_trai::RONG_GON).frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| {
+                    crate::gui_tach::cot_trai::day(ui, "ml_day_gon", &mut String::new(), "", &mut self.trai_gon);
+                })
+            } else {
+                egui::Panel::left("ml_trai")
+                    .resizable(true)
+                    .default_size(self.rong_trai)
+                    .size_range(RONG_TRAI_ML.0..=RONG_TRAI_ML.1)
+                    .frame(egui::Frame::new().fill(Color32::WHITE))
+                    .show(ui, |ui| self.sidebar(ui))
+            };
             // Kẻ mờ ngăn sidebar với khung xem bên phải
             let rt = trai.response.rect;
             ui.painter().vline(rt.right().round() - 0.5, rt.y_range(), Stroke::new(1.0, VIEN_NHAT));
             let rong = trai.response.rect.width().round();
-            if (rong - self.rong_trai).abs() >= 1.0 && !ctx.input(|i| i.pointer.any_down()) {
+            if !self.trai_gon && (rong - self.rong_trai).abs() >= 1.0 && !ctx.input(|i| i.pointer.any_down()) {
                 self.rong_trai = rong;
                 self.cfg_doi = true;
             }

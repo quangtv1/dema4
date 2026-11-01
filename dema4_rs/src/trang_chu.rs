@@ -170,14 +170,13 @@ fn dai_dau(ui: &egui::Ui, r: Rect) {
         y += 18.0;
     }
     p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, Color32::from_rgb(0xE1, 0xE7, 0xF0)));
-    let tex = crate::tro_giup::logo(ui.ctx());
-    let kich = egui::vec2(60.0, 60.0 * tex.size()[1] as f32 / tex.size()[0].max(1) as f32);
+    let kich = crate::logo_sao_mai::kich(60.0);
     let ten = p.layout_no_wrap(TIEU_DE.into(), font(19.0, true), CHU);
     let moi = p.layout_no_wrap("Chọn chức năng để bắt đầu".into(), font(12.5, false), CHU_PHU);
     let cao = kich.y + 8.0 + ten.size().y + 4.0 + moi.size().y;
     let mut y = r.center().y - cao / 2.0;
     let o_logo = Rect::from_center_size(egui::pos2(r.center().x, y + kich.y / 2.0), kich);
-    p.image(tex.id(), o_logo, Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
+    crate::logo_sao_mai::ve(&p, o_logo);
     let ph = ui.interact(o_logo, ui.scope_id().with("tc_logo"), Sense::click()).on_hover_text("saomaiso.com");
     if ph.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
         ui.ctx().open_url(egui::OpenUrl::new_tab(crate::tro_giup::WEBSITE));
@@ -280,10 +279,11 @@ mod tests {
                 c2.set(Some(cn));
             }
         });
-        h.run();
+        // Logo Sao Mai động luôn xin vẽ lại → chạy số bước cố định thay vì chờ giao diện đứng yên
+        h.run_steps(3);
         for (ten, cn) in [("Đếm trang A4", ChonChucNang::Dem), ("Tách văn bản", ChonChucNang::Tach), ("Sinh mục lục", ChonChucNang::MucLuc), ("Bóc tách dữ liệu", ChonChucNang::BocTach), ("Chuẩn hoá tên", ChonChucNang::ChuanTen), ("Ký văn bản", ChonChucNang::Ky), ("Đóng gói AIP", ChonChucNang::Aip)] {
             h.get_by_label(ten).click();
-            h.run();
+            h.run_steps(3);
             assert_eq!(chon.take(), Some(cn), "{ten}");
         }
         assert!(h.get_all_by_label("saomaiso.com").next().is_some(), "link website ở thanh đáy");

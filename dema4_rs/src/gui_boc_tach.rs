@@ -75,6 +75,8 @@ pub struct ManBocTach {
     pub tab: Tab,
     /// Thu gọn khối đầu vào (nút góc phải hàng tab).
     pub gon: bool,
+    /// Màn giới thiệu (chưa đủ Nguồn + Mô hình + Loại): cột trái co lại; bấm nút ở chân dải để mở tay.
+    mo_trai_gt: bool,
     pub(crate) truong: truong::TabTruong,
     pub(crate) hop: Option<Hop>,
     /// Bấm mục "Cấu hình mô hình…" của ô Mô hình đọc → app mở Cấu hình › Bóc tách.
@@ -124,6 +126,7 @@ impl Default for ManBocTach {
             ket_noi: None,
             tab: Tab::Truong,
             gon: false,
+            mo_trai_gt: false,
             truong: Default::default(),
             hop: None,
             mo_cau_hinh: false,
@@ -303,7 +306,12 @@ impl ManBocTach {
 
     /// Màn giới thiệu khi chưa chọn đủ: cột trái trống như prototype, 3 bước (bước xong có dấu ✓).
     fn gioi_thieu(&mut self, ui: &mut egui::Ui) {
-        egui::Panel::left("bt_trai_gt").exact_size(300.0).resizable(false).frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |_| {});
+        let mut gon = !self.mo_trai_gt;
+        let rong = if gon { crate::gui_tach::cot_trai::RONG_GON } else { 300.0 };
+        egui::Panel::left(if gon { "bt_trai_gt_gon" } else { "bt_trai_gt" }).exact_size(rong).resizable(false).frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| {
+            crate::gui_tach::cot_trai::day(ui, "bt_day_gt", &mut String::new(), "", &mut gon);
+        });
+        self.mo_trai_gt = !gon;
         let r = ui.available_rect_before_wrap();
         ui.painter().vline(r.left() - 0.5, r.y_range(), Stroke::new(1.0, VIEN_NHAT));
         egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::WHITE)).show(ui, |ui| {

@@ -14,17 +14,6 @@ pub const TRANG_TAI: &str = "https://github.com/quangtv1/dema4/releases/latest";
 pub const PHIEN_BAN: &str = env!("CARGO_PKG_VERSION");
 pub const WEBSITE: &str = "https://saomaiso.com";
 
-/// Logo Sao Mai (PNG nhúng trong exe), nạp texture 1 lần rồi giữ trong bộ nhớ egui.
-pub(crate) fn logo(ctx: &egui::Context) -> egui::TextureHandle {
-    let id = egui::Id::unique("logo_sao_mai");
-    if let Some(t) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
-        return t;
-    }
-    let anh = eframe::icon_data::from_png_bytes(include_bytes!("../assets/logo-sao-mai.png")).expect("logo PNG hợp lệ");
-    let t = ctx.load_texture("logo_sao_mai", egui::ColorImage::from_rgba_unmultiplied([anh.width as usize, anh.height as usize], &anh.rgba), egui::TextureOptions::LINEAR);
-    ctx.data_mut(|d| d.insert_temp(id, t.clone()));
-    t
-}
 const RONG: f32 = 560.0;
 /// Popup gọn (Cập nhật, Thông tin).
 const RONG_GON: f32 = 340.0;
@@ -139,8 +128,8 @@ impl HopTroGiup {
                 egui::Frame::new().inner_margin(Margin { left: 16, right: 16, top: 16, bottom: 0 }).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.vertical_centered(|ui| {
-                        let tex = logo(ctx);
-                        ui.add(egui::Image::new(&tex).fit_to_exact_size(egui::vec2(150.0, 150.0 * tex.size()[1] as f32 / tex.size()[0] as f32)));
+                        let (o, _) = ui.allocate_exact_size(crate::logo_sao_mai::kich(150.0), egui::Sense::hover());
+                        crate::logo_sao_mai::ve_tinh(ui.painter(), o);
                     });
                 });
                 kh::bang_gon(

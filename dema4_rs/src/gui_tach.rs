@@ -184,6 +184,9 @@ pub struct ManTach {
     pub(crate) tim_hs: String,
     tim_vb: String,
     pub trai_gon: bool,
+    /// Đủ đầu vào (có thư mục) ở khung trước: cột trái co lại khi chưa đủ, tự mở khi đủ — chỉ đổi lúc trạng thái này đổi
+    /// (người dùng bấm thu gọn / mở rộng tay vẫn giữ).
+    du_truoc: Option<bool>,
     hs_dang_cuon: Option<u32>,
     /// Chọn thư mục (chưa Phân tích): danh sách PDF đọc nền để hiện ngay tên ở cột trái.
     xem_truoc: XemTruoc,
@@ -270,6 +273,7 @@ impl Default for ManTach {
             tim_hs: String::new(),
             tim_vb: String::new(),
             trai_gon: false,
+            du_truoc: None,
             hs_dang_cuon: None,
             xem_truoc: XemTruoc::default(),
             tien_do_hs: Default::default(),
@@ -1057,6 +1061,11 @@ impl ManTach {
             if self.tab == Tab::VanBan {
                 self.tab_van_ban(ui, cfg, &mut viec);
                 return;
+            }
+            let du = !self.thu_muc.trim().is_empty();
+            if self.du_truoc != Some(du) {
+                self.trai_gon = !du;
+                self.du_truoc = Some(du);
             }
             let rong_cu = cfg.rong_cot_trai;
             let gon = self.trai_gon;

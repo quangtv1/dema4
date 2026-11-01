@@ -66,9 +66,10 @@ impl HopLicense {
             egui::Frame::new().inner_margin(Margin { left: 16, right: 16, top: 14, bottom: 0 }).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.vertical_centered(|ui| {
-                    let tex = crate::tro_giup::logo(ctx);
-                    let anh = egui::Image::new(&tex).fit_to_exact_size(egui::vec2(64.0, 64.0 * tex.size()[1] as f32 / tex.size()[0] as f32)).sense(Sense::click());
-                    if ui.add(anh).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("saomaiso.com").clicked() {
+                    let (o, ph) = ui.allocate_exact_size(crate::logo_sao_mai::kich(64.0), Sense::click());
+                    crate::logo_sao_mai::ve_tinh(ui.painter(), o);
+                    ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, true, "saomaiso.com"));
+                    if ph.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("saomaiso.com").clicked() {
                         ctx.open_url(egui::OpenUrl::new_tab(crate::tro_giup::WEBSITE));
                     }
                 });

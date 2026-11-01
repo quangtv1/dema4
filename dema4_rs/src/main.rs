@@ -17,6 +17,7 @@ mod dem_pdf;
 mod gioi_thieu;
 mod license;
 mod logo_chuc_nang;
+mod logo_sao_mai;
 mod muc_luc;
 mod tram;
 mod hop_license;
