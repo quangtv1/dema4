@@ -259,20 +259,20 @@ struct Chung {
     tt: TrangThaiGui,
 }
 
-/// Đồng bộ Sheet chạy nền theo cờ: giao diện chỉ `danh_dau()` khi dữ liệu đổi (không gọi API); luồng nền thấy cờ và
-/// đã qua `khoang` kể từ lần ghi trước thì xin bảng (giao diện nộp bằng `nop` — dựng bảng tối đa 1 lần / phút) rồi ghi
-/// lại toàn bộ tab. Lỗi → giữ cờ, thử lại sau 5 → 60 s.
+/// Đồng bộ chạy nền theo cờ: giao diện chỉ `danh_dau()` khi dữ liệu đổi (không gọi API); luồng nền thấy cờ và
+/// đã qua `khoang` kể từ lần ghi trước thì xin bảng (giao diện nộp bằng `nop` — dựng bảng tối đa 1 lần / phút) rồi gọi
+/// `ghi` với cả bảng (Sheet người dùng: ghi lại cả tab; trạm: sao lưu). Lỗi → giữ cờ, thử lại sau 5 → 60 s.
 pub struct DongBoSheet {
     chung: Arc<Mutex<Chung>>,
     _dung: Sender<()>,
 }
 
 impl DongBoSheet {
-    pub fn moi(dich: DichSheet, ctx: Option<eframe::egui::Context>, khoang: Duration) -> Self {
+    pub fn moi(ghi: impl Fn(&[String], &[Vec<String>]) -> Result<(), String> + Send + 'static, ctx: Option<eframe::egui::Context>, khoang: Duration) -> Self {
         let chung = Arc::new(Mutex::new(Chung::default()));
         let (dung, nhan_dung) = mpsc::channel::<()>();
         let c2 = chung.clone();
-        std::thread::spawn(move || luong_dong_bo(dich, c2, nhan_dung, ctx, khoang));
+        std::thread::spawn(move || luong_dong_bo(ghi, c2, nhan_dung, ctx, khoang));
         Self { chung, _dung: dung }
     }
 
@@ -299,7 +299,7 @@ impl DongBoSheet {
     }
 }
 
-fn luong_dong_bo(dich: DichSheet, chung: Arc<Mutex<Chung>>, dung: Receiver<()>, ctx: Option<eframe::egui::Context>, khoang: Duration) {
+fn luong_dong_bo(ghi: impl Fn(&[String], &[Vec<String>]) -> Result<(), String>, chung: Arc<Mutex<Chung>>, dung: Receiver<()>, ctx: Option<eframe::egui::Context>, khoang: Duration) {
     let mut lan_ghi: Option<Instant> = None;
     let mut thu_lai_luc: Option<Instant> = None;
     let mut lan_loi = 0u32;
@@ -322,7 +322,7 @@ fn luong_dong_bo(dich: DichSheet, chung: Arc<Mutex<Chung>>, dung: Receiver<()>, 
         };
         if let Some((td, dong)) = bang {
             lan_ghi = Some(Instant::now());
-            let kq = dich.ghi_lai(&td, &dong);
+            let kq = ghi(&td, &dong);
             let mut c = chung.lock().unwrap();
             match kq {
                 Ok(()) => {
@@ -452,7 +452,8 @@ mod tests {
     fn dong_bo_theo_co_toi_da_1_lan_moi_khoang() {
         let ok = json!({ "ok": true }).to_string();
         let (dc, nhan) = may_chu_gia(vec![(200, vec![], ok.clone()), (200, vec![], ok)]);
-        let ds = DongBoSheet::moi(DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec"), bi_mat: String::new() }, "", "Kq").unwrap(), None, Duration::from_millis(1500));
+        let dich = DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec"), bi_mat: String::new() }, "", "Kq").unwrap();
+        let ds = DongBoSheet::moi(move |td, d| dich.ghi_lai(td, d), None, Duration::from_millis(1500));
         let nop = |ds: &DongBoSheet, n: usize| {
             for _ in 0..100 {
                 if ds.xin_bang() {

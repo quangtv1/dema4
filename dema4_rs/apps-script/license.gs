@@ -143,6 +143,91 @@ function khoSheet() {
   };
 }
 
+// ---- Sao lưu kết quả Bóc tách lên Drive ----
+// Cây thư mục: <thư mục chứa Sheet trạm>/Bóc tách dữ liệu/<mã máy>/<tên thư mục nguồn>_<băm>  (Google Sheet)
+var THU_MUC_SAO_LUU = 'Bóc tách dữ liệu';
+var RONG_COT_SAO_LUU = { 'trích yếu': 480, 'nội dung': 480, 'tên file': 220, 'lỗi bóc tách': 280, 'hồ sơ': 110, 'số trang': 70 };
+
+/** Thư mục con `ten` trong `cha` (chưa có thì tạo). */
+function thuMucCon(cha, ten) {
+  var it = cha.getFoldersByName(ten);
+  return it.hasNext() ? it.next() : cha.createFolder(ten);
+}
+
+/** Thư mục "Bóc tách dữ liệu" cùng cấp Sheet trạm; id nhớ ở Script Properties, tạo trong khoá (không tạo trùng). */
+function thuMucSaoLuu() {
+  var pr = PropertiesService.getScriptProperties();
+  var id = pr.getProperty('THU_MUC_SAO_LUU');
+  if (id) {
+    try {
+      var cu = DriveApp.getFolderById(id);
+      if (!cu.isTrashed()) return cu;
+    } catch (e) { /* bị xoá hẳn → tạo lại */ }
+  }
+  var khoa = LockService.getScriptLock();
+  khoa.waitLock(20000);
+  try {
+    var cha = DriveApp.getFileById(SpreadsheetApp.getActiveSpreadsheet().getId()).getParents().next();
+    var tm = thuMucCon(cha, THU_MUC_SAO_LUU);
+    pr.setProperty('THU_MUC_SAO_LUU', tm.getId());
+    return tm;
+  } finally {
+    khoa.releaseLock();
+  }
+}
+
+/** Ghi lại cả file sao lưu: tab "Kết quả" (giống Excel của app) + tab "Thông tin" (máy, thư mục, loại, mô hình…). */
+function ghiSaoLuu(maMay, tenFile, tieuDe, dong, thongTin) {
+  var tm = thuMucCon(thuMucSaoLuu(), maMay);
+  var it = tm.getFilesByName(tenFile);
+  var ss;
+  if (it.hasNext()) {
+    ss = SpreadsheetApp.openById(it.next().getId());
+  } else {
+    ss = SpreadsheetApp.create(tenFile);
+    DriveApp.getFileById(ss.getId()).moveTo(tm);
+  }
+  var kq = ss.getSheetByName('Kết quả') || ss.getSheets()[0].setName('Kết quả');
+  if (kq.getFilter()) kq.getFilter().remove();
+  kq.clear();
+  var bang = [tieuDe].concat(dong);
+  var n = tieuDe.length;
+  if (kq.getMaxColumns() < n) kq.insertColumnsAfter(kq.getMaxColumns(), n - kq.getMaxColumns());
+  if (kq.getMaxRows() < bang.length + 1) kq.insertRowsAfter(kq.getMaxRows(), bang.length + 1 - kq.getMaxRows());
+  var vung = kq.getRange(1, 1, bang.length, n);
+  vung.setNumberFormat('@').setValues(bang).setWrap(true).setVerticalAlignment('middle');
+  kq.getRange(1, 1, 1, n).setFontWeight('bold').setBackground('#f3f3f3');
+  kq.setFrozenRows(1);
+  tieuDe.forEach(function (t, i) { kq.setColumnWidth(i + 1, RONG_COT_SAO_LUU[String(t).toLowerCase()] || 160); });
+  vung.createFilter();
+  var tt = ss.getSheetByName('Thông tin') || ss.insertSheet('Thông tin');
+  tt.clear();
+  tt.getRange(1, 1, thongTin.length, 2).setNumberFormat('@').setValues(thongTin.map(function (r) { return [r[0], String(r[1])]; }));
+  tt.getRange(1, 1, thongTin.length, 1).setFontWeight('bold');
+  tt.setColumnWidth(1, 140).setColumnWidth(2, 480);
+}
+
+/** Kho cho lời gọi sao lưu: chạy NGOÀI khoá trạm (ghi file mất vài giây, không chặn kiểm tra license của máy khác). */
+function khoSaoLuu() {
+  var cache = CacheService.getScriptCache();
+  return {
+    choPhep: function (khoa, gioiHan, giay) {
+      var k = 'dem_' + khoa + '_' + Math.floor(Date.now() / 1000 / giay);
+      var n = Number(cache.get(k) || 0) + 1;
+      cache.put(k, String(n), giay + 60);
+      return n <= gioiHan;
+    },
+    saoLuu: ghiSaoLuu,
+  };
+}
+
+/** Chạy 1 lần trong trình soạn Apps Script sau khi đẩy mã: cấp quyền Drive + tạo thư mục "Bóc tách dữ liệu". */
+function caiSaoLuu() {
+  var tm = thuMucSaoLuu();
+  console.log('Thư mục sao lưu: ' + tm.getName() + ' — ' + tm.getUrl());
+  return tm.getUrl();
+}
+
 function traJson(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -161,6 +246,7 @@ function doPost(e) {
   var kq;
   try {
     var yc = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (yc.hanh_dong === 'sao_luu_boc_tach') return traJson(xuLy(yc, khoSaoLuu(), new Date()));
     var khoa = LockService.getScriptLock();
     if (!khoa.tryLock(2500)) return traJson({ ok: false, loi: 'ban' });
     try {

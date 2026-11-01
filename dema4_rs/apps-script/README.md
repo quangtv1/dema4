@@ -6,7 +6,7 @@ xếp và gửi tin Telegram (token ở Script Properties), ghi tab `2_nguong_tr
 | File | Vai trò |
 |---|---|
 | `loi.js` | Logic thuần (kiểm đầu vào, đếm lượt, soạn tin, chọn tin gửi). Dán vào Apps Script thành file `loi`. |
-| `license.gs` | Lớp nối Sheet / Cache / Lock / UrlFetch; `doPost`, `guiHangDoi`, `caiTrigger`, `tuKiemKhoa`. |
+| `license.gs` | Lớp nối Sheet / Drive / Cache / Lock / UrlFetch; `doPost`, `guiHangDoi`, `caiTrigger`, `caiSaoLuu`, `tuKiemKhoa`. |
 | `appsscript.json` | Múi giờ, quyền, web app Anyone. |
 | `test/` | Test Node: `node --test dema4_rs/apps-script/test/loi.test.js`. |
 
@@ -20,10 +20,16 @@ xếp và gửi tin Telegram (token ở Script Properties), ghi tab `2_nguong_tr
 6. Script Properties: `TELEGRAM_TOKEN` = token bot, `TELEGRAM_CHAT_ID` = id nhóm (đổi token / nhóm: sửa ở đây, không cần cài lại app).
 7. Chạy `caiTrigger` 1 lần, cấp quyền khi Google hỏi.
 8. Gửi `license_pub.pem` + URL cho người build app (khoá công khai không phải bí mật).
+9. Chạy `caiSaoLuu` 1 lần, cấp quyền Drive khi Google hỏi (tạo thư mục `Bóc tách dữ liệu` cùng cấp Sheet). **Đổi quyền (scope) trong `appsscript.json` thì phải chạy lại 1 hàm và cấp quyền TRƯỚC khi update-deployment**, nếu không web app báo lỗi quyền với mọi máy (license dừng).
 
 ## Bản đang chạy
 - Dự án Apps Script gắn Monitor_dema4 (tạo bằng `clasp create --parentId <id Sheet>`); deployment web app `AKfycbyR90…` — URL nằm ở `URL_TRAM` (`src/tram.rs`).
 - Sửa script: chép `loi.js`, `license.gs` (đổi tên `license.js`), `appsscript.json` vào thư mục có `.clasp.json` → `clasp push --force` → `clasp update-deployment <deploymentId>` (giữ URL). clasp 3 có thể báo "already up to date" khi chỉ xoá file: sửa 1 file rồi push lại, kiểm bằng `clasp pull` vào thư mục trống.
+
+## Sao lưu Bóc tách
+App gửi `sao_luu_boc_tach` (bảng kết quả 1 thư mục nguồn) khi có thay đổi, tối đa 1 lần/phút. Trạm ghi lại cả file
+`Bóc tách dữ liệu/<mã máy>/<tên thư mục>_<băm đường dẫn>` (tab Kết quả + Thông tin), chạy ngoài khoá trạm. Trạm chỉ nhận ghi,
+không có lệnh đọc. Giới hạn: 5000 dòng, 60 cột, 5000 ký tự/ô, 120 lần/giờ mỗi máy.
 
 ## Bố cục Sheet
 `1_license` (mỗi máy 1 dòng; I Đã dùng = tổng mọi chức năng, J Hạn mức chung; cột ẩn N: 20 mã lần gần nhất để chống trùng — bảng cũ theo từng chức năng được trạm tự chuyển ở lời gọi đầu tiên, bản sao lưu ở tab ẩn `1_license_cu_<ngày>`) · `2_nguong_trang` (mỗi lần Tách 1 dòng) · `3_hang_doi_telegram` (ẩn: chuột phải thanh tab › Hiện). Ý nghĩa từng cột: rê chuột vào ô tiêu đề (ghi chú); hướng dẫn cấp lượt ở ghi chú ô A1 tab `1_license`. Tiêu đề vàng = cột Sao Mai sửa. Cột mã / phiên bản / MAC / IP định dạng chữ (tránh Sheets đổi `0.6.0` thành ngày).

@@ -95,7 +95,7 @@ pub(crate) struct TongKet {
     dung_som: Option<String>,
     excel: Option<Result<PathBuf, String>>,
     tab_sheet: Option<String>,
-    /// Đã gửi thống kê lên trạm → hiện câu "Thông tin bóc tách đã được ghi lại".
+    /// Đã gửi thống kê lên trạm → hiện câu "Thông tin và kết quả bóc tách đã được ghi lại" (kết quả còn được sao lưu lên trạm).
     co_telegram: bool,
 }
 
@@ -146,6 +146,24 @@ pub(crate) fn khop_loc(ten: &str, tt: &TrangThai, loc: &str, n_truong: usize) ->
         },
     };
     theo_tt || (!dang_so(&q).is_empty() && dang_so(ten).contains(&dang_so(&q)))
+}
+
+/// Số liệu như tin Telegram (văn bản đọc được / lỗi, trang đã đọc, trường có / tổng) tính từ bảng `dong_chu`
+/// (Tên file, Hồ sơ, Số trang, các trường, Lỗi bóc tách).
+fn so_lieu_tu_bang(loai: &LoaiTaiLieu, dong: &[Vec<String>], thoi_gian: Duration) -> crate::tram::SoLieuSaoLuu {
+    let n = loai.truong.len();
+    let mut sl = crate::tram::SoLieuSaoLuu { van_ban: dong.len(), thoi_gian, ..Default::default() };
+    for d in dong {
+        if d.get(3 + n).is_some_and(|l| !l.is_empty()) {
+            sl.loi += 1;
+            continue;
+        }
+        sl.ok += 1;
+        sl.trang += loai.trang_doc.cac_trang(d.get(2).and_then(|s| s.parse().ok()).unwrap_or(0)).len();
+        sl.truong_co += d.iter().skip(3).take(n).filter(|g| !g.is_empty()).count();
+        sl.truong_tong += n;
+    }
+    sl
 }
 
 /// Đích Google Sheet theo Cấu hình (khoá service account đọc từ file, URL Apps Script từ kho khoá).
@@ -222,6 +240,7 @@ impl ManBocTach {
         let files: Vec<(usize, PathBuf)> = ds.iter().map(|&i| (i, self.files[i].duong_dan.clone())).collect();
         let loai_chay = loai.clone();
         self.tao_sheet(cfg, khoa, ctx);
+        self.tao_sao_luu(cfg, ctx);
         let dung = Arc::new(AtomicBool::new(false));
         let (gui, nhan) = mpsc::channel();
         let (d2, ctx2) = (dung.clone(), ctx.clone());
@@ -284,6 +303,7 @@ impl ManBocTach {
                 SuKien::HetHang => {
                     let c = self.chay.take().unwrap();
                     self.thoi_gian_chay = Some(c.bat_dau.elapsed());
+                    self.ms_chay_sao_luu.store(c.bat_dau.elapsed().as_millis() as u64, std::sync::atomic::Ordering::Relaxed);
                     self.ghi_excel(cfg);
                     self.license.ket_thuc(&c.lan, c.ok > 0);
                     let mut tk = self.tinh_tong_ket(&c, &loai);
@@ -301,17 +321,21 @@ impl ManBocTach {
 
     /// Dữ liệu đổi → bật cờ; luồng đồng bộ ghi lại cả tab tối đa 1 lần / phút (không gọi API ở đây).
     fn danh_dau_sheet(&self) {
-        if let Some(ds) = &self.sheet {
+        for ds in [&self.sheet, &self.sao_luu].into_iter().flatten() {
             ds.danh_dau();
         }
     }
 
     /// Mỗi khung hình: luồng đồng bộ xin bảng → nộp toàn bộ dòng hiện có (giống file Excel).
     pub(crate) fn nop_sheet(&self) {
-        let (Some(ds), Some(loai)) = (&self.sheet, self.loai_chon()) else { return };
-        if ds.xin_bang() {
-            let dong = (0..self.files.len()).filter_map(|i| self.dong_excel(i, loai)).map(|d| excel::dong_chu(&d, true)).collect();
-            ds.nop(excel::tieu_de(loai, true), dong);
+        let Some(loai) = self.loai_chon() else { return };
+        let xin: Vec<_> = [&self.sheet, &self.sao_luu].into_iter().flatten().filter(|ds| ds.xin_bang()).collect();
+        if xin.is_empty() {
+            return;
+        }
+        let dong: Vec<Vec<String>> = (0..self.files.len()).filter_map(|i| self.dong_excel(i, loai)).map(|d| excel::dong_chu(&d, true)).collect();
+        for ds in xin {
+            ds.nop(excel::tieu_de(loai, true), dong.clone());
         }
     }
 
@@ -411,6 +435,9 @@ impl ManBocTach {
         if self.sheet.is_none() {
             self.tao_sheet(cfg, khoa, ctx);
         }
+        if self.sao_luu.is_none() {
+            self.tao_sao_luu(cfg, ctx);
+        }
         self.danh_dau_sheet();
     }
 
@@ -451,10 +478,26 @@ impl ManBocTach {
         match tao_dich_sheet(cfg, khoa, &nguon) {
             Ok(d) => {
                 self.tab_sheet = if cfg.sheet_tab.trim().is_empty() { nguon } else { cfg.sheet_tab.trim().into() };
-                self.sheet = Some(DongBoSheet::moi(d, Some(ctx.clone()), self.khoang_sheet));
+                self.sheet = Some(DongBoSheet::moi(move |td, dong| d.ghi_lai(td, dong), Some(ctx.clone()), self.khoang_sheet));
             }
             Err(e) => self.loi_sheet = Some(e),
         }
+    }
+
+    /// Sao lưu kết quả thư mục này lên trạm (cùng nhịp cờ + 1 phút như Sheet); không có trạm thì thôi.
+    fn tao_sao_luu(&mut self, cfg: &CauHinhBocTach, ctx: &egui::Context) {
+        self.sao_luu = None;
+        let Some(loai) = self.loai_chon() else { return };
+        if !self.license.co_tram() {
+            return;
+        }
+        let (lic, thu_muc, loai, ms) = (self.license.clone(), self.thu_muc.trim().to_string(), loai.clone(), self.ms_chay_sao_luu.clone());
+        let mo_hinh = self.ncc.map(|n| super::cau_hinh::ten_mo_hinh(cfg, n)).unwrap_or_default();
+        let ghi = move |td: &[String], dong: &[Vec<String>]| {
+            let sl = so_lieu_tu_bang(&loai, dong, Duration::from_millis(ms.load(std::sync::atomic::Ordering::Relaxed)));
+            lic.gui_ngay("sao_luu_boc_tach", crate::tram::sao_luu_boc_tach(&thu_muc, &loai.ten, &mo_hinh, td, dong, sl))
+        };
+        self.sao_luu = Some(DongBoSheet::moi(ghi, Some(ctx.clone()), self.khoang_sheet));
     }
 
     /// Dòng đáy khi đang chạy / sau khi chạy (None = chưa chạy lần nào trong danh sách này).
@@ -1026,7 +1069,7 @@ pub(crate) fn ve_tong_ket(ctx: &egui::Context, t: &TongKet, link_sheet: &str) ->
             }
             if t.co_telegram {
                 ui.add_space(6.0);
-                ui.label(RichText::new("Thông tin bóc tách đã được ghi lại").size(11.0).color(CHU_PHU));
+                ui.label(RichText::new("Thông tin và kết quả bóc tách đã được ghi lại").size(11.0).color(CHU_PHU));
             }
         });
         kh::chan(ui, |ui| {

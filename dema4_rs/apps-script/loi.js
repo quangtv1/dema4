@@ -16,6 +16,8 @@ var SO_COT_MAY = 14;
 // Số mã lần gần nhất giữ trong dòng máy để chống trùng (app gửi lại tối đa vài lần chưa được xác nhận)
 var GIU_MA_LAN = 20;
 var TEN_CN = { dem: 'Đếm', tach: 'Tách', muc_luc: 'Mục lục', boc_tach: 'Bóc tách' };
+// Sao lưu kết quả Bóc tách (dữ liệu để nâng chất lượng bóc / đánh nhãn): giới hạn kích thước, số lần mỗi máy
+var SAO_LUU = { DONG: 5000, COT: 60, O: 5000, MOI_GIO: 120 };
 
 /** Bỏ ký tự điều khiển, cắt `toiDa` ký tự. */
 function sachChu(s, toiDa) {
@@ -118,8 +120,10 @@ function chuyenDongCu(r) {
 function xuLy(yc, kho, bayGio) {
   yc = yc || {};
   var hd = yc.hanh_dong;
-  if (['kiem_tra', 'ghi_lan', 'thong_ke_dem', 'thong_ke_tach', 'thong_ke_muc_luc', 'thong_ke_boc_tach'].indexOf(hd) < 0) return { ok: false, loi: 'hanh_dong' };
+  if (['kiem_tra', 'ghi_lan', 'thong_ke_dem', 'thong_ke_tach', 'thong_ke_muc_luc', 'thong_ke_boc_tach', 'sao_luu_boc_tach'].indexOf(hd) < 0) return { ok: false, loi: 'hanh_dong' };
   if (!MAU_MA_MAY.test(String(yc.ma_may))) return { ok: false, loi: 'ma_may' };
+  // Sao lưu không đụng bảng license (license.gs gọi ngoài khoá trạm): chỉ kiểm dữ liệu rồi giao cho kho ghi file
+  if (hd === 'sao_luu_boc_tach') return saoLuu(yc, kho, bayGio);
   var nonce = sachChu(yc.nonce, 64);
   if (!kho.choPhep('goi', GIOI_HAN_LOI_GOI_MOI_PHUT, 60)) return { ok: false, loi: 'ban' };
   var may = sachMay(yc.may);
@@ -208,6 +212,47 @@ function thongKe(hd, yc, may, kho, bayGio) {
   }
   kho.xepTin(hang);
   return { ok: true };
+}
+
+/**
+ * Sao lưu bảng kết quả Bóc tách của 1 thư mục nguồn: mỗi máy 1 thư mục (mã máy), mỗi thư mục nguồn 1 file — ghi lại
+ * cả file mỗi lần (bản cuối cùng, gồm cả sửa tay). `kho.saoLuu(maMay, tenFile, tieuDe, dong, thongTin)`.
+ */
+function saoLuu(yc, kho, bayGio) {
+  var sl = yc.sao_luu || {};
+  if (!Array.isArray(sl.tieu_de) || !Array.isArray(sl.dong) || sl.tieu_de.length === 0 || sl.tieu_de.length > SAO_LUU.COT || sl.dong.length > SAO_LUU.DONG) return { ok: false, loi: 'sao_luu' };
+  if (!kho.choPhep('sao_luu_' + yc.ma_may, SAO_LUU.MOI_GIO, 3600)) return { ok: false, loi: 'ban' };
+  var n = sl.tieu_de.length;
+  var o = function (x) { return oChu(sachChu(x == null ? '' : x, SAO_LUU.O)); };
+  var tieuDe = sl.tieu_de.map(o);
+  var dong = sl.dong.map(function (r) {
+    var d = (Array.isArray(r) ? r : []).slice(0, n).map(o);
+    while (d.length < n) d.push('');
+    return d;
+  });
+  var thuMuc = sachChu(sl.thu_muc, 500);
+  var may = sachMay(yc.may);
+  var so = sl.so_lieu || {};
+  var n = function (x) { return soNguyen(x); };
+  // Cùng các ô với tin Telegram Bóc tách: thông tin máy + số liệu lượt chạy (bản cuối, gồm sửa tay)
+  var thongTin = [
+    ['Mã máy', yc.ma_may], ['Tên PC', may.ten], ['Địa chỉ MAC', may.mac], ['IP nội bộ', may.ip_noi_bo], ['IP public', may.ip_public],
+    ['Phiên bản', may.phien_ban], ['Thư mục nguồn', thuMuc], ['Loại tài liệu', sachChu(sl.loai, 200)], ['Mô hình đọc', sachChu(sl.mo_hinh, 200)],
+    ['Văn bản', n(so.ok) + '/' + n(so.van_ban != null ? so.van_ban : dong.length) + ' file · lỗi ' + n(so.loi)],
+    ['Trang đã đọc', n(so.trang)], ['Trường', n(so.truong_co) + '/' + n(so.truong_tong)],
+    ['Thời gian chạy', phutGiay(so.thoi_gian_ms)], ['Cập nhật', thoiDiem(bayGio)],
+  ].map(function (r) { return [r[0], o(r[1])]; });
+  kho.saoLuu(yc.ma_may, tenFileSaoLuu(thuMuc), tieuDe, dong, thongTin);
+  return { ok: true };
+}
+
+/** "<tên thư mục>_<băm 8 hex đường dẫn>": 2 thư mục trùng tên ở 2 nơi trên cùng máy không ghi đè nhau. */
+function tenFileSaoLuu(thuMuc) {
+  var p = String(thuMuc).replace(/[\\/]+$/, '');
+  var ten = (p.split(/[\\/]/).pop() || 'thu_muc').replace(/[^\w\u00C0-\u1EF9 .\-]/g, '_').slice(0, 80);
+  var h = 0x811c9dc5; // FNV-1a 32 bit
+  for (var i = 0; i < p.length; i++) { h ^= p.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return ten + '_' + ('0000000' + h.toString(16)).slice(-8);
 }
 
 // ---- Thông báo sự kiện license (máy mới, hết lượt) ----
@@ -375,5 +420,5 @@ function chonGui(ds, bayGioMs, nganSach) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { chuyenDongCu: chuyenDongCu, TIEU_DE_COT_J_CU: TIEU_DE_COT_J_CU, GIU_MA_LAN: GIU_MA_LAN, HAN_MAC_DINH: HAN_MAC_DINH, SO_COT_MAY: SO_COT_MAY, xuLy: xuLy, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, tinDem: tinDem, tinTach: tinTach, tinMucLuc: tinMucLuc, tinMayMoi: tinMayMoi, tinHetLuot: tinHetLuot, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
+  module.exports = { chuyenDongCu: chuyenDongCu, TIEU_DE_COT_J_CU: TIEU_DE_COT_J_CU, GIU_MA_LAN: GIU_MA_LAN, HAN_MAC_DINH: HAN_MAC_DINH, SO_COT_MAY: SO_COT_MAY, xuLy: xuLy, tenFileSaoLuu: tenFileSaoLuu, SAO_LUU: SAO_LUU, oChu: oChu, sachChu: sachChu, maTrangThai: maTrangThai, hanMuc: hanMuc, tinDem: tinDem, tinTach: tinTach, tinMucLuc: tinMucLuc, tinMayMoi: tinMayMoi, tinHetLuot: tinHetLuot, soNguyen: soNguyen, soThuc: soThuc, chonGui: chonGui, thoiDiem: thoiDiem, COT: COT };
 }

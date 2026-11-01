@@ -11,6 +11,7 @@ pub const URL_TRAM: &str = "https://script.google.com/macros/s/AKfycbyR90faddKyg
 const KHOA_CONG_KHAI_PEM: &str = include_str!("../assets/license_pub.pem");
 /// Trạm trả lời ~3 s (lần đầu sau lúc nghỉ ~7 s, gồm chuyển hướng 302 của Apps Script); lời gọi chạy nền nên chờ rộng tay.
 const CHO_TOI_DA: Duration = Duration::from_secs(15);
+const CHO_SAO_LUU: Duration = Duration::from_secs(120);
 
 /// Thông tin máy gửi kèm mỗi lời gọi; IP đọc lại mỗi lần (máy có thể đã chuyển mạng).
 #[derive(Debug, Clone, PartialEq)]
@@ -56,7 +57,9 @@ impl KhoTram {
     }
 
     fn goi(&self, may: &ThongTinMay, hanh_dong: &str, nonce: &str, them: Value) -> Result<String, String> {
-        let agent: ureq::Agent = ureq::Agent::config_builder().timeout_global(Some(CHO_TOI_DA)).http_status_as_error(false).build().into();
+        // Sao lưu: trạm tạo / ghi lại cả file Sheet, lâu hơn lời gọi license
+        let cho = if hanh_dong.starts_with("sao_luu_") { CHO_SAO_LUU } else { CHO_TOI_DA };
+        let agent: ureq::Agent = ureq::Agent::config_builder().timeout_global(Some(cho)).http_status_as_error(false).build().into();
         let mut ph = agent.post(self.url).header("Content-Type", "application/json").send(yeu_cau(may, hanh_dong, nonce, them).to_string()).map_err(|e| format!("không kết nối được trạm ({e})"))?;
         ph.body_mut().read_to_string().map_err(|e| format!("không đọc được trả lời trạm ({e})"))
     }
@@ -208,6 +211,25 @@ pub fn so_lieu_boc_tach(thu_muc: &str, loai: &str, mo_hinh: &str, van_ban: usize
         "truong_tong": truong.1,
         "thoi_gian_ms": thoi_gian.as_millis() as u64,
     }})
+}
+
+/// Bảng kết quả Bóc tách 1 thư mục nguồn gửi trạm sao lưu (`<mã máy>/<tên thư mục>_<băm>` trên Drive của Sao Mai).
+pub fn sao_luu_boc_tach(thu_muc: &str, loai: &str, mo_hinh: &str, tieu_de: &[String], dong: &[Vec<String>], sl: SoLieuSaoLuu) -> Value {
+    let mut v = json!({ "sao_luu": { "thu_muc": duong_dan_tuyet_doi(thu_muc), "loai": loai, "mo_hinh": mo_hinh, "tieu_de": tieu_de, "dong": dong } });
+    v["sao_luu"]["so_lieu"] = so_lieu_boc_tach(thu_muc, loai, mo_hinh, sl.van_ban, sl.ok, sl.loi, sl.trang, (sl.truong_co, sl.truong_tong), sl.thoi_gian)["so_lieu"].take();
+    v
+}
+
+/// Số liệu kèm bản sao lưu (cùng các ô với tin Telegram Bóc tách).
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct SoLieuSaoLuu {
+    pub van_ban: usize,
+    pub ok: usize,
+    pub loi: usize,
+    pub trang: usize,
+    pub truong_co: usize,
+    pub truong_tong: usize,
+    pub thoi_gian: Duration,
 }
 
 /// Số liệu 1 lần Tách + thống kê ngưỡng trắng (tin, file CSV, 1 hàng tab "Ngưỡng trắng" — trạm ghi).
@@ -487,5 +509,18 @@ mod tests {
             assert!(!mau_token(&s), "{ten} còn token bot Telegram");
             assert!(!s.contains(&["telegram", ".txt"].concat()), "{ten} còn đọc file token");
         }
+    }
+
+    /// Gửi thật 1 bản sao lưu Bóc tách lên trạm (tạo / ghi lại file trên Drive): DEMA4_SAO_LUU_THU=1.
+    #[test]
+    #[ignore]
+    fn sao_luu_boc_tach_that_len_tram() {
+        if std::env::var("DEMA4_SAO_LUU_THU").is_err() {
+            return;
+        }
+        let may = ThongTinMay { ma: crate::license::ma_may(), ten: "thu-sao-luu".into(), mac: String::new(), ip_noi_bo: String::new(), ip_public: String::new(), phien_ban: env!("CARGO_PKG_VERSION").into() };
+        let td: Vec<String> = ["Tên file", "Hồ sơ", "Số trang", "Số, ký hiệu", "Ngày tháng", "Trích yếu"].map(String::from).to_vec();
+        let dong: Vec<Vec<String>> = (1..=3).map(|i| vec![format!("VB{i:02}.pdf"), "HS-01".into(), "2".into(), format!("{i}/QĐ-UBND"), "01/02/2015".into(), format!("Trích yếu văn bản thử {i}")]).collect();
+        KhoTram::moi().unwrap().thong_ke(&may, "sao_luu_boc_tach", sao_luu_boc_tach("/tmp/SoHoa/Van_ban_thu", "Văn bản hành chính", "Thử sao lưu", &td, &dong, SoLieuSaoLuu { van_ban: 3, ok: 3, trang: 6, truong_co: 9, truong_tong: 9, thoi_gian: Duration::from_secs(75), ..Default::default() })).unwrap();
     }
 }

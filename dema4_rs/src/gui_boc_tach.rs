@@ -90,12 +90,16 @@ pub struct ManBocTach {
     pub(crate) excel: Option<Result<PathBuf, String>>,
     /// Hàng đợi Google Sheet của lần chạy (giữ sau khi chạy để gửi lại / ghi đè khi Lưu).
     pub(crate) sheet: Option<crate::boc_tach::sheet::DongBoSheet>,
+    /// Sao lưu kết quả lên trạm (Drive của Sao Mai, mỗi máy 1 thư mục) — luôn bật, ngoài cấu hình Sheet người dùng.
+    pub(crate) sao_luu: Option<crate::boc_tach::sheet::DongBoSheet>,
     pub(crate) loi_sheet: Option<String>,
     /// Khoảng tối thiểu giữa 2 lần ghi lại cả tab Sheet.
     pub(crate) khoang_sheet: std::time::Duration,
     pub(crate) tab_sheet: String,
     /// Thời gian lần chạy gần nhất (dòng đáy).
     pub(crate) thoi_gian_chay: Option<Duration>,
+    /// Thời gian lượt chạy gần nhất (ms) cho tab Thông tin của bản sao lưu (luồng sao lưu đọc).
+    pub(crate) ms_chay_sao_luu: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// Bấm Bắt đầu / Chạy lại: danh sách file cần chạy (xử lý sau khi vẽ, cần Cấu hình + khoá).
     yeu_cau_chay: Option<Vec<usize>>,
     /// Đã chọn sẵn mô hình ★ Mặc định (1 lần mỗi lần mở màn).
@@ -129,8 +133,10 @@ impl Default for ManBocTach {
             kq: Default::default(),
             tong_ket: None,
             thoi_gian_chay: None,
+            ms_chay_sao_luu: Default::default(),
             excel: None,
             sheet: None,
+            sao_luu: None,
             loi_sheet: None,
             khoang_sheet: crate::boc_tach::sheet::KHOANG_GHI,
             tab_sheet: String::new(),

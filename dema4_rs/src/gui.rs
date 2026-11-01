@@ -2007,6 +2007,51 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
+    /// Chạy thật đầu-cuối: mô hình + trạm license thật, sao lưu lên Drive.
+    /// DEMA4_E2E_THU_MUC=<thư mục PDF> DEMA4_E2E_CFG=<file .dema4_saomai.cfg> (dùng 1 lượt license của máy này).
+    #[test]
+    #[ignore]
+    fn boc_tach_that_dau_cuoi_sao_luu_len_tram() {
+        use crate::gui_boc_tach::ket_qua::TrangThai;
+        use egui_kittest::kittest::Queryable;
+        let (Ok(thu_muc), Ok(f_cfg)) = (std::env::var("DEMA4_E2E_THU_MUC"), std::env::var("DEMA4_E2E_CFG")) else { return };
+        let cfg = crate::cau_hinh::CauHinh::phan_tich(&std::fs::read_to_string(f_cfg).unwrap());
+        let kt = crate::license::KiemTra::that();
+        kt.mo_app();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1240.0, 820.0)).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut app = UngDungChinh { man: Man::BocTach, cfg: cfg.clone(), ..Default::default() };
+            app.boc_tach.license = kt.clone();
+            app
+        });
+        let ctx = h.ctx.clone();
+        let cho = |h: &mut egui_kittest::Harness<'_, UngDungChinh>, giay: u64, xong: &dyn Fn(&UngDungChinh) -> bool| {
+            let het = std::time::Instant::now() + Duration::from_secs(giay);
+            while std::time::Instant::now() < het {
+                h.run_steps(1);
+                if xong(h.state()) {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            panic!("quá thời gian chờ");
+        };
+        h.state_mut().boc_tach.chon_thu_muc(thu_muc, &ctx);
+        cho(&mut h, 60, &|s| !s.boc_tach.files.is_empty());
+        let n = h.state().boc_tach.files.len();
+        (h.state_mut().boc_tach.ncc, h.state_mut().boc_tach.loai) = (Some(NhaCungCap::NoiBo), Some(0));
+        h.run_steps(2);
+        h.get_by_label("Bắt đầu").click();
+        cho(&mut h, 900, &|s| !s.boc_tach.dang_chay() && s.boc_tach.tt.iter().all(|t| !matches!(t, TrangThai::Cho)));
+        let tt = &h.state().boc_tach.tt;
+        eprintln!("bóc xong: {} đọc được, {} lỗi / {n} file", tt.iter().filter(|t| matches!(t, TrangThai::Xong(_))).count(), tt.iter().filter(|t| matches!(t, TrangThai::Loi(_))).count());
+        // Sao lưu: lần đầu ghi ngay, các thay đổi sau gom ≤ 1 phút → chờ tới khi hết thay đổi chưa ghi
+        cho(&mut h, 300, &|s| s.boc_tach.sao_luu.as_ref().is_some_and(|q| q.trang_thai().so_dong == n && !q.trang_thai().con_doi));
+        let tt = h.state().boc_tach.sao_luu.as_ref().unwrap().trang_thai();
+        assert!(tt.loi.is_none(), "{:?}", tt.loi);
+        eprintln!("sao lưu: {} dòng, mã máy {}", tt.so_dong, crate::license::ma_may());
+    }
+
     /// Màn Bóc tách với license giả hạn mức `han` (đã kiểm tra với trạm giả).
     fn boc_tach_license(ten: &str, han: u32, phan_hoi: Vec<Result<&'static str, u16>>) -> (PathBuf, egui_kittest::Harness<'static, UngDungChinh>, Arc<crate::license::KiemTra>) {
         let (d, cfg) = boc_tach_thu(ten, phan_hoi);
@@ -2053,6 +2098,9 @@ mod tests {
         assert!(h.state().boc_tach.tong_ket.is_some());
         let _ = kt.moc().recv_timeout(Duration::from_secs(5));
         assert_eq!(kt.luot().unwrap().0, truoc + 1, "1 lần Bắt đầu = 1 lượt");
+        // Sao lưu kết quả lên trạm luôn chạy (không cần bật Google Sheet ở Cấu hình)
+        cho_boc_tach(&mut h, |s| s.boc_tach.sao_luu.as_ref().is_some_and(|q| q.trang_thai().lan_ghi.is_some()));
+        assert_eq!(h.state().boc_tach.sao_luu.as_ref().unwrap().trang_thai().so_dong, 3);
         // Lần 2: lọc file lỗi, chạy lại, vẫn lỗi hết → hoàn lượt
         h.get_by_label("Xem file lỗi").click();
         h.run_steps(2);

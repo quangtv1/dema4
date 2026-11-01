@@ -17,6 +17,7 @@ function khoGia() {
   k.soTinCho = () => k.hangDoi.filter((r) => r.trang_thai === 'cho').length;
   k.xepTin = (r) => { k.hangDoi.push(r); };
   k.themNguong = (tieuDe, moTa, dong) => { k.nguong.push(dong); };
+  k.saoLuu = (maMay, ten, tieuDe, dong, thongTin) => { (k.saoLuuDs = k.saoLuuDs || []).push({ maMay, ten, tieuDe, dong, thongTin }); };
   return k;
 }
 const BAY_GIO = new Date('2026-11-02T08:15:00+07:00');
@@ -239,4 +240,29 @@ test('boc_tach_dem_luot_va_tin_thong_ke', () => {
   assert.ok(tin.split('\n')[0].startsWith('🧾 BÓC TÁCH DỮ LIỆU'));
   for (const d of ['- Loại tài liệu: Văn bản hành chính', '- Mô hình đọc: Máy chủ nội bộ · 5CD-AI/Vintern-1B-v3_5', '- Văn bản: 31/33 file · lỗi 2', '- Trang đã đọc: 60', '- Trường: 181/186']) assert.ok(tin.includes(d), d);
   assert.equal(goi(k, { hanh_dong: 'thong_ke_bat_ky', so_lieu: {} }).loi, 'hanh_dong');
+});
+
+test('sao_luu_boc_tach', () => {
+  const k = khoGia();
+  const sl = { thu_muc: 'D:\\SoHoa\\Van_ban', loai: 'Văn bản hành chính', mo_hinh: 'Gemini', tieu_de: ['Tên file', 'Trích yếu'], dong: [['VB01.pdf', '=HYPERLINK("x")'], ['VB02.pdf']] };
+  assert.deepEqual(goi(k, { hanh_dong: 'sao_luu_boc_tach', sao_luu: sl }), { ok: true });
+  const s = k.saoLuuDs[0];
+  assert.equal(s.maMay, MA);
+  assert.match(s.ten, /^Van_ban_[0-9a-f]{8}$/);
+  assert.notEqual(L.tenFileSaoLuu('E:\\Khac\\Van_ban'), s.ten, 'thư mục trùng tên ở nơi khác → file khác');
+  assert.equal(L.tenFileSaoLuu('/tmp/SoHoa/Van_ban/'), L.tenFileSaoLuu('/tmp/SoHoa/Van_ban'));
+  assert.equal(s.dong[0][1], "'=HYPERLINK(\"x\")", 'ô công thức thành chữ');
+  assert.deepEqual(s.dong[1], ['VB02.pdf', ''], 'dòng thiếu ô được bù');
+  const tt = Object.fromEntries(s.thongTin);
+  assert.equal(tt['Địa chỉ MAC'], MAY.mac); assert.equal(tt['IP nội bộ'], MAY.ip_noi_bo); assert.equal(tt['IP public'], MAY.ip_public);
+  assert.equal(tt['Văn bản'], '0/2 file · lỗi 0', 'thiếu so_lieu → số file theo bảng');
+  goi(k, { hanh_dong: 'sao_luu_boc_tach', sao_luu: Object.assign({}, sl, { so_lieu: { van_ban: 2, ok: 1, loi: 1, trang: 3, truong_co: 5, truong_tong: 6, thoi_gian_ms: 75000 } }) });
+  const t2 = Object.fromEntries(k.saoLuuDs[1].thongTin);
+  assert.deepEqual([t2['Văn bản'], t2['Trang đã đọc'], t2['Trường']], ['1/2 file · lỗi 1', '3', '5/6']);
+  assert.equal(k.may.length, 0, 'không đăng ký / đụng bảng license');
+  assert.equal(goi(k, { hanh_dong: 'sao_luu_boc_tach', sao_luu: { tieu_de: [], dong: [] } }).loi, 'sao_luu');
+  assert.equal(goi(k, { hanh_dong: 'sao_luu_boc_tach', sao_luu: Object.assign({}, sl, { dong: new Array(L.SAO_LUU.DONG + 1).fill([]) }) }).loi, 'sao_luu');
+  assert.equal(goi(k, { hanh_dong: 'sao_luu_boc_tach', ma_may: 'x', sao_luu: sl }).loi, 'ma_may');
+  for (let i = 0; i < L.SAO_LUU.MOI_GIO; i++) goi(k, { hanh_dong: 'sao_luu_boc_tach', sao_luu: sl });
+  assert.equal(goi(k, { hanh_dong: 'sao_luu_boc_tach', sao_luu: sl }).loi, 'ban', 'giới hạn số lần mỗi máy');
 });

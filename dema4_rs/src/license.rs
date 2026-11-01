@@ -421,7 +421,7 @@ impl KiemTra {
     }
 
     /// Trạm thật + sổ lượt thật, dùng chung cả app.
-    fn that() -> Arc<KiemTra> {
+    pub(crate) fn that() -> Arc<KiemTra> {
         static KT: OnceLock<Arc<KiemTra>> = OnceLock::new();
         KT.get_or_init(|| {
             let kho = crate::tram::KhoTram::moi().map(|k| Arc::new(k) as Arc<dyn KhoLicense>);
@@ -532,6 +532,17 @@ impl KiemTra {
         }
         self.gui(Viec::ThongKe(hanh_dong, Box::new(soan)));
         true
+    }
+
+    /// Gửi ngay lên trạm và chờ kết quả (gọi từ luồng nền; dùng cho sao lưu cần biết lỗi để thử lại).
+    pub fn gui_ngay(&self, hanh_dong: &str, them: serde_json::Value) -> Result<(), String> {
+        let kho = self.chung.kho.as_ref().ok_or("chưa có trạm")?;
+        kho.thong_ke(&self.chung.may(), hanh_dong, them)
+    }
+
+    /// Có trạm để gửi thống kê / sao lưu.
+    pub fn co_tram(&self) -> bool {
+        self.chung.kho.is_some()
     }
 }
 
