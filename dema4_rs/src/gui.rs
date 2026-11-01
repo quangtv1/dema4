@@ -1981,12 +1981,14 @@ mod tests {
         let ctx = h.ctx.clone();
         let _ = std::fs::remove_file(crate::boc_tach::luu::file_jsonl(&d));
         h.state_mut().boc_tach.chon_thu_muc(goc, &ctx);
+        // Khoảng ghi lại cả tab rút ngắn cho test (thật: 1 phút)
+        h.state_mut().boc_tach.khoang_sheet = std::time::Duration::from_millis(300);
         cho_boc_tach(&mut h, |s| s.boc_tach.files.len() == 3);
         (h.state_mut().boc_tach.ncc, h.state_mut().boc_tach.loai) = (Some(NhaCungCap::NoiBo), Some(0));
         h.run_steps(2);
         h.get_by_label("Bắt đầu").click();
         cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && s.boc_tach.tt.iter().all(|t| !matches!(t, TrangThai::Cho)));
-        cho_boc_tach(&mut h, |s| s.boc_tach.sheet.as_ref().is_some_and(|q| q.trang_thai().da_gui == 3));
+        cho_boc_tach(&mut h, |s| s.boc_tach.sheet.as_ref().is_some_and(|q| q.trang_thai().so_dong == 3 && !q.trang_thai().con_doi));
         // Excel cạnh thư mục nguồn: 3 dòng (1 lỗi), ngày giữ dạng chữ
         let f = crate::boc_tach::excel::duong_dan(&d, "");
         assert!(matches!(&h.state().boc_tach.excel, Some(Ok(p)) if *p == f));
@@ -1994,8 +1996,12 @@ mod tests {
         assert_eq!(bang.dong.len(), 3);
         assert_eq!((bang.dong[0][0].as_str(), bang.dong[0][5].as_str(), bang.dong[0][8].as_str()), ("VB01.pdf", "20/01/2015", "Trần Thị B"));
         assert!(bang.dong[1][9].contains("500"));
-        let yc: String = nhan_as.try_iter().collect();
-        assert!(yc.contains("\"tab\":\"Boc_tach\"") && yc.contains("VB01.pdf") && yc.contains("VB03.pdf") && yc.contains("Lỗi bóc tách"));
+        // Ghi lại cả tab (tab trống ở Cấu hình = tên thư mục nguồn); lần ghi cuối chứa đủ 3 file
+        let yc: Vec<String> = nhan_as.try_iter().collect();
+        assert!(yc.len() < 6, "gom theo cờ, không gọi API mỗi file");
+        let cuoi = yc.last().unwrap();
+        let tab = d.file_name().unwrap().to_string_lossy();
+        assert!(cuoi.contains(&format!("\"tab\":\"{tab}\"")) && cuoi.contains("\"ghi_lai\":true") && cuoi.contains("VB01.pdf") && cuoi.contains("VB03.pdf") && cuoi.contains("Lỗi bóc tách"));
         let _ = std::fs::remove_file(&f);
         let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
         let _ = std::fs::remove_dir_all(&d);

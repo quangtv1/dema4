@@ -89,8 +89,10 @@ pub struct ManBocTach {
     /// File Excel đã ghi lần gần nhất (hoặc lỗi ghi).
     pub(crate) excel: Option<Result<PathBuf, String>>,
     /// Hàng đợi Google Sheet của lần chạy (giữ sau khi chạy để gửi lại / ghi đè khi Lưu).
-    pub(crate) sheet: Option<crate::boc_tach::sheet::HangDoi>,
+    pub(crate) sheet: Option<crate::boc_tach::sheet::DongBoSheet>,
     pub(crate) loi_sheet: Option<String>,
+    /// Khoảng tối thiểu giữa 2 lần ghi lại cả tab Sheet.
+    pub(crate) khoang_sheet: std::time::Duration,
     pub(crate) tab_sheet: String,
     /// Thời gian lần chạy gần nhất (dòng đáy).
     pub(crate) thoi_gian_chay: Option<Duration>,
@@ -130,6 +132,7 @@ impl Default for ManBocTach {
             excel: None,
             sheet: None,
             loi_sheet: None,
+            khoang_sheet: crate::boc_tach::sheet::KHOANG_GHI,
             tab_sheet: String::new(),
             yeu_cau_chay: None,
             da_mac_dinh: false,
@@ -248,6 +251,7 @@ impl ManBocTach {
         self.nhan_nen(&ctx);
         self.nhan_chay(&ctx, cfg);
         self.nhan_doc_lai(&ctx, cfg, khoa);
+        self.nop_sheet();
         let mut cfg_doi = false;
         if !self.gon {
             // Đang chạy: khoá khối đầu vào (đổi nguồn / loại / mô hình giữa chừng làm sai kết quả)

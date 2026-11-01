@@ -375,7 +375,7 @@ impl TabBocTach {
             ui.add(kh::o_nhap(&mut ch.sheet_link).desired_width(ui.available_width()).hint_text("https://docs.google.com/spreadsheets/d/…/edit"));
         });
         dong(ui, "Tab", |ui| {
-            ui.add(kh::o_nhap(&mut ch.sheet_tab).desired_width(180.0).hint_text("Tên tab"));
+            ui.add(kh::o_nhap(&mut ch.sheet_tab).desired_width(180.0).hint_text("Trống = tên thư mục nguồn"));
         });
         dong(ui, "Cách ghi", |ui| {
             ui.spacing_mut().item_spacing.x = 18.0;
@@ -451,7 +451,7 @@ impl TabBocTach {
                 let (gui, nhan) = mpsc::channel();
                 let (ch2, khoa2, ctx) = (ch.clone(), khoa.clone(), ui.ctx().clone());
                 std::thread::spawn(move || {
-                    let kq = super::ket_qua::tao_dich_sheet(&ch2, &khoa2).and_then(|d| {
+                    let kq = super::ket_qua::tao_dich_sheet(&ch2, &khoa2, crate::boc_tach::excel::TAB).and_then(|d| {
                         let loai = &crate::boc_tach::loai_tai_lieu::co_san()[0];
                         let mut dong = vec![String::new(); crate::boc_tach::excel::tieu_de(loai, true).len()];
                         dong[0] = format!("Ghi thử dema4 · {}", chrono::Local::now().format("%d/%m/%Y %H:%M"));

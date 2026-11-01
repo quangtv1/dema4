@@ -15,7 +15,7 @@ use super::xem_pdf::{XemPdf, NAC};
 use super::ManBocTach;
 use crate::boc_tach::chay::{chay_hang, SuKien};
 use crate::boc_tach::excel::{self, DongExcel};
-use crate::boc_tach::sheet::{self, CachGhi, DichSheet, HangDoi};
+use crate::boc_tach::sheet::{self, CachGhi, DichSheet, DongBoSheet};
 use crate::boc_tach::loai_tai_lieu::LoaiTaiLieu;
 use crate::boc_tach::luu::{self, BanGhi};
 use crate::cau_hinh::{CachGhiSheet, CauHinhBocTach};
@@ -149,7 +149,8 @@ pub(crate) fn khop_loc(ten: &str, tt: &TrangThai, loc: &str, n_truong: usize) ->
 }
 
 /// Đích Google Sheet theo Cấu hình (khoá service account đọc từ file, URL Apps Script từ kho khoá).
-pub(crate) fn tao_dich_sheet(cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>) -> Result<DichSheet, String> {
+/// Tab trống ở Cấu hình → `tab_mac_dinh` (tên thư mục nguồn).
+pub(crate) fn tao_dich_sheet(cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>, tab_mac_dinh: &str) -> Result<DichSheet, String> {
     let cach = match cfg.sheet_cach {
         CachGhiSheet::ServiceAccount => {
             if cfg.sheet_file_khoa.trim().is_empty() {
@@ -163,7 +164,7 @@ pub(crate) fn tao_dich_sheet(cfg: &CauHinhBocTach, khoa: &BTreeMap<String, Strin
             bi_mat: khoa.get(super::cau_hinh::KHOA_APPS_SCRIPT_BI_MAT).cloned().unwrap_or_default(),
         },
     };
-    DichSheet::moi(cach, &cfg.sheet_link, &cfg.sheet_tab)
+    DichSheet::moi(cach, &cfg.sheet_link, if cfg.sheet_tab.trim().is_empty() { tab_mac_dinh } else { &cfg.sheet_tab })
 }
 
 fn giay(d: Duration) -> String {
@@ -220,7 +221,7 @@ impl ManBocTach {
         let anh = cfg.anh();
         let files: Vec<(usize, PathBuf)> = ds.iter().map(|&i| (i, self.files[i].duong_dan.clone())).collect();
         let loai_chay = loai.clone();
-        self.tao_sheet(cfg, khoa);
+        self.tao_sheet(cfg, khoa, ctx);
         let dung = Arc::new(AtomicBool::new(false));
         let (gui, nhan) = mpsc::channel();
         let (d2, ctx2) = (dung.clone(), ctx.clone());
@@ -265,7 +266,7 @@ impl ManBocTach {
                     c.ok += 1;
                     c.truong_boc += kq.so_co();
                     self.tt[i] = TrangThai::Xong(b);
-                    self.day_sheet(i, &loai);
+                    self.danh_dau_sheet();
                 }
                 SuKien::Loi(i, e) => {
                     let _ = luu::ghi_them(&f_jsonl, &BanGhi::loi(&self.files[i].ten, &loai, self.files[i].so_trang, &e));
@@ -275,7 +276,7 @@ impl ManBocTach {
                         Some(cu @ TrangThai::Xong(_)) => self.tt[i] = cu,
                         _ => {
                             self.tt[i] = TrangThai::Loi(e);
-                            self.day_sheet(i, &loai);
+                            self.danh_dau_sheet();
                         }
                     }
                 }
@@ -298,9 +299,19 @@ impl ManBocTach {
         }
     }
 
-    fn day_sheet(&self, i: usize, loai: &LoaiTaiLieu) {
-        if let (Some(h), Some(d)) = (&self.sheet, self.dong_excel(i, loai)) {
-            h.them(excel::dong_chu(&d, true));
+    /// Dữ liệu đổi → bật cờ; luồng đồng bộ ghi lại cả tab tối đa 1 lần / phút (không gọi API ở đây).
+    fn danh_dau_sheet(&self) {
+        if let Some(ds) = &self.sheet {
+            ds.danh_dau();
+        }
+    }
+
+    /// Mỗi khung hình: luồng đồng bộ xin bảng → nộp toàn bộ dòng hiện có (giống file Excel).
+    pub(crate) fn nop_sheet(&self) {
+        let (Some(ds), Some(loai)) = (&self.sheet, self.loai_chon()) else { return };
+        if ds.xin_bang() {
+            let dong = (0..self.files.len()).filter_map(|i| self.dong_excel(i, loai)).map(|d| excel::dong_chu(&d, true)).collect();
+            ds.nop(excel::tieu_de(loai, true), dong);
         }
     }
 
@@ -392,12 +403,15 @@ impl ManBocTach {
         };
         self.kq.sua = None;
         self.ghi_excel(cfg);
+        self.sua_sheet(cfg, khoa, ctx);
+    }
+
+    /// Sửa 1 file (Lưu / ReOCR) ngoài lượt chạy: chưa có đồng bộ Sheet thì tạo, rồi bật cờ.
+    fn sua_sheet(&mut self, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>, ctx: &egui::Context) {
         if self.sheet.is_none() {
-            self.tao_sheet(cfg, khoa);
+            self.tao_sheet(cfg, khoa, ctx);
         }
-        if let (Some(h), Some(d)) = (&self.sheet, self.dong_excel(i, &loai)) {
-            h.ghi_de(d.ten_file.clone(), excel::dong_chu(&d, true));
-        }
+        self.danh_dau_sheet();
     }
 
     /// Dòng Excel / Sheet của file `i` (đã đọc xong hoặc lỗi).
@@ -425,18 +439,19 @@ impl ManBocTach {
         self.excel = Some(excel::ghi(&f, &loai, &dong));
     }
 
-    /// Hàng đợi Google Sheet theo Cấu hình (ô Google Sheet đang bật); lỗi cấu hình → ghi vào `loi_sheet`.
-    fn tao_sheet(&mut self, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>) {
+    /// Đồng bộ Google Sheet theo Cấu hình (ô Google Sheet đang bật); lỗi cấu hình → ghi vào `loi_sheet`.
+    /// Tab trống ở Cấu hình = tên thư mục nguồn (mỗi thư mục 1 tab, ghi lại không đè thư mục khác).
+    fn tao_sheet(&mut self, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>, ctx: &egui::Context) {
         self.sheet = None;
         self.loi_sheet = None;
-        let Some(loai) = self.loai_chon().cloned() else { return };
-        if !cfg.ghi_sheet {
+        if !cfg.ghi_sheet || self.loai_chon().is_none() {
             return;
         }
-        match tao_dich_sheet(cfg, khoa) {
+        let nguon = Path::new(self.thu_muc.trim()).file_name().map_or_else(|| excel::TAB.to_string(), |s| s.to_string_lossy().into_owned());
+        match tao_dich_sheet(cfg, khoa, &nguon) {
             Ok(d) => {
-                self.tab_sheet = if cfg.sheet_tab.trim().is_empty() { excel::TAB.into() } else { cfg.sheet_tab.trim().into() };
-                self.sheet = Some(HangDoi::moi(d, excel::tieu_de(&loai, true)));
+                self.tab_sheet = if cfg.sheet_tab.trim().is_empty() { nguon } else { cfg.sheet_tab.trim().into() };
+                self.sheet = Some(DongBoSheet::moi(d, Some(ctx.clone()), self.khoang_sheet));
             }
             Err(e) => self.loi_sheet = Some(e),
         }
@@ -711,11 +726,9 @@ fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &Cau
     ui.allocate_rect(thanh, Sense::hover());
     if luu {
         luu_sua(m, loai, i, &fp.ten, fp.so_trang);
-        // Lưu ghi lại Excel + dòng của file đó trên Sheet
+        // Lưu: ghi lại Excel ngay; Sheet bật cờ, ghi lại cả tab trong ≤ 1 phút
         m.ghi_excel(cfg);
-        if let (Some(h), Some(d)) = (&m.sheet, m.dong_excel(i, loai)) {
-            h.ghi_de(d.ten_file.clone(), excel::dong_chu(&d, true));
-        }
+        m.sua_sheet(cfg, khoa, ui.ctx());
     }
     if ocr_lai {
         m.doc_lai(i, cfg, khoa, ui.ctx());
@@ -834,11 +847,15 @@ fn bang_day(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, hien: &[u
     let mut con = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_max(egui::pos2(dau.right() - 300.0, dau.top()), egui::pos2(o_dong.left() - 8.0, dau.bottom()))).layout(egui::Layout::right_to_left(egui::Align::Center)));
     con.spacing_mut().item_spacing.x = 4.0;
     let co_sheet = !cfg.sheet_link.trim().is_empty();
-    let tt_sheet = m.sheet.as_ref().map(HangDoi::trang_thai);
+    let tt_sheet = m.sheet.as_ref().map(DongBoSheet::trang_thai);
     let goi_sheet = match (&tt_sheet, &m.loi_sheet) {
         (_, Some(e)) => format!("Không ghi được Google Sheet: {e}"),
-        (Some(t), _) if t.loi.is_some() => format!("Đã ghi {} dòng, chờ gửi lại {} dòng: {}", t.da_gui, t.cho, t.loi.as_deref().unwrap_or("")),
-        (Some(t), _) => format!("Đã ghi {} dòng lên Google Sheet{}", t.da_gui, if t.cho > 0 { format!(", đang gửi {}", t.cho) } else { String::new() }),
+        (Some(t), _) => {
+            let lan = t.lan_ghi.map_or_else(|| "Chưa ghi lên Google Sheet".to_string(), |l| format!("Đã ghi {} dòng lên tab {} lúc {}", t.so_dong, m.tab_sheet, chrono::DateTime::<chrono::Local>::from(l).format("%H:%M:%S")));
+            let doi = if t.con_doi { "\nCó thay đổi — tự ghi lại cả tab trong ≤ 1 phút" } else { "" };
+            let loi = t.loi.as_deref().map_or_else(String::new, |e| format!("\nLần ghi gần nhất lỗi (sẽ thử lại): {e}"));
+            format!("{lan}{doi}{loi}")
+        }
         _ => "Mở Google Sheet trên trình duyệt".into(),
     };
     let mau_sheet = if m.loi_sheet.is_some() || tt_sheet.as_ref().is_some_and(|t| t.loi.is_some()) { DO } else { CHU };

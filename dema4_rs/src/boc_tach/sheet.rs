@@ -140,27 +140,61 @@ impl DichSheet {
         }
         let a = agent();
         let auth = format!("Bearer {tk}");
-        let v = tra_loi(a.get(&format!("{}/{}?fields=sheets.properties.title", self.url_sheets, self.sheet_id)).header("Authorization", &auth).call())?;
-        let co_tab = v["sheets"].as_array().is_some_and(|ds| ds.iter().any(|s| s["properties"]["title"].as_str() == Some(self.tab.as_str())));
-        if !co_tab {
+        let v = tra_loi(a.get(&format!("{}/{}?fields=sheets.properties(title,sheetId)", self.url_sheets, self.sheet_id)).header("Authorization", &auth).call())?;
+        let mut sheet_id = v["sheets"].as_array().and_then(|ds| ds.iter().find(|s| s["properties"]["title"].as_str() == Some(self.tab.as_str()))).and_then(|s| s["properties"]["sheetId"].as_i64());
+        if sheet_id.is_none() {
             let yc = json!({ "requests": [{ "addSheet": { "properties": { "title": self.tab } } }] });
-            tra_loi(a.post(&format!("{}/{}:batchUpdate", self.url_sheets, self.sheet_id)).header("Authorization", &auth).header("Content-Type", "application/json").send(yc.to_string()))?;
+            let v = tra_loi(a.post(&format!("{}/{}:batchUpdate", self.url_sheets, self.sheet_id)).header("Authorization", &auth).header("Content-Type", "application/json").send(yc.to_string()))?;
+            sheet_id = v["replies"][0]["addSheet"]["properties"]["sheetId"].as_i64();
         }
         let v = tra_loi(a.get(&format!("{}/{}/values/{}", self.url_sheets, self.sheet_id, self.pham_vi("1:1"))).header("Authorization", &auth).call())?;
         if v["values"].as_array().is_none_or(|d| d.is_empty()) {
             self.them_sa(tk, &[tieu_de.to_vec()])?;
+            // Tab mới (chưa có tiêu đề): định dạng 1 lần — không đè cách trình bày người dùng đã sửa ở tab cũ
+            if let Some(id) = sheet_id {
+                let yc = json!({ "requests": dinh_dang_tab(id, tieu_de) });
+                tra_loi(a.post(&format!("{}/{}:batchUpdate", self.url_sheets, self.sheet_id)).header("Authorization", &auth).header("Content-Type", "application/json").send(yc.to_string()))?;
+            }
         }
         *self.da_chuan_bi.lock().unwrap() = true;
         Ok(())
     }
 
+}
+
+/// Yêu cầu định dạng tab (giống file Excel): mọi ô xuống dòng + căn giữa dọc, tiêu đề đậm nền xám cố định,
+/// cột theo tên (Trích yếu rộng nhất), bộ lọc trên toàn bảng.
+fn dinh_dang_tab(sheet_id: i64, tieu_de: &[String]) -> Vec<Value> {
+    let n = tieu_de.len();
+    let mut yc = vec![
+        json!({ "repeatCell": {
+            "range": { "sheetId": sheet_id, "startColumnIndex": 0, "endColumnIndex": n },
+            "cell": { "userEnteredFormat": { "wrapStrategy": "WRAP", "verticalAlignment": "MIDDLE" } },
+            "fields": "userEnteredFormat(wrapStrategy,verticalAlignment)" } }),
+        json!({ "repeatCell": {
+            "range": { "sheetId": sheet_id, "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 0, "endColumnIndex": n },
+            "cell": { "userEnteredFormat": { "textFormat": { "bold": true }, "backgroundColor": { "red": 0.953, "green": 0.953, "blue": 0.953 } } },
+            "fields": "userEnteredFormat(textFormat,backgroundColor)" } }),
+        json!({ "updateSheetProperties": { "properties": { "sheetId": sheet_id, "gridProperties": { "frozenRowCount": 1 } }, "fields": "gridProperties.frozenRowCount" } }),
+        json!({ "setBasicFilter": { "filter": { "range": { "sheetId": sheet_id, "startRowIndex": 0, "startColumnIndex": 0, "endColumnIndex": n } } } }),
+    ];
+    for (c, t) in tieu_de.iter().enumerate() {
+        yc.push(json!({ "updateDimensionProperties": {
+            "range": { "sheetId": sheet_id, "dimension": "COLUMNS", "startIndex": c, "endIndex": c + 1 },
+            "properties": { "pixelSize": super::excel::rong_cot(t).1 }, "fields": "pixelSize" } }));
+    }
+    yc
+}
+
+impl DichSheet {
     fn them_sa(&self, tk: &str, dong: &[Vec<String>]) -> Result<(), String> {
         let url = format!("{}/{}/values/{}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS", self.url_sheets, self.sheet_id, self.pham_vi("A1"));
         tra_loi(agent().post(&url).header("Authorization", &format!("Bearer {tk}")).header("Content-Type", "application/json").send(json!({ "values": dong }).to_string())).map(|_| ())
     }
 
-    fn apps_script(&self, url: &str, bi_mat: &str, tieu_de: &[String], dong: &[Vec<String>], khoa: Option<&str>) -> Result<(), String> {
-        let yc = json!({ "tab": self.tab, "tieu_de": tieu_de, "dong": dong, "khoa": khoa, "bi_mat": bi_mat });
+    fn apps_script(&self, url: &str, bi_mat: &str, tieu_de: &[String], dong: &[Vec<String>], ghi_lai: bool) -> Result<(), String> {
+        // ghi_lai: script xoá dữ liệu dưới dòng tiêu đề rồi ghi cả bảng; không thì thêm dòng cuối tab
+        let yc = json!({ "tab": self.tab, "tieu_de": tieu_de, "dong": dong, "ghi_lai": ghi_lai, "bi_mat": bi_mat });
         let v = tra_loi(agent().post(url.trim()).header("Content-Type", "application/json").send(yc.to_string()))?;
         if v["ok"] == true {
             Ok(())
@@ -169,7 +203,7 @@ impl DichSheet {
         }
     }
 
-    /// Thêm các dòng vào cuối tab.
+    /// Thêm dòng cuối tab (chỉ dùng cho "Ghi thử 1 dòng" — không đụng dữ liệu đang có).
     pub fn them(&self, tieu_de: &[String], dong: &[Vec<String>]) -> Result<(), String> {
         match &self.cach {
             CachGhi::ServiceAccount { email, khoa_pem } => {
@@ -177,124 +211,137 @@ impl DichSheet {
                 self.chuan_bi(&tk, tieu_de)?;
                 self.them_sa(&tk, dong)
             }
-            CachGhi::AppsScript { url, bi_mat } => self.apps_script(url, bi_mat, tieu_de, dong, None),
+            CachGhi::AppsScript { url, bi_mat } => self.apps_script(url, bi_mat, tieu_de, dong, false),
         }
     }
 
-    /// Ghi đè dòng có cột A = `ten_file` (sửa tay); chưa có thì thêm.
-    pub fn ghi_de(&self, tieu_de: &[String], ten_file: &str, dong: &[String]) -> Result<(), String> {
+    /// Ghi lại toàn bộ tab = bản sao kết quả (giống file Excel): ghi cả bảng từ A1 rồi xoá phần thừa phía dưới.
+    /// Service account: 2 lần gọi mỗi lần ghi, dù đổi 1 dòng hay 1.000 dòng; định dạng / bộ lọc của tab giữ nguyên.
+    pub fn ghi_lai(&self, tieu_de: &[String], dong: &[Vec<String>]) -> Result<(), String> {
         match &self.cach {
             CachGhi::ServiceAccount { email, khoa_pem } => {
                 let tk = self.token(email, khoa_pem)?;
                 self.chuan_bi(&tk, tieu_de)?;
                 let auth = format!("Bearer {tk}");
-                let v = tra_loi(agent().get(&format!("{}/{}/values/{}", self.url_sheets, self.sheet_id, self.pham_vi("A:A"))).header("Authorization", &auth).call())?;
-                let hang = v["values"].as_array().and_then(|ds| ds.iter().rposition(|d| d[0].as_str() == Some(ten_file)));
-                match hang {
-                    Some(h) => {
-                        let url = format!("{}/{}/values/{}?valueInputOption=RAW", self.url_sheets, self.sheet_id, self.pham_vi(&format!("A{}", h + 1)));
-                        tra_loi(agent().put(&url).header("Authorization", &auth).header("Content-Type", "application/json").send(json!({ "values": [dong] }).to_string())).map(|_| ())
-                    }
-                    None => self.them_sa(&tk, &[dong.to_vec()]),
-                }
+                let mut bang = vec![tieu_de.to_vec()];
+                bang.extend(dong.iter().cloned());
+                let url = format!("{}/{}/values/{}?valueInputOption=RAW", self.url_sheets, self.sheet_id, self.pham_vi("A1"));
+                tra_loi(agent().put(&url).header("Authorization", &auth).header("Content-Type", "application/json").send(json!({ "values": bang }).to_string()))?;
+                // Ghi trước, xoá sau: người đang xem Sheet không thấy tab trống giữa chừng
+                let thua = self.pham_vi(&format!("A{}:ZZ", bang.len() + 1));
+                tra_loi(agent().post(&format!("{}/{}/values/{thua}:clear", self.url_sheets, self.sheet_id)).header("Authorization", &auth).header("Content-Type", "application/json").send("{}"))?;
+                Ok(())
             }
-            CachGhi::AppsScript { url, bi_mat } => self.apps_script(url, bi_mat, tieu_de, &[dong.to_vec()], Some(ten_file)),
+            CachGhi::AppsScript { url, bi_mat } => self.apps_script(url, bi_mat, tieu_de, dong, true),
         }
     }
 }
 
-/// Trạng thái hàng đợi gửi Sheet (hiện ở popup xong / bảng đáy).
+/// Trạng thái đồng bộ Sheet (bảng đáy, popup xong).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TrangThaiGui {
-    pub da_gui: usize,
-    pub cho: usize,
+    /// Số dòng của lần ghi gần nhất.
+    pub so_dong: usize,
+    pub lan_ghi: Option<std::time::SystemTime>,
+    /// Có thay đổi chưa ghi (sẽ ghi trong ≤ 1 phút).
+    pub con_doi: bool,
     pub loi: Option<String>,
 }
 
-enum Viec {
-    Them(Vec<String>),
-    GhiDe(String, Vec<String>),
+/// 2 lần ghi lại toàn bộ cách nhau ít nhất chừng này: dữ liệu đổi liên tục cũng chỉ ghi 1 lần / phút (Sheet không khoá).
+pub const KHOANG_GHI: Duration = Duration::from_secs(60);
+
+#[derive(Default)]
+struct Chung {
+    thay_doi: bool,
+    xin_bang: bool,
+    bang: Option<(Vec<String>, Vec<Vec<String>>)>,
+    tt: TrangThaiGui,
 }
 
-/// Hàng đợi gửi Sheet trên luồng nền: gom dòng gửi 1 lần; lỗi → giữ lại, thử lại sau 5 → 60 s.
-pub struct HangDoi {
-    gui: Sender<Viec>,
-    pub tt: Arc<Mutex<TrangThaiGui>>,
+/// Đồng bộ Sheet chạy nền theo cờ: giao diện chỉ `danh_dau()` khi dữ liệu đổi (không gọi API); luồng nền thấy cờ và
+/// đã qua `khoang` kể từ lần ghi trước thì xin bảng (giao diện nộp bằng `nop` — dựng bảng tối đa 1 lần / phút) rồi ghi
+/// lại toàn bộ tab. Lỗi → giữ cờ, thử lại sau 5 → 60 s.
+pub struct DongBoSheet {
+    chung: Arc<Mutex<Chung>>,
+    _dung: Sender<()>,
 }
 
-impl HangDoi {
-    pub fn moi(dich: DichSheet, tieu_de: Vec<String>) -> Self {
-        let (gui, nhan) = mpsc::channel();
-        let tt = Arc::new(Mutex::new(TrangThaiGui::default()));
-        let tt2 = tt.clone();
-        std::thread::spawn(move || luong_gui(dich, tieu_de, nhan, tt2));
-        Self { gui, tt }
+impl DongBoSheet {
+    pub fn moi(dich: DichSheet, ctx: Option<eframe::egui::Context>, khoang: Duration) -> Self {
+        let chung = Arc::new(Mutex::new(Chung::default()));
+        let (dung, nhan_dung) = mpsc::channel::<()>();
+        let c2 = chung.clone();
+        std::thread::spawn(move || luong_dong_bo(dich, c2, nhan_dung, ctx, khoang));
+        Self { chung, _dung: dung }
     }
 
-    pub fn them(&self, dong: Vec<String>) {
-        self.tt.lock().unwrap().cho += 1;
-        let _ = self.gui.send(Viec::Them(dong));
+    /// Dữ liệu vừa đổi (đọc xong 1 file, Lưu sửa tay, ReOCR).
+    pub fn danh_dau(&self) {
+        let mut c = self.chung.lock().unwrap();
+        c.thay_doi = true;
+        c.tt.con_doi = true;
     }
 
-    pub fn ghi_de(&self, ten_file: String, dong: Vec<String>) {
-        self.tt.lock().unwrap().cho += 1;
-        let _ = self.gui.send(Viec::GhiDe(ten_file, dong));
+    /// Luồng nền đang chờ bảng để ghi.
+    pub fn xin_bang(&self) -> bool {
+        self.chung.lock().unwrap().xin_bang
+    }
+
+    pub fn nop(&self, tieu_de: Vec<String>, dong: Vec<Vec<String>>) {
+        let mut c = self.chung.lock().unwrap();
+        c.bang = Some((tieu_de, dong));
+        c.xin_bang = false;
     }
 
     pub fn trang_thai(&self) -> TrangThaiGui {
-        self.tt.lock().unwrap().clone()
+        self.chung.lock().unwrap().tt.clone()
     }
 }
 
-fn luong_gui(dich: DichSheet, tieu_de: Vec<String>, nhan: Receiver<Viec>, tt: Arc<Mutex<TrangThaiGui>>) {
-    let mut cho: Vec<Viec> = Vec::new();
-    let mut doi = Duration::from_millis(300);
+fn luong_dong_bo(dich: DichSheet, chung: Arc<Mutex<Chung>>, dung: Receiver<()>, ctx: Option<eframe::egui::Context>, khoang: Duration) {
+    let mut lan_ghi: Option<Instant> = None;
+    let mut thu_lai_luc: Option<Instant> = None;
     let mut lan_loi = 0u32;
     loop {
-        match nhan.recv_timeout(doi) {
-            Ok(v) => {
-                cho.push(v);
-                while let Ok(v) = nhan.try_recv() {
-                    cho.push(v);
+        // Kênh đóng (giao diện bỏ đồng bộ này) → ghi nốt nếu đang có bảng rồi thôi
+        let het = matches!(dung.recv_timeout(Duration::from_millis(250)), Err(RecvTimeoutError::Disconnected));
+        let bay_gio = Instant::now();
+        let bang = {
+            let mut c = chung.lock().unwrap();
+            let den_luc = lan_ghi.is_none_or(|t| bay_gio - t >= khoang) && thu_lai_luc.is_none_or(|t| bay_gio >= t);
+            if c.thay_doi && den_luc && c.bang.is_none() && !c.xin_bang {
+                c.thay_doi = false;
+                c.xin_bang = true;
+                // Đánh thức giao diện để nộp bảng (giao diện ngủ khi không có thao tác)
+                if let Some(ctx) = &ctx {
+                    ctx.request_repaint();
                 }
             }
-            Err(RecvTimeoutError::Timeout) => {}
-            Err(RecvTimeoutError::Disconnected) if cho.is_empty() => return,
-            Err(RecvTimeoutError::Disconnected) => {}
-        }
-        if cho.is_empty() {
-            continue;
-        }
-        // Gom các dòng Thêm liền nhau thành 1 yêu cầu; Ghi đè gửi riêng
-        let mut kq = Ok(0);
-        while !cho.is_empty() && kq.is_ok() {
-            let so_them = cho.iter().take_while(|v| matches!(v, Viec::Them(_))).count();
-            kq = if so_them > 0 {
-                let dong: Vec<Vec<String>> = cho[..so_them].iter().map(|v| if let Viec::Them(d) = v { d.clone() } else { vec![] }).collect();
-                dich.them(&tieu_de, &dong).map(|_| so_them)
-            } else if let Viec::GhiDe(t, d) = &cho[0] {
-                dich.ghi_de(&tieu_de, t, d).map(|_| 1)
-            } else {
-                Ok(0)
-            };
-            if let Ok(n) = kq {
-                cho.drain(..n);
-                let mut t = tt.lock().unwrap();
-                t.da_gui += n;
-                t.cho = t.cho.saturating_sub(n);
-                t.loi = None;
+            c.bang.take()
+        };
+        if let Some((td, dong)) = bang {
+            lan_ghi = Some(Instant::now());
+            let kq = dich.ghi_lai(&td, &dong);
+            let mut c = chung.lock().unwrap();
+            match kq {
+                Ok(()) => {
+                    lan_loi = 0;
+                    thu_lai_luc = None;
+                    c.tt.so_dong = dong.len();
+                    c.tt.lan_ghi = Some(std::time::SystemTime::now());
+                    c.tt.loi = None;
+                    c.tt.con_doi = c.thay_doi;
+                }
+                Err(e) => {
+                    c.thay_doi = true;
+                    c.tt.loi = Some(e);
+                    lan_loi += 1;
+                    thu_lai_luc = Some(Instant::now() + Duration::from_secs((5u64 << lan_loi.min(4)).min(60)));
+                }
             }
-        }
-        match kq {
-            Ok(_) => {
-                lan_loi = 0;
-                doi = Duration::from_millis(300);
-            }
-            Err(e) => {
-                tt.lock().unwrap().loi = Some(e);
-                lan_loi += 1;
-                doi = Duration::from_secs((5u64 << lan_loi.min(4)).min(60));
-            }
+        } else if het {
+            return;
         }
     }
 }
@@ -333,61 +380,114 @@ mod tests {
     }
 
     #[test]
-    fn service_account_tao_tab_tieu_de_them_va_ghi_de() {
+    fn service_account_ghi_lai_toan_bo_tab() {
         let (pem, _) = khoa_thu();
         let ok = |v: Value| (200, vec![], v.to_string());
         let (dc, nhan) = may_chu_gia(vec![
             ok(json!({ "access_token": "tk-1", "expires_in": 3600 })),
-            ok(json!({ "sheets": [{ "properties": { "title": "Sheet1" } }] })),
+            ok(json!({ "sheets": [{ "properties": { "title": "Sheet1", "sheetId": 0 } }] })),
+            ok(json!({ "replies": [{ "addSheet": { "properties": { "sheetId": 777, "title": "Van_ban" } } }] })),
+            ok(json!({ "range": "'Van_ban'!A1:Z1" })),
             ok(json!({})),
-            ok(json!({ "range": "'Boc_tach'!A1:Z1" })),
             ok(json!({})),
             ok(json!({})),
-            ok(json!({ "values": [["Tên file"], ["a.pdf"], ["b.pdf"]] })),
+            ok(json!({})),
+            ok(json!({})),
             ok(json!({})),
         ]);
-        let d = DichSheet::moi(CachGhi::ServiceAccount { email: "e@x.iam.gserviceaccount.com".into(), khoa_pem: pem }, "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit", "Boc_tach").unwrap().dia_chi_thu(dc.trim_end_matches("/v1"));
+        let d = DichSheet::moi(CachGhi::ServiceAccount { email: "e@x.iam.gserviceaccount.com".into(), khoa_pem: pem }, "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit", "Van_ban").unwrap().dia_chi_thu(dc.trim_end_matches("/v1"));
         let td: Vec<String> = ["Tên file", "Số ký hiệu"].map(String::from).to_vec();
-        d.them(&td, &[vec!["a.pdf".into(), "1/QĐ".into()], vec!["b.pdf".into(), "2/QĐ".into()]]).unwrap();
-        d.ghi_de(&td, "b.pdf", &["b.pdf".into(), "2/QĐ-UBND".into()]).unwrap();
+        d.ghi_lai(&td, &[vec!["a.pdf".into(), "1/QĐ".into()], vec!["b.pdf".into(), "2/QĐ".into()]]).unwrap();
+        d.ghi_lai(&td, &[vec!["a.pdf".into(), "1/QĐ".into()], vec!["b.pdf".into(), "2/QĐ-UBND".into()]]).unwrap();
         let yc: Vec<String> = nhan.try_iter().collect();
-        assert!(yc[0].starts_with("POST /token") && yc[0].contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=ey"));
-        assert!(yc[1].starts_with("GET /sheets/1AbCdEfGhIjKlMnOpQrStUvWxYz?fields=") && yc[1].contains("Bearer tk-1"));
-        assert!(yc[2].starts_with("POST /sheets/1AbCdEfGhIjKlMnOpQrStUvWxYz:batchUpdate") && yc[2].contains("addSheet"), "chưa có tab → tạo");
-        assert!(yc[4].contains(":append") && yc[4].contains("Số ký hiệu"), "tab trống → ghi tiêu đề");
-        assert!(yc[5].contains(":append") && yc[5].contains("1/QĐ") && yc[5].contains("2/QĐ"), "gom 2 dòng 1 yêu cầu");
-        assert!(yc[6].starts_with("GET /sheets/1AbCdEfGhIjKlMnOpQrStUvWxYz/values/%27Boc_tach%27%21A%3AA"));
-        assert!(yc[7].starts_with("PUT /sheets/1AbCdEfGhIjKlMnOpQrStUvWxYz/values/%27Boc_tach%27%21A3?") && yc[7].contains("2/QĐ-UBND"), "ghi đè dòng 3 (b.pdf)");
-        assert_eq!(yc.len(), 8, "token dùng lại, không chuẩn bị lại tab");
+        assert!(yc[0].starts_with("POST /token") && yc[0].contains("assertion=ey"));
+        assert!(yc[2].contains(":batchUpdate") && yc[2].contains("addSheet"), "chưa có tab → tạo");
+        assert!(yc[5].contains(":batchUpdate") && yc[5].contains("\"sheetId\":777") && yc[5].contains("WRAP") && yc[5].contains("MIDDLE") && yc[5].contains("setBasicFilter"), "tab mới → định dạng");
+        assert!(yc[6].starts_with("PUT /sheets/1AbCdEfGhIjKlMnOpQrStUvWxYz/values/%27Van_ban%27%21A1?valueInputOption=RAW") && yc[6].contains("[[\"Tên file\",\"Số ký hiệu\"],[\"a.pdf\""), "ghi cả bảng từ A1");
+        assert!(yc[7].starts_with("POST /sheets/1AbCdEfGhIjKlMnOpQrStUvWxYz/values/%27Van_ban%27%21A4%3AZZ:clear"), "xoá phần thừa dưới bảng");
+        assert!(yc[8].starts_with("PUT ") && yc[8].contains("2/QĐ-UBND") && yc[9].contains(":clear"), "lần sau: lại 2 lần gọi, không chuẩn bị lại tab");
+        assert_eq!(yc.len(), 10);
     }
 
     #[test]
-    fn apps_script_va_hang_doi_thu_lai_khi_loi() {
+    fn apps_script_ghi_lai_va_them() {
         let (dc, nhan) = may_chu_gia(vec![(500, vec![], "lỗi".into()), (200, vec![], json!({ "ok": true }).to_string()), (200, vec![], json!({ "ok": false, "loi": "Sai tab" }).to_string())]);
         let d = DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec"), bi_mat: "bm".into() }, "", "").unwrap();
         let td = vec!["Tên file".to_string()];
-        assert!(d.them(&td, &[vec!["a.pdf".into()]]).unwrap_err().contains("500"));
-        d.them(&td, &[vec!["a.pdf".into()]]).unwrap();
-        assert_eq!(d.ghi_de(&td, "a.pdf", &["a.pdf".into()]).unwrap_err(), "Apps Script báo lỗi: Sai tab");
+        assert!(d.ghi_lai(&td, &[vec!["a.pdf".into()]]).unwrap_err().contains("500"));
+        d.ghi_lai(&td, &[vec!["a.pdf".into()]]).unwrap();
+        assert_eq!(d.them(&td, &[vec!["thu".into()]]).unwrap_err(), "Apps Script báo lỗi: Sai tab");
         let yc: Vec<String> = nhan.try_iter().collect();
-        assert!(yc[1].contains("\"tab\":\"Boc_tach\"") && yc[1].contains("\"dong\":[[\"a.pdf\"]]"));
-        assert!(yc[2].contains("\"khoa\":\"a.pdf\"") && yc[2].contains("\"bi_mat\":\"bm\""));
+        assert!(yc[1].contains("\"ghi_lai\":true") && yc[1].contains("\"bi_mat\":\"bm\"") && yc[1].contains("\"tab\":\"Boc_tach\""));
+        assert!(yc[2].contains("\"ghi_lai\":false"), "Ghi thử: chỉ thêm dòng");
         assert!(DichSheet::moi(CachGhi::AppsScript { url: "abc".into(), bi_mat: String::new() }, "", "").is_err());
     }
 
+    /// Ghi thật lên Google Sheet: DEMA4_SA_KEY=<file khoá .json> DEMA4_SHEET=<link> [DEMA4_TAB=<tab>].
     #[test]
-    fn hang_doi_gom_dong_va_dem() {
-        let (dc, nhan) = may_chu_gia(vec![(200, vec![], json!({ "ok": true }).to_string()), (200, vec![], json!({ "ok": true }).to_string())]);
-        let h = HangDoi::moi(DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec"), bi_mat: "bm".into() }, "", "Kq").unwrap(), vec!["Tên file".into()]);
-        h.them(vec!["a.pdf".into()]);
-        h.them(vec!["b.pdf".into()]);
+    #[ignore]
+    fn ghi_that_len_google_sheet() {
+        let (Ok(khoa), Ok(link)) = (std::env::var("DEMA4_SA_KEY"), std::env::var("DEMA4_SHEET")) else { return };
+        let (email, khoa_pem) = doc_khoa_sa(&khoa).unwrap();
+        let tab = std::env::var("DEMA4_TAB").unwrap_or_else(|_| "Boc_tach_thu".into());
+        let d = DichSheet::moi(CachGhi::ServiceAccount { email: email.clone(), khoa_pem: khoa_pem.clone() }, &link, &tab).unwrap();
+        let td: Vec<String> = ["Tên file", "Hồ sơ", "Số trang", "Số, ký hiệu", "Ngày tháng", "Trích yếu"].map(String::from).to_vec();
+        let dong = |n: usize, hau: &str| (1..=n).map(|i| vec![format!("VB{i:02}.pdf"), "HS-01".into(), "2".into(), format!("{i}/QĐ-UBND{hau}"), "01/02/2015".into(), format!("Trích yếu văn bản {i} rất dài để kiểm tra xuống dòng và căn giữa theo chiều dọc của ô")]).collect::<Vec<_>>();
+        d.ghi_lai(&td, &dong(5, "")).unwrap();
+        d.ghi_lai(&td, &dong(3, "-sua")).unwrap();
+        let tk = d.token(&email, &khoa_pem).unwrap();
+        let v = tra_loi(agent().get(&format!("{}/{}/values/{}", d.url_sheets, d.sheet_id, d.pham_vi("A1:Z"))).header("Authorization", &format!("Bearer {tk}")).call()).unwrap();
+        let o = v["values"].as_array().unwrap();
+        assert_eq!(o.len(), 4, "tiêu đề + 3 dòng, 2 dòng thừa đã xoá: {o:?}");
+        assert_eq!(o[3][3], "3/QĐ-UBND-sua");
+        assert_eq!(o[1][4], "01/02/2015", "ngày giữ dạng chữ");
+        let p = tra_loi(agent().get(&format!("{}/{}?fields=sheets(properties(title,gridProperties.frozenRowCount),basicFilter.range,data.columnMetadata.pixelSize)", d.url_sheets, d.sheet_id)).header("Authorization", &format!("Bearer {tk}")).call()).unwrap();
+        let t = p["sheets"].as_array().unwrap().iter().find(|t| t["properties"]["title"] == tab.as_str()).unwrap();
+        assert_eq!(t["properties"]["gridProperties"]["frozenRowCount"], 1);
+        assert!(t["basicFilter"]["range"].is_object(), "có bộ lọc");
+        assert_eq!(t["data"][0]["columnMetadata"][5]["pixelSize"], 480, "Trích yếu rộng nhất");
+    }
+
+    #[test]
+    fn dong_bo_theo_co_toi_da_1_lan_moi_khoang() {
+        let ok = json!({ "ok": true }).to_string();
+        let (dc, nhan) = may_chu_gia(vec![(200, vec![], ok.clone()), (200, vec![], ok)]);
+        let ds = DongBoSheet::moi(DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec"), bi_mat: String::new() }, "", "Kq").unwrap(), None, Duration::from_millis(1500));
+        let nop = |ds: &DongBoSheet, n: usize| {
+            for _ in 0..100 {
+                if ds.xin_bang() {
+                    ds.nop(vec!["Tên file".into()], (0..n).map(|i| vec![format!("{i}.pdf")]).collect());
+                    return true;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            false
+        };
+        std::thread::sleep(Duration::from_millis(400));
+        assert!(!ds.xin_bang(), "chưa có thay đổi → không xin bảng, không gọi API");
+        ds.danh_dau();
+        assert!(nop(&ds, 2), "thay đổi đầu tiên → ghi ngay");
         for _ in 0..100 {
-            if h.trang_thai().da_gui == 2 {
+            if ds.trang_thai().so_dong == 2 {
                 break;
             }
             std::thread::sleep(Duration::from_millis(20));
         }
-        assert_eq!(h.trang_thai(), TrangThaiGui { da_gui: 2, cho: 0, loi: None });
-        assert!(nhan.try_iter().count() <= 2);
+        // Đổi liên tục ngay sau đó: chưa tới khoảng → chưa ghi
+        for _ in 0..5 {
+            ds.danh_dau();
+        }
+        std::thread::sleep(Duration::from_millis(500));
+        assert!(!ds.xin_bang() && ds.trang_thai().con_doi, "trong khoảng chờ: chỉ giữ cờ");
+        assert!(nop(&ds, 3), "hết khoảng → ghi lại 1 lần với bảng mới nhất");
+        for _ in 0..100 {
+            if ds.trang_thai().so_dong == 3 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let yc: Vec<String> = nhan.try_iter().collect();
+        assert_eq!(yc.len(), 2, "5 lần đánh dấu liên tiếp → 1 lần ghi");
+        assert!(yc[1].contains("2.pdf") && !ds.trang_thai().con_doi);
     }
 }

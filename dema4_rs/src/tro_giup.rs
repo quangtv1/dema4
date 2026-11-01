@@ -271,7 +271,7 @@ const HD_BOC_TACH: &[Khoi] = &[
     Khoi::Muc("Kết quả"),
     Khoi::Bang(&[
         ("Excel", "`<tên thư mục>_boc_tach.xlsx` cạnh thư mục nguồn (hoặc thư mục đặt ở Cấu hình): mỗi file 1 dòng, nạp thẳng vào Sinh mục lục làm file biên mục."),
-        ("Google Sheet", "Bật ô *Google Sheet*: ghi thêm 1 dòng sau mỗi file (khoá service account hoặc Apps Script, khai ở Cấu hình). Mất mạng thì tự gửi lại sau."),
+        ("Google Sheet", "Bật ô *Google Sheet*: tab trên Sheet là bản sao kết quả như file Excel (khoá service account hoặc Apps Script, khai ở Cấu hình). Có thay đổi (đọc xong file, Lưu, ReOCR) thì tự ghi lại cả tab, tối đa 1 lần mỗi phút; tab để trống = tên thư mục nguồn. Mất mạng thì tự thử lại."),
         ("Lượt chạy", "Mỗi lần *Bắt đầu* / *Chạy lại* có ít nhất 1 file đọc được = 1 lượt; *Thử đọc* không tính."),
     ]),
     Khoi::Ghi("Mỗi trang cần đọc được gửi tới mô hình đọc đã chọn: máy chủ nội bộ thì ảnh không ra khỏi mạng đơn vị; dịch vụ đám mây (Gemini, Claude, GPT, OpenRouter) thì ảnh gửi tới máy chủ của hãng — không dùng cho tài liệu mật. Khoá API lưu mã hoá trên máy."),

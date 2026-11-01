@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use rust_xlsxwriter::{Format, Workbook};
+use rust_xlsxwriter::{Format, FormatAlign, Workbook};
 
 use super::loai_tai_lieu::LoaiTaiLieu;
 
@@ -37,6 +37,18 @@ pub fn tieu_de(loai: &LoaiTaiLieu, co_loi: bool) -> Vec<String> {
     t
 }
 
+/// Bề rộng cột theo tên cột (Excel: số ký tự; Google Sheet: pixel) — Trích yếu / Nội dung rộng nhất.
+pub fn rong_cot(ten: &str) -> (f64, u32) {
+    match crate::muc_luc::khop::chuan_hoa(ten).as_str() {
+        "trichyeu" | "noidung" => (70.0, 480),
+        "tenfile" => (30.0, 220),
+        "loiboctach" => (40.0, 280),
+        "hoso" => (14.0, 110),
+        "sotrang" => (9.0, 70),
+        _ => (22.0, 160),
+    }
+}
+
 /// Dòng dạng chữ (Google Sheet).
 pub fn dong_chu(d: &DongExcel, co_loi: bool) -> Vec<String> {
     let mut v = vec![d.ten_file.clone(), d.ho_so.clone(), d.so_trang.to_string()];
@@ -65,33 +77,30 @@ fn ghi_vao(duong_dan: &Path, loai: &LoaiTaiLieu, dong: &[DongExcel]) -> Result<(
     let mut wb = Workbook::new();
     let ws = wb.add_worksheet();
     ws.set_name(TAB).map_err(|e| e.to_string())?;
-    let dam = Format::new().set_bold().set_background_color(0xF3F3F3);
-    let chu = Format::new().set_num_format("@");
+    // Mọi ô: xuống dòng, căn giữa theo chiều dọc; ô chữ định dạng văn bản (@) để Excel không đổi số ký hiệu / ngày
+    let dam = Format::new().set_bold().set_background_color(0xF3F3F3).set_text_wrap().set_align(FormatAlign::VerticalCenter);
+    let chu = Format::new().set_num_format("@").set_text_wrap().set_align(FormatAlign::VerticalCenter);
+    let so = Format::new().set_align(FormatAlign::VerticalCenter).set_align(FormatAlign::Center);
     let td = tieu_de(loai, co_loi);
     for (c, t) in td.iter().enumerate() {
         ws.write_string_with_format(0, c as u16, t, &dam).map_err(|e| e.to_string())?;
-        let rong = match c {
-            0 => 28.0,
-            1 => 14.0,
-            2 => 9.0,
-            _ if loai.truong.get(c - 3).is_some_and(|t| t.bien == "trich_yeu" || t.bien == "noi_dung") => 60.0,
-            _ => 20.0,
-        };
-        ws.set_column_width(c as u16, rong).map_err(|e| e.to_string())?;
+        ws.set_column_width(c as u16, rong_cot(t).0).map_err(|e| e.to_string())?;
     }
     for (r, d) in dong.iter().enumerate() {
         let r = r as u32 + 1;
         ws.write_string_with_format(r, 0, &d.ten_file, &chu).map_err(|e| e.to_string())?;
         ws.write_string_with_format(r, 1, &d.ho_so, &chu).map_err(|e| e.to_string())?;
-        ws.write_number(r, 2, d.so_trang as f64).map_err(|e| e.to_string())?;
+        ws.write_number_with_format(r, 2, d.so_trang as f64, &so).map_err(|e| e.to_string())?;
         for (k, g) in d.gia_tri.iter().enumerate() {
             ws.write_string_with_format(r, 3 + k as u16, g, &chu).map_err(|e| e.to_string())?;
         }
         if let (true, Some(l)) = (co_loi, &d.loi) {
-            ws.write_string(r, 3 + loai.truong.len() as u16, l).map_err(|e| e.to_string())?;
+            ws.write_string_with_format(r, 3 + loai.truong.len() as u16, l, &chu).map_err(|e| e.to_string())?;
         }
     }
+    // Dòng tiêu đề cố định + bộ lọc trên toàn bảng
     ws.set_freeze_panes(1, 0).map_err(|e| e.to_string())?;
+    ws.autofilter(0, 0, dong.len() as u32, td.len().saturating_sub(1) as u16).map_err(|e| e.to_string())?;
     if let Some(cha) = duong_dan.parent() {
         std::fs::create_dir_all(cha).map_err(|e| format!("Không tạo được thư mục {}: {e}", cha.display()))?;
     }
@@ -128,6 +137,16 @@ mod tests {
         assert_eq!(bang.dong[0][5], "20/01/2015", "ngày giữ dạng chữ, không thành số");
         assert_eq!(bang.dong[1][9], "Máy chủ báo lỗi 500");
         // Biến mẫu Sinh mục lục tự khớp tên cột (so khớp không dấu)
+        // Bộ lọc + xuống dòng có trong file xlsx
+        let xml = {
+            let mut z = zip::ZipArchive::new(std::fs::File::open(&f).unwrap()).unwrap();
+            let mut s = String::new();
+            std::io::Read::read_to_string(&mut z.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut s).unwrap();
+            s
+        };
+        assert!(xml.contains("<autoFilter ref=\"A1:J3\""), "có bộ lọc");
+        assert_eq!(rong_cot("Trích yếu").0, 70.0);
+        assert!(["Tên file", "Hồ sơ", "Số trang", "Loại văn bản", "Ngày tháng", "Người ký"].iter().all(|t| rong_cot(t).0 < rong_cot("Trích yếu").0), "Trích yếu rộng nhất");
         let khop: Vec<_> = ["so_ky_hieu", "ngay_thang", "tac_gia", "trich_yeu"].iter().map(|b| bang.tieu_de.iter().any(|t| crate::muc_luc::khop::chuan_hoa(t) == crate::muc_luc::khop::chuan_hoa(b))).collect();
         assert_eq!(khop, [true; 4]);
         let _ = std::fs::remove_dir_all(&d);

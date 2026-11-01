@@ -163,6 +163,7 @@ pub struct CauHinhBocTach {
     /// Thư mục ghi Excel; trống = cạnh thư mục nguồn.
     pub thu_muc_excel: String,
     pub sheet_link: String,
+    /// Tab Google Sheet; trống = tên thư mục nguồn.
     pub sheet_tab: String,
     pub sheet_cach: CachGhiSheet,
     /// File khoá JSON service account (đường dẫn; nội dung không chép vào cấu hình).
@@ -181,7 +182,7 @@ impl Default for CauHinhBocTach {
             jpeg: 90,
             thu_muc_excel: String::new(),
             sheet_link: String::new(),
-            sheet_tab: "Boc_tach".into(),
+            sheet_tab: String::new(),
             sheet_cach: CachGhiSheet::ServiceAccount,
             sheet_file_khoa: String::new(),
             ghi_sheet: false,
