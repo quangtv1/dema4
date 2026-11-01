@@ -300,4 +300,33 @@ mod tests {
         }
         println!("{}/{} trường · {} trang · {:.1} s", kq.so_co(), loai.truong.len(), kq.so_trang, kq.thoi_gian.as_secs_f32());
     }
+
+    /// Gọi thật Gemini (Vertex AI express) với 1 PDF, lần lượt từng model trong danh sách có sẵn:
+    /// DEMA4_GEMINI_KEY=<khoá> DEMA4_GEMINI_PDF=<file.pdf> [DEMA4_GEMINI_MODEL=<model>] [DEMA4_GEMINI_AISTUDIO=1].
+    #[test]
+    #[ignore]
+    fn gemini_that_doc_1_pdf() {
+        use crate::boc_tach::mo_hinh::{KetNoi, NhaCungCap};
+        let (Ok(khoa), Ok(pdf)) = (std::env::var("DEMA4_GEMINI_KEY"), std::env::var("DEMA4_GEMINI_PDF")) else { return };
+        let ds: Vec<String> = std::env::var("DEMA4_GEMINI_MODEL").map_or_else(|_| NhaCungCap::Gemini.ds_model().iter().map(|m| m.to_string()).collect(), |m| vec![m]);
+        let loai = &crate::boc_tach::loai_tai_lieu::co_san()[0];
+        let anh = crate::cau_hinh::CauHinh::default().boc_tach.anh();
+        for m in ds {
+            let mut kn = KetNoi::moi(NhaCungCap::Gemini, "", &khoa, &m);
+            if std::env::var("DEMA4_GEMINI_AISTUDIO").is_err() {
+                kn = kn.vertex();
+            }
+            kn.max_tokens = NhaCungCap::Gemini.max_tokens_mac_dinh();
+            let bd = std::time::Instant::now();
+            match doc_file(std::path::Path::new(&pdf), loai, &anh, &kn, &AtomicBool::new(false)) {
+                Ok(kq) => {
+                    eprintln!("✓ {m} ({:.1}s): {}/{} trường · {:?}", bd.elapsed().as_secs_f32(), kq.so_co(), loai.truong.len(), kq.gia_tri);
+                    if std::env::var("DEMA4_GEMINI_THO").is_ok() {
+                        kq.tho.iter().for_each(|(t, s)| eprintln!("  thô trang {t}: {s}"));
+                    }
+                }
+                Err(e) => eprintln!("✗ {m}: {e}"),
+            }
+        }
+    }
 }

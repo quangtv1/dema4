@@ -112,7 +112,8 @@ pub const RONG_TRAI_ML: (f32, f32) = (220.0, 600.0);
 /// Thông số 1 nhà cung cấp mô hình đọc (khoá `bt_<mã>_*`). Khoá API không ở đây: lưu mã hoá trong `boc_tach::khoa_cache`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MoHinhBocTach {
-    /// Trống = địa chỉ mặc định của dịch vụ đám mây (Nội bộ bắt buộc nhập).
+    /// Trống = địa chỉ mặc định của dịch vụ đám mây (Nội bộ bắt buộc nhập). Sửa được (proxy / cổng riêng của đơn vị);
+    /// dịch vụ đám mây chỉ nhận `https://` (khoá API không đi qua kết nối không mã hoá).
     pub dia_chi: String,
     pub model: String,
     pub song_song: u32,
@@ -209,10 +210,10 @@ impl CauHinhBocTach {
         crate::boc_tach::anh::CauHinhAnh { dpi: self.dpi as f32, canh_toi_da: self.canh_toi_da, chat_luong: self.jpeg as u8 }
     }
 
-    /// Dịch vụ đám mây luôn dùng địa chỉ cố định (không lấy từ file cấu hình: sửa file không chuyển hướng được khoá API / ảnh).
+    /// Địa chỉ trống → mặc định của nhà cung cấp (Gemini: Vertex AI hoặc AI Studio theo kiểu khoá).
     pub fn ket_noi(&self, n: NhaCungCap, khoa: &str) -> crate::boc_tach::mo_hinh::KetNoi {
         let m = self.mo_hinh(n);
-        let dia_chi = if n.la_dam_may() { "" } else { m.dia_chi.as_str() };
+        let dia_chi = if dia_chi_hop_le(n, &m.dia_chi) { m.dia_chi.as_str() } else { "" };
         let mut k = crate::boc_tach::mo_hinh::KetNoi::moi(n, dia_chi, khoa, &m.model);
         if n == NhaCungCap::Gemini && m.vertex {
             k = k.vertex();
@@ -295,7 +296,8 @@ fn doc_boc_tach(b: &mut CauHinhBocTach, k: &str, v: &str) {
             let m = b.mo_hinh_mut(n);
             match &k[n.ma().len() + 1..] {
                 "dia_chi" => m.dia_chi = v.into(),
-                "model" => m.model = v.into(),
+                // Trống (cấu hình bản cũ) → giữ model mặc định có sẵn của nhà cung cấp
+                "model" if !v.trim().is_empty() => m.model = v.trim().into(),
                 "song_song" => m.song_song = so(SONG_SONG_KHOANG).unwrap_or(m.song_song),
                 "cho" => m.cho_s = so(CHO_KHOANG).unwrap_or(m.cho_s),
                 "max_tokens" => m.max_tokens = so(TOKEN_KHOANG).unwrap_or(m.max_tokens),
@@ -306,16 +308,19 @@ fn doc_boc_tach(b: &mut CauHinhBocTach, k: &str, v: &str) {
     }
 }
 
+/// Địa chỉ người dùng nhập có dùng được không: Nội bộ thì mọi địa chỉ; dịch vụ đám mây phải `https://` (khoá API).
+pub fn dia_chi_hop_le(n: NhaCungCap, dia_chi: &str) -> bool {
+    let d = dia_chi.trim();
+    !d.is_empty() && (!n.la_dam_may() || d.starts_with("https://"))
+}
+
 fn ghi_boc_tach(b: &CauHinhBocTach) -> String {
     let bool_ = |x: bool| if x { "1" } else { "0" };
     let ma = |n: Option<NhaCungCap>| n.map_or("", NhaCungCap::ma);
     let mut s = format!("bt_mac_dinh={}\nbt_dpi={}\nbt_canh_toi_da={}\nbt_jpeg={}\n", ma(b.mac_dinh), b.dpi, b.canh_toi_da, b.jpeg);
     for n in NhaCungCap::TAT_CA {
         let m = b.mo_hinh(n);
-        // Dịch vụ đám mây không ghi địa chỉ (luôn dùng địa chỉ cố định)
-        if !n.la_dam_may() {
-            s += &format!("bt_{0}_dia_chi={1}\n", n.ma(), m.dia_chi);
-        }
+        s += &format!("bt_{0}_dia_chi={1}\n", n.ma(), m.dia_chi);
         s += &format!("bt_{0}_model={1}\nbt_{0}_song_song={2}\nbt_{0}_cho={3}\nbt_{0}_max_tokens={4}\n", n.ma(), m.model, m.song_song, m.cho_s, m.max_tokens);
         if n == NhaCungCap::Gemini {
             s += &format!("bt_{}_vertex={}\n", n.ma(), bool_(m.vertex));
@@ -716,11 +721,14 @@ mod tests {
         assert_eq!(c.boc_tach.mac_dinh, None);
         assert_eq!(c.boc_tach.mo_hinh(NhaCungCap::Claude).model, "claude-haiku-4-5");
         assert!(!c.noi_dung().to_lowercase().contains("khoa_api"), "khoá API không bao giờ nằm trong file cấu hình");
-        // Địa chỉ dịch vụ đám mây trong file cấu hình bị bỏ qua (không chuyển hướng được khoá API)
-        let c = CauHinh::phan_tich("bt_gemini_dia_chi=https://ke-gian.example/v1\nbt_claude_dia_chi=http://ke-gian.example\n");
-        assert_eq!(c.boc_tach.ket_noi(NhaCungCap::Claude, "k").dia_chi, "https://api.anthropic.com/v1");
-        assert_eq!(c.boc_tach.ket_noi(NhaCungCap::Gemini, "k").dia_chi, crate::boc_tach::mo_hinh::DIA_CHI_VERTEX, "Gemini mặc định Vertex AI");
+        // Địa chỉ dịch vụ đám mây sửa được nhưng phải https (khoá API không đi kết nối không mã hoá)
+        let c = CauHinh::phan_tich("bt_gemini_dia_chi=https://proxy.example/v1/publishers/google/models\nbt_claude_dia_chi=http://ke-gian.example\n");
+        assert_eq!(c.boc_tach.ket_noi(NhaCungCap::Claude, "k").dia_chi, "https://api.anthropic.com/v1", "http → bỏ, dùng mặc định");
+        assert_eq!(c.boc_tach.ket_noi(NhaCungCap::Gemini, "k").dia_chi, "https://proxy.example/v1/publishers/google/models");
+        assert!(c.noi_dung().contains("bt_gemini_dia_chi=https://proxy.example"), "địa chỉ dịch vụ đám mây được lưu");
+        assert_eq!(CauHinh::default().boc_tach.ket_noi(NhaCungCap::Gemini, "k").dia_chi, crate::boc_tach::mo_hinh::DIA_CHI_VERTEX, "Gemini mặc định Vertex AI");
         assert_eq!(c.boc_tach.mo_hinh(NhaCungCap::Claude).model, "claude-haiku-4-5", "có sẵn model mặc định");
+        assert_eq!(CauHinh::phan_tich("bt_gemini_model=\n").boc_tach.mo_hinh(NhaCungCap::Gemini).model, "gemini-3.7-flash", "model trống → mặc định");
     }
 
     #[test]

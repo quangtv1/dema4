@@ -37,7 +37,8 @@ impl NhaCungCap {
     pub fn ds_model(self) -> &'static [&'static str] {
         match self {
             NhaCungCap::NoiBo => &[],
-            NhaCungCap::Gemini => &["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
+            // Đã chạy thật trên Vertex AI (express); 3.7-flash nhanh nhất, đủ trường → mặc định
+            NhaCungCap::Gemini => &["gemini-3.7-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.8-flash", "gemini-4-argon"],
             NhaCungCap::Claude => &["claude-haiku-4-5", "claude-sonnet-4-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
             NhaCungCap::ChatGpt => &["gpt-4.1-mini", "gpt-4.1", "gpt-4o", "gpt-5-mini"],
             NhaCungCap::OpenRouter => &["google/gemini-2.5-flash", "qwen/qwen2.5-vl-72b-instruct", "openai/gpt-4.1-mini", "anthropic/claude-haiku-4.5"],
@@ -109,11 +110,18 @@ impl NhaCungCap {
         if self.la_dam_may() { 60 } else { 120 }
     }
 
-    /// Số token trả lời tối đa mặc định: mô hình nội bộ nhỏ (vd ngữ cảnh 8192) chỉ cần đủ cho 1 JSON ngắn.
+    /// Số token trả lời tối đa mặc định: mô hình nội bộ nhỏ (vd ngữ cảnh 8192) chỉ cần đủ cho 1 JSON ngắn;
+    /// Gemini suy luận (thinking) tính cả token suy nghĩ vào giới hạn này → rộng hơn.
     pub fn max_tokens_mac_dinh(self) -> u32 {
-        if self.la_dam_may() { 2048 } else { 1024 }
+        match self {
+            NhaCungCap::NoiBo => 1024,
+            NhaCungCap::Gemini => 8192,
+            _ => 2048,
+        }
     }
 }
+
+const TAT_LOC_AN_TOAN: [&str; 4] = ["HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_DANGEROUS_CONTENT", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_HARASSMENT"];
 
 /// Địa chỉ Gemini qua Vertex AI express mode (khoá API, không cần service account).
 pub const DIA_CHI_VERTEX: &str = "https://aiplatform.googleapis.com/v1/publishers/google/models";
@@ -144,11 +152,24 @@ impl KetNoi {
         Self { ncc, dia_chi: dia_chi.into(), khoa: khoa.trim().into(), model: model.trim().into(), cho_toi_da: Duration::from_secs(ncc.cho_mac_dinh_s()), max_tokens: ncc.max_tokens_mac_dinh(), vertex: false }
     }
 
-    /// Gemini qua Vertex AI express mode.
+    /// Gemini qua Vertex AI express mode (địa chỉ mặc định AI Studio → địa chỉ Vertex; địa chỉ tự nhập giữ nguyên).
     pub fn vertex(mut self) -> Self {
         self.vertex = true;
-        self.dia_chi = DIA_CHI_VERTEX.into();
+        if self.dia_chi == self.ncc.dia_chi_mac_dinh() {
+            self.dia_chi = DIA_CHI_VERTEX.into();
+        }
         self
+    }
+
+    /// generationConfig Vertex: Gemini từ thế hệ 3 suy luận mức MEDIUM như mẫu Vertex AI Studio (1.x / 2.x không nhận
+    /// `thinkingLevel`).
+    fn cau_hinh_vertex(&self) -> Value {
+        let mut c = json!({ "temperature": 0, "maxOutputTokens": self.max_tokens });
+        let the_he = self.model.strip_prefix("gemini-").and_then(|s| s.split(['.', '-']).next()).and_then(|s| s.parse::<u32>().ok());
+        if the_he.is_some_and(|t| t >= 3) {
+            c["thinkingConfig"] = json!({ "thinkingLevel": "MEDIUM" });
+        }
+        c
     }
 
     fn url(&self, duoi: &str) -> String {
@@ -215,7 +236,9 @@ impl MoHinhDoc for KetNoi {
                     { "text": cau_lenh },
                     { "inline_data": { "mime_type": "image/jpeg", "data": b64 } },
                 ]}],
-                "generationConfig": { "temperature": 0, "maxOutputTokens": self.max_tokens },
+                "generationConfig": self.cau_hinh_vertex(),
+                // Văn bản hành chính: tắt bộ lọc an toàn để không bị chặn nhầm nội dung (như mẫu Vertex AI Studio)
+                "safetySettings": TAT_LOC_AN_TOAN.map(|c| json!({ "category": c, "threshold": "OFF" })),
             });
             return noi_dung_vertex(&self.post(&format!("{}:generateContent", self.model), &than)?);
         }
@@ -447,8 +470,19 @@ pub(crate) mod tests {
         let yc = nhan.recv().unwrap();
         assert!(yc.starts_with("POST /v1/publishers/google/models/gemini-2.5-flash:generateContent "), "{yc}");
         assert!(yc.to_lowercase().contains("x-goog-api-key: khoa-vertex") && !yc.contains("key=khoa"), "khoá trong header, không trong URL");
-        assert!(yc.contains("\"inline_data\"") && yc.contains("\"maxOutputTokens\":2048"));
+        assert!(yc.contains("\"inline_data\"") && yc.contains("\"maxOutputTokens\":8192"));
+        assert!(yc.contains("\"threshold\":\"OFF\"") && yc.contains("HARM_CATEGORY_HARASSMENT"), "tắt bộ lọc an toàn");
+        assert!(!yc.contains("thinkingConfig"), "Gemini 2.x không nhận thinkingLevel");
+        for (m, co) in [("gemini-1.5-flash", false), ("gemini-2.0-flash", false), ("gemini-3.5-flash", true), ("gemini-3.8-flash", true)] {
+            assert_eq!(KetNoi::moi(NhaCungCap::Gemini, "", "k", m).cau_hinh_vertex().get("thinkingConfig").is_some(), co, "{m}");
+        }
         assert!(!format!("{kn:?}").contains("khoa-vertex"), "Debug không in khoá");
+        // Gemini thế hệ mới (vd gemini-4-argon): suy luận MEDIUM như mẫu Vertex AI Studio
+        let kn4 = KetNoi::moi(NhaCungCap::Gemini, "", "k", "gemini-4-argon").vertex();
+        assert_eq!(kn4.cau_hinh_vertex()["thinkingConfig"]["thinkingLevel"], "MEDIUM");
+        assert_eq!(kn4.dia_chi, DIA_CHI_VERTEX);
+        assert_eq!(KetNoi::moi(NhaCungCap::Gemini, "https://proxy.example/m", "k", "x").vertex().dia_chi, "https://proxy.example/m", "địa chỉ tự nhập giữ nguyên");
+        assert_eq!(NhaCungCap::Gemini.ds_model()[0], "gemini-3.7-flash", "model mặc định");
     }
 
     #[test]

@@ -197,16 +197,21 @@ impl TabBocTach {
                 kh::o_radio(ui, &mut ch.mo_hinh_mut(n).vertex, false, "AI Studio");
             });
         }
+        // Dịch vụ đám mây: trống = địa chỉ mặc định (hiện mờ trong ô); sửa được để đi qua proxy / cổng riêng của đơn vị
+        let mac_dinh = if n == NhaCungCap::Gemini && ch.mo_hinh(n).vertex { crate::boc_tach::mo_hinh::DIA_CHI_VERTEX } else { n.dia_chi_mac_dinh() };
         dong(ui, "Địa chỉ", |ui| {
-            if n.la_dam_may() {
-                let mut dc = if n == NhaCungCap::Gemini && ch.mo_hinh(n).vertex { crate::boc_tach::mo_hinh::DIA_CHI_VERTEX } else { n.dia_chi_mac_dinh() }.to_string();
-                ui.add_enabled(false, kh::o_nhap(&mut dc).desired_width(ui.available_width()).hint_text("Địa chỉ")).on_disabled_hover_text("Tự điền theo nhà cung cấp");
-            } else {
-                ui.add(kh::o_nhap(&mut ch.mo_hinh_mut(n).dia_chi).desired_width(ui.available_width()).hint_text("http://máy-chủ:cổng/v1"));
-            }
+            let goi = if n.la_dam_may() { mac_dinh } else { "http://máy-chủ:cổng/v1" };
+            ui.add(kh::o_nhap(&mut ch.mo_hinh_mut(n).dia_chi).desired_width(ui.available_width()).hint_text(goi));
         });
+        let dc = ch.mo_hinh(n).dia_chi.trim().to_string();
         if !n.la_dam_may() {
             goi_y(ui, "vLLM: cổng 8000 · Ollama: 11434 · LM Studio: 1234 — địa chỉ kết thúc bằng /v1");
+        } else if dc.is_empty() || dc == mac_dinh {
+            goi_y(ui, "Để trống = địa chỉ mặc định của nhà cung cấp");
+        } else if !crate::cau_hinh::dia_chi_hop_le(n, &dc) {
+            goi_y_mau(ui, "Địa chỉ dịch vụ đám mây phải bắt đầu bằng https:// — đang dùng địa chỉ mặc định", DO);
+        } else {
+            goi_y_mau(ui, "Địa chỉ tự nhập: khoá API và ảnh văn bản sẽ gửi tới địa chỉ này — xoá trống để về mặc định", DO);
         }
         dong(ui, "Khoá API", |ui| {
             let k = khoa.entry(n.ma().to_string()).or_default();
