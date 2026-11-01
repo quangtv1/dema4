@@ -5,7 +5,7 @@
 - **Đếm trang A4** — đếm trang mọi PDF trong thư mục, phân loại khổ A0–A7, quy đổi ra số trang A4.
 - **Tách văn bản** — tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), bỏ trang trắng, gợi ý trang xoay.
 - **Sinh mục lục hồ sơ** — từ file biên mục Excel/CSV và mẫu DOCX, sinh mục lục cho từng hồ sơ.
-- **Bóc tách dữ liệu** — đọc văn bản PDF bằng mô hình AI (máy chủ nội bộ hoặc ChatGPT / Gemini / Claude / OpenRouter) lấy số ký hiệu, ngày, trích yếu, tác giả, người ký…; ghi Excel và Google Sheet.
+- **Bóc tách dữ liệu** — đọc văn bản PDF bằng mô hình AI (máy chủ nội bộ hoặc Gemini / Claude / GPT / OpenRouter) lấy số ký hiệu, ngày, trích yếu, tác giả, người ký…; ghi Excel và Google Sheet.
 - **Chuẩn hoá tên**, **Ký văn bản**, **Đóng gói AIP** — đang phát triển.
 
 Một file chạy duy nhất, không cần cài đặt. Tải ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
@@ -58,7 +58,7 @@ Ví dụ **Mẫu 04 – Vĩnh Phúc** với file biên mục có đủ cột (S�
 ## Bóc tách dữ liệu
 
 1. **Nguồn văn bản**: chọn thư mục PDF (gồm thư mục con).
-2. **Mô hình đọc**: mô hình đã khai ở **Cấu hình › Bóc tách** — máy chủ nội bộ (vLLM / Ollama / LM Studio, địa chỉ chuẩn OpenAI `http://<máy>:<cổng>/v1`), ChatGPT, Gemini, Claude, OpenRouter.
+2. **Mô hình đọc**: mô hình đã khai ở **Cấu hình › Bóc tách** — máy chủ nội bộ (vLLM / Ollama / LM Studio, địa chỉ chuẩn OpenAI `http://<máy>:<cổng>/v1`), Gemini (Vertex AI express mode hoặc AI Studio), Claude, GPT, OpenRouter. Dịch vụ đám mây có sẵn địa chỉ và danh sách model: chỉ cần dán khoá API.
 3. **Loại tài liệu**: Văn bản hành chính, Hồ sơ đất đai, Hợp đồng hoặc loại riêng. Tab **Trường dữ liệu** xem các trường và câu lệnh gửi mô hình, sửa tên cột / mô tả / chuẩn hoá; **Thử đọc** file đang xem (không trừ lượt chạy).
 4. **Bắt đầu**: tab **Kết quả bóc** hiện từng file (PDF bên trái, các trường bên phải), sửa tay rồi **Lưu**; lọc `lỗi` / `5/6` rồi **Chạy lại (n)** chỉ đọc lại các file đang hiện.
 5. Kết quả: `<thư mục>_boc_tach.xlsx` cạnh thư mục nguồn — mỗi file 1 dòng, nạp thẳng vào **Sinh mục lục** làm file biên mục; bật **Google Sheet** để ghi thêm 1 dòng sau mỗi file (khoá service account hoặc Apps Script — script mẫu `dema4_rs/apps-script-mau/boc_tach.gs`).

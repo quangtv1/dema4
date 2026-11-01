@@ -5,16 +5,23 @@
  *  1. Mở Google Sheet › Tiện ích mở rộng › Apps Script, xoá mã sẵn có, dán toàn bộ file này, Lưu.
  *  2. Triển khai › Triển khai mới › Loại: Ứng dụng web; Thực thi với tư cách: Tôi; Ai có quyền truy cập: Bất kỳ ai.
  *  3. Chép URL kết thúc bằng /exec vào dema4 › Cấu hình › Bóc tách › Ghi kết quả › URL Web app.
- * URL này ghi được vào Sheet: không gửi cho người ngoài (dema4 lưu URL đã mã hoá).
+ * 4. Đặt BI_MAT bên dưới thành 1 chuỗi ngẫu nhiên, nhập đúng chuỗi đó vào ô "Mã bí mật" trong dema4
+ *    (ai có URL mà không có mã thì không ghi được). dema4 lưu URL và mã đã mã hoá.
  *
  * dema4 gửi: { tab, tieu_de: [..], dong: [[..], ..], khoa: null | "<Tên file>" }
  *  - khoa = null: thêm các dòng vào cuối tab;
  *  - khoa = tên file (sửa tay): ghi đè dòng có cột A trùng tên file, chưa có thì thêm.
  * Trả về { ok: true } hoặc { ok: false, loi: "..." }.
  */
+var BI_MAT = ''; // ĐẶT GIÁ TRỊ: chuỗi ngẫu nhiên, trùng ô "Mã bí mật" trong dema4
+
 function doPost(e) {
+  // Khoá: nhiều máy cùng ghi 1 Sheet không đè dòng của nhau
+  var khoaGhi = LockService.getScriptLock();
   try {
     var yc = JSON.parse(e.postData.contents);
+    if (BI_MAT && yc.bi_mat !== BI_MAT) return traLoi({ ok: false, loi: 'Sai mã bí mật' });
+    khoaGhi.waitLock(30000);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sh = ss.getSheetByName(yc.tab) || ss.insertSheet(yc.tab);
     if (sh.getLastRow() === 0) ghiDong(sh, 1, yc.tieu_de);
@@ -25,6 +32,8 @@ function doPost(e) {
     return traLoi({ ok: true });
   } catch (err) {
     return traLoi({ ok: false, loi: String(err) });
+  } finally {
+    if (khoaGhi.hasLock()) khoaGhi.releaseLock();
   }
 }
 

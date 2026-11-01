@@ -101,11 +101,14 @@ fn ma_may_tu(ma_hdh: &str) -> String {
 /// không đọc được → ID ngẫu nhiên tạo 1 lần, lưu cạnh dữ liệu ẩn của app.
 pub fn ma_may() -> String {
     static MA: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    MA.get_or_init(|| {
-        let id = id_he_dieu_hanh().filter(|s| !s.trim().is_empty()).unwrap_or_else(|| id_du_phong(crate::tach_vb::du_lieu_an::goc_du_lieu()));
-        ma_may_tu(&id)
-    })
-    .clone()
+    MA.get_or_init(|| ma_may_tu(&id_goc_may())).clone()
+}
+
+/// ID gốc của máy (ID hệ điều hành / ID dự phòng) — KHÔNG công khai như mã máy `SM-…` (mã máy hiện trên giao diện,
+/// gửi trạm, in vào tin Telegram), dùng làm thành phần khoá mã hoá cache.
+pub(crate) fn id_goc_may() -> String {
+    static ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    ID.get_or_init(|| id_he_dieu_hanh().filter(|s| !s.trim().is_empty()).unwrap_or_else(|| id_du_phong(crate::tach_vb::du_lieu_an::goc_du_lieu()))).clone()
 }
 
 #[cfg(windows)]

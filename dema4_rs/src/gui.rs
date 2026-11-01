@@ -2082,6 +2082,24 @@ mod tests {
     }
 
     #[test]
+    fn boc_tach_xoa_hoac_sua_loai_giua_chung_khong_treo_khong_lech_cot() {
+        use crate::gui_boc_tach::ket_qua::TrangThai;
+        use egui_kittest::kittest::Queryable;
+        let (d, mut h, _) = boc_tach_license("doi_loai", 10, vec![Ok(BT_DAU), Ok(BT_CUOI), Ok(BT_DAU), Ok(BT_CUOI), Ok(BT_DAU), Ok(BT_CUOI)]);
+        h.get_by_label("Bắt đầu").click();
+        h.run_steps(1);
+        // Giữa lúc chạy: đảo thứ tự trường của loại đang dùng rồi bỏ chọn loại (như xoá loại)
+        h.state_mut().boc_tach.ds_loai[0].truong.reverse();
+        h.state_mut().boc_tach.loai = None;
+        cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay());
+        let bt = &h.state().boc_tach;
+        assert!(bt.tong_ket.is_some(), "lần chạy vẫn kết thúc (không treo)");
+        assert!(bt.tt.iter().all(|t| matches!(t, TrangThai::Xong(b) if b.gia_tri["so_ky_hieu"] == "15/TTr-TCKH" && b.gia_tri["nguoi_ky"] == "Trần Thị B")), "đúng cột theo loại lúc bấm Bắt đầu");
+        let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
+    }
+
+    #[test]
     fn luong_dem_chet_khong_lam_sap_giao_dien() {
         let mut app = UngDung::default();
         let (gui, nhan) = mpsc::channel::<SuKien>();

@@ -210,7 +210,8 @@ impl ManBocTach {
             match n.try_recv() {
                 Ok(kq) => {
                     self.chon_tm = None;
-                    if let Some(p) = kq {
+                    // Hộp chọn thư mục (luồng riêng trên Windows) trả về lúc đang chạy: bỏ qua, không đổi danh sách file giữa chừng
+                    if let Some(p) = kq.filter(|_| !self.dang_chay()) {
                         self.chon_thu_muc(p.display().to_string(), ctx);
                     }
                 }
@@ -593,6 +594,10 @@ impl ManBocTach {
                 None => {}
             }
         }
+        // Đang chạy: không áp thay đổi loại tài liệu (đóng popup nếu đang mở)
+        if self.dang_chay() && matches!(self.hop, Some(Hop::Sua(_) | Hop::XacNhanXoa(_) | Hop::LuuMoi(..))) {
+            self.hop = None;
+        }
         let Some(hop) = &mut self.hop else { return };
         let mut dong = false;
         let mut sau: Option<Hop> = None;
@@ -642,6 +647,7 @@ impl ManBocTach {
                         let _ = loai_tai_lieu::ghi(&loai_tai_lieu::file_mac_dinh(), &self.ds_loai);
                         self.loai = Some(self.ds_loai.len() - 1);
                         self.truong.bo_ket_qua_thu();
+                        self.nap_ket_qua();
                         dong = true;
                     }
                     Some(false) => sau = Some(Hop::Sua(b.clone())),

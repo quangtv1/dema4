@@ -3,7 +3,7 @@
 //! cùng file thì bản ghi sau thắng (đọc lại, sửa tay).
 
 use std::collections::{BTreeMap, HashMap};
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -29,6 +29,9 @@ pub struct BanGhi {
     pub sua: Vec<String>,
     #[serde(default)]
     pub giay: f32,
+    /// Cảnh báo cần Kiểm tra (vd trang không trả JSON) — giá trị vẫn dùng được.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canh_bao: Option<String>,
     /// Câu trả lời thô từng trang (soát khi mô hình trả sai).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tho: Vec<(usize, String)>,
@@ -43,13 +46,14 @@ impl BanGhi {
             gia_tri: loai.truong.iter().zip(&kq.gia_tri).map(|(t, g)| (t.bien.clone(), g.clone())).collect(),
             loi: None,
             sua: vec![],
+            canh_bao: (!kq.loi_trang.is_empty()).then(|| format!("Trang {} không trả JSON", kq.loi_trang.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", "))),
             giay: kq.thoi_gian.as_secs_f32(),
             tho: kq.tho.clone(),
         }
     }
 
     pub fn loi(file: &str, loai: &LoaiTaiLieu, so_trang: usize, loi: &str) -> Self {
-        Self { file: file.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: Some(loi.into()), sua: vec![], giay: 0.0, tho: vec![] }
+        Self { file: file.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: Some(loi.into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![] }
     }
 
     /// Giá trị theo thứ tự trường của loại (biến thiếu → rỗng).
@@ -66,19 +70,26 @@ pub fn ghi_them(f: &Path, b: &BanGhi) -> std::io::Result<()> {
     if let Some(cha) = f.parent() {
         std::fs::create_dir_all(cha)?;
     }
-    // Dòng cuối ghi dở (tắt máy giữa chừng) → xuống dòng trước, không làm hỏng bản ghi mới
-    let do_dang = std::fs::read(f).ok().is_some_and(|b| b.last().is_some_and(|c| *c != b'\n'));
-    let mut tep = std::fs::OpenOptions::new().create(true).append(true).open(f)?;
+    // Dòng cuối ghi dở (tắt máy giữa chừng) → xuống dòng trước, không làm hỏng bản ghi mới.
+    // Chỉ đọc 1 byte cuối (không đọc lại cả file mỗi lần ghi — thư mục lớn / ổ mạng).
+    let mut tep = std::fs::OpenOptions::new().create(true).append(true).read(true).open(f)?;
+    let do_dang = tep.metadata()?.len() > 0 && {
+        let mut c = [0u8; 1];
+        tep.seek(SeekFrom::End(-1))?;
+        tep.read_exact(&mut c)?;
+        c[0] != b'\n'
+    };
     let dong = serde_json::to_string(b).map_err(std::io::Error::other)?;
     writeln!(tep, "{}{dong}", if do_dang { "\n" } else { "" })
 }
 
 /// Bản ghi mới nhất của từng file thuộc loại `loai`; dòng hỏng (ghi dở khi tắt máy) bỏ qua.
+/// Bản ghi lỗi không đè bản ghi đọc được trước đó (đọc lại / Chạy lại bị lỗi không làm mất kết quả tốt, giá trị sửa tay).
 pub fn doc(f: &Path, loai: &str) -> HashMap<String, BanGhi> {
     let mut ds = HashMap::new();
     let Ok(s) = std::fs::read_to_string(f) else { return ds };
     for b in s.lines().filter_map(|d| serde_json::from_str::<BanGhi>(d).ok()) {
-        if b.loai == loai {
+        if b.loai == loai && !(b.loi.is_some() && ds.get(&b.file).is_some_and(|cu: &BanGhi| cu.loi.is_none())) {
             ds.insert(b.file.clone(), b);
         }
     }
@@ -95,7 +106,7 @@ mod tests {
         let d = std::env::temp_dir().join(format!("dema4_bt_luu_{}", std::process::id()));
         let f = d.join("boc_tach.jsonl");
         let l = &co_san()[0];
-        let kq = KetQua { so_trang: 3, gia_tri: ["Tờ trình", "15/TTr", "20/01/2015", "Phòng A", "Dự toán", ""].map(String::from).to_vec(), tho: vec![(1, "{}".into())], thoi_gian: std::time::Duration::from_millis(2100) };
+        let kq = KetQua { so_trang: 3, gia_tri: ["Tờ trình", "15/TTr", "20/01/2015", "Phòng A", "Dự toán", ""].map(String::from).to_vec(), tho: vec![(1, "{}".into())], thoi_gian: std::time::Duration::from_millis(2100), loi_trang: vec![] };
         ghi_them(&f, &BanGhi::tu_ket_qua("HS01/a.pdf", l, &kq)).unwrap();
         ghi_them(&f, &BanGhi::loi("HS01/b.pdf", l, 2, "Mô hình không trả JSON ở trang 1")).unwrap();
         std::fs::OpenOptions::new().append(true).open(&f).unwrap().write_all(b"{\"file\": \"ghi d").unwrap();
@@ -109,6 +120,9 @@ mod tests {
         assert_eq!(ds["HS01/a.pdf"].sua, ["nguoi_ky"]);
         assert_eq!(ds["HS01/b.pdf"].loi.as_deref(), Some("Mô hình không trả JSON ở trang 1"));
         assert!(doc(&f, "Hợp đồng").is_empty(), "loại khác không dùng lại");
+        // Đọc lại bị lỗi sau bản tốt: giữ bản tốt (kể cả giá trị sửa tay)
+        ghi_them(&f, &BanGhi::loi("HS01/a.pdf", l, 3, "Máy chủ báo lỗi 500")).unwrap();
+        assert_eq!(doc(&f, &l.ten)["HS01/a.pdf"].theo_truong(l)[5], "Trần Thị B");
         let _ = std::fs::remove_dir_all(&d);
     }
 }

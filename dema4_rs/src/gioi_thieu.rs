@@ -99,7 +99,7 @@ pub const BOC_TACH: GioiThieu = GioiThieu {
     mo_ta: "Đọc văn bản PDF bằng AI để lấy số ký hiệu, ngày tháng, trích yếu, cơ quan ban hành, người ký…; kết quả ghi ra Excel và Google Sheet, dùng làm file biên mục cho Sinh mục lục.",
     buoc: [
         Buoc { ten: "Chọn nguồn văn bản", than: &[Doan::Chu("Thư mục trên máy, Google Drive, Google Cloud Storage hoặc kho S3; bấm "), Doan::Link("Chọn", Bam::Chon), Doan::Chu(".")] },
-        Buoc { ten: "Chọn mô hình đọc", than: &[Doan::Chu("Máy chủ nội bộ, ChatGPT, Gemini, Claude… ở ô "), Doan::Link("Mô hình đọc", Bam::MoHinh), Doan::Chu("; khai khoá ở Cấu hình.")] },
+        Buoc { ten: "Chọn mô hình đọc", than: &[Doan::Chu("Máy chủ nội bộ, Gemini, Claude, GPT… ở ô "), Doan::Link("Mô hình đọc", Bam::MoHinh), Doan::Chu("; khai khoá ở Cấu hình.")] },
         Buoc { ten: "Chọn loại tài liệu", than: &[Doan::Chu("Chọn ở ô "), Doan::Link("Loại tài liệu", Bam::LoaiTaiLieu), Doan::Chu("; tab "), Doan::Link("Trường dữ liệu", Bam::TruongDuLieu), Doan::Chu(" xem, thử đọc, rồi bấm "), Doan::Dam("Bắt đầu"), Doan::Chu(".")] },
     ],
     kho: false,

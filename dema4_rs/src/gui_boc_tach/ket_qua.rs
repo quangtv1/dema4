@@ -35,6 +35,7 @@ const RONG_NHAN_FORM: f32 = 104.0;
 const XANH_DOC: Color32 = Color32::from_rgb(0x1E, 0x6F, 0xD0);
 const NAU: Color32 = Color32::from_rgb(0x8A, 0x4B, 0x08);
 const NEN_DAU_BANG: Color32 = Color32::from_rgb(0xF3, 0xF3, 0xF3);
+const CAM_CB: Color32 = Color32::from_rgb(0xB8, 0x5F, 0x00);
 
 /// Trạng thái 1 file.
 #[derive(Debug, Clone, PartialEq)]
@@ -71,6 +72,10 @@ pub(crate) struct DangChay {
     /// Lượt license của lần chạy: ≥ 1 file đọc được mới tính, không thì hoàn lượt.
     lan: crate::license::LanChay,
     ok: usize,
+    /// Loại tài liệu lúc bấm Bắt đầu — luồng nền dùng đúng bộ trường này (sửa / xoá loại giữa chừng không lệch cột).
+    loai: LoaiTaiLieu,
+    /// Trạng thái trước khi đọc lại từng file: đọc lại bị lỗi thì giữ kết quả tốt cũ.
+    truoc: HashMap<usize, TrangThai>,
 }
 
 /// Số liệu popup "Đã bóc tách xong".
@@ -107,11 +112,21 @@ pub(crate) struct TabKetQua {
     o_so: String,
     /// ReOCR: đọc lại 1 file (chỉ số file, kết quả từ luồng nền).
     pub doc_lai: Option<(usize, Receiver<Result<crate::boc_tach::chay::KetQua, String>>)>,
+    truoc_doc_lai: Option<TrangThai>,
+    /// ReOCR lỗi (đã giữ kết quả cũ): file, thông báo.
+    loi_doc_lai: Option<(usize, String)>,
+}
+
+impl TabKetQua {
+    /// Đang có giá trị sửa tay chưa Lưu.
+    pub(crate) fn dang_sua(&self) -> bool {
+        self.sua.as_ref().is_some_and(|(_, g, b)| g != b)
+    }
 }
 
 impl Default for TabKetQua {
     fn default() -> Self {
-        Self { i_xem: 0, loc: String::new(), gon_trai: false, gon_bang: false, xem: XemPdf::moi(), sua: None, cuon_toi: false, rong_cot: BTreeMap::new(), o_so: String::new(), doc_lai: None }
+        Self { i_xem: 0, loc: String::new(), gon_trai: false, gon_bang: false, xem: XemPdf::moi(), sua: None, cuon_toi: false, rong_cot: BTreeMap::new(), o_so: String::new(), doc_lai: None, truoc_doc_lai: None, loi_doc_lai: None }
     }
 }
 
@@ -143,7 +158,10 @@ pub(crate) fn tao_dich_sheet(cfg: &CauHinhBocTach, khoa: &BTreeMap<String, Strin
             let (email, khoa_pem) = sheet::doc_khoa_sa(&cfg.sheet_file_khoa)?;
             CachGhi::ServiceAccount { email, khoa_pem }
         }
-        CachGhiSheet::AppsScript => CachGhi::AppsScript { url: khoa.get(super::cau_hinh::KHOA_APPS_SCRIPT).cloned().unwrap_or_default() },
+        CachGhiSheet::AppsScript => CachGhi::AppsScript {
+            url: khoa.get(super::cau_hinh::KHOA_APPS_SCRIPT).cloned().unwrap_or_default(),
+            bi_mat: khoa.get(super::cau_hinh::KHOA_APPS_SCRIPT_BI_MAT).cloned().unwrap_or_default(),
+        },
     };
     DichSheet::moi(cach, &cfg.sheet_link, &cfg.sheet_tab)
 }
@@ -201,6 +219,7 @@ impl ManBocTach {
         let song_song = cfg.mo_hinh(n).song_song as usize;
         let anh = cfg.anh();
         let files: Vec<(usize, PathBuf)> = ds.iter().map(|&i| (i, self.files[i].duong_dan.clone())).collect();
+        let loai_chay = loai.clone();
         self.tao_sheet(cfg, khoa);
         let dung = Arc::new(AtomicBool::new(false));
         let (gui, nhan) = mpsc::channel();
@@ -212,11 +231,11 @@ impl ManBocTach {
         self.kq.sua = None;
         self.tong_ket = None;
         self.tab = super::Tab::KetQua;
-        self.chay = Some(DangChay { nhan, dung, bat_dau: Instant::now(), ds, xong: 0, truong_boc: 0, bat_dau_file: HashMap::new(), dung_som: None, mo_hinh: super::cau_hinh::ten_mo_hinh(cfg, n), lan, ok: 0 });
+        self.chay = Some(DangChay { nhan, dung, bat_dau: Instant::now(), ds, xong: 0, truong_boc: 0, bat_dau_file: HashMap::new(), dung_som: None, mo_hinh: super::cau_hinh::ten_mo_hinh(cfg, n), lan, ok: 0, loai: loai_chay, truoc: HashMap::new() });
     }
 
     pub(crate) fn nhan_chay(&mut self, ctx: &egui::Context, cfg: &CauHinhBocTach) {
-        let Some(loai) = self.loai_chon().cloned() else { return };
+        let Some(loai) = self.chay.as_ref().map(|c| c.loai.clone()) else { return };
         let goc = PathBuf::from(self.thu_muc.trim());
         let f_jsonl = luu::file_jsonl(&goc);
         loop {
@@ -232,10 +251,12 @@ impl ManBocTach {
             match sk {
                 SuKien::BatDau(i) => {
                     c.bat_dau_file.insert(i, Instant::now());
-                    self.tt[i] = TrangThai::Dang;
-                    // Chi tiết + 2 bảng đi theo file đang bóc
-                    self.kq.i_xem = i;
-                    self.kq.cuon_toi = true;
+                    c.truoc.insert(i, std::mem::replace(&mut self.tt[i], TrangThai::Dang));
+                    // Chi tiết + 2 bảng đi theo file đang bóc — trừ khi người dùng đang sửa dở 1 file (không mất bản sửa)
+                    if !self.kq.dang_sua() {
+                        self.kq.i_xem = i;
+                        self.kq.cuon_toi = true;
+                    }
                 }
                 SuKien::Xong(i, kq) => {
                     let b = BanGhi::tu_ket_qua(&self.files[i].ten, &loai, &kq);
@@ -249,8 +270,14 @@ impl ManBocTach {
                 SuKien::Loi(i, e) => {
                     let _ = luu::ghi_them(&f_jsonl, &BanGhi::loi(&self.files[i].ten, &loai, self.files[i].so_trang, &e));
                     c.xong += 1;
-                    self.tt[i] = TrangThai::Loi(e);
-                    self.day_sheet(i, &loai);
+                    // Đọc lại bị lỗi: giữ kết quả tốt cũ (jsonl cũng giữ bản tốt), không đẩy dòng lỗi lên Sheet
+                    match c.truoc.remove(&i) {
+                        Some(cu @ TrangThai::Xong(_)) => self.tt[i] = cu,
+                        _ => {
+                            self.tt[i] = TrangThai::Loi(e);
+                            self.day_sheet(i, &loai);
+                        }
+                    }
                 }
                 SuKien::DungSom(l) => c.dung_som = Some(l),
                 SuKien::HetHang => {
@@ -324,7 +351,8 @@ impl ManBocTach {
             let _ = gui.send(kq);
             ctx2.request_repaint();
         });
-        self.tt[i] = TrangThai::Dang;
+        self.kq.truoc_doc_lai = Some(std::mem::replace(&mut self.tt[i], TrangThai::Dang));
+        self.kq.loi_doc_lai = None;
         self.kq.sua = None;
         self.kq.doc_lai = Some((i, nhan));
     }
@@ -344,9 +372,18 @@ impl ManBocTach {
         self.kq.doc_lai = None;
         let Some(loai) = self.loai_chon().cloned() else { return };
         let ten = self.files[i].ten.clone();
+        let truoc = self.kq.truoc_doc_lai.take();
         let b = match kq {
             Ok(kq) => BanGhi::tu_ket_qua(&ten, &loai, &kq),
-            Err(e) => BanGhi::loi(&ten, &loai, self.files[i].so_trang, &e),
+            Err(e) => {
+                // ReOCR lỗi: giữ kết quả tốt cũ, báo lỗi ở thanh chi tiết
+                if let Some(cu @ TrangThai::Xong(_)) = truoc {
+                    self.tt[i] = cu;
+                    self.kq.loi_doc_lai = Some((i, e));
+                    return;
+                }
+                BanGhi::loi(&ten, &loai, self.files[i].so_trang, &e)
+            }
         };
         let _ = luu::ghi_them(&luu::file_jsonl(Path::new(self.thu_muc.trim())), &b);
         self.tt[i] = match &b.loi {
@@ -455,6 +492,10 @@ impl ManBocTach {
         }
         if thieu > 0 {
             phan.push(format!("{thieu} file thiếu trường bắt buộc"));
+        }
+        let can_xem = self.tt.iter().filter(|t| matches!(t, TrangThai::Xong(b) if b.canh_bao.is_some())).count();
+        if can_xem > 0 {
+            phan.push(format!("{can_xem} file có trang đọc lỗi"));
         }
         (!phan.is_empty()).then(|| format!("Kiểm tra: {}", phan.join(" · ")))
     }
@@ -585,7 +626,7 @@ fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &Cau
         _ => vec![String::new(); loai.truong.len()],
     };
     let can_moi = match &m.kq.sua {
-        Some((j, g, b)) => *j != i || (*g != goc && b == g),
+        Some((j, g, b)) => *j != i || b.len() != goc.len() || (*g != goc && b == g),
         None => true,
     };
     if can_moi {
@@ -615,6 +656,8 @@ fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &Cau
     }
     con.add_space(8.0);
     let (tt_chu, tt_mau) = match &tt {
+        TrangThai::Xong(_) if m.kq.loi_doc_lai.as_ref().is_some_and(|(j, _)| *j == i) => (format!("ReOCR lỗi, giữ kết quả cũ: {}", m.kq.loi_doc_lai.as_ref().map_or("", |(_, e)| e.as_str())), DO),
+        TrangThai::Xong(b) if b.canh_bao.is_some() => (format!("Cần kiểm tra: {}", b.canh_bao.as_deref().unwrap_or("")), CAM_CB),
         TrangThai::Cho => ("Chưa đọc".to_string(), CHU_PHU),
         TrangThai::Dang => ("Đang đọc…".to_string(), CHU_PHU),
         TrangThai::Xong(b) => (format!("Đã đọc: {} s", giay(Duration::from_secs_f32(b.giay))), CHU_PHU),
@@ -698,6 +741,9 @@ fn chi_tiet(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, cfg: &Cau
 /// Các trường: nhãn | ô (Trích yếu / Nội dung nhiều dòng); đang bóc → vòng xoay + "Đang bóc".
 fn form(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu, tt: &TrangThai) {
     let Some((_, _, ban)) = &mut m.kq.sua else { return };
+    if ban.len() != loai.truong.len() {
+        return;
+    }
     egui::ScrollArea::vertical().id_salt("bt_kq_form_cuon").auto_shrink([false, false]).show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 10.0;
         for (k, tr) in loai.truong.iter().enumerate() {
@@ -729,11 +775,15 @@ fn luu_sua(m: &mut ManBocTach, loai: &LoaiTaiLieu, i: usize, ten: &str, so_trang
     let Some((_, goc, ban)) = m.kq.sua.clone() else { return };
     let mut b = match m.tt.get(i) {
         Some(TrangThai::Xong(b)) => b.clone(),
-        _ => BanGhi { file: ten.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: None, sua: vec![], giay: 0.0, tho: vec![] },
+        _ => BanGhi { file: ten.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: None, sua: vec![], canh_bao: None, giay: 0.0, tho: vec![] },
     };
+    // Chỉ ghi các trường người dùng đã sửa (trường khác giữ giá trị hiện có)
     for (k, tr) in loai.truong.iter().enumerate() {
-        let moi = ban[k].trim().to_string();
-        if moi != goc[k] && !b.sua.contains(&tr.bien) {
+        let moi = ban.get(k).map_or_else(String::new, |s| s.trim().to_string());
+        if goc.get(k).is_some_and(|g| *g == moi) {
+            continue;
+        }
+        if !b.sua.contains(&tr.bien) {
             b.sua.push(tr.bien.clone());
         }
         b.gia_tri.insert(tr.bien.clone(), moi);
@@ -992,7 +1042,7 @@ mod tests {
 
     fn xong(n: usize) -> TrangThai {
         let gia_tri = (0..6).map(|k| (format!("b{k}"), if k < n { "x".to_string() } else { String::new() })).collect();
-        TrangThai::Xong(BanGhi { file: String::new(), loai: String::new(), so_trang: 1, gia_tri, loi: None, sua: vec![], giay: 1.0, tho: vec![] })
+        TrangThai::Xong(BanGhi { file: String::new(), loai: String::new(), so_trang: 1, gia_tri, loi: None, sua: vec![], canh_bao: None, giay: 1.0, tho: vec![] })
     }
 
     #[test]

@@ -8,6 +8,9 @@ pub fn chuan_hoa(gia_tri: &str, t: &Truong) -> String {
     let mut s = gia_tri.split_whitespace().collect::<Vec<_>>().join(" ");
     s = s.trim_matches(|c| matches!(c, '"' | '\'' | '“' | '”')).trim().to_string();
     s = bo_nhan_lap(&s, t);
+    if la_chep_mau(&s, t) {
+        return String::new();
+    }
     if dang_so(&t.ten_cot).starts_with("so") {
         s = bo_chu_so(&s);
     }
@@ -29,6 +32,13 @@ fn bo_nhan_lap(s: &str, t: &Truong) -> String {
         }
     }
     s.to_string()
+}
+
+/// Mô hình chép lại mẫu thay vì đọc: giá trị nằm trong câu mô tả (vd "văn bản về việc gì", ví dụ "123/QĐ-UBND")
+/// hoặc liệt kê cả danh sách "a | b | c" → coi như không đọc được.
+fn la_chep_mau(s: &str, t: &Truong) -> bool {
+    let k = dang_so(s);
+    (k.chars().count() >= 6 && dang_so(&t.mo_ta).contains(&k)) || (t.chuan_hoa == ChuanHoa::DanhSach && s.matches('|').count() >= 1)
 }
 
 /// "Số 36/BC-NTTS" / "Số: 36/…" → "36/BC-NTTS" (chỉ khi phần còn lại bắt đầu bằng chữ số).
@@ -53,11 +63,30 @@ fn khop_danh_sach(s: &str, ds: &[String]) -> String {
     if let Some(g) = ds.iter().find(|g| dang_so(g) == k) {
         return g.clone();
     }
-    ds.iter().filter(|g| !dang_so(g).is_empty() && k.contains(&dang_so(g))).max_by_key(|g| dang_so(g).len()).cloned().unwrap_or_default()
+    // Giá trị xuất hiện sớm nhất (tên loại đứng đầu: "BÁO CÁO Kết quả thực hiện kế hoạch" → Báo cáo); cùng chỗ thì lấy dài hơn
+    ds.iter()
+        .filter_map(|g| {
+            let kg = dang_so(g);
+            (!kg.is_empty()).then(|| k.find(&kg).map(|p| (p, std::cmp::Reverse(kg.len()), g))).flatten()
+        })
+        .min_by_key(|(p, dai, _)| (*p, *dai))
+        .map(|(_, _, g)| g.clone())
+        .unwrap_or_default()
 }
 
 /// Ngày → dd/mm/yyyy: "6/4/2015", "06-04-2015", "2015-04-06", "ngày 6 tháng 4 năm 2015", "Hà Nội, ngày 06 tháng 4 năm 2015".
 fn ngay(s: &str) -> Option<String> {
+    // "Số 12/2015/QĐ-UBND ngày 3/4/2015": ưu tiên phần sau chữ "ngày" (tránh lấy năm trong số ký hiệu)
+    let thuong = s.to_lowercase();
+    if let Some(p) = thuong.rfind("ngày").or_else(|| thuong.rfind("ngay")) {
+        if let Some(d) = ngay_trong(&thuong[p..]) {
+            return Some(d);
+        }
+    }
+    ngay_trong(&thuong)
+}
+
+fn ngay_trong(s: &str) -> Option<String> {
     let so: Vec<&str> = s.split(|c: char| !c.is_ascii_digit()).filter(|x| !x.is_empty()).collect();
     let hop_le = |d: u32, m: u32, y: u32| (1..=31).contains(&d) && (1..=12).contains(&m) && (1800..=2200).contains(&y);
     for w in so.windows(3) {
@@ -128,6 +157,20 @@ mod tests {
         assert_eq!(chuan_hoa("\"UBND huyện\"", &t), "UBND huyện");
         t.chuan_hoa = ChuanHoa::InHoa;
         assert_eq!(chuan_hoa("ubnd huyện", &t), "UBND HUYỆN");
+    }
+
+    #[test]
+    fn loi_red_team_loai_ngay_chep_mau() {
+        let loai = truong("loai_van_ban");
+        assert_eq!(chuan_hoa("BÁO CÁO Kết quả thực hiện kế hoạch", &loai), "Báo cáo", "loại đứng đầu, không lấy giá trị dài nhất");
+        assert_eq!(chuan_hoa("Tờ trình về việc ban hành quyết định", &loai), "Tờ trình");
+        assert_eq!(chuan_hoa("Quyết định | Công văn | Tờ trình", &loai), "", "chép cả danh sách → trống");
+        let ngay_t = truong("ngay_thang");
+        assert_eq!(chuan_hoa("Số 12/2015/QĐ-UBND ngày 3/4/2015", &ngay_t), "03/04/2015");
+        assert_eq!(chuan_hoa("Hà Nội, ngày 06 tháng 4 năm 2015", &ngay_t), "06/04/2015");
+        assert_eq!(chuan_hoa("văn bản về việc gì", &truong("trich_yeu")), "", "chép câu mô tả → trống");
+        assert_eq!(chuan_hoa("123/QĐ-UBND", &truong("so_ky_hieu")), "", "chép ví dụ trong mô tả → trống");
+        assert_eq!(chuan_hoa("15/TTr-TCKH", &truong("so_ky_hieu")), "15/TTr-TCKH");
     }
 
     #[test]

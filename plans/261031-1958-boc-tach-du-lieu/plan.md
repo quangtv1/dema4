@@ -61,3 +61,4 @@ Trang chủ 7 ô (Bóc tách đang để "Đang phát triển"), menu, màn gi�
 4. Câu "Xử lý ngay trên máy" (Trang chủ) và câu thống kê trong README: sửa đúng như prototype khi Bóc tách mở dùng (giai đoạn 6).
 5. Mô hình nội bộ chạy trên máy chủ GPU trong LAN (vLLM / Ollama…), app gọi qua địa chỉ chuẩn OpenAI, không nhúng mô hình. Chọn model mặc định để sau.
 6. Đủ 5 nhà cung cấp theo prototype; mỗi yêu cầu 1 trang.
+7. (2026-11-01, v2.1.1) Thứ tự nhà cung cấp: Nội bộ · Gemini · Claude · GPT · OpenRouter; dịch vụ đám mây có sẵn địa chỉ (cố định, không đọc từ file cấu hình) + danh sách model, chỉ cần dán khoá. Gemini mặc định Vertex AI express mode (khoá API, `generateContent`), tuỳ chọn AI Studio. Sửa theo 3 báo cáo red-team `plans/reports/red-team-261101-0921-boc-tach-*`.

@@ -1,5 +1,5 @@
 //! Khoá API / bí mật của Bóc tách lưu trong cache `.sm-dema4/boc_tach/khoa.bin`, mã hoá AES-256-GCM.
-//! Khoá giải mã = SHA-256(bí mật lúc build ‖ mã máy): bí mật lấy từ biến `DEMA4_KHOA_CACHE` khi build (secret CI,
+//! Khoá giải mã = SHA-256(bí mật lúc build ‖ ID gốc của máy — không phải mã máy `SM-…` công khai): bí mật lấy từ biến `DEMA4_KHOA_CACHE` khi build (secret CI,
 //! không có trong repo); gắn mã máy nên chép file sang máy khác không giải mã được. Build thiếu biến → không ghi
 //! khoá ra đĩa (chỉ giữ trong phiên). Giới hạn: bí mật nằm trong file chạy — chống đọc trộm file cache, không
 //! chống người dịch ngược app trên chính máy đó.
@@ -74,7 +74,7 @@ pub fn ghi_vao(f: &Path, bi_mat: &str, ma_may: &str, ds: &BTreeMap<String, Strin
 /// Khoá đã lưu của máy này (bản build không có bí mật → rỗng).
 pub fn doc() -> BTreeMap<String, String> {
     match BI_MAT.filter(|s| !s.is_empty()) {
-        Some(b) => doc_tu(&file_mac_dinh(), b, &crate::license::ma_may()),
+        Some(b) => doc_tu(&file_mac_dinh(), b, &crate::license::id_goc_may()),
         None => BTreeMap::new(),
     }
 }
@@ -82,7 +82,7 @@ pub fn doc() -> BTreeMap<String, String> {
 /// Ghi khoá; `Ok(false)` = bản build không lưu được (khoá chỉ dùng trong phiên).
 pub fn ghi(ds: &BTreeMap<String, String>) -> std::io::Result<bool> {
     match BI_MAT.filter(|s| !s.is_empty()) {
-        Some(b) => ghi_vao(&file_mac_dinh(), b, &crate::license::ma_may(), ds).map(|_| true),
+        Some(b) => ghi_vao(&file_mac_dinh(), b, &crate::license::id_goc_may(), ds).map(|_| true),
         None => Ok(false),
     }
 }

@@ -19,7 +19,8 @@ const PHAM_VI: &str = "https://www.googleapis.com/auth/spreadsheets";
 pub enum CachGhi {
     /// email + khoá riêng PEM đọc từ file JSON service account (không chép vào cấu hình / log).
     ServiceAccount { email: String, khoa_pem: String },
-    AppsScript { url: String },
+    /// `bi_mat`: mã chung với hằng `BI_MAT` trong script (rỗng = script không kiểm tra).
+    AppsScript { url: String, bi_mat: String },
 }
 
 pub struct DichSheet {
@@ -100,7 +101,7 @@ impl DichSheet {
     pub fn moi(cach: CachGhi, link: &str, tab: &str) -> Result<Self, String> {
         let sheet_id = match &cach {
             CachGhi::ServiceAccount { .. } => id_sheet(link).ok_or("Link Google Sheet không đúng")?,
-            CachGhi::AppsScript { url } if !url.trim().starts_with("https://") && !url.trim().starts_with("http://") => return Err("URL Web app không đúng".into()),
+            CachGhi::AppsScript { url, .. } if !url.trim().starts_with("https://") && !url.trim().starts_with("http://") => return Err("URL Web app không đúng".into()),
             CachGhi::AppsScript { .. } => String::new(),
         };
         let tab = if tab.trim().is_empty() { "Boc_tach".to_string() } else { tab.trim().to_string() };
@@ -158,8 +159,8 @@ impl DichSheet {
         tra_loi(agent().post(&url).header("Authorization", &format!("Bearer {tk}")).header("Content-Type", "application/json").send(json!({ "values": dong }).to_string())).map(|_| ())
     }
 
-    fn apps_script(&self, url: &str, tieu_de: &[String], dong: &[Vec<String>], khoa: Option<&str>) -> Result<(), String> {
-        let yc = json!({ "tab": self.tab, "tieu_de": tieu_de, "dong": dong, "khoa": khoa });
+    fn apps_script(&self, url: &str, bi_mat: &str, tieu_de: &[String], dong: &[Vec<String>], khoa: Option<&str>) -> Result<(), String> {
+        let yc = json!({ "tab": self.tab, "tieu_de": tieu_de, "dong": dong, "khoa": khoa, "bi_mat": bi_mat });
         let v = tra_loi(agent().post(url.trim()).header("Content-Type", "application/json").send(yc.to_string()))?;
         if v["ok"] == true {
             Ok(())
@@ -176,7 +177,7 @@ impl DichSheet {
                 self.chuan_bi(&tk, tieu_de)?;
                 self.them_sa(&tk, dong)
             }
-            CachGhi::AppsScript { url } => self.apps_script(url, tieu_de, dong, None),
+            CachGhi::AppsScript { url, bi_mat } => self.apps_script(url, bi_mat, tieu_de, dong, None),
         }
     }
 
@@ -197,7 +198,7 @@ impl DichSheet {
                     None => self.them_sa(&tk, &[dong.to_vec()]),
                 }
             }
-            CachGhi::AppsScript { url } => self.apps_script(url, tieu_de, &[dong.to_vec()], Some(ten_file)),
+            CachGhi::AppsScript { url, bi_mat } => self.apps_script(url, bi_mat, tieu_de, &[dong.to_vec()], Some(ten_file)),
         }
     }
 }
@@ -363,21 +364,21 @@ mod tests {
     #[test]
     fn apps_script_va_hang_doi_thu_lai_khi_loi() {
         let (dc, nhan) = may_chu_gia(vec![(500, vec![], "lỗi".into()), (200, vec![], json!({ "ok": true }).to_string()), (200, vec![], json!({ "ok": false, "loi": "Sai tab" }).to_string())]);
-        let d = DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec") }, "", "").unwrap();
+        let d = DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec"), bi_mat: "bm".into() }, "", "").unwrap();
         let td = vec!["Tên file".to_string()];
         assert!(d.them(&td, &[vec!["a.pdf".into()]]).unwrap_err().contains("500"));
         d.them(&td, &[vec!["a.pdf".into()]]).unwrap();
         assert_eq!(d.ghi_de(&td, "a.pdf", &["a.pdf".into()]).unwrap_err(), "Apps Script báo lỗi: Sai tab");
         let yc: Vec<String> = nhan.try_iter().collect();
         assert!(yc[1].contains("\"tab\":\"Boc_tach\"") && yc[1].contains("\"dong\":[[\"a.pdf\"]]"));
-        assert!(yc[2].contains("\"khoa\":\"a.pdf\""));
-        assert!(DichSheet::moi(CachGhi::AppsScript { url: "abc".into() }, "", "").is_err());
+        assert!(yc[2].contains("\"khoa\":\"a.pdf\"") && yc[2].contains("\"bi_mat\":\"bm\""));
+        assert!(DichSheet::moi(CachGhi::AppsScript { url: "abc".into(), bi_mat: String::new() }, "", "").is_err());
     }
 
     #[test]
     fn hang_doi_gom_dong_va_dem() {
         let (dc, nhan) = may_chu_gia(vec![(200, vec![], json!({ "ok": true }).to_string()), (200, vec![], json!({ "ok": true }).to_string())]);
-        let h = HangDoi::moi(DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec") }, "", "Kq").unwrap(), vec!["Tên file".into()]);
+        let h = HangDoi::moi(DichSheet::moi(CachGhi::AppsScript { url: format!("{dc}/exec"), bi_mat: "bm".into() }, "", "Kq").unwrap(), vec!["Tên file".into()]);
         h.them(vec!["a.pdf".into()]);
         h.them(vec!["b.pdf".into()]);
         for _ in 0..100 {

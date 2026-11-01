@@ -139,6 +139,7 @@ pub(crate) fn ve(m: &mut ManBocTach, ui: &mut egui::Ui, cfg: &CauHinhBocTach, kh
 
 /// Bảng trường chỉ xem: # | Tên cột + chip biến | Mô tả (Câu lệnh) | Chuẩn hoá ✎.
 fn bang(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu) {
+    let dang_chay = m.dang_chay();
     let t = &mut m.truong;
     let khung = ui.available_rect_before_wrap();
     let rong_mo_ta = (khung.width() - RONG_SO - t.rong_ten - t.rong_chuan).max(120.0);
@@ -176,7 +177,7 @@ fn bang(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu) {
         p.rect_filled(o_but, 3.0, NUT_HOVER);
     }
     bt::ve(&p, o_but.shrink(4.0), BieuTuong::But, CHU_PHU);
-    let mut mo_sua = but.on_hover_text("Chỉnh sửa loại tài liệu: tên cột, mô tả, chuẩn hoá, thứ tự").clicked();
+    let mut mo_sua = but.on_hover_text(if dang_chay { "Đang bóc tách — chờ xong để sửa loại tài liệu" } else { "Chỉnh sửa loại tài liệu: tên cột, mô tả, chuẩn hoá, thứ tự" }).clicked();
     // Kéo ranh giới cột ở mép tiêu đề
     for (k, xx) in [(0usize, x[2]), (1, x[3])] {
         let o = Rect::from_center_size(egui::pos2(xx, dau.center().y), egui::vec2(8.0, CAO_DAU));
@@ -240,7 +241,8 @@ fn bang(m: &mut ManBocTach, ui: &mut egui::Ui, loai: &LoaiTaiLieu) {
     if mo_cau_lenh {
         m.hop = Some(Hop::CauLenh(false));
     }
-    if mo_sua {
+    // Đang chạy / đang đọc lại: không sửa loại tài liệu (bộ trường phải giữ nguyên tới hết lần chạy)
+    if mo_sua && !m.dang_chay() {
         if let Some(i) = m.loai {
             m.hop = Some(Hop::Sua(hop_loai::BanSua::moi(&m.ds_loai[i], i)));
         }

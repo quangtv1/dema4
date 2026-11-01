@@ -21,6 +21,8 @@ pub struct KetQua {
     /// Câu trả lời thô từng trang đã đọc (trang, nội dung) — ghi log để soát khi mô hình trả sai.
     pub tho: Vec<(usize, String)>,
     pub thoi_gian: Duration,
+    /// Trang mô hình không trả JSON (các trang khác vẫn dùng được) → file cần Kiểm tra.
+    pub loi_trang: Vec<usize>,
 }
 
 impl KetQua {
@@ -68,12 +70,23 @@ pub fn doc_file(pdf: &Path, loai: &LoaiTaiLieu, anh: &CauHinhAnh, mo_hinh: &dyn 
     }
     let mut tho = Vec::new();
     let mut theo_trang = Vec::new();
+    let mut loi_trang = Vec::new();
+    let bien: Vec<&str> = loai.truong.iter().map(|t| t.bien.as_str()).collect();
     for &t in &trang {
         let jpeg = jpeg_trang(&doc, t, anh).map_err(LoiDoc::TraLoi)?;
         let tl = goi(mo_hinh, &cau_lenh(loai, t, so_trang), &jpeg, dung)?;
-        let m = doc_json::doc(&tl);
+        // 1 trang không trả JSON: giữ kết quả các trang khác (đã tốn lượt gọi), đánh dấu cần Kiểm tra
+        match doc_json::doc_khop(&tl, &bien) {
+            Some(m) => theo_trang.push(m),
+            None => {
+                loi_trang.push(t);
+                theo_trang.push(serde_json::Map::new());
+            }
+        }
         tho.push((t, tl));
-        theo_trang.push(m.ok_or_else(|| LoiDoc::TraLoi(format!("Mô hình không trả JSON ở trang {t}")))?);
+    }
+    if loi_trang.len() == trang.len() {
+        return Err(LoiDoc::TraLoi(if trang.len() == 1 { format!("Mô hình không trả JSON ở trang {}", trang[0]) } else { "Mô hình không trả JSON ở trang nào".into() }));
     }
     let gia_tri = loai
         .truong
@@ -88,7 +101,7 @@ pub fn doc_file(pdf: &Path, loai: &LoaiTaiLieu, anh: &CauHinhAnh, mo_hinh: &dyn 
             (0..theo_trang.len()).filter(|&i| i != uu_tien).map(lay).find(|g| !g.is_empty()).unwrap_or_default()
         })
         .collect();
-    Ok(KetQua { so_trang, gia_tri, tho, thoi_gian: bat_dau.elapsed() })
+    Ok(KetQua { so_trang, gia_tri, tho, thoi_gian: bat_dau.elapsed(), loi_trang })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -201,6 +214,16 @@ mod tests {
         let m = gia(|_| Ok("Tôi không đọc được".into()));
         let e = doc_file(&d.join("a.pdf"), &co_san()[0], &CauHinhAnh { canh_toi_da: 300, ..Default::default() }, &m, &AtomicBool::new(false)).unwrap_err();
         assert_eq!(e, LoiDoc::TraLoi("Mô hình không trả JSON ở trang 1".into()));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn mot_trang_khong_json_van_giu_trang_kia() {
+        let d = thu_muc("mottrang", &[("a.pdf", 3)]);
+        let m = gia(|cl| Ok(if cl.contains("TRANG ĐẦU") { TRANG_DAU.into() } else { "Xin lỗi, không đọc được".into() }));
+        let kq = doc_file(&d.join("a.pdf"), &co_san()[0], &CauHinhAnh { canh_toi_da: 300, ..Default::default() }, &m, &AtomicBool::new(false)).unwrap();
+        assert_eq!(kq.gia_tri[1], "36/BC-NTTS", "trang đầu vẫn dùng được");
+        assert_eq!(kq.loi_trang, [3]);
         let _ = std::fs::remove_dir_all(&d);
     }
 

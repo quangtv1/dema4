@@ -1,5 +1,6 @@
-//! Gọi mô hình đọc ảnh — 5 nhà cung cấp như prototype, 2 giao thức:
-//! - chuẩn OpenAI `POST {địa chỉ}/chat/completions` (Nội bộ vLLM / Ollama…, ChatGPT, Gemini qua địa chỉ tương thích OpenAI, OpenRouter);
+//! Gọi mô hình đọc ảnh — 5 nhà cung cấp (Nội bộ, Gemini, Claude, GPT, OpenRouter), 3 giao thức:
+//! - chuẩn OpenAI `POST {địa chỉ}/chat/completions` (Nội bộ vLLM / Ollama…, GPT, OpenRouter, Gemini AI Studio);
+//! - Gemini Vertex AI (express mode, khoá API) `POST …/publishers/google/models/{model}:generateContent`;
 //! - Anthropic `POST {địa chỉ}/messages` (Claude).
 //! Mỗi yêu cầu đúng 1 ảnh trang (máy chủ vLLM nhỏ chỉ nhận 1 ảnh / yêu cầu).
 
@@ -20,15 +21,26 @@ pub enum NhaCungCap {
 
 impl NhaCungCap {
     /// Thứ tự ô trong Cấu hình › Bóc tách.
-    pub const TAT_CA: [NhaCungCap; 5] = [NhaCungCap::NoiBo, NhaCungCap::ChatGpt, NhaCungCap::Gemini, NhaCungCap::Claude, NhaCungCap::OpenRouter];
+    pub const TAT_CA: [NhaCungCap; 5] = [NhaCungCap::NoiBo, NhaCungCap::Gemini, NhaCungCap::Claude, NhaCungCap::ChatGpt, NhaCungCap::OpenRouter];
 
     pub fn ten(self) -> &'static str {
         match self {
             NhaCungCap::NoiBo => "Nội bộ",
-            NhaCungCap::ChatGpt => "ChatGPT",
+            NhaCungCap::ChatGpt => "GPT",
             NhaCungCap::Gemini => "Gemini",
             NhaCungCap::Claude => "Claude",
             NhaCungCap::OpenRouter => "OpenRouter",
+        }
+    }
+
+    /// Model đọc được ảnh có sẵn (ô Model gợi ý; model đầu = mặc định) — người dùng chỉ cần dán khoá API.
+    pub fn ds_model(self) -> &'static [&'static str] {
+        match self {
+            NhaCungCap::NoiBo => &[],
+            NhaCungCap::Gemini => &["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
+            NhaCungCap::Claude => &["claude-haiku-4-5", "claude-sonnet-4-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+            NhaCungCap::ChatGpt => &["gpt-4.1-mini", "gpt-4.1", "gpt-4o", "gpt-5-mini"],
+            NhaCungCap::OpenRouter => &["google/gemini-2.5-flash", "qwen/qwen2.5-vl-72b-instruct", "openai/gpt-4.1-mini", "anthropic/claude-haiku-4.5"],
         }
     }
 
@@ -96,10 +108,18 @@ impl NhaCungCap {
     pub fn cho_mac_dinh_s(self) -> u64 {
         if self.la_dam_may() { 60 } else { 120 }
     }
+
+    /// Số token trả lời tối đa mặc định: mô hình nội bộ nhỏ (vd ngữ cảnh 8192) chỉ cần đủ cho 1 JSON ngắn.
+    pub fn max_tokens_mac_dinh(self) -> u32 {
+        if self.la_dam_may() { 2048 } else { 1024 }
+    }
 }
 
+/// Địa chỉ Gemini qua Vertex AI express mode (khoá API, không cần service account).
+pub const DIA_CHI_VERTEX: &str = "https://aiplatform.googleapis.com/v1/publishers/google/models";
+
 /// Thông số gọi 1 mô hình (lấy từ Cấu hình › Bóc tách).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct KetNoi {
     pub ncc: NhaCungCap,
     pub dia_chi: String,
@@ -107,25 +127,44 @@ pub struct KetNoi {
     pub model: String,
     pub cho_toi_da: Duration,
     pub max_tokens: u32,
+    /// Gemini qua Vertex AI (generateContent) thay vì AI Studio (chuẩn OpenAI).
+    pub vertex: bool,
+}
+
+/// Không in khoá API khi debug / log.
+impl std::fmt::Debug for KetNoi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KetNoi").field("ncc", &self.ncc).field("dia_chi", &self.dia_chi).field("model", &self.model).field("vertex", &self.vertex).field("khoa", &if self.khoa.is_empty() { "" } else { "***" }).finish()
+    }
 }
 
 impl KetNoi {
     pub fn moi(ncc: NhaCungCap, dia_chi: &str, khoa: &str, model: &str) -> Self {
         let dia_chi = if dia_chi.trim().is_empty() { ncc.dia_chi_mac_dinh() } else { dia_chi.trim() };
-        Self { ncc, dia_chi: dia_chi.into(), khoa: khoa.trim().into(), model: model.trim().into(), cho_toi_da: Duration::from_secs(ncc.cho_mac_dinh_s()), max_tokens: 2048 }
+        Self { ncc, dia_chi: dia_chi.into(), khoa: khoa.trim().into(), model: model.trim().into(), cho_toi_da: Duration::from_secs(ncc.cho_mac_dinh_s()), max_tokens: ncc.max_tokens_mac_dinh(), vertex: false }
+    }
+
+    /// Gemini qua Vertex AI express mode.
+    pub fn vertex(mut self) -> Self {
+        self.vertex = true;
+        self.dia_chi = DIA_CHI_VERTEX.into();
+        self
     }
 
     fn url(&self, duoi: &str) -> String {
         format!("{}/{duoi}", self.dia_chi.trim_end_matches('/'))
     }
 
+    /// Không theo chuyển hướng: API mô hình không redirect, và redirect sang host khác sẽ mang theo khoá (`x-api-key`).
     fn agent(&self) -> ureq::Agent {
-        ureq::Agent::config_builder().timeout_global(Some(self.cho_toi_da)).http_status_as_error(false).build().into()
+        ureq::Agent::config_builder().timeout_global(Some(self.cho_toi_da)).http_status_as_error(false).max_redirects(0).build().into()
     }
 
     fn header<B>(&self, mut rq: ureq::RequestBuilder<B>) -> ureq::RequestBuilder<B> {
         if self.ncc == NhaCungCap::Claude {
             rq = rq.header("x-api-key", &self.khoa).header("anthropic-version", "2023-06-01");
+        } else if self.vertex {
+            rq = rq.header("x-goog-api-key", &self.khoa);
         } else if !self.khoa.is_empty() {
             rq = rq.header("Authorization", &format!("Bearer {}", self.khoa));
         }
@@ -170,6 +209,16 @@ pub trait MoHinhDoc: Send + Sync {
 impl MoHinhDoc for KetNoi {
     fn doc(&self, cau_lenh: &str, jpeg: &[u8]) -> Result<String, LoiDoc> {
         let b64 = super::anh::base64(jpeg);
+        if self.vertex {
+            let than = json!({
+                "contents": [{ "role": "user", "parts": [
+                    { "text": cau_lenh },
+                    { "inline_data": { "mime_type": "image/jpeg", "data": b64 } },
+                ]}],
+                "generationConfig": { "temperature": 0, "maxOutputTokens": self.max_tokens },
+            });
+            return noi_dung_vertex(&self.post(&format!("{}:generateContent", self.model), &than)?);
+        }
         if self.ncc == NhaCungCap::Claude {
             let than = json!({
                 "model": self.model, "max_tokens": self.max_tokens, "temperature": 0,
@@ -208,7 +257,14 @@ impl KetNoi {
     }
 
     /// Danh sách model (`GET /models`) — dùng cho ô chọn Model và Kiểm tra kết nối.
+    /// Vertex express mode không liệt kê model: gửi 1 câu rất ngắn để thử khoá, trả danh sách có sẵn.
     pub fn liet_ke_model(&self) -> Result<Vec<String>, LoiDoc> {
+        if self.vertex {
+            let model = if self.model.is_empty() { self.ncc.ds_model()[0] } else { self.model.as_str() };
+            let than = json!({ "contents": [{ "role": "user", "parts": [{ "text": "OK" }] }], "generationConfig": { "maxOutputTokens": 5 } });
+            self.post(&format!("{model}:generateContent"), &than)?;
+            return Ok(self.ncc.ds_model().iter().map(|s| s.to_string()).collect());
+        }
         let v = tra_loi(self.header(self.agent().get(&self.url("models"))).call())?;
         let mut ds: Vec<String> = v["data"]
             .as_array()
@@ -251,6 +307,12 @@ fn noi_dung_openai(v: &Value) -> Result<String, LoiDoc> {
         _ => String::new(),
     };
     het_token(s, c["finish_reason"].as_str() == Some("length"))
+}
+
+fn noi_dung_vertex(v: &Value) -> Result<String, LoiDoc> {
+    let c = &v["candidates"][0];
+    let s = c["content"]["parts"].as_array().map(|a| a.iter().filter_map(|p| p["text"].as_str()).collect::<Vec<_>>().join("")).unwrap_or_default();
+    het_token(s, c["finishReason"].as_str() == Some("MAX_TOKENS"))
 }
 
 fn noi_dung_anthropic(v: &Value) -> Result<String, LoiDoc> {
@@ -323,7 +385,7 @@ pub(crate) mod tests {
         assert_eq!(nd.iter().filter(|p| p["type"] == "image_url").count(), 1);
         assert!(nd[1]["image_url"]["url"].as_str().unwrap().starts_with("data:image/jpeg;base64,/9gB"));
         assert_eq!(than["temperature"], 0);
-        assert_eq!(than["max_tokens"], 2048);
+        assert_eq!(than["max_tokens"], 1024, "mô hình nội bộ nhỏ: mặc định 1024 token (ngữ cảnh 8192)");
     }
 
     #[test]
@@ -373,6 +435,27 @@ pub(crate) mod tests {
         let kn = KetNoi::moi(NhaCungCap::Gemini, &dc, "k", "");
         assert_eq!(kn.liet_ke_model().unwrap(), ["gemini-2.5-flash", "gemini-2.5-pro"]);
         assert!(nhan.recv().unwrap().starts_with("GET /v1/models"));
+    }
+
+    #[test]
+    fn gemini_vertex_generate_content_khoa_trong_header() {
+        let tl = json!({ "candidates": [{ "content": { "parts": [{ "text": "{\"a\":\"1\"}" }] }, "finishReason": "STOP" }] }).to_string();
+        let (dc, nhan) = may_chu_gia(vec![(200, vec![], tl)]);
+        let mut kn = KetNoi::moi(NhaCungCap::Gemini, "", "khoa-vertex", "gemini-2.5-flash").vertex();
+        kn.dia_chi = format!("{dc}/publishers/google/models");
+        assert_eq!(kn.doc("CL", &[1, 2]).unwrap(), "{\"a\":\"1\"}");
+        let yc = nhan.recv().unwrap();
+        assert!(yc.starts_with("POST /v1/publishers/google/models/gemini-2.5-flash:generateContent "), "{yc}");
+        assert!(yc.to_lowercase().contains("x-goog-api-key: khoa-vertex") && !yc.contains("key=khoa"), "khoá trong header, không trong URL");
+        assert!(yc.contains("\"inline_data\"") && yc.contains("\"maxOutputTokens\":2048"));
+        assert!(!format!("{kn:?}").contains("khoa-vertex"), "Debug không in khoá");
+    }
+
+    #[test]
+    fn khong_theo_chuyen_huong() {
+        let (dc, _n) = may_chu_gia(vec![(302, vec![("Location", "http://127.0.0.1:9/khac")], "{}".into())]);
+        let kn = KetNoi::moi(NhaCungCap::Claude, &dc, "k", "m");
+        assert!(matches!(kn.doc("", &[]), Err(LoiDoc::May(302, _))), "redirect không được theo (sẽ mang x-api-key sang host khác)");
     }
 
     #[test]

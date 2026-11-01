@@ -37,3 +37,8 @@ temp/
 
 # Cấu hình người dùng sinh khi chạy
 sm-dema4.cfg
+
+# Cấu hình / dữ liệu người dùng cạnh file chạy (có thể chứa đường dẫn, kết quả bóc tách, khoá mã hoá)
+.dema4_saomai.cfg
+sm-dema4.cfg
+.sm-dema4/

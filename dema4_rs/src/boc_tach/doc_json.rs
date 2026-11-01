@@ -13,6 +13,21 @@ pub fn doc(tra_loi: &str) -> Option<Map<String, Value>> {
     None
 }
 
+/// Như `doc`, ưu tiên object có ít nhất 1 khoá trong `bien` (câu trả lời có thể chứa JSON khác trước kết quả).
+pub fn doc_khop(tra_loi: &str, bien: &[&str]) -> Option<Map<String, Value>> {
+    let mut dau = None;
+    for (i, _) in tra_loi.match_indices('{') {
+        let mut it = serde_json::Deserializer::from_str(&tra_loi[i..]).into_iter::<Value>();
+        if let Some(Ok(Value::Object(m))) = it.next() {
+            if bien.iter().any(|b| m.contains_key(*b)) {
+                return Some(m);
+            }
+            dau.get_or_insert(m);
+        }
+    }
+    dau
+}
+
 /// Giá trị của `bien` dạng chuỗi: thiếu / null → rỗng; số → chữ số; mảng → nối bằng ", ".
 pub fn chuoi(m: &Map<String, Value>, bien: &str) -> String {
     fn ra_chuoi(v: &Value) -> String {
@@ -38,6 +53,13 @@ mod tests {
         assert_eq!(chuoi(&m, "ds"), "a, b");
         assert_eq!(chuoi(&m, "x"), "");
         assert_eq!(chuoi(&m, "khong_co"), "");
+    }
+
+    #[test]
+    fn uu_tien_object_co_khoa_can_doc() {
+        let m = doc_khop(r#"Ví dụ {"x": 1} và kết quả {"so_ky_hieu": "1/QĐ"}"#, &["so_ky_hieu"]).unwrap();
+        assert_eq!(chuoi(&m, "so_ky_hieu"), "1/QĐ");
+        assert!(doc_khop(r#"{"x": 1}"#, &["a"]).is_some(), "không object nào khớp → object đầu");
     }
 
     #[test]

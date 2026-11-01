@@ -20,6 +20,8 @@ const NEN_CANH_BAO: Color32 = Color32::from_rgb(0xFF, 0xF8, 0xE5);
 const VIEN_CANH_BAO: Color32 = Color32::from_rgb(0xF0, 0xD8, 0x9A);
 /// Khoá Apps Script nằm cùng kho khoá API (URL Web app ghi được vào Sheet nên coi như bí mật).
 pub const KHOA_APPS_SCRIPT: &str = "apps_script";
+/// Mã bí mật chung với script Apps Script (chống người có URL ghi bừa vào Sheet).
+pub const KHOA_APPS_SCRIPT_BI_MAT: &str = "apps_script_bi_mat";
 /// Script mẫu cho cách ghi Apps Script (nút "Chép script mẫu").
 const SCRIPT_MAU: &str = include_str!("../../apps-script-mau/boc_tach.gs");
 
@@ -50,11 +52,11 @@ pub struct TabBocTach {
 /// Mặc định tab Bóc tách: chỉ phần Nâng cao (ảnh gửi đi, token, song song, chờ); giữ nhà cung cấp, model, Sheet, lựa chọn gần nhất.
 pub fn mac_dinh(c: &CauHinh) -> CauHinh {
     let md = CauHinhBocTach::default();
-    let mut b = CauHinhBocTach { dpi: md.dpi, canh_toi_da: md.canh_toi_da, jpeg: md.jpeg, max_tokens: md.max_tokens, ..c.boc_tach.clone() };
+    let mut b = CauHinhBocTach { dpi: md.dpi, canh_toi_da: md.canh_toi_da, jpeg: md.jpeg, ..c.boc_tach.clone() };
     for n in NhaCungCap::TAT_CA {
         let m = b.mo_hinh_mut(n);
         let d = MoHinhBocTach::mac_dinh(n);
-        (m.song_song, m.cho_s) = (d.song_song, d.cho_s);
+        (m.song_song, m.cho_s, m.max_tokens) = (d.song_song, d.cho_s, d.max_tokens);
     }
     CauHinh { boc_tach: b, ..c.clone() }
 }
@@ -188,9 +190,16 @@ impl TabBocTach {
         ui.add_space(6.0);
         // Bước 2: địa chỉ (dịch vụ đám mây tự điền, khoá ô) + khoá API
         buoc(ui, 2, if n.la_dam_may() { "Dán khoá API" } else { "Địa chỉ máy chủ" });
+        if n == NhaCungCap::Gemini {
+            dong(ui, "Kiểu khoá", |ui| {
+                ui.spacing_mut().item_spacing.x = 18.0;
+                kh::o_radio(ui, &mut ch.mo_hinh_mut(n).vertex, true, "Vertex AI (express)");
+                kh::o_radio(ui, &mut ch.mo_hinh_mut(n).vertex, false, "AI Studio");
+            });
+        }
         dong(ui, "Địa chỉ", |ui| {
             if n.la_dam_may() {
-                let mut dc = n.dia_chi_mac_dinh().to_string();
+                let mut dc = if n == NhaCungCap::Gemini && ch.mo_hinh(n).vertex { crate::boc_tach::mo_hinh::DIA_CHI_VERTEX } else { n.dia_chi_mac_dinh() }.to_string();
                 ui.add_enabled(false, kh::o_nhap(&mut dc).desired_width(ui.available_width()).hint_text("Địa chỉ")).on_disabled_hover_text("Tự điền theo nhà cung cấp");
             } else {
                 ui.add(kh::o_nhap(&mut ch.mo_hinh_mut(n).dia_chi).desired_width(ui.available_width()).hint_text("http://máy-chủ:cổng/v1"));
@@ -205,7 +214,8 @@ impl TabBocTach {
             ui.add(kh::o_nhap(k).password(true).desired_width(ui.available_width()).hint_text(goi));
         });
         if n.la_dam_may() {
-            goi_y(ui, &format!("Lấy khoá: {}", n.noi_lay_khoa()));
+            let noi = if n == NhaCungCap::Gemini && ch.mo_hinh(n).vertex { "console.cloud.google.com › Vertex AI › API keys (express mode)" } else { n.noi_lay_khoa() };
+            goi_y(ui, &format!("Lấy khoá: {noi}"));
         }
         if !crate::boc_tach::khoa_cache::co_luu() {
             goi_y_mau(ui, "Bản chạy này không lưu khoá ra đĩa — khoá chỉ dùng trong phiên làm việc", NAU);
@@ -216,7 +226,8 @@ impl TabBocTach {
         let dang = self.dang_kiem_tra.as_ref().is_some_and(|(x, _)| *x == n);
         dong(ui, "Model", |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
-            let ds = self.ds_model.get(&n).cloned().unwrap_or_default();
+            // Danh sách lấy từ máy chủ (Kiểm tra kết nối); chưa có thì dùng danh sách sẵn của nhà cung cấp
+            let ds = self.ds_model.get(&n).cloned().filter(|d| !d.is_empty()).unwrap_or_else(|| n.ds_model().iter().map(|s| s.to_string()).collect());
             // Phải → trái: nút Kiểm tra, nút ▾ danh sách model, ô model lấp phần còn lại
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let co_dia_chi = n.la_dam_may() || !ch.mo_hinh(n).dia_chi.trim().is_empty();
@@ -299,10 +310,10 @@ impl TabBocTach {
                 so(ui, &mut ch.jpeg, JPEG_KHOANG);
             });
             dong(ui, "Số token tối đa", |ui| {
-                so(ui, &mut ch.max_tokens, TOKEN_KHOANG);
+                so(ui, &mut ch.mo_hinh_mut(n).max_tokens, TOKEN_KHOANG);
                 ui.label(RichText::new("mỗi câu trả lời; tăng khi mô hình trả lời bị cụt").color(CHU_PHU));
             });
-            goi_y(ui, "Song song và thời gian chờ riêng cho từng nhà cung cấp; ảnh gửi đi dùng chung. Mỗi yêu cầu gửi 1 trang.");
+            goi_y(ui, "Song song, thời gian chờ, số token riêng cho từng nhà cung cấp (mô hình nội bộ nhỏ: giữ ≤ 1024 token); ảnh gửi đi dùng chung. Mỗi yêu cầu gửi 1 trang.");
         }
     }
 
@@ -406,6 +417,10 @@ impl TabBocTach {
                 dong(ui, "URL Web app", |ui| {
                     let url = khoa.entry(KHOA_APPS_SCRIPT.to_string()).or_default();
                     ui.add(kh::o_nhap(url).desired_width(ui.available_width()).hint_text("https://script.google.com/macros/s/…/exec"));
+                });
+                dong(ui, "Mã bí mật", |ui| {
+                    let bm = khoa.entry(KHOA_APPS_SCRIPT_BI_MAT.to_string()).or_default();
+                    ui.add(kh::o_nhap(bm).password(true).desired_width(ui.available_width()).hint_text("Trùng BI_MAT trong script (ai có URL cũng không ghi được nếu thiếu mã)"));
                 });
                 ui.horizontal(|ui| {
                     ui.add_space(RONG_NHAN + 8.0);

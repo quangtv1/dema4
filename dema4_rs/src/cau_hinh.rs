@@ -117,11 +117,23 @@ pub struct MoHinhBocTach {
     pub model: String,
     pub song_song: u32,
     pub cho_s: u32,
+    /// Số token trả lời tối đa — riêng từng nhà cung cấp (mô hình nội bộ nhỏ có ngữ cảnh ngắn).
+    pub max_tokens: u32,
+    /// Gemini: Vertex AI express mode (mặc định) thay vì AI Studio.
+    pub vertex: bool,
 }
 
 impl MoHinhBocTach {
+    /// Dịch vụ đám mây có sẵn model mặc định → người dùng chỉ cần dán khoá API.
     pub fn mac_dinh(n: NhaCungCap) -> Self {
-        Self { dia_chi: String::new(), model: String::new(), song_song: n.song_song_mac_dinh() as u32, cho_s: n.cho_mac_dinh_s() as u32 }
+        Self {
+            dia_chi: String::new(),
+            model: n.ds_model().first().map_or_else(String::new, |m| m.to_string()),
+            song_song: n.song_song_mac_dinh() as u32,
+            cho_s: n.cho_mac_dinh_s() as u32,
+            max_tokens: n.max_tokens_mac_dinh(),
+            vertex: n == NhaCungCap::Gemini,
+        }
     }
 }
 
@@ -148,7 +160,6 @@ pub struct CauHinhBocTach {
     pub dpi: u32,
     pub canh_toi_da: u32,
     pub jpeg: u32,
-    pub max_tokens: u32,
     /// Thư mục ghi Excel; trống = cạnh thư mục nguồn.
     pub thu_muc_excel: String,
     pub sheet_link: String,
@@ -168,7 +179,6 @@ impl Default for CauHinhBocTach {
             dpi: 200,
             canh_toi_da: 2048,
             jpeg: 90,
-            max_tokens: 2048,
             thu_muc_excel: String::new(),
             sheet_link: String::new(),
             sheet_tab: "Boc_tach".into(),
@@ -198,11 +208,16 @@ impl CauHinhBocTach {
         crate::boc_tach::anh::CauHinhAnh { dpi: self.dpi as f32, canh_toi_da: self.canh_toi_da, chat_luong: self.jpeg as u8 }
     }
 
+    /// Dịch vụ đám mây luôn dùng địa chỉ cố định (không lấy từ file cấu hình: sửa file không chuyển hướng được khoá API / ảnh).
     pub fn ket_noi(&self, n: NhaCungCap, khoa: &str) -> crate::boc_tach::mo_hinh::KetNoi {
         let m = self.mo_hinh(n);
-        let mut k = crate::boc_tach::mo_hinh::KetNoi::moi(n, &m.dia_chi, khoa, &m.model);
+        let dia_chi = if n.la_dam_may() { "" } else { m.dia_chi.as_str() };
+        let mut k = crate::boc_tach::mo_hinh::KetNoi::moi(n, dia_chi, khoa, &m.model);
+        if n == NhaCungCap::Gemini && m.vertex {
+            k = k.vertex();
+        }
         k.cho_toi_da = std::time::Duration::from_secs(m.cho_s as u64);
-        k.max_tokens = self.max_tokens;
+        k.max_tokens = m.max_tokens;
         k
     }
 }
@@ -267,7 +282,6 @@ fn doc_boc_tach(b: &mut CauHinhBocTach, k: &str, v: &str) {
         "dpi" => b.dpi = so(DPI_KHOANG).unwrap_or(b.dpi),
         "canh_toi_da" => b.canh_toi_da = so(CANH_KHOANG).unwrap_or(b.canh_toi_da),
         "jpeg" => b.jpeg = so(JPEG_KHOANG).unwrap_or(b.jpeg),
-        "max_tokens" => b.max_tokens = so(TOKEN_KHOANG).unwrap_or(b.max_tokens),
         "thu_muc_excel" => b.thu_muc_excel = v.into(),
         "sheet_link" => b.sheet_link = v.into(),
         "sheet_tab" => b.sheet_tab = v.into(),
@@ -283,6 +297,8 @@ fn doc_boc_tach(b: &mut CauHinhBocTach, k: &str, v: &str) {
                 "model" => m.model = v.into(),
                 "song_song" => m.song_song = so(SONG_SONG_KHOANG).unwrap_or(m.song_song),
                 "cho" => m.cho_s = so(CHO_KHOANG).unwrap_or(m.cho_s),
+                "max_tokens" => m.max_tokens = so(TOKEN_KHOANG).unwrap_or(m.max_tokens),
+                "vertex" => m.vertex = bool_().unwrap_or(m.vertex),
                 _ => {}
             }
         }
@@ -292,10 +308,17 @@ fn doc_boc_tach(b: &mut CauHinhBocTach, k: &str, v: &str) {
 fn ghi_boc_tach(b: &CauHinhBocTach) -> String {
     let bool_ = |x: bool| if x { "1" } else { "0" };
     let ma = |n: Option<NhaCungCap>| n.map_or("", NhaCungCap::ma);
-    let mut s = format!("bt_mac_dinh={}\nbt_dpi={}\nbt_canh_toi_da={}\nbt_jpeg={}\nbt_max_tokens={}\n", ma(b.mac_dinh), b.dpi, b.canh_toi_da, b.jpeg, b.max_tokens);
+    let mut s = format!("bt_mac_dinh={}\nbt_dpi={}\nbt_canh_toi_da={}\nbt_jpeg={}\n", ma(b.mac_dinh), b.dpi, b.canh_toi_da, b.jpeg);
     for n in NhaCungCap::TAT_CA {
         let m = b.mo_hinh(n);
-        s += &format!("bt_{0}_dia_chi={1}\nbt_{0}_model={2}\nbt_{0}_song_song={3}\nbt_{0}_cho={4}\n", n.ma(), m.dia_chi, m.model, m.song_song, m.cho_s);
+        // Dịch vụ đám mây không ghi địa chỉ (luôn dùng địa chỉ cố định)
+        if !n.la_dam_may() {
+            s += &format!("bt_{0}_dia_chi={1}\n", n.ma(), m.dia_chi);
+        }
+        s += &format!("bt_{0}_model={1}\nbt_{0}_song_song={2}\nbt_{0}_cho={3}\nbt_{0}_max_tokens={4}\n", n.ma(), m.model, m.song_song, m.cho_s, m.max_tokens);
+        if n == NhaCungCap::Gemini {
+            s += &format!("bt_{}_vertex={}\n", n.ma(), bool_(m.vertex));
+        }
     }
     let cach = if b.sheet_cach == CachGhiSheet::AppsScript { "apps_script" } else { "service_account" };
     s += &format!("bt_thu_muc_excel={}\nbt_sheet_link={}\nbt_sheet_tab={}\nbt_sheet_cach={cach}\nbt_sheet_file_khoa={}\n", b.thu_muc_excel, b.sheet_link, b.sheet_tab, b.sheet_file_khoa);
@@ -666,9 +689,10 @@ mod tests {
                 bien: crate::muc_luc::RangBuoc { cot_nhom: "Số HS".into(), bien: vec![("a".into(), crate::muc_luc::Nguon::Hang("x=y".into()))] }.json(),
             },
             boc_tach: {
-                let mut b = CauHinhBocTach { mac_dinh: Some(NhaCungCap::Gemini), dpi: 150, canh_toi_da: 1600, jpeg: 85, max_tokens: 4096, ..Default::default() };
-                *b.mo_hinh_mut(NhaCungCap::NoiBo) = MoHinhBocTach { dia_chi: "http://192.168.1.5:8001/v1".into(), model: "5CD-AI/Vintern-1B-v3_5".into(), song_song: 1, cho_s: 300 };
-                b.mo_hinh_mut(NhaCungCap::Gemini).model = "gemini-2.5-flash".into();
+                let mut b = CauHinhBocTach { mac_dinh: Some(NhaCungCap::Gemini), dpi: 150, canh_toi_da: 1600, jpeg: 85, ..Default::default() };
+                *b.mo_hinh_mut(NhaCungCap::NoiBo) = MoHinhBocTach { dia_chi: "http://192.168.1.5:8001/v1".into(), model: "5CD-AI/Vintern-1B-v3_5".into(), song_song: 1, cho_s: 300, max_tokens: 768, vertex: false };
+                b.mo_hinh_mut(NhaCungCap::Gemini).model = "gemini-2.5-pro".into();
+                b.mo_hinh_mut(NhaCungCap::Gemini).vertex = false;
                 b.sheet_cach = CachGhiSheet::AppsScript;
                 (b.ghi_sheet, b.sheet_file_khoa) = (true, r"D:\khoa=1.json".into());
                 b
@@ -691,6 +715,11 @@ mod tests {
         assert_eq!(c.boc_tach.mac_dinh, None);
         assert_eq!(c.boc_tach.mo_hinh(NhaCungCap::Claude).model, "claude-haiku-4-5");
         assert!(!c.noi_dung().to_lowercase().contains("khoa_api"), "khoá API không bao giờ nằm trong file cấu hình");
+        // Địa chỉ dịch vụ đám mây trong file cấu hình bị bỏ qua (không chuyển hướng được khoá API)
+        let c = CauHinh::phan_tich("bt_gemini_dia_chi=https://ke-gian.example/v1\nbt_claude_dia_chi=http://ke-gian.example\n");
+        assert_eq!(c.boc_tach.ket_noi(NhaCungCap::Claude, "k").dia_chi, "https://api.anthropic.com/v1");
+        assert_eq!(c.boc_tach.ket_noi(NhaCungCap::Gemini, "k").dia_chi, crate::boc_tach::mo_hinh::DIA_CHI_VERTEX, "Gemini mặc định Vertex AI");
+        assert_eq!(c.boc_tach.mo_hinh(NhaCungCap::Claude).model, "claude-haiku-4-5", "có sẵn model mặc định");
     }
 
     #[test]
