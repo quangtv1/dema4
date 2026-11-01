@@ -76,6 +76,9 @@ impl ManTach {
             return Vec::new();
         }
         let mut viec = Vec::new();
+        if self.backspace_xoa(ctx) {
+            viec.push(Viec::BoKhoiVb);
+        }
         let trang = self.trang_vb_hien();
         let so_cot = self.so_cot_vb;
         let co_chon = self.chon_vb.so_luong() > 0;
@@ -130,7 +133,7 @@ impl ManTach {
             if bam(egui::Key::Escape) {
                 viec.push(Viec::BoChon);
             }
-            if bam(egui::Key::Delete) || bam(egui::Key::Backspace) {
+            if bam(egui::Key::Delete) {
                 viec.push(Viec::BoKhoiVb);
             }
             if bam(egui::Key::R) {

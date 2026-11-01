@@ -100,6 +100,8 @@ enum Viec {
     DuyetNghiTrang(Nhan),
     /// Chọn nhãn sẽ áp khi Enter trong bộ lọc Nghi trắng (chưa đổi gì).
     ChonNghi(Nhan),
+    /// Hộp phóng to (nhóm Tất cả / Index / Trắng / Điểm cắt): áp nhãn đã chọn cho trang đang xem rồi sang trang kế.
+    ApNhanHop(Nhan),
     HoanTac,
     LamLai,
     ChonTat,
@@ -138,6 +140,15 @@ pub struct ManTach {
     /// Tên hồ sơ ở cột trái: `ten_hien` + đuôi gốc (`.pdf` / `.PDF`).
     ten_cot: Vec<String>,
     bao: Option<(String, Instant)>,
+    /// Thông báo nổi góc dưới phải khi duyệt Nghi trắng (lưới hoặc hộp phóng to): "… được gán nhãn: …", tự ẩn.
+    bao_noi: Option<(String, Instant)>,
+    /// Backspace đang chờ (xem `backspace_xoa`): bộ gõ tiếng Việt gửi Backspace + chữ có dấu khi sửa chữ vừa gõ.
+    cho_backspace: Option<Instant>,
+    /// Vị trí dòng "Tự động lưu index_and_blank.txt" (khung trước): thông báo nổi hiện ngay phía trên dòng này.
+    o_luu_nhan: Option<Rect>,
+    /// Trang đang chọn cuối cùng của từng bộ lọc (Tất cả, Index, Nghi trắng…): quay lại bộ lọc thì chọn lại trang đó;
+    /// lần đầu vào bộ lọc (sau Phân tích) thì cuộn về đầu danh sách. Xoá khi đổi thư mục / phân tích lại.
+    vi_tri_loc: std::collections::HashMap<Loc, u32>,
     /// Nhãn đang chọn để duyệt Nghi trắng: (trang tiêu điểm, nhãn). I / C / S / B chọn, Enter áp.
     chon_nghi: Option<(u32, Nhan)>,
     trang_thai: String,
@@ -238,6 +249,10 @@ impl Default for ManTach {
             ten_hien: Vec::new(),
             ten_cot: Vec::new(),
             bao: None,
+            bao_noi: None,
+            cho_backspace: None,
+            o_luu_nhan: None,
+            vi_tri_loc: Default::default(),
             chon_nghi: None,
             trang_thai: String::new(),
             so_cot: 1,
@@ -443,6 +458,7 @@ impl ManTach {
         self.bang = None;
         self.phien = None;
         self.anh = None;
+        self.vi_tri_loc.clear();
         self.chon = BoChon::default();
         self.loc = Loc::TatCa;
         self.loc_menu = Loc::TatCa;
@@ -590,6 +606,7 @@ impl ManTach {
                     self.bang = None;
                     self.phien = None;
                     self.anh = None;
+                    self.vi_tri_loc.clear();
                     self.chon = BoChon::default();
                     self.chon_vb = BoChon::default();
                     self.loc = Loc::TatCa;
@@ -821,7 +838,17 @@ impl ManTach {
         // Nghi trắng / Nghi xoay: sau khi duyệt tự chọn trang còn cờ kế tiếp theo thứ tự đang hiện
         let mut sang_ke: Option<(Loc, u32)> = None;
         match viec {
-            Viec::Gan(n) => doi = b.gan(nhom, &ds, &ds, n),
+            Viec::Gan(n) => {
+                doi = b.gan(nhom, &ds, &ds, n);
+                // Thông báo nổi góc dưới phải (lưới và hộp phóng to)
+                if doi > 0 {
+                    let chu = match ds.as_slice() {
+                        [k] => format!("{}.{} được gán nhãn: {}", self.ten_hien[b.trang[*k as usize].ho_so as usize], b.trang[*k as usize].so, ten_nhan(b.trang[*k as usize].nhan())),
+                        ds => format!("{} trang được gán nhãn: {}", ds.len(), ten_nhan(n)),
+                    };
+                    self.bao_noi = Some((chu, Instant::now()));
+                }
+            }
             // Bỏ khỏi văn bản = gán Trắng (không có trong file tách; bỏ luôn cờ Nghi trắng)
             Viec::BoKhoiVb => doi = b.gan(nhom, &ds, &ds, Nhan::Trang),
             Viec::Xoa => {
@@ -844,10 +871,26 @@ impl ManTach {
             Viec::VeGoc => doi = b.ve_chieu_goc(nhom, &ds, &ds),
             Viec::XacNhanXoay => {
                 doi = b.xac_nhan_xoay(nhom, &ds, &ds);
+                if doi > 0 {
+                    let chu = match ds.as_slice() {
+                        [k] => format!("{}.{} đã xác nhận xoay {}°", self.ten_hien[b.trang[*k as usize].ho_so as usize], b.trang[*k as usize].so, b.trang[*k as usize].sua.goc),
+                        ds => format!("{} trang đã xác nhận xoay", ds.len()),
+                    };
+                    self.bao_noi = Some((chu, Instant::now()));
+                }
                 sang_ke = ds.last().map(|&k| (Loc::NghiXoay, k));
             }
             Viec::DuyetNghiTrang(n) => {
+                let nghi: Vec<u32> = ds.iter().copied().filter(|&k| b.trang[k as usize].nghi_trang()).collect();
                 doi = b.duyet_nghi_trang(&ds, &ds, n);
+                // Thông báo nổi góc dưới phải (lưới và hộp phóng to)
+                if doi > 0 {
+                    let chu = match nghi.as_slice() {
+                        [k] => format!("{}.{}", self.ten_hien[b.trang[*k as usize].ho_so as usize], b.trang[*k as usize].so),
+                        ds => format!("{} trang", ds.len()),
+                    };
+                    self.bao_noi = Some((format!("{chu} được gán nhãn: {}", bang_trang::ten_nhan(n)), Instant::now()));
+                }
                 sang_ke = ds.last().map(|&k| (Loc::NghiTrang, k));
                 self.chon_nghi = None;
             }
@@ -871,13 +914,25 @@ impl ManTach {
                 };
                 self.bao = Some((chu, Instant::now()));
             }
-            Viec::ChonTat | Viec::BoChon | Viec::DoiVb(_) | Viec::DenVb(_) | Viec::PhongTo(_) | Viec::CheDoVb(_) | Viec::NacVb(_) => {}
+            Viec::ChonTat | Viec::BoChon | Viec::DoiVb(_) | Viec::DenVb(_) | Viec::PhongTo(_) | Viec::CheDoVb(_) | Viec::NacVb(_) | Viec::ApNhanHop(_) => {}
             Viec::DatLoc(l) => {
+                if let Some(k) = self.chon.tieu_diem {
+                    self.vi_tri_loc.insert(self.loc, k);
+                }
                 self.loc = l;
                 if l != Loc::DiemCat {
                     self.loc_menu = l;
                 }
                 self.chon.bo_het();
+                let thu_tu_moi = b.thu_tu(l, self.ho_so_loc, self.sap);
+                match self.vi_tri_loc.get(&l).copied().filter(|k| thu_tu_moi.contains(k)) {
+                    Some(k) => {
+                        self.chon.chon_rieng(k);
+                        self.cuon_toi = Some(k);
+                    }
+                    // Lần đầu vào bộ lọc: về màn đầu của danh sách
+                    None => self.cuon_toi = thu_tu_moi.first().copied(),
+                }
             }
             Viec::MoLoc(l, k) => {
                 self.loc = l;
@@ -918,12 +973,43 @@ impl ManTach {
         }
     }
 
+    /// Backspace = xoá, nhưng bộ gõ tiếng Việt (Unikey / EVKey, kiểu Telex) gửi Backspace rồi gõ lại chữ có dấu khi sửa
+    /// chữ vừa gõ (vd "i" + "s" → "í") — không được xoá trang vì thế. Backspace chỉ xoá khi 150 ms sau không có chữ nào.
+    /// Delete xoá ngay như cũ. Trả về true đúng 1 lần khi Backspace thật đã chờ đủ.
+    pub(super) fn backspace_xoa(&mut self, ctx: &egui::Context) -> bool {
+        const CHO: std::time::Duration = std::time::Duration::from_millis(150);
+        let (bam, co_chu) = ctx.input(|i| (i.key_pressed(egui::Key::Backspace) && !i.modifiers.command, i.events.iter().any(|e| matches!(e, egui::Event::Text(t) if !t.is_empty()))));
+        if co_chu {
+            self.cho_backspace = None;
+            return false;
+        }
+        if bam {
+            self.cho_backspace = Some(Instant::now());
+            ctx.request_repaint_after(CHO);
+            return false;
+        }
+        match self.cho_backspace {
+            Some(t) if t.elapsed() >= CHO => {
+                self.cho_backspace = None;
+                true
+            }
+            Some(t) => {
+                ctx.request_repaint_after(CHO.saturating_sub(t.elapsed()));
+                false
+            }
+            None => false,
+        }
+    }
+
     /// Phím tắt tab Hồ sơ (khi không gõ chữ).
     fn phim_tat(&mut self, ctx: &egui::Context) -> Vec<Viec> {
         if ctx.egui_wants_keyboard_input() || self.bang.is_none() || self.tab != Tab::HoSo || self.phong_to.is_some() {
             return Vec::new();
         }
         let mut viec = Vec::new();
+        if self.backspace_xoa(ctx) {
+            viec.push(Viec::Xoa);
+        }
         let (loc, so_cot, so_hang) = (self.loc, self.so_cot, self.so_hang_nhin);
         let thu_tu = &self.thu_tu;
         let enter_xoay = self.bang.as_ref().map(|b| b.viec_enter_xoay(&self.chon.theo_thu_tu(thu_tu)));
@@ -969,7 +1055,7 @@ impl ManTach {
             if bam(egui::Key::Escape) {
                 viec.push(Viec::BoChon);
             }
-            if bam(egui::Key::Delete) || bam(egui::Key::Backspace) {
+            if bam(egui::Key::Delete) {
                 viec.push(Viec::Xoa);
             }
             if bam(egui::Key::R) {
@@ -1094,6 +1180,7 @@ impl ManTach {
         }
         self.hop_phan_tich_lai(&ctx, &ch);
         self.hop_phong_to(&ctx, cfg);
+        self.ve_bao_noi(&ctx);
         self.hop_tach(&ctx, cfg);
     }
 
@@ -1244,7 +1331,8 @@ impl ManTach {
         // Hồ sơ hiện trong cột: khớp ô tìm (dòng "Tất cả" luôn ở đầu)
         let hien: Vec<u32> = (0..b.ho_so.len() as u32).filter(|&h| cot_trai::khop_tim(&self.ten_cot[h as usize], &self.tim_hs)).collect();
         let khong_thay = hien.is_empty() && !self.tim_hs.trim().is_empty();
-        // Hồ sơ chứa trang đang xem (khi xem Tất cả): tự cuộn tới 1 lần mỗi khi đổi hồ sơ (không tô nền)
+        // Hồ sơ chứa trang đang xem (khi xem Tất cả): tự cuộn tới 1 lần mỗi khi đổi hồ sơ, tô nền xanh nhạt để biết trang
+        // đang chọn ở file nào (ở mọi nhóm lọc: Trắng, Index, Nghi trắng, Nghi xoay, Điểm cắt…)
         let dang = if ho_so_loc.is_none() && self.chon.so_luong() > 0 { self.chon.tieu_diem.map(|k| b.trang[k as usize].ho_so) } else { None };
         let cuon = match dang {
             Some(h) if self.hs_dang_cuon != Some(h) => hien.iter().position(|&x| x == h).map(|i| i + 1),
@@ -1309,7 +1397,11 @@ impl ManTach {
                     let h = i.checked_sub(1).map(|i| hien[i]);
                     row.set_selected(h == ho_so_loc);
                     let f_td = h.and_then(|h| td.phan(h));
+                    let chua_trang = h.is_some() && h == dang;
                     let ke_duoi = |ui: &egui::Ui, mau: Color32| {
+                        if chua_trang {
+                            ui.painter().rect_filled(ui.max_rect().expand2(egui::vec2(ui.spacing().item_spacing.x / 2.0, 0.0)), 0.0, NEN_FILE_DANG_XEM);
+                        }
                         ke_duoi(ui, mau);
                         if let Some(f) = f_td {
                             cot_trai::vach_tien_do(ui, f, x_trai, rong_bang);
@@ -1565,29 +1657,26 @@ impl ManTach {
         let (co, nen): (Vec<u32>, Color32) = match loc {
             Loc::NghiTrang => (ds.iter().copied().filter(|&k| b.trang[k as usize].nghi_trang()).collect(), Color32::from_rgb(0xFF, 0xF4, 0xCC)),
             Loc::NghiXoay => (ds.iter().copied().filter(|&k| b.trang[k as usize].nghi_xoay().is_some()).collect(), Color32::from_rgb(0xFD, 0xEB, 0xD8)),
+            // Nhóm thường: thanh xác nhận chỉ có trong hộp phóng to (lưới vẫn áp ngay)
+            _ if trong_hop => (ds.to_vec(), Color32::from_rgb(0xEA, 0xF2, 0xFC)),
             _ => return,
         };
         if co.is_empty() {
             return;
         }
-        // Trong hộp phóng to: căn giữa theo bề rộng hàng đo ở khung hình trước (egui không biết trước bề rộng)
+        // Nền trải hết bề ngang; nội dung căn giữa theo bề rộng hàng đo ở khung hình trước (egui không biết trước bề rộng)
         let id = ui.scope_id().with("thanh_hoi_rong");
         let rong_truoc: Option<f32> = ui.data(|d| d.get_temp(id));
         egui::Frame::new().fill(nen).inner_margin(Margin::symmetric(8, 4)).show(ui, |ui| {
+            ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
-                if let (true, Some(w)) = (trong_hop, rong_truoc) {
+                if let Some(w) = rong_truoc {
                     ui.add_space(((ui.available_width() - w) / 2.0).max(0.0));
                 }
                 let x0 = ui.cursor().left();
                 match loc {
                 Loc::NghiTrang => {
-                    let chu = if trong_hop {
-                        "Máy đoán trang này trắng — thực tế là gì?".to_string()
-                    } else if co.len() == 1 {
-                        format!("Máy đoán trang {} trắng — thực tế là gì?", ten(co[0]))
-                    } else {
-                        format!("{} trang máy đoán trắng — thực tế là gì?", co.len())
-                    };
+                    let chu = if trong_hop || co.len() == 1 { format!("Trang {} gán nhãn:", ten(co[0])) } else { format!("{} trang gán nhãn:", co.len()) };
                     ui.label(chu);
                     for (n, chu) in [(Nhan::Trang, "Trắng (B)"), (Nhan::NoiDung, "Nội dung (C)"), (Nhan::Index, "Index (I)"), (Nhan::Split, "Split (S)")] {
                         let r = if n == nhan_chon { ui.add(nut_mau(chu, XANH_LA)) } else { ui.add(nut(chu)) };
@@ -1602,12 +1691,10 @@ impl ManTach {
                 }
                 Loc::NghiXoay => {
                     let da_chinh = co.iter().all(|&k| b.trang[k as usize].da_chinh());
-                    let chu = if trong_hop {
-                        format!("Máy đoán trang này bị xoay {}°", b.trang[co[0] as usize].nghi_xoay().unwrap_or(0))
-                    } else if co.len() == 1 {
-                        format!("Máy đoán trang {} bị xoay {}°", ten(co[0]), b.trang[co[0] as usize].nghi_xoay().unwrap_or(0))
+                    let chu = if trong_hop || co.len() == 1 {
+                        format!("Trang {} xoay {}°:", ten(co[0]), b.trang[co[0] as usize].nghi_xoay().unwrap_or(0))
                     } else {
-                        format!("{} trang máy đoán bị xoay (góc riêng từng trang)", co.len())
+                        format!("{} trang xoay:", co.len())
                     };
                     ui.label(chu);
                     let (n1, n2) = if da_chinh { (nut("1. Xoay thử"), nut_mau("2. Đúng rồi, tiếp (Enter)", XANH_LA)) } else { (nut_mau("1. Xoay thử (Enter)", XANH_LA), nut("2. Đúng rồi, tiếp")) };
@@ -1620,7 +1707,19 @@ impl ManTach {
                     }
                     ui.label(RichText::new(format!("R xoay tay · C về như cũ · còn {} trang", so_nguyen(b.tong.nghi_xoay as usize))).color(CHU_PHU));
                 }
-                _ => {}
+                _ => {
+                    // Hộp phóng to, nhóm Tất cả / Index / Trắng / Điểm cắt: chọn nhãn rồi Xong / Enter mới áp
+                    ui.label(format!("Trang {} gán nhãn:", ten(co[0])));
+                    for (n, chu) in [(Nhan::Trang, "Trắng (B)"), (Nhan::NoiDung, "Nội dung (C)"), (Nhan::Index, "Index (I)"), (Nhan::Split, "Split (S)")] {
+                        let r = if n == nhan_chon { ui.add(nut_mau(chu, XANH_LA)) } else { ui.add(nut(chu)) };
+                        if r.on_hover_text("Chọn nhãn của trang, rồi Xong / Enter").clicked() {
+                            viec.push(Viec::ChonNghi(n));
+                        }
+                    }
+                    if ui.add(nut("Xong (Enter)")).on_hover_text("Áp nhãn đang chọn, sang trang kế").clicked() {
+                        viec.push(Viec::ApNhanHop(nhan_chon));
+                    }
+                }
                 }
                 let rong = ui.min_rect().right() - x0;
                 if rong_truoc.is_none_or(|w| (w - rong).abs() > 0.5) {
@@ -1804,8 +1903,10 @@ impl ManTach {
                         painter.rect_filled(r.expand(2.0), 2.0, mau);
                         painter.text(goc_tren, egui::Align2::RIGHT_TOP, &chu, font.clone(), Color32::WHITE);
                         if nhan && vi_tri.is_some_and(|p| r.expand(2.0).contains(p)) {
+                            // Nghi trắng: nhãn "Trắng?" chỉ chọn sẵn Trắng, Enter mới áp (bấm đúp để mở hộp phóng to
+                            // không được duyệt nhầm trang ngay lần nhấn đầu)
                             viec.push(if self.loc == l {
-                                if l == Loc::NghiTrang { Viec::DuyetNghiTrang(Nhan::Trang) } else { Viec::XoayDeXuat }
+                                if l == Loc::NghiTrang { Viec::ChonNghi(Nhan::Trang) } else { Viec::XoayDeXuat }
                             } else {
                                 Viec::MoLoc(l, k)
                             });
@@ -1845,6 +1946,7 @@ impl ManTach {
     /// Dòng trạng thái dưới lưới (trong vùng duyệt): số trang trong lưới / đã xoá / đã chọn, hoàn tác / làm lại, trạng thái lưu nhãn.
     fn dong_trang_thai(&mut self, ui: &mut egui::Ui, cfg: &CauHinh, viec: &mut Vec<Viec>) {
         let Some(b) = &self.bang else { return };
+        let mut o_luu = None;
         ui.horizontal(|ui| {
             let mut job = egui::text::LayoutJob::default();
             let thuong = chu_dong(CHU_PHU, false);
@@ -1860,12 +1962,14 @@ impl ManTach {
                     viec.push(Viec::LuuNhan);
                 }
                 let r = ui.label(RichText::new(if cfg.luu_nhan == LuuNhan::TuDong { "Tự động lưu index_and_blank.txt" } else { "Lưu bằng tay index_and_blank.txt" }).size(12.0).color(CHU_PHU));
+                o_luu = Some(r.rect);
                 let r = if b.chua_luu { r.on_hover_text("Có thay đổi chưa lưu") } else { r.on_hover_text("Đã lưu") };
                 if b.chua_luu {
                     ui.painter().circle_filled(r.rect.right_top() + egui::vec2(5.0, 1.0), 3.5, Color32::from_rgb(0xE8, 0x11, 0x23));
                 }
             });
         });
+        self.o_luu_nhan = o_luu;
     }
 
     /// Báo tạm (vd "Đã hoàn tác …") ở dòng trạng thái.
@@ -2058,6 +2162,9 @@ pub(super) fn cot_trai_panel(id: &'static str, gon: bool, rong: f32) -> egui::Pa
     }
 }
 
+/// Nền dòng hồ sơ (cột trái) chứa trang đang chọn ở lưới — nhạt hơn nền dòng đang lọc.
+const NEN_FILE_DANG_XEM: Color32 = Color32::from_rgb(0xE3, 0xEE, 0xFB);
+
 /// Lề chữ hai bên trong ô bảng.
 pub(super) const LE_O_BANG: f32 = 5.0;
 
@@ -2207,6 +2314,273 @@ pub(super) fn ve_net_dut(painter: &egui::Painter, r: Rect, net: Stroke, dai: f32
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Cả màn (lưới + hộp phóng to): lọc Nghi trắng, bấm đúp mở hộp, bấm S chưa Enter → trang vẫn nghi; Enter mới áp.
+    #[test]
+    fn nghi_trang_bam_dup_mo_hop_bam_s_chua_enter() {
+        use bang_trang::{BangTrang, Sua, TrangMeta};
+        use crate::tach_vb::phan_tich::NhanTuDong;
+        let trang: Vec<TrangMeta> = (1..=6).map(|so| TrangMeta { ho_so: 0, so, dung_luong: 1, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: so % 2 == 0, nghi_xoay: None }), sua: Sua::default() }).collect();
+        let man = ManTach { bang: Some(BangTrang::moi(vec!["a.pdf".into()], trang)), ten_hien: vec!["a".into()], ten_cot: vec!["a".into()], thu_muc: "/x".into(), tab: Tab::HoSo, loc: Loc::NghiTrang, loc_menu: Loc::NghiTrang, ..Default::default() };
+        let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+        let m2 = man.clone();
+        let mut cfg = CauHinh::default();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 700.0)).build_ui(move |ui| {
+            crate::gui::cai_giao_dien(ui.ctx());
+            m2.borrow_mut().ve(ui, &mut cfg);
+        });
+        h.run_steps(3);
+        let nghi = |m: &ManTach, k: usize| m.bang.as_ref().unwrap().trang[k].nghi_trang();
+        assert_eq!(man.borrow().thu_tu, [1, 3, 5]);
+        // Bấm đúp ô đầu của lưới (giữa ô) → mở hộp
+        let o = {
+            let m = man.borrow();
+            let _ = &m;
+            egui::pos2(60.0, 200.0)
+        };
+        let _ = o;
+        man.borrow_mut().lam(Viec::PhongTo(1), &mut CauHinh::default());
+        h.run_steps(2);
+        assert!(man.borrow().phong_to.is_some());
+        h.key_press(egui::Key::S);
+        h.run_steps(3);
+        {
+            let m = man.borrow();
+            assert!(nghi(&m, 1), "S chưa Enter: trang vẫn nghi");
+            assert_eq!(m.thu_tu, [1, 3, 5], "vẫn trong danh sách Nghi trắng");
+        }
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        let m = man.borrow();
+        assert_eq!(m.bang.as_ref().unwrap().trang[1].nhan(), Nhan::Split, "Enter mới áp Split");
+        assert_eq!(m.phong_to.as_ref().and_then(|p| p.trang()), Some(3), "sang trang nghi kế");
+    }
+
+    /// Hộp phóng to đang mở: bấm chuột trong hộp không được chạm nhãn "Trắng?" của ô lưới nằm dưới hộp
+    /// (trước đây bấm trùng vị trí nhãn → trang sau lưng bị duyệt Trắng, rời danh sách Nghi trắng).
+    #[test]
+    fn hop_phong_to_mo_bam_chuot_khong_duyet_trang_sau_lung() {
+        use bang_trang::{BangTrang, Sua, TrangMeta};
+        use crate::tach_vb::phan_tich::NhanTuDong;
+        let trang: Vec<TrangMeta> = (1..=24).map(|so| TrangMeta { ho_so: 0, so, dung_luong: 1, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: true, nghi_xoay: None }), sua: Sua::default() }).collect();
+        let man = ManTach { bang: Some(BangTrang::moi(vec!["a.pdf".into()], trang)), ten_hien: vec!["a".into()], ten_cot: vec!["a".into()], thu_muc: "/x".into(), tab: Tab::HoSo, loc: Loc::NghiTrang, loc_menu: Loc::NghiTrang, ..Default::default() };
+        let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+        let m2 = man.clone();
+        let mut cfg = CauHinh::default();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 700.0)).build_ui(move |ui| {
+            crate::gui::cai_giao_dien(ui.ctx());
+            m2.borrow_mut().ve(ui, &mut cfg);
+        });
+        h.run_steps(3);
+        man.borrow_mut().lam(Viec::PhongTo(0), &mut CauHinh::default());
+        h.run_steps(2);
+        // Bấm chuột khắp vùng ảnh của hộp (dưới hàng nút), mỗi lần nhấn + thả
+        for y in (130..640).step_by(9) {
+            for x in (80..1020).step_by(11) {
+                let p = egui::pos2(x as f32, y as f32);
+                h.event(egui::Event::PointerMoved(p));
+                h.event(egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+                h.step();
+                h.event(egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+                h.step();
+            }
+        }
+        let m = man.borrow();
+        let con = m.bang.as_ref().unwrap().trang.iter().filter(|t| t.nghi_trang()).count();
+        assert_eq!(con, 24, "không trang nghi nào bị duyệt khi bấm trong hộp phóng to");
+    }
+
+    /// Bấm đúp vào nhãn "Trắng?" để mở hộp phóng to: chỉ mở hộp, không được duyệt trang thành Trắng.
+    #[test]
+    fn bam_dup_nhan_trang_hoi_mo_hop_khong_duyet() {
+        use bang_trang::{BangTrang, Sua, TrangMeta};
+        use crate::tach_vb::phan_tich::NhanTuDong;
+        let trang: Vec<TrangMeta> = (1..=24).map(|so| TrangMeta { ho_so: 0, so, dung_luong: 1, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: true, nghi_xoay: None }), sua: Sua::default() }).collect();
+        let man = ManTach { bang: Some(BangTrang::moi(vec!["a.pdf".into()], trang)), ten_hien: vec!["a".into()], ten_cot: vec!["a".into()], thu_muc: "/x".into(), tab: Tab::HoSo, loc: Loc::NghiTrang, loc_menu: Loc::NghiTrang, ..Default::default() };
+        let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+        let m2 = man.clone();
+        let mut cfg = CauHinh::default();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 700.0)).build_ui(move |ui| {
+            crate::gui::cai_giao_dien(ui.ctx());
+            m2.borrow_mut().ve(ui, &mut cfg);
+        });
+        h.run_steps(3);
+        let bam = |h: &mut egui_kittest::Harness<'_>, p: egui::Pos2| {
+            h.event(egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+            h.event(egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+        };
+        // Dò nhãn "Trắng?" của ô lưới: nhấn 1 lần dưới hàng thanh công cụ, chỗ nào chọn sẵn nhãn Trắng (chon_nghi) là nhãn
+        let mut nhan_o = None;
+        'do_tim: for y in (150..400).step_by(3) {
+            for x in (40..1060).step_by(3) {
+                let p = egui::pos2(x as f32, y as f32);
+                h.event(egui::Event::PointerMoved(p));
+                bam(&mut h, p);
+                h.step();
+                h.step();
+                if man.borrow().chon_nghi.is_some() {
+                    nhan_o = Some(p);
+                    break 'do_tim;
+                }
+            }
+        }
+        let p = nhan_o.expect("tìm thấy nhãn Trắng? trên lưới");
+        assert_eq!(man.borrow().bang.as_ref().unwrap().trang.iter().filter(|t| t.nghi_trang()).count(), 24, "nhấn nhãn chỉ chọn sẵn, chưa duyệt");
+        man.borrow_mut().chon_nghi = None;
+        // Bấm đúp đúng nhãn (như khi mở hộp phóng to): không duyệt trang
+        bam(&mut h, p);
+        h.step();
+        bam(&mut h, p);
+        h.run_steps(3);
+        let m = man.borrow();
+        assert_eq!(m.bang.as_ref().unwrap().trang.iter().filter(|t| t.nghi_trang()).count(), 24, "bấm đúp nhãn tại {p:?} không duyệt trang");
+    }
+
+    /// Ảnh dải gợi ý Nghi trắng / Nghi xoay ở lưới và trong hộp phóng to. DEMA4_ANH=<thư mục> … -- --ignored chup_thanh_hoi
+    #[test]
+    #[ignore = "cần GPU"]
+    fn chup_thanh_hoi() {
+        use bang_trang::{BangTrang, Sua, TrangMeta};
+        use crate::tach_vb::phan_tich::NhanTuDong;
+        let thu_muc = std::path::PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        for (loc, ten) in [(Loc::NghiTrang, "nghi_trang"), (Loc::NghiXoay, "nghi_xoay")] {
+            for hop in [false, true] {
+                let trang: Vec<TrangMeta> = (1..=8).map(|so| TrangMeta { ho_so: 0, so, dung_luong: 1, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: so % 2 == 0, nghi_xoay: if so % 2 == 1 { Some(90) } else { None } }), sua: Sua::default() }).collect();
+                let man = ManTach { bang: Some(BangTrang::moi(vec!["L1_05_13.pdf".into()], trang)), ten_hien: vec!["L1_05_13".into()], ten_cot: vec!["L1_05_13".into()], thu_muc: "/x".into(), tab: Tab::HoSo, loc, loc_menu: loc, ..Default::default() };
+                let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+                let m2 = man.clone();
+                let mut cfg = CauHinh::default();
+                let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 700.0)).with_pixels_per_point(1.5).build_ui(move |ui| {
+                    crate::gui::cai_giao_dien(ui.ctx());
+                    m2.borrow_mut().ve(ui, &mut cfg);
+                });
+                h.run_steps(3);
+                let k = man.borrow().thu_tu[0];
+                man.borrow_mut().chon.chon_rieng(k);
+                if hop {
+                    man.borrow_mut().lam(Viec::PhongTo(k), &mut CauHinh::default());
+                    if loc == Loc::NghiTrang {
+                        man.borrow_mut().bao_noi = Some(("L1_05_13.2 được gán nhãn: Trắng".into(), Instant::now()));
+                    }
+                }
+                h.run_steps(4);
+                h.render().unwrap().save(thu_muc.join(format!("thanh_hoi_{ten}_{}.png", if hop { "hop" } else { "luoi" }))).unwrap();
+            }
+        }
+    }
+
+    /// Lưới lọc Nghi trắng: chọn 1 trang, bấm B, C, I rồi S (không Enter) → trang vẫn nghi, vẫn trong danh sách.
+    #[test]
+    fn nghi_trang_luoi_bam_b_c_i_s_chua_enter() {
+        use bang_trang::{BangTrang, Sua, TrangMeta};
+        use crate::tach_vb::phan_tich::NhanTuDong;
+        let trang: Vec<TrangMeta> = (1..=6).map(|so| TrangMeta { ho_so: 0, so, dung_luong: 1, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: so % 2 == 0, nghi_xoay: None }), sua: Sua::default() }).collect();
+        let man = ManTach { bang: Some(BangTrang::moi(vec!["a.pdf".into()], trang)), ten_hien: vec!["a".into()], ten_cot: vec!["a".into()], thu_muc: "/x".into(), tab: Tab::HoSo, loc: Loc::NghiTrang, loc_menu: Loc::NghiTrang, ..Default::default() };
+        let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+        let m2 = man.clone();
+        let mut cfg = CauHinh::default();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 700.0)).build_ui(move |ui| {
+            crate::gui::cai_giao_dien(ui.ctx());
+            m2.borrow_mut().ve(ui, &mut cfg);
+        });
+        h.run_steps(3);
+        man.borrow_mut().chon.chon_rieng(1);
+        h.run_steps(2);
+        for (key, n) in [(egui::Key::B, Nhan::Trang), (egui::Key::C, Nhan::NoiDung), (egui::Key::I, Nhan::Index), (egui::Key::S, Nhan::Split)] {
+            h.key_press(key);
+            h.run_steps(2);
+            let m = man.borrow();
+            assert!(m.bang.as_ref().unwrap().trang[1].nghi_trang(), "{key:?} chưa Enter: trang vẫn nghi");
+            assert_eq!(m.thu_tu, [1, 3, 5], "{key:?}: vẫn trong danh sách");
+            assert_eq!(m.nhan_duyet_cua(Some(1)), n, "{key:?} chọn sẵn nhãn");
+        }
+        // Bộ gõ Telex: "i" + "s" → bộ gõ gửi Backspace rồi gõ lại "í" → không được xoá trang
+        h.key_press(egui::Key::Backspace);
+        h.event(egui::Event::Text("í".into()));
+        h.run_steps(2);
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        h.run_steps(2);
+        assert!(man.borrow().bang.as_ref().unwrap().trang[1].nghi_trang(), "Backspace của bộ gõ không xoá trang");
+        assert_eq!(man.borrow().thu_tu, [1, 3, 5]);
+        // Backspace thật (không có chữ theo sau) vẫn xoá sau 150 ms
+        h.key_press(egui::Key::Backspace);
+        h.run_steps(1);
+        assert!(!man.borrow().bang.as_ref().unwrap().trang[1].da_xoa(), "chưa đủ 150 ms");
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        h.run_steps(2);
+        assert!(man.borrow().bang.as_ref().unwrap().trang[1].da_xoa(), "Backspace thật xoá trang");
+    }
+
+    /// Đổi bộ lọc: lần đầu cuộn về đầu danh sách; quay lại bộ lọc đã xem thì chọn lại trang đang chọn trước đó.
+    #[test]
+    fn doi_loc_lan_dau_ve_dau_lan_sau_nho_trang() {
+        use bang_trang::{BangTrang, Sua, TrangMeta};
+        use crate::tach_vb::phan_tich::NhanTuDong;
+        let trang: Vec<TrangMeta> = (1..=8).map(|so| TrangMeta { ho_so: 0, so, dung_luong: 1, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: if so == 3 || so == 7 { Nhan::Index } else { Nhan::NoiDung }, nghi_trang: so % 2 == 0, nghi_xoay: None }), sua: Sua::default() }).collect();
+        let mut man = ManTach { bang: Some(BangTrang::moi(vec!["a.pdf".into()], trang)), ten_hien: vec!["a".into()], tab: Tab::HoSo, ..Default::default() };
+        let mut cfg = CauHinh::default();
+        man.cap_nhat_thu_tu();
+        man.chon.chon_rieng(5);
+        man.lam(Viec::DatLoc(Loc::NghiTrang), &mut cfg);
+        man.cap_nhat_thu_tu();
+        assert_eq!(man.cuon_toi, Some(man.thu_tu[0]), "lần đầu vào Nghi trắng: về đầu danh sách");
+        man.chon.chon_rieng(5);
+        man.lam(Viec::DatLoc(Loc::Index), &mut cfg);
+        man.cap_nhat_thu_tu();
+        assert_eq!(man.cuon_toi, Some(2), "lần đầu vào Index: về đầu");
+        man.lam(Viec::DatLoc(Loc::NghiTrang), &mut cfg);
+        assert_eq!((man.chon.tieu_diem, man.cuon_toi), (Some(5), Some(5)), "quay lại Nghi trắng: chọn lại trang đã làm");
+        man.lam(Viec::DatLoc(Loc::TatCa), &mut cfg);
+        assert_eq!(man.chon.tieu_diem, Some(5), "Tất cả nhớ trang chọn lúc rời đi");
+    }
+
+    /// Ảnh: lọc Index, chọn 1 trang của file thứ 2 → dòng file đó ở cột trái nền xanh nhạt. DEMA4_ANH=… -- --ignored chup_file_dang_xem
+    #[test]
+    #[ignore = "cần GPU"]
+    fn chup_file_dang_xem() {
+        use bang_trang::{BangTrang, Sua, TrangMeta};
+        use crate::tach_vb::phan_tich::NhanTuDong;
+        let thu_muc = std::path::PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        let trang: Vec<TrangMeta> = (0..3u32).flat_map(|hs| (1..=6).map(move |so| TrangMeta { ho_so: hs, so, dung_luong: 1, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: if so == 1 || so == 4 { Nhan::Index } else { Nhan::NoiDung }, nghi_trang: false, nghi_xoay: None }), sua: Sua::default() })).collect();
+        let ten: Vec<String> = ["L1_05_13", "L1_06_14", "L1_07_15"].map(String::from).to_vec();
+        let man = ManTach { bang: Some(BangTrang::moi(ten.iter().map(|t| format!("{t}.pdf")).collect(), trang)), ten_hien: ten.clone(), ten_cot: ten, thu_muc: "/x".into(), tab: Tab::HoSo, loc: Loc::Index, loc_menu: Loc::Index, ..Default::default() };
+        let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+        let m2 = man.clone();
+        let mut cfg = CauHinh::default();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1100.0, 600.0)).with_pixels_per_point(1.5).build_ui(move |ui| {
+            crate::gui::cai_giao_dien(ui.ctx());
+            m2.borrow_mut().ve(ui, &mut cfg);
+        });
+        h.run_steps(3);
+        man.borrow_mut().chon.chon_rieng(9); // file 2, trang 4 (Index)
+        man.borrow_mut().bao_noi = Some(("L1_06_14.4 được gán nhãn: Index".into(), Instant::now()));
+        h.run_steps(4);
+        h.render().unwrap().save(thu_muc.join("file_dang_xem.png")).unwrap();
+        // Hộp phóng to nhóm Tất cả: cột ảnh + thanh xác nhận
+        man.borrow_mut().lam(Viec::DatLoc(Loc::TatCa), &mut CauHinh::default());
+        h.run_steps(2);
+        man.borrow_mut().lam(Viec::PhongTo(9), &mut CauHinh::default());
+        h.run_steps(4);
+        h.render().unwrap().save(thu_muc.join("hop_tat_ca.png")).unwrap();
+    }
+
+    /// Duyệt Nghi trắng ngay trên lưới (không phóng to): cũng nổi thông báo "… được gán nhãn: …"; nhiều trang → "N trang".
+    #[test]
+    fn nghi_trang_luoi_duyet_co_thong_bao_noi() {
+        use bang_trang::{BangTrang, Sua, TrangMeta};
+        use crate::tach_vb::phan_tich::NhanTuDong;
+        let trang: Vec<TrangMeta> = (1..=6).map(|so| TrangMeta { ho_so: 0, so, dung_luong: 1, rong: 595.0, cao: 842.0, tu_dong: Some(NhanTuDong { nhan: Nhan::NoiDung, nghi_trang: so % 2 == 0, nghi_xoay: None }), sua: Sua::default() }).collect();
+        let mut man = ManTach { bang: Some(BangTrang::moi(vec!["a.pdf".into()], trang)), ten_hien: vec!["a".into()], tab: Tab::HoSo, loc: Loc::NghiTrang, loc_menu: Loc::NghiTrang, ..Default::default() };
+        let mut cfg = CauHinh::default();
+        man.cap_nhat_thu_tu();
+        man.chon.chon_rieng(1);
+        man.lam(Viec::DuyetNghiTrang(Nhan::Split), &mut cfg);
+        assert_eq!(man.bao_noi.as_ref().map(|b| b.0.as_str()), Some("a.2 được gán nhãn: Split"));
+        man.cap_nhat_thu_tu();
+        man.lam(Viec::ChonTat, &mut cfg);
+        man.lam(Viec::DuyetNghiTrang(Nhan::Trang), &mut cfg);
+        assert_eq!(man.bao_noi.as_ref().map(|b| b.0.as_str()), Some("2 trang được gán nhãn: Trắng"));
+    }
 
     #[test]
     fn dat_lai_ve_luc_mo_chuc_nang() {
