@@ -264,7 +264,30 @@
   .goiyxoay.vang { background:#B08900; } .goiyxoay.vang:hover { background:#7A5F00; } .hoixoay.vang { background:#FFFCEB; border-bottom-color:#EAD58A; color:#5C4700; }
   .ixoay { width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:2; vertical-align:-1px; margin-right:2px; } .hoixoay .ixoay { width:13px; height:13px; }
   .hoixoay { display:flex; align-items:center; gap:8px; padding:5px 12px; background:#FFF6EC; border-bottom:1px solid #F0C9A0; font-size:12px; color:#6B3A00; }
-  .hoixoay.an { display:none; } .hoixoay .mui { color:#B85F00; font-weight:bold; } .hoixoay .phu-chu { color:var(--chu-phu); font-size:11px; white-space:nowrap; } .hoixoay .nut, .hoixoay .con { white-space:nowrap; flex-shrink:0; } .hoixoay > span:not(.con):not(.phu-chu) { min-width:0; } .hoixoay .con { margin-left:auto; color:var(--chu-phu); }
+  /* Theo app v2.2.0: dải gợi ý trải hết bề ngang, nội dung căn giữa; dòng hồ sơ chứa trang đang chọn tô xanh nhạt;
+     thông báo gán nhãn nổi ngay trên dòng "Tự động lưu" (vàng nhạt, hiện nhanh rồi mờ chậm) */
+  .hoixoay { justify-content:center; }
+  .hoixoay .nut.xanh { background:#1E8E3E; border-color:#1E8E3E; color:#fff; }
+  .banghs .vbdong.dang > span { background:#E3EEFB; }
+  .bao-noi { position:absolute; z-index:60; background:#FFF4CC; border:1px solid #E6C85C; color:#5A4600; border-radius:3px; padding:4px 12px; font-size:12.5px; white-space:nowrap; pointer-events:none; opacity:0; }
+  .bao-noi.hien { animation:baoNoi 3.6s forwards; }
+  @keyframes baoNoi { 0% { opacity:0; } 5.5% { opacity:1; animation-timing-function:ease-in-out; } 61% { opacity:1; } 100% { opacity:0; } }
+  /* Hộp phóng to (tab Hồ sơ): dải gán nhãn + cột ảnh trang của nhóm đang xem bên trái */
+  .pt-hoi { display:none; align-items:center; justify-content:center; gap:6px; background:#EAF2FC; border-radius:4px; padding:5px 10px; margin-bottom:8px; font-size:12.5px; min-width:640px; }
+  .pt-hoi.nghi { background:#FFF4CC; } .pt-hoi.xoay { background:#FDEBD8; }
+  .phongto-phu.hoso .pt-hoi { display:flex; }
+  .pt-hoi button { height:24px; padding:0 10px; border:1px solid #BDBDBD; background:#F5F5F5; border-radius:3px; font-size:12px; cursor:pointer; }
+  .pt-hoi button.chon { background:#1E8E3E; border-color:#1E8E3E; color:#fff; }
+  .pt-hoi .con, .pt-hoi .phu { color:var(--chu-phu); }
+  .pt-than { display:flex; gap:10px; align-items:flex-start; }
+  .pt-ds { display:none; width:96px; max-height:640px; overflow:auto; background:#fff; border-radius:4px; padding:6px; flex-direction:column; gap:6px; }
+  .phongto-phu.hoso .pt-ds { display:flex; }
+  .pt-ds .o { cursor:pointer; border:2px solid transparent; border-radius:3px; padding:2px; text-align:center; font-size:10.5px; color:#555; flex-shrink:0; }
+  .pt-ds .o.dang { border-color:#0B57D0; background:#EAF2FC; color:#111; }
+  .pt-ds .mini { width:100%; height:0; padding-bottom:141.4%; background:#F1F1F1; border:1px solid #DDD; }
+  .pt-ds .mini.index { border:2px solid #0B57D0; } .pt-ds .mini.trang { border:1.5px dashed #0B57D0; } .pt-ds .mini.cat { border:1.5px solid #E8710A; }
+  .pt-ds .mini.nghi { border:1.5px dashed #D4A000; } .pt-ds .mini.xoay { border:1.5px dashed #E8710A; }
+  .hoixoay.an { display:none; } .hoixoay .mui { color:#B85F00; font-weight:bold; } .hoixoay .phu-chu { color:var(--chu-phu); font-size:11px; white-space:nowrap; } .hoixoay .nut, .hoixoay .con { white-space:nowrap; flex-shrink:0; } .hoixoay > span:not(.con):not(.phu-chu) { min-width:0; } .hoixoay .con { color:var(--chu-phu); } /* căn giữa cùng các nút, không đẩy sang mép phải */
   .dong { display:flex; flex-direction:column; gap:5px; padding:12px 10px; }
   .dong i { display:block; height:3px; background:#C8C8C8; } .dong i:first-child { height:4px; width:60%; align-self:center; background:#9A9A9A; }
   .mavach { display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:34px; font-size:8px; }
@@ -1543,6 +1566,7 @@
               <span id="conView"></span>
               <span id="baoTam" style="display:none;color:var(--chon-vien);font-weight:bold"></span>
               <span style="margin-left:auto;margin-right:8px" id="ttLuu"></span>
+              <div class="bao-noi" id="baoNoi" role="status" aria-live="polite"></div>
               <button class="nut nho" id="nutLuuNhan">Lưu nhãn</button>
             </div>
           </div>
@@ -2037,7 +2061,8 @@
       <button class="nutma" id="ptLon" aria-label="Phóng to">+</button>
       <button class="nutma" id="ptDong" aria-label="Đóng (Esc)" style="margin-left:6px">✕</button>
     </div>
-    <div class="phongto-khung"><div class="phongto" id="ptTrang"></div></div>
+    <div class="pt-hoi" id="ptHoi"></div>
+    <div class="pt-than"><div class="pt-ds" id="ptDs" aria-label="Trang của nhóm đang xem"></div><div class="phongto-khung"><div class="phongto" id="ptTrang"></div></div></div>
   </div>
 
   <div class="phu" id="phuPTLai">
@@ -2412,6 +2437,7 @@
     if (tren < khung.scrollTop || duoi > khung.scrollTop + khung.clientHeight) khung.scrollTop = o.offsetTop - khung.clientHeight / 2;
   }
   // Tab Hồ sơ: đánh dấu + cuộn tới hồ sơ chứa trang đang xem (trang vừa bấm / tiêu điểm bàn phím)
+  var viTriLoc = {}; // nhóm lọc -> trang đang làm lần cuối (xoá khi phân tích lại)
   function danhDauHoSo() {
     if (s.che === 'vanban' || !s.daPT) return;
     var k = s.tdHS || s.neo, hs = k ? tachKhoa(k).hs : (s.locHS >= 0 ? s.locHS : -1);
@@ -2643,6 +2669,17 @@
     clearTimeout(henBao); henBao = setTimeout(function () { el.style.display = 'none'; }, 3000);
   }
   // Gán nhãn kiểu bật/tắt: mọi trang đang chọn đã mang nhãn l -> bấm lại là huỷ (về Nội dung); còn lại -> gán l
+  // Thông báo gán nhãn: nổi ngay trên dòng "Tự động lưu index_and_blank.txt" (căn phải), ở lưới và hộp phóng to
+  var TEN_NHAN_DU = { trang: 'Trắng', noidung: 'Nội dung', index: 'Index', cat: 'Split' };
+  function tenTrang(k) { var x = tachKhoa(k); return tenHS(x.hs) + '.' + x.p; }
+  function baoNoi(chu) {
+    var b = $('baoNoi'), luu = $('ttLuu'), cs = document.querySelector('.cuaso').getBoundingClientRect(), r = luu.getBoundingClientRect();
+    b.textContent = chu; b.classList.remove('hien'); void b.offsetWidth;
+    b.style.right = Math.round(cs.right - r.right) + 'px'; b.style.bottom = Math.round(cs.bottom - r.top + 6) + 'px';
+    if (b.parentNode !== document.querySelector('.cuaso')) document.querySelector('.cuaso').appendChild(b);
+    b.classList.add('hien');
+  }
+  function baoGan(ds, l) { baoNoi((ds.length === 1 ? tenTrang(ds[0]) : ds.length + ' trang') + ' được gán nhãn: ' + TEN_NHAN_DU[l]); }
   function datNhan(l, dsKhoa) {
     var ds = dsKhoa || Object.keys(s.chonDs);
     if (l === 'cat') ds = ds.filter(function (k) { var x = tachKhoa(k); return datDuocCat(x.hs, x.p); });
@@ -2656,6 +2693,7 @@
       m[x.p] = l;
     });
     daSuaNhan(); ve();
+    baoGan(ds, huy ? 'noidung' : l);
   }
   // Xoá khỏi view: các trang đã xác nhận có dữ liệu -> nhãn Nội dung, ẩn khỏi lưới
   function xoaKhoiView() {
@@ -2695,6 +2733,7 @@
     ds = ds.filter(coGoiY); if (!ds.length) return false;
     var thuTu = thuTuView(), cuoi = thuTu.indexOf(ds[ds.length - 1]);
     ghiLichSu('xác nhận xoay ' + ds.length + ' trang');
+    baoNoi(ds.length === 1 ? tenTrang(ds[0]) + ' đã xác nhận xoay ' + (xoay[tachKhoa(ds[0]).hs][tachKhoa(ds[0]).p] || 0) + '°' : ds.length + ' trang đã xác nhận xoay');
     ds.forEach(function (k) { var x = tachKhoa(k); delete goiy[x.hs][x.p]; delete daThu[k]; });
     daSuaNhan(); chonTiep(thuTu, cuoi, coGoiY, 'Đã xác nhận hết trang Nghi xoay');
     return true;
@@ -2717,10 +2756,14 @@
   }
   // Nghi trắng: trang đang chọn có cờ -> Enter / B = Trắng, C = giữ nội dung, I = Index; bỏ cờ rồi chọn trang Nghi trắng kế tiếp
   function coNghi(k) { var x = tachKhoa(k); return !nhan[x.hs][x.p] && nghi[x.hs][x.p]; }
+  // Nghi trắng: B / C / I / S chỉ chọn nhãn cho trang đang chọn (nút xanh), Enter / Xong mới áp — mặc định Trắng
+  function nhanChonNghi(k) { return s.chonNghi && s.chonNghi.k === k ? s.chonNghi.l : 'trang'; }
+  function chonNhanNghi(l) { var ds = Object.keys(s.chonDs).filter(coNghi); if (!ds.length) return false; s.chonNghi = { k: ds[0], l: l }; veHoiXoay(); return true; }
   function xuLyNghi(ds, l) {
     ds = ds.filter(coNghi); if (!ds.length) return false;
     var thuTu = thuTuView(), cuoi = thuTu.indexOf(ds[ds.length - 1]);
     ghiLichSu('nghi trắng → ' + (TEN_NHAN[l] || 'nội dung') + ' ' + ds.length + ' trang');
+    s.chonNghi = null; baoGan(ds, l);
     ds.forEach(function (k) { var x = tachKhoa(k); delete nghi[x.hs][x.p]; if (l !== 'noidung') nhan[x.hs][x.p] = l; }); // trang vừa cả Nghi xoay: sau khi giữ nội dung sẽ hiện trong Nghi xoay
     daSuaNhan(); chonTiep(thuTu, cuoi, coNghi, 'Đã duyệt hết trang Nghi trắng');
     return true;
@@ -2733,22 +2776,23 @@
     if (dn.length) {
       var cn = 0; nghi.forEach(function (o, hs) { for (var p in o) if (coNghi(khoa(hs, +p)) && !daXoa[hs][p]) cn++; });
       var y = tachKhoa(dn[0]); el.classList.remove('an');
-      el.innerHTML = '<span>' + (dn.length === 1 ? 'Trang <b>' + tenHS(y.hs) + '.' + y.p + '</b> nghi trắng — bỏ khi tách?' : '<b>' + dn.length + '</b> trang đang chọn nghi trắng — bỏ khi tách?') +
-        '</span><button class="nut nho" data-hoi="trang">Trắng (Enter · B)</button><button class="nut nho" data-hoi="noidung">Giữ nội dung (C)</button><button class="nut nho" data-hoi="index">Index (I)</button><span class="con">còn ' + cn + '</span>';
+      var dc = nhanChonNghi(dn[0]);
+      el.innerHTML = '<span>' + (dn.length === 1 ? 'Trang <b>' + tenHS(y.hs) + '.' + y.p + '</b> gán nhãn:' : '<b>' + dn.length + '</b> trang gán nhãn:') + '</span>' +
+        [['trang', 'Trắng (B)'], ['noidung', 'Nội dung (C)'], ['index', 'Index (I)'], ['cat', 'Split (S)']].map(function (n) {
+          return '<button class="nut nho' + (dc === n[0] ? ' xanh' : '') + '" data-hoichon="' + n[0] + '">' + n[1] + '</button>';
+        }).join('') + '<button class="nut nho" data-hoi="xong">Xong (Enter)</button><span class="con">còn ' + cn + ' trang</span>';
       return;
     }
     var ds = s.loc === 'xoay' ? Object.keys(s.chonDs).filter(coGoiY) : [];
     el.classList.toggle('an', !ds.length); if (!ds.length) return;
     var con = 0; goiy.forEach(function (o, hs) { for (var p in o) if (coGoiY(khoa(hs, +p)) && !daXoa[hs][p]) con++; });
     var x = tachKhoa(ds[0]), g = goiy[x.hs][x.p], hien = xoay[x.hs][x.p] || 0, thu = ds.every(function (k) { return daThu[k]; });
-    var cau = ds.length === 1
-      ? '<b>' + tenHS(x.hs) + '.' + x.p + '</b> (đề xuất xoay <b>' + g + '°</b>)'
-      : '<b>' + ds.length + '</b> trang Nghi xoay (đề xuất riêng từng trang)'; // góc đang xoay hiện ở chữ dưới ảnh
+    var cau = ds.length === 1 ? 'Trang <b>' + tenHS(x.hs) + '.' + x.p + '</b> xoay <b>' + g + '°</b>:' : '<b>' + ds.length + '</b> trang xoay:';
     el.innerHTML = ICON_XOAY + '<span>' + cau + '</span>' +
       // Luôn hiện 2 nút theo thứ tự làm; nút Enter sẽ bấm được tô xanh + ghi (Enter), nút kia để thường
-      '<span class="mui">→</span><button class="nut nho' + (thu ? '' : ' xanh') + '" data-hoi="xoay">1. Xoay đề xuất' + (thu ? '' : ' (Enter)') + '</button>' +
-      '<span class="mui">→</span><button class="nut nho' + (thu ? ' xanh' : '') + '" data-hoi="xacnhan">2. Xác nhận và tiếp' + (thu ? ' (Enter)' : '') + '</button>' +
-      '<span class="phu-chu" title="R xoay thêm 90° · Shift+R thêm 180° · C về chiều gốc (0°)">R chỉnh · C về gốc</span><span class="con">còn ' + con + '</span>';
+      '<button class="nut nho' + (thu ? '' : ' xanh') + '" data-hoi="xoay">1. Xoay thử' + (thu ? '' : ' (Enter)') + '</button>' +
+      '<span class="mui">→</span><button class="nut nho' + (thu ? ' xanh' : '') + '" data-hoi="xacnhan">2. Đúng rồi, tiếp' + (thu ? ' (Enter)' : '') + '</button>' +
+      '<span class="phu-chu" title="R xoay thêm 90° · Shift+R thêm 180° · C về chiều gốc (0°)">R xoay tay · C về như cũ · còn ' + con + ' trang</span>';
   }
   // Tab Văn bản: bỏ trang đang chọn khỏi văn bản = gán nhãn Trắng (không có trong file tách)
   function boKhoiVB() {
@@ -3040,7 +3084,7 @@
       i += 0.5; $('vachTD').style.width = Math.min(i, 100) + '%';
       $('nhanTD').textContent = 'Đang phân tích ' + Math.floor(Math.min(i, 100)) + '% (' + gioPhutGiay(Date.now() - batDau) + ')'; $('nhanTD').className = 'nhantd';
       veTienDoHS(Math.min(i, 100) / 100);
-      if (i >= 100 || dungPT) { clearInterval(t); veTienDoHS(-1); tgPhanTich = Date.now() - batDau; dangPT = false; s.daPT = true; s.loc = 'tat'; $('nutCauHinh').disabled = false; $('nutMenu').disabled = false; ve(); if (dungPT) { $('nhanTD').textContent = 'Đã dừng ở ' + Math.floor(Math.min(i, 100)) + '% (' + gioPhutGiay(tgPhanTich) + ')'; $('nhanTD').className = 'nhantd dung'; } }
+      if (i >= 100 || dungPT) { clearInterval(t); veTienDoHS(-1); tgPhanTich = Date.now() - batDau; dangPT = false; s.daPT = true; s.loc = 'tat'; viTriLoc = {}; $('nutCauHinh').disabled = false; $('nutMenu').disabled = false; ve(); if (dungPT) { $('nhanTD').textContent = 'Đã dừng ở ' + Math.floor(Math.min(i, 100)) + '% (' + gioPhutGiay(tgPhanTich) + ')'; $('nhanTD').className = 'nhantd dung'; } }
     }, 40);
   }
   // Hồ sơ đang phân tích: vạch xanh 2 px dưới chân dòng dài dần theo % trang đã xong của hồ sơ đó (như thanh tiến
@@ -3109,9 +3153,16 @@
     var b = e.target.closest('[data-loc]');
     if (b) {
       var l = b.getAttribute('data-loc');
+      if (s.tdHS) viTriLoc[s.loc] = s.tdHS; // nhớ trang đang làm của nhóm cũ
       if (l === 'cat') s.loc = s.loc === 'cat' ? s.locMenu : 'cat'; // bấm lại Điểm cắt -> về mục menu đã chọn
       else { s.locMenu = l; s.loc = l; }
-      dongMenuLoc(); ve(); return;
+      dongMenuLoc();
+      // Quay lại nhóm đã xem: chọn lại trang đã làm; lần đầu: về đầu danh sách
+      var nho = viTriLoc[s.loc], tt = thuTuView();
+      s.chonDs = {};
+      if (nho && tt.indexOf(nho) >= 0) { s.chonDs[nho] = true; s.neo = s.tdHS = nho; ve(); var on = document.querySelector('#luoi [data-k="' + nho + '"]'); if (on) on.scrollIntoView({ block: 'center' }); }
+      else { s.neo = s.tdHS = ''; ve(); $('luoi').scrollTop = 0; }
+      return;
     }
     var sp = e.target.closest('[data-sap]'); if (sp) { s.sap = sp.getAttribute('data-sap'); dongMenuSap(); ve(); return; }
     if (e.target.closest('#nutSap')) { e.stopPropagation(); var mo = !$('menuSap').classList.contains('mo'); $('menuSap').classList.toggle('mo', mo); $('nutSap').classList.toggle('mo', mo); $('nutSap').setAttribute('aria-expanded', mo); return; }
@@ -3120,8 +3171,9 @@
   };
   $('nutXoa').onclick = xoaKhoiView;
   $('hoiXoay').onclick = function (e) {
-    var b = e.target.closest('[data-hoi]'); if (!b) return; var h = b.getAttribute('data-hoi'), ds = Object.keys(s.chonDs);
-    if (h === 'xoay') thuGoiY(ds); else if (h === 'xacnhan') xacNhanXoay(ds); else xuLyNghi(ds, h);
+    var b = e.target.closest('[data-hoi],[data-hoichon]'); if (!b) return; var h = b.getAttribute('data-hoi'), ds = Object.keys(s.chonDs);
+    var c = e.target.closest('[data-hoichon]'); if (c) { chonNhanNghi(c.getAttribute('data-hoichon')); return; }
+    if (h === 'xoay') thuGoiY(ds); else if (h === 'xacnhan') xacNhanXoay(ds); else if (h === 'xong') xuLyNghi(ds, nhanChonNghi(ds.filter(coNghi)[0])); else xuLyNghi(ds, h);
   };
   // Cỡ ảnh lưới: nút −/+ hoặc Ctrl + cuộn chuột (chụm 2 ngón trên trackpad); nhớ cho lần sau
   // 100 % = cỡ trang ở hộp phóng to (430 px); nấc cuối 1075 px = 250 % như khi bấm vào từng trang
@@ -3216,7 +3268,7 @@
     var gocCat = e.target.closest('[data-catgoc]');
     if (gocCat) { e.preventDefault(); e.stopPropagation(); datNhan('cat', [gocCat.getAttribute('data-catgoc')]); return; }
     var ng = e.target.closest('[data-nghik]');
-    if (ng) { e.preventDefault(); e.stopPropagation(); if (s.loc === 'nghi') xuLyNghi([ng.getAttribute('data-nghik')], 'trang'); else moBoLoc('nghi', ng.getAttribute('data-nghik')); return; }
+    if (ng) { e.preventDefault(); e.stopPropagation(); if (s.loc === 'nghi') { var kn = ng.getAttribute('data-nghik'); s.chonDs = {}; s.chonDs[kn] = true; s.neo = s.tdHS = kn; s.chonNghi = { k: kn, l: 'trang' }; ve(); } else moBoLoc('nghi', ng.getAttribute('data-nghik')); return; }
     var gy = e.target.closest('[data-goiyk]');
     if (gy) { e.preventDefault(); e.stopPropagation(); if (s.loc === 'xoay') thuGoiY([gy.getAttribute('data-goiyk')]); else moBoLoc('xoay', gy.getAttribute('data-goiyk')); return; }
     chonKieuExplorer(this, e, CHON_HS);
@@ -3376,7 +3428,27 @@
   });
   $('vbTrang').ondblclick = function (e) { var o = e.target.closest('[data-k]'); if (o) moPhongTo(dsTrangVB(), o.getAttribute('data-k')); };
   function dsTrangVB() { return Array.prototype.map.call($('vbTrang').querySelectorAll('[data-k]'), function (o) { return o.getAttribute('data-k'); }); }
-  function moPhongTo(ds, k) { pt.ds = ds; pt.i = Math.max(0, ds.indexOf(k)); pt.tyLe = 1; vePhongTo(); $('phongTo').classList.add('mo'); }
+  // Hộp phóng to theo app v2.2.0 (tab Hồ sơ): cột ảnh trang của nhóm đang xem bên trái; dải gán nhãn — B/C/I/S chỉ chọn,
+  // Enter / Xong áp rồi sang trang kế phía sau (trang không còn thuộc nhóm thì rời cột; hết cuối thì về đầu; rỗng thì đóng).
+  // Nghi xoay giữ dải riêng: 1. Xoay thử (Enter) → 2. Đúng rồi, tiếp.
+  function moPhongTo(ds, k) {
+    pt.hoSo = s.che !== 'vanban'; pt.chon = null; pt.cuon = true;
+    pt.ds = ds; pt.i = Math.max(0, ds.indexOf(k)); pt.tyLe = 1; vePhongTo(); $('phongTo').classList.add('mo');
+  }
+  function nhanTrang(k) { var x = tachKhoa(k); return nhan[x.hs][x.p] || 'noidung'; }
+  function nhanChonPT(k) { return pt.chon || (s.loc === 'nghi' ? 'trang' : nhanTrang(k)); }
+  function apPT() {
+    var k = pt.ds[pt.i], l = nhanChonPT(k);
+    if (s.loc === 'xoay') { if (!daThu[k]) { thuGoiY([k]); vePhongTo(); return; } xacNhanXoay([k]); }
+    else if (s.loc === 'nghi') xuLyNghi([k], l);
+    else if (l !== nhanTrang(k)) datNhan(l, [k]);
+    pt.chon = null; pt.cuon = true;
+    var con = thuTuView().indexOf(k) >= 0;
+    if (con) pt.i++; else pt.ds.splice(pt.i, 1);
+    if (!pt.ds.length) { dongPhongTo(); ve(); return; }
+    if (pt.i >= pt.ds.length) pt.i = 0;
+    s.chonDs = {}; s.chonDs[pt.ds[pt.i]] = true; s.neo = s.tdHS = pt.ds[pt.i]; ve(); vePhongTo();
+  }
   function vePhongTo() {
     var k = pt.ds[pt.i], x = tachKhoa(k), l = nhan[x.hs][x.p] || 'noidung';
     $('ptTen').textContent = tenHS(x.hs) + '.' + x.p + (TEN_NHAN[l] ? ' · ' + TEN_NHAN[l] : '') + '  (' + (pt.i + 1) + '/' + pt.ds.length + ')';
@@ -3384,10 +3456,36 @@
     $('ptTrang').innerHTML = '<div class="giay ' + (l === 'noidung' ? '' : l) + lopXoay(x.hs, x.p) + '">' + ruotGiay(l) + '</div>';
     $('ptTyLe').textContent = Math.round(pt.tyLe * 100) + '%';
     $('ptTruoc').disabled = pt.i <= 0; $('ptSau').disabled = pt.i >= pt.ds.length - 1;
+    $('phongTo').classList.toggle('hoso', !!pt.hoSo);
+    if (!pt.hoSo) return;
+    var h = $('ptHoi'); h.className = 'pt-hoi' + (s.loc === 'nghi' ? ' nghi' : s.loc === 'xoay' ? ' xoay' : '');
+    if (s.loc === 'xoay') {
+      var thu = !!daThu[k], con = 0; goiy.forEach(function (o, hs) { for (var p in o) if (coGoiY(khoa(hs, +p)) && !daXoa[hs][p]) con++; });
+      h.innerHTML = '<span>Trang ' + tenTrang(k) + ' xoay ' + (goiy[x.hs][x.p] || 0) + '°:</span><button data-ptxoay class="' + (thu ? '' : 'chon') + '">1. Xoay thử' + (thu ? '' : ' (Enter)') + '</button><span>→</span>' +
+        '<button data-ptxong class="' + (thu ? 'chon' : '') + '">2. Đúng rồi, tiếp' + (thu ? ' (Enter)' : '') + '</button><span class="phu">R xoay tay · C về như cũ · còn ' + con + ' trang</span>';
+    } else {
+      var dc = nhanChonPT(k), cn = 0;
+      if (s.loc === 'nghi') nghi.forEach(function (o, hs) { for (var p in o) if (coNghi(khoa(hs, +p)) && !daXoa[hs][p]) cn++; });
+      h.innerHTML = '<span>Trang ' + tenTrang(k) + ' gán nhãn:</span>' +
+        [['trang', 'Trắng (B)'], ['noidung', 'Nội dung (C)'], ['index', 'Index (I)'], ['cat', 'Split (S)']].map(function (n) {
+          return '<button data-ptnhan="' + n[0] + '" class="' + (dc === n[0] ? 'chon' : '') + '">' + n[1] + '</button>';
+        }).join('') + '<button data-ptxong>Xong (Enter)</button>' + (s.loc === 'nghi' ? '<span class="con">còn ' + cn + ' trang</span>' : '');
+    }
+    $('ptDs').innerHTML = pt.ds.map(function (kk, i) {
+      var y = tachKhoa(kk), ly = nhan[y.hs][y.p], lop = ly ? ly : coNghi(kk) ? 'nghi' : coGoiY(kk) ? 'xoay' : '';
+      return '<div class="o' + (i === pt.i ? ' dang' : '') + '" data-pti="' + i + '"><div class="mini ' + lop + '"></div>' + tenTrang(kk) + '</div>';
+    }).join('');
+    if (pt.cuon) { pt.cuon = false; var dang = $('ptDs').querySelector('.dang'); if (dang) dang.scrollIntoView({ block: 'center' }); }
   }
+  $('ptHoi').onclick = function (e) {
+    var b = e.target.closest('[data-ptnhan]'); if (b) { pt.chon = b.getAttribute('data-ptnhan'); vePhongTo(); return; }
+    if (e.target.closest('[data-ptxoay]')) { thuGoiY([pt.ds[pt.i]]); vePhongTo(); return; }
+    if (e.target.closest('[data-ptxong]')) { if (s.loc === 'xoay') daThu[pt.ds[pt.i]] = true; apPT(); }
+  };
+  $('ptDs').onclick = function (e) { var o = e.target.closest('[data-pti]'); if (o) { pt.i = +o.getAttribute('data-pti'); pt.chon = null; vePhongTo(); } };
   function dongPhongTo() { $('phongTo').classList.remove('mo'); }
-  $('ptTruoc').onclick = function () { pt.i--; vePhongTo(); };
-  $('ptSau').onclick = function () { pt.i++; vePhongTo(); };
+  $('ptTruoc').onclick = function () { pt.i--; pt.chon = null; pt.cuon = true; vePhongTo(); };
+  $('ptSau').onclick = function () { pt.i++; pt.chon = null; pt.cuon = true; vePhongTo(); };
   $('ptNho').onclick = function () { pt.tyLe = Math.max(0.5, pt.tyLe - 0.25); vePhongTo(); };
   $('ptLon').onclick = function () { pt.tyLe = Math.min(2.5, pt.tyLe + 0.25); vePhongTo(); };
   $('ptDong').onclick = dongPhongTo;
@@ -3402,9 +3500,16 @@
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (cauHinh.luu === 'tay') luuNhan(); return; }
     if ($('phongTo').classList.contains('mo')) {
+      var kp = e.key.toLowerCase(), MAP = { b: 'trang', c: 'noidung', i: 'index', s: 'cat' };
+      if (pt.hoSo && !e.ctrlKey && !e.metaKey) {
+        if (s.loc === 'xoay' && kp === 'c') { veGocGoc([pt.ds[pt.i]]); vePhongTo(); e.preventDefault(); return; }
+        if (s.loc === 'xoay' && kp === 'r') { xoayTrang([pt.ds[pt.i]], e.shiftKey ? 180 : 90); daThu[pt.ds[pt.i]] = true; vePhongTo(); e.preventDefault(); return; }
+        if (s.loc !== 'xoay' && MAP[kp]) { pt.chon = MAP[kp]; vePhongTo(); e.preventDefault(); return; }
+        if (e.key === 'Enter') { apPT(); e.preventDefault(); return; }
+      }
       if (e.key === 'Escape') dongPhongTo();
-      else if (e.key === 'ArrowLeft' && pt.i > 0) { pt.i--; vePhongTo(); }
-      else if (e.key === 'ArrowRight' && pt.i < pt.ds.length - 1) { pt.i++; vePhongTo(); }
+      else if (e.key === 'ArrowLeft' && pt.i > 0) { pt.i--; pt.chon = null; pt.cuon = true; vePhongTo(); }
+      else if (e.key === 'ArrowRight' && pt.i < pt.ds.length - 1) { pt.i++; pt.chon = null; pt.cuon = true; vePhongTo(); }
       else if (e.key === '+' || e.key === '=') $('ptLon').onclick();
       else if (e.key === '-') $('ptNho').onclick();
       e.preventDefault(); return;
@@ -3426,15 +3531,16 @@
       return;
     }
     if (phimChon(e, CHON_HS)) { e.preventDefault(); return; }
-    if (e.key === 'Enter' && ((s.loc === 'nghi' && xuLyNghi(Object.keys(s.chonDs), 'trang')) || (s.loc === 'xoay' && enterXoay(Object.keys(s.chonDs))))) { e.preventDefault(); return; } // chỉ trong bộ lọc Nghi; nhóm khác Enter = Xem lớn // vùng chọn có trang Nghi trắng: Trắng; Nghi xoay: xoay theo gợi ý; rồi sang trang tiếp // vùng chọn có trang Nghi xoay: xoay theo gợi ý, sang trang tiếp
+    if (e.key === 'Enter' && ((s.loc === 'nghi' && xuLyNghi(Object.keys(s.chonDs), nhanChonNghi(Object.keys(s.chonDs).filter(coNghi)[0]))) || (s.loc === 'xoay' && enterXoay(Object.keys(s.chonDs))))) { e.preventDefault(); return; } // chỉ trong bộ lọc Nghi; nhóm khác Enter = Xem lớn // vùng chọn có trang Nghi trắng: Trắng; Nghi xoay: xoay theo gợi ý; rồi sang trang tiếp // vùng chọn có trang Nghi xoay: xoay theo gợi ý, sang trang tiếp
     if (e.key === 'Enter' && s.tdHS) { moPhongTo(thuTuView(), s.tdHS); return; }
     if (e.key === 'Escape' && soChon()) { s.chonDs = {}; apChon(); return; }
     if (!soChon()) return;
     var k = e.key.toLowerCase();
     if (k === 'delete' || k === 'backspace') { xoaKhoiView(); e.preventDefault(); }
-    else if (k === 'i') { if (!(s.loc === 'nghi' && xuLyNghi(Object.keys(s.chonDs), 'index'))) datNhan('index'); }
-    else if (k === 'b') { if (!(s.loc === 'nghi' && xuLyNghi(Object.keys(s.chonDs), 'trang'))) datNhan('trang'); }
-    else if (k === 'c') { if (!(s.loc === 'nghi' && xuLyNghi(Object.keys(s.chonDs), 'noidung')) && !(s.loc === 'xoay' && veGocGoc(Object.keys(s.chonDs)))) datNhan('noidung'); } else if (k === 's') datNhan('cat');
+    else if (k === 'i') { if (!(s.loc === 'nghi' && chonNhanNghi('index'))) datNhan('index'); }
+    else if (k === 'b') { if (!(s.loc === 'nghi' && chonNhanNghi('trang'))) datNhan('trang'); }
+    else if (k === 'c') { if (!(s.loc === 'nghi' && chonNhanNghi('noidung')) && !(s.loc === 'xoay' && veGocGoc(Object.keys(s.chonDs)))) datNhan('noidung'); }
+    else if (k === 's') { if (!(s.loc === 'nghi' && chonNhanNghi('cat'))) datNhan('cat'); }
     else if (k === 'r') xoayTrang(Object.keys(s.chonDs), e.shiftKey ? 180 : 90);
   });
   // Tách chỉ chạy khi danh sách Nghi trắng và Nghi xoay đều rỗng (mọi hồ sơ, bỏ trang đã xoá); còn thì báo + nút đi duyệt
@@ -3545,6 +3651,7 @@
   if (location.hash === '#cau-hinh-tin-cay') { $('nutCauHinh').onclick(); $('chTinCay').value = '0.85'; veTinCay(); document.querySelector('#hangXoay .tip').classList.add('hien'); }
   if (location.hash === '#cau-hinh-nhap') { $('nutCauHinh').onclick(); $('chTen').focus(); }
   if (location.hash === '#nut-sang') { s.daPT = true; nhan[0][3] = 'cat'; s.chonDs = { '0.3': true }; s.neo = '0.3'; ve(); }
+  if (location.hash === '#nghi-trang-phong-to') { s.daPT = true; s.loc = 'nghi'; s.locMenu = 'nghi'; ve(); var dsp = thuTuView(); if (dsp[0]) moPhongTo(dsp, dsp[0]); }
   if (location.hash === '#nghi-trang') { s.daPT = true; s.loc = 'nghi'; s.locMenu = 'nghi'; var dsn = thuTuView(); if (dsn[0]) { s.chonDs[dsn[0]] = true; s.neo = s.tdHS = dsn[0]; } ve(); }
   if (location.hash === '#nghi-xoay') { s.daPT = true; s.loc = 'xoay'; s.locMenu = 'xoay'; var dsx = thuTuView(); if (dsx[0]) { s.chonDs[dsx[0]] = true; s.neo = s.tdHS = dsx[0]; } ve(); }
   if (location.hash === '#nghi-trang-tat') { s.daPT = true; var dsz = thuTuView().filter(coNghi); if (dsz[0]) { s.chonDs[dsz[0]] = true; s.neo = s.tdHS = dsz[0]; } ve(); setTimeout(function () { var o = document.querySelector('#luoi [data-k="' + dsz[0] + '"]'); if (o) o.scrollIntoView({ block: 'center' }); }, 50); }
