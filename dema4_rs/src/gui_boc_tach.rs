@@ -60,6 +60,9 @@ pub(crate) enum Hop {
     Sua(hop_loai::BanSua),
     XacNhanXoa(hop_loai::BanSua),
     LuuMoi(hop_loai::BanSua, String),
+    /// Hỏi trước khi đọc lại cả thư mục (kể cả file đã có kết quả); danh sách file lập lúc bấm xác nhận
+    /// (thư mục có thể đã đổi trong lúc hộp đang mở).
+    XacNhanChayLai,
 }
 
 pub struct ManBocTach {
@@ -587,14 +590,26 @@ impl ManBocTach {
                     return;
                 }
                 let bat = self.san_sang();
-                let da_chay = self.tt.iter().any(|t| !matches!(t, ket_qua::TrangThai::Cho));
                 let hien = if bat { self.hien() } else { vec![] };
-                let loc = !self.kq.loc.trim().is_empty();
-                let chu = if loc { format!("Chạy lại ({})", hien.len()) } else if da_chay { "Chạy lại".into() } else { "Bắt đầu".into() };
+                let nut = ket_qua::nut_chay(&self.tt, self.kq.loc.trim().is_empty(), hien.len());
+                let (chu, goi_y) = match nut {
+                    _ if !bat => ("Bắt đầu".to_string(), "Chọn nguồn văn bản, mô hình đọc và loại tài liệu trước".to_string()),
+                    ket_qua::NutChay::BatDau => ("Bắt đầu".into(), "Đọc mọi file PDF trong thư mục".into()),
+                    ket_qua::NutChay::TiepTuc(n) => (format!("Tiếp tục ({n})"), format!("Chỉ đọc {n} file chưa có kết quả — file đã đọc giữ nguyên, không đọc lại")),
+                    ket_qua::NutChay::ChayLaiTatCa => ("Chạy lại tất cả".into(), "Mọi file đã có kết quả — đọc lại cả thư mục (hỏi xác nhận trước)".into()),
+                    ket_qua::NutChay::ChayLaiLoc(k) => (format!("Chạy lại ({k})"), format!("Đọc lại {k} file đang hiện theo bộ lọc")),
+                };
                 let bat = bat && !hien.is_empty() && self.kq.doc_lai.is_none();
-                let goi_y = if !self.san_sang() { "Chọn nguồn văn bản, mô hình đọc và loại tài liệu trước".to_string() } else if loc { format!("Đọc lại {} file đang hiện theo bộ lọc", hien.len()) } else { "Đọc mọi file PDF trong thư mục".into() };
                 if ui.add_enabled(bat, nut_mau(&chu, if bat { XANH_LA } else { NUT_TAT }).min_size(egui::vec2(130.0, 28.0))).on_hover_text(&goi_y).on_disabled_hover_text(&goi_y).clicked() {
-                    self.yeu_cau_chay = Some(hien);
+                    match nut {
+                        ket_qua::NutChay::TiepTuc(_) => self.yeu_cau_chay = Some(ket_qua::chi_so_chua_doc(&self.tt)),
+                        ket_qua::NutChay::ChayLaiTatCa => self.hop = Some(Hop::XacNhanChayLai),
+                        _ => self.yeu_cau_chay = Some(hien.clone()),
+                    }
+                }
+                // Còn file chưa đọc: "Chạy lại tất cả" là nút phụ, vẫn phải xác nhận
+                if bat && matches!(nut, ket_qua::NutChay::TiepTuc(_)) && ui.add(egui::Button::new("Chạy lại tất cả").min_size(egui::vec2(0.0, 28.0))).on_hover_text("Đọc lại cả thư mục, kể cả file đã có kết quả (hỏi xác nhận trước)").clicked() {
+                    self.hop = Some(Hop::XacNhanChayLai);
                 }
             });
         });
@@ -613,7 +628,7 @@ impl ManBocTach {
             }
         }
         // Đang chạy: không áp thay đổi loại tài liệu (đóng popup nếu đang mở)
-        if self.dang_chay() && matches!(self.hop, Some(Hop::Sua(_) | Hop::XacNhanXoa(_) | Hop::LuuMoi(..))) {
+        if self.dang_chay() && matches!(self.hop, Some(Hop::Sua(_) | Hop::XacNhanXoa(_) | Hop::LuuMoi(..) | Hop::XacNhanChayLai)) {
             self.hop = None;
         }
         let Some(hop) = &mut self.hop else { return };
@@ -655,6 +670,18 @@ impl ManBocTach {
                 Some(false) => sau = Some(Hop::Sua(b.clone())),
                 None => {}
             },
+            Hop::XacNhanChayLai => {
+                let tong = self.files.len();
+                let da_co = (0..tong).filter(|&i| !matches!(self.tt.get(i), Some(ket_qua::TrangThai::Cho) | None)).count();
+                match hop_loai::ve_xn_chay_lai(ctx, tong, da_co) {
+                    Some(true) => {
+                        self.yeu_cau_chay = Some((0..tong).collect());
+                        dong = true;
+                    }
+                    Some(false) => dong = true,
+                    None => {}
+                }
+            }
             Hop::LuuMoi(b, ten) => {
                 let da_co: Vec<String> = self.ds_loai.iter().map(|l| l.ten.clone()).collect();
                 match hop_loai::ve_luu_moi(ctx, ten, &self.ds_loai[b.chi_so].ten, &da_co) {

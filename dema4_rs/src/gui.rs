@@ -138,6 +138,29 @@ impl Default for UngDungChinh {
     }
 }
 
+/// Việc đang chạy lúc người dùng đóng app; `boc_tach` = (file đã xong, tổng file của lần chạy).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct ViecDangChay {
+    dem: bool,
+    phan_tich: bool,
+    tach: bool,
+    muc_luc: bool,
+    boc_tach: Option<(usize, usize)>,
+}
+
+impl ViecDangChay {
+    /// Câu mô tả cho hộp hỏi khi đóng; `None` = không có gì đang chạy → đóng luôn.
+    fn mo_ta(&self) -> Option<String> {
+        if let Some((xong, tong)) = self.boc_tach {
+            return Some(format!("bóc tách {xong}/{tong} file — file đang đọc dở sẽ mất, lượt gọi mô hình đã tốn"));
+        }
+        [(self.tach, "tách văn bản"), (self.muc_luc, "sinh mục lục"), (self.phan_tich, "phân tích"), (self.dem, "đếm trang")]
+            .into_iter()
+            .find(|(co, _)| *co)
+            .map(|(_, chu)| chu.to_string())
+    }
+}
+
 impl UngDungChinh {
     fn tab_huong_dan(&self) -> crate::tro_giup::TabHuongDan {
         match self.man {
@@ -148,20 +171,25 @@ impl UngDungChinh {
         }
     }
 
-    /// Hỏi Lưu / Bỏ / Huỷ khi đóng app còn nhãn chưa lưu.
+    /// Việc đang chạy ở mọi màn (đóng app lúc này thì phần dở dang bị mất).
+    fn viec_dang_chay(&self) -> ViecDangChay {
+        ViecDangChay {
+            dem: self.dem.dang_dem.is_some(),
+            phan_tich: self.tach.dang_chay() && !self.tach.dang_tach(),
+            tach: self.tach.dang_tach(),
+            muc_luc: self.muc_luc.dang_chay(),
+            boc_tach: self.boc_tach.tien_do_chay(),
+        }
+    }
+
+    /// Hỏi Thoát luôn / Huỷ khi đóng app lúc đang chạy (Đếm, Phân tích, Tách, Mục lục, Bóc tách).
     fn hop_hoi_dong_chay(&mut self, ctx: &egui::Context) {
         if !self.hoi_dong_chay {
             return;
         }
         let mut chon = None;
         use crate::gui_tach::khung_hop as kh;
-        let viec = if self.muc_luc.dang_chay() {
-            "sinh mục lục"
-        } else if self.tach.dang_tach() {
-            "tách văn bản"
-        } else {
-            "phân tích"
-        };
+        let viec = self.viec_dang_chay().mo_ta().unwrap_or_else(|| "xử lý".into());
         kh::hop(ctx, "hoi_dong_chay", 360.0, "Đang xử lý", |ui| {
             kh::than_chu(ui, &format!("Đang {viec}. Thoát ngay thì phần đang làm dở sẽ mất; nên bấm *Dừng*, đợi xong rồi mới thoát."));
             kh::chan(ui, |ui| {
@@ -177,7 +205,10 @@ impl UngDungChinh {
         });
         if let Some(thoat) = chon {
             self.hoi_dong_chay = false;
-            if thoat {
+            if thoat && self.tach.chua_luu() {
+                // Còn nhãn Tách chưa lưu: hỏi Lưu / Bỏ / Huỷ tiếp, không đóng thẳng
+                self.hoi_dong = true;
+            } else if thoat {
                 self.cho_dong = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
@@ -239,8 +270,9 @@ impl UngDungChinh {
         self.man = man;
     }
 
+    /// Có chức năng nào đang chạy (khoá menu chuyển màn; đóng app thì hỏi). Một nguồn với hộp hỏi khi đóng.
     fn dang_chay(&self) -> bool {
-        self.dem.dang_dem.is_some() || self.tach.dang_chay() || self.muc_luc.dang_chay() || self.boc_tach.dang_chay()
+        self.viec_dang_chay().mo_ta().is_some()
     }
 
     fn thanh_menu(&mut self, ui: &mut egui::Ui) {
@@ -321,7 +353,7 @@ impl eframe::App for UngDungChinh {
         if ctx.input(|i| i.viewport().close_requested()) {
             if self.cho_dong {
                 self.tach.ghi_cache();
-            } else if self.tach.dang_chay() || self.muc_luc.dang_chay() {
+            } else if self.dang_chay() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                 self.hoi_dong_chay = true;
             } else if self.tach.chua_luu() {
@@ -1612,6 +1644,18 @@ mod tests {
     use crate::boc_tach::mo_hinh::NhaCungCap;
 
     #[test]
+    fn dong_app_hoi_khi_bat_ky_chuc_nang_nao_dang_chay() {
+        let khong = ViecDangChay::default();
+        assert_eq!(khong.mo_ta(), None, "không chạy gì → đóng luôn");
+        let boc = ViecDangChay { boc_tach: Some((12, 40)), ..Default::default() };
+        assert_eq!(boc.mo_ta().as_deref(), Some("bóc tách 12/40 file — file đang đọc dở sẽ mất, lượt gọi mô hình đã tốn"));
+        assert_eq!(ViecDangChay { dem: true, ..Default::default() }.mo_ta().as_deref(), Some("đếm trang"));
+        assert_eq!(ViecDangChay { muc_luc: true, ..Default::default() }.mo_ta().as_deref(), Some("sinh mục lục"));
+        assert_eq!(ViecDangChay { tach: true, ..Default::default() }.mo_ta().as_deref(), Some("tách văn bản"));
+        assert_eq!(ViecDangChay { phan_tich: true, ..Default::default() }.mo_ta().as_deref(), Some("phân tích"));
+    }
+
+    #[test]
     fn windows_khong_do_vulkan_tru_khi_ep_bang_bien_moi_truong() {
         use eframe::wgpu::Backends;
         let w = backend_wgpu(true, None);
@@ -2145,6 +2189,63 @@ mod tests {
         cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && s.boc_tach.tong_ket.is_some());
         let _ = kt.moc().recv_timeout(Duration::from_secs(5));
         assert_eq!(kt.luot().unwrap().0, truoc + 1, "không file nào đọc được → hoàn lượt");
+        let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
+    }
+
+    #[test]
+    fn boc_tach_tiep_tuc_chi_doc_file_chua_co_ket_qua_chay_lai_tat_ca_phai_xac_nhan() {
+        use crate::gui_boc_tach::ket_qua::TrangThai;
+        use egui_kittest::kittest::Queryable;
+        // Lần 1 đọc cả 3 file; lần 2 (Tiếp tục) chỉ được đọc VB03
+        let (d, mut h, kt) = boc_tach_license("tiep_tuc", 10, vec![Ok(BT_DAU), Ok(BT_CUOI), Err(500), Ok(BT_DAU), Ok(BT_CUOI), Ok(BT_DAU), Ok(BT_CUOI)]);
+        let dem_dong = || std::fs::read_to_string(crate::boc_tach::luu::file_jsonl(&d)).map_or(0, |s| s.lines().count());
+        h.get_by_label("Bắt đầu").click();
+        cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && s.boc_tach.tt.iter().all(|t| !matches!(t, TrangThai::Cho)));
+        h.state_mut().boc_tach.tong_ket = None;
+        // Mô phỏng mở lại khi VB03 chưa đọc (tắt app giữa chừng)
+        h.state_mut().boc_tach.tt[2] = TrangThai::Cho;
+        h.run_steps(2);
+        h.get_by_label("Chạy lại tất cả"); // nút phụ có mặt
+        let (truoc, luot) = (dem_dong(), kt.luot().unwrap().0);
+        h.get_by_label("Tiếp tục (1)").click();
+        cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && matches!(s.boc_tach.tt[2], TrangThai::Xong(_)));
+        assert_eq!(dem_dong(), truoc + 1, "chỉ đọc 1 file chưa có kết quả, không đọc lại VB01 / VB02");
+        h.state_mut().boc_tach.tong_ket = None;
+        let _ = kt.moc().recv_timeout(Duration::from_secs(5));
+        // Đọc hết → nút chính là Chạy lại tất cả; Huỷ ở hộp xác nhận → không đọc, không trừ lượt
+        h.run_steps(2);
+        let luot_sau_tiep_tuc = kt.luot().unwrap().0;
+        assert_eq!(luot_sau_tiep_tuc, luot + 1, "Tiếp tục = 1 lượt");
+        h.get_by_label("Chạy lại tất cả").click();
+        h.run_steps(2);
+        assert!(matches!(h.state().boc_tach.hop, Some(crate::gui_boc_tach::Hop::XacNhanChayLai)));
+        let truoc = dem_dong();
+        h.get_by_label("Huỷ").click();
+        h.run_steps(3);
+        assert!(h.state().boc_tach.hop.is_none() && !h.state().boc_tach.dang_chay());
+        assert_eq!((dem_dong(), kt.luot().unwrap().0), (truoc, luot_sau_tiep_tuc), "Huỷ: không gọi mô hình, không trừ lượt");
+        let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
+        let _ = std::fs::remove_dir_all(d.parent().unwrap());
+    }
+
+    #[test]
+    fn dong_app_luc_dang_boc_tach_thi_hoi_khong_dong_ngay() {
+        use egui_kittest::kittest::Queryable;
+        let (d, mut h, _) = boc_tach_license("dong_app", 10, vec![Ok(BT_DAU), Ok(BT_CUOI), Ok(BT_DAU), Ok(BT_CUOI), Ok(BT_DAU), Ok(BT_CUOI)]);
+        h.get_by_label("Bắt đầu").click();
+        h.run_steps(1);
+        assert!(h.state().boc_tach.dang_chay(), "đã bắt đầu chạy");
+        h.input_mut().viewports.entry(egui::ViewportId::ROOT).or_default().events.push(egui::ViewportEvent::Close);
+        h.run_steps(1);
+        assert!(h.state().hoi_dong_chay, "đóng app lúc đang bóc tách → hỏi Thoát luôn / Huỷ");
+        assert!(!h.state().cho_dong, "chưa đóng");
+        h.run_steps(2);
+        h.get_by_label("Thoát luôn");
+        h.get_by_label("Huỷ").click();
+        h.run_steps(2);
+        // Không chờ lần chạy xong (máy chạy test song song có thể chậm): chỉ cần hộp đóng và app vẫn mở
+        assert!(!h.state().hoi_dong_chay && !h.state().cho_dong, "Huỷ: app vẫn mở, lần chạy tiếp tục");
         let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&d));
         let _ = std::fs::remove_dir_all(d.parent().unwrap());
     }

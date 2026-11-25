@@ -295,6 +295,35 @@ fn bang_truong(ui: &mut egui::Ui, b: &mut BanSua) {
     });
 }
 
+/// Xác nhận đọc lại `tong` file, trong đó `da_co` file đã có kết quả (mỗi file đọc lại tốn lượt gọi mô hình).
+pub fn ve_xn_chay_lai(ctx: &egui::Context, tong: usize, da_co: usize) -> Option<bool> {
+    let mut kq = None;
+    let ph = kh::hop(ctx, "bt_xn_chay_lai", 420.0, "Đọc lại cả thư mục?", |ui| {
+        kh::than(ui, "bt_than_xn_chay_lai", 60.0, Margin::same(14), |ui| {
+            let mut job = egui::text::LayoutJob::default();
+            let (t, d) = (crate::gui_tach::chu_dong(CHU, false), crate::gui_tach::chu_dong(CHU, true));
+            job.append("Đọc lại ", 0.0, t.clone());
+            job.append(&format!("{tong} file"), 0.0, d.clone());
+            job.append(", kể cả ", 0.0, t.clone());
+            job.append(&format!("{da_co} file đã có kết quả"), 0.0, d);
+            job.append(" (tốn lượt gọi mô hình; giá trị sửa tay của các file này bị thay bằng kết quả đọc mới).", 0.0, t);
+            job.wrap.max_width = ui.available_width();
+            ui.label(job);
+        });
+        kh::chan(ui, |ui| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.add(kh::nut_chan_mau("Đọc lại", DO)).clicked() {
+                    kq = Some(true);
+                }
+                if ui.add(kh::nut_chan("Huỷ")).clicked() {
+                    kq = Some(false);
+                }
+            });
+        });
+    });
+    kq.or(ph.should_close().then_some(false))
+}
+
 /// Xác nhận Xoá loại: `Some(true)` = xoá, `Some(false)` = huỷ.
 pub fn ve_xn_xoa(ctx: &egui::Context, ten: &str, so_truong: usize) -> Option<bool> {
     let mut kq = None;

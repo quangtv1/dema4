@@ -130,6 +130,37 @@ impl Default for TabKetQua {
     }
 }
 
+/// Nút chạy chính của màn Bóc tách. Mỗi lần đọc file đều tốn lượt gọi mô hình, nên khi ô lọc trống mặc định
+/// chỉ đọc file **chưa có kết quả**; đọc lại file đã có kết quả phải qua xác nhận.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NutChay {
+    /// Chưa file nào có kết quả.
+    BatDau,
+    /// Còn `n` file chưa có kết quả → chỉ đọc chúng (nút phụ "Chạy lại tất cả" cần xác nhận).
+    TiepTuc(usize),
+    /// Mọi file đã có kết quả → chỉ còn "Chạy lại tất cả" (cần xác nhận).
+    ChayLaiTatCa,
+    /// Ô lọc có chữ → đọc lại `k` file đang hiện (người dùng đã tự chọn).
+    ChayLaiLoc(usize),
+}
+
+/// `tt`: trạng thái mọi file; `so_hien`: số file đang hiện theo ô lọc. File lỗi tính là đã có kết quả (lọc `lỗi` để đọc lại).
+pub(crate) fn nut_chay(tt: &[TrangThai], loc_trong: bool, so_hien: usize) -> NutChay {
+    if !loc_trong {
+        return NutChay::ChayLaiLoc(so_hien);
+    }
+    match tt.iter().filter(|t| matches!(t, TrangThai::Cho)).count() {
+        n if n == tt.len() => NutChay::BatDau,
+        0 => NutChay::ChayLaiTatCa,
+        n => NutChay::TiepTuc(n),
+    }
+}
+
+/// Chỉ số các file chưa có kết quả (danh sách cho nút Tiếp tục).
+pub(crate) fn chi_so_chua_doc(tt: &[TrangThai]) -> Vec<usize> {
+    tt.iter().enumerate().filter(|(_, t)| matches!(t, TrangThai::Cho)).map(|(i, _)| i).collect()
+}
+
 /// Bộ lọc của ô tìm: tên file (không dấu, không hoa) hoặc trạng thái cột Trường ("lỗi", "đọc", "-", "5/6").
 pub(crate) fn khop_loc(ten: &str, tt: &TrangThai, loc: &str, n_truong: usize) -> bool {
     let q = loc.trim().to_lowercase();
@@ -219,10 +250,17 @@ impl ManBocTach {
         (0..self.files.len()).filter(|&i| khop_loc(&self.files[i].ten, self.tt.get(i).unwrap_or(&TrangThai::Cho), &self.kq.loc, n)).collect()
     }
 
+    /// Đang chạy: (số file đã xong, tổng file của lần chạy); đang đọc lại 1 file = (0, 1). Cho hộp hỏi khi đóng app.
+    pub(crate) fn tien_do_chay(&self) -> Option<(usize, usize)> {
+        self.chay.as_ref().map(|c| (c.xong, c.ds.len())).or(self.kq.doc_lai.is_some().then_some((0, 1)))
+    }
+
     /// Bắt đầu / Chạy lại các file `ds` trên luồng nền.
-    pub(crate) fn bat_dau(&mut self, ds: Vec<usize>, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>, ctx: &egui::Context) {
+    pub(crate) fn bat_dau(&mut self, mut ds: Vec<usize>, cfg: &CauHinhBocTach, khoa: &BTreeMap<String, String>, ctx: &egui::Context) {
         let (Some(loai), Some(n)) = (self.loai_chon().cloned(), self.ncc) else { return };
-        if ds.is_empty() {
+        // Danh sách có thể lập từ trước (popup license / xác nhận) mà thư mục đã đổi: bỏ chỉ số không còn, trước khi trừ lượt
+        ds.retain(|&i| i < self.files.len());
+        if ds.is_empty() || self.chay.is_some() {
             return;
         }
         // 1 lượt cho mỗi lần Bắt đầu / Chạy lại; hết lượt → popup license, bấm chạy được thì chạy lại đúng danh sách này
@@ -1103,6 +1141,19 @@ mod tests {
     fn xong(n: usize) -> TrangThai {
         let gia_tri = (0..6).map(|k| (format!("b{k}"), if k < n { "x".to_string() } else { String::new() })).collect();
         TrangThai::Xong(BanGhi { file: String::new(), loai: String::new(), so_trang: 1, gia_tri, loi: None, sua: vec![], canh_bao: None, giay: 1.0, tho: vec![] })
+    }
+
+    #[test]
+    fn nut_chay_khong_doc_lai_file_da_co_ket_qua_khi_chua_xac_nhan() {
+        let cho = || TrangThai::Cho;
+        assert_eq!(nut_chay(&[cho(), cho(), cho()], true, 3), NutChay::BatDau, "chưa chạy lần nào");
+        let lo: Vec<TrangThai> = (0..100).map(|i| if i < 60 { xong(6) } else { cho() }).collect();
+        assert_eq!(nut_chay(&lo, true, 100), NutChay::TiepTuc(40), "60/100 xong → chỉ đọc 40 file còn lại");
+        let co_loi = [xong(6), TrangThai::Loi("x".into()), cho()];
+        assert_eq!(nut_chay(&co_loi, true, 3), NutChay::TiepTuc(1), "file lỗi đã có kết quả (lọc `lỗi` để đọc lại)");
+        assert_eq!(nut_chay(&[xong(6), xong(5)], true, 2), NutChay::ChayLaiTatCa, "đã đọc hết → chỉ còn Chạy lại tất cả (có xác nhận)");
+        assert_eq!(nut_chay(&lo, false, 7), NutChay::ChayLaiLoc(7), "ô lọc có chữ → như cũ: đọc lại file đang hiện");
+        assert_eq!(chi_so_chua_doc(&co_loi), vec![2]);
     }
 
     #[test]

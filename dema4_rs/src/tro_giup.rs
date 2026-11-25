@@ -255,14 +255,14 @@ const HD_BOC_TACH: &[Khoi] = &[
         "*Mô hình đọc*: chọn mô hình đã khai ở *Cấu hình › Bóc tách* (máy chủ nội bộ vLLM / Ollama / LM Studio, Gemini (Vertex AI hoặc AI Studio), Claude, GPT, OpenRouter — dịch vụ đám mây chỉ cần dán khoá API); *Kiểm tra* để thử kết nối.",
         "*Loại tài liệu*: Văn bản hành chính, Hồ sơ đất đai, Hợp đồng hoặc loại riêng. Tab *Trường dữ liệu*: xem các trường, *Câu lệnh* gửi mô hình; bút chì (hoặc bấm đúp 1 dòng) để sửa tên cột, mô tả, chuẩn hoá, thứ tự.",
         "*Thử đọc* file đang xem để kiểm tra kết quả — không trừ lượt chạy.",
-        "*Bắt đầu*: đọc mọi file; tab *Kết quả bóc* hiện từng file, sửa tay ô sai rồi *Lưu*. Lọc (ô tìm: tên file, `lỗi`, `5/6`…) rồi *Chạy lại (n)* để đọc lại các file đang hiện.",
+        "*Bắt đầu*: đọc mọi file; tab *Kết quả bóc* hiện từng file, sửa tay ô sai rồi *Lưu*. Mở lại thư mục làm dở: *Tiếp tục (n)* chỉ đọc n file chưa có kết quả; *Chạy lại tất cả* đọc lại cả thư mục (hỏi xác nhận, ghi đè cả giá trị sửa tay). Lọc (ô tìm: tên file, `lỗi`, `5/6`…) rồi *Chạy lại (n)* để đọc lại các file đang hiện.",
     ]),
     Khoi::Muc("Kết quả"),
     Khoi::Bang(&[
         ("Excel", "`<tên thư mục>_boc_tach.xlsx` cạnh thư mục nguồn (hoặc thư mục đặt ở Cấu hình): mỗi file 1 dòng, nạp thẳng vào Sinh mục lục làm file biên mục."),
         ("Google Sheet", "Bật ô *Google Sheet*: tab trên Sheet là bản sao kết quả như file Excel (khoá service account hoặc Apps Script, khai ở Cấu hình). Có thay đổi (đọc xong file, Lưu, ReOCR) thì tự ghi lại cả tab, tối đa 1 lần mỗi phút; tab để trống = tên thư mục nguồn. Mất mạng thì tự thử lại."),
         ("Sao lưu", "Kết quả bóc tách (cả phần sửa tay) được gửi về trạm Sao Mai để sao lưu và nâng chất lượng bóc tách — mỗi máy 1 thư mục theo mã máy, mỗi thư mục nguồn 1 file; cùng nhịp tối đa 1 lần mỗi phút, không phụ thuộc ô Google Sheet."),
-        ("Lượt chạy", "Mỗi lần *Bắt đầu* / *Chạy lại* có ít nhất 1 file đọc được = 1 lượt; *Thử đọc* không tính."),
+        ("Lượt chạy", "Mỗi lần *Bắt đầu* / *Tiếp tục* / *Chạy lại* có ít nhất 1 file đọc được = 1 lượt; *Thử đọc* không tính. Đóng app khi đang bóc tách thì app hỏi trước — file đang đọc dở sẽ mất."),
     ]),
     Khoi::Ghi("Mỗi trang cần đọc được gửi tới mô hình đọc đã chọn: máy chủ nội bộ thì ảnh không ra khỏi mạng đơn vị; dịch vụ đám mây (Gemini, Claude, GPT, OpenRouter) thì ảnh gửi tới máy chủ của hãng — không dùng cho tài liệu mật. Khoá API lưu mã hoá trên máy."),
 ];
