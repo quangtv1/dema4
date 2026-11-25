@@ -24,9 +24,42 @@ pub enum ViTri {
 }
 
 impl ViTri {
+    /// 4 góc rồi 4 cạnh (thứ tự xử lý như XoaGhim khi bật nhiều vùng có sẵn).
+    pub const CO_SAN: [ViTri; 8] = [ViTri::GocTrenTrai, ViTri::GocTrenPhai, ViTri::GocDuoiTrai, ViTri::GocDuoiPhai, ViTri::CanhTrai, ViTri::CanhPhai, ViTri::CanhTren, ViTri::CanhDuoi];
+
     /// Góc / cạnh có sẵn (ngưỡng nét đen thấp hơn vùng vẽ tay, có nới ra mép).
     pub fn la_goc_canh(self) -> bool {
         self != ViTri::Tay
+    }
+
+    pub fn la_goc(self) -> bool {
+        matches!(self, ViTri::GocTrenTrai | ViTri::GocTrenPhai | ViTri::GocDuoiTrai | ViTri::GocDuoiPhai)
+    }
+
+    pub fn ten(self) -> &'static str {
+        match self {
+            ViTri::GocTrenTrai => "Góc trên trái",
+            ViTri::GocTrenPhai => "Góc trên phải",
+            ViTri::GocDuoiTrai => "Góc dưới trái",
+            ViTri::GocDuoiPhai => "Góc dưới phải",
+            ViTri::CanhTrai => "Cạnh trái",
+            ViTri::CanhPhai => "Cạnh phải",
+            ViTri::CanhTren => "Cạnh trên",
+            ViTri::CanhDuoi => "Cạnh dưới",
+            ViTri::Tay => "Vùng vẽ",
+        }
+    }
+}
+
+/// Vùng có sẵn với kích thước / ngưỡng mặc định như XoaGhim: góc 130 × 130 điểm ảnh @120 dpi (góc trên trái ngưỡng 3,
+/// góc khác 5); cạnh sâu 50 điểm ảnh @120 dpi suốt chiều dài (trái / phải ngưỡng 8, trên / dưới 5).
+pub fn co_san(vi_tri: ViTri) -> Vung {
+    let v = Vung { vi_tri, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.0, y: 0.0, rong: 0.12, cao: 0.12, rong_px: 130, cao_px: 130, nguong: 5 };
+    match vi_tri {
+        ViTri::GocTrenTrai => Vung { nguong: 3, ..v },
+        ViTri::CanhTrai | ViTri::CanhPhai => Vung { rong: 0.08, cao: 1.0, rong_px: 50, cao_px: 0, nguong: 8, ..v },
+        ViTri::CanhTren | ViTri::CanhDuoi => Vung { rong: 1.0, cao: 0.05, rong_px: 0, cao_px: 50, ..v },
+        _ => v,
     }
 }
 

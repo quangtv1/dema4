@@ -20,6 +20,7 @@ pub enum ChonChucNang {
     ChuanTen,
     Ky,
     Aip,
+    XoaGhim,
 }
 
 /// Việc người dùng bấm trên Trang chủ.
@@ -38,11 +39,13 @@ pub enum ChonTrangChu {
 const TIEU_DE: &str = "Hỗ trợ nghiệp vụ số hóa tài liệu";
 const CAO_DAU: f32 = 160.0;
 const CAO_DAY: f32 = 30.0;
-const RONG_O: f32 = 79.0;
-const CAO_O: f32 = 72.0;
+/// Số ô hàng đầu khi đủ chỗ; ô chia đều bề ngang khối (tên chức năng 1 dòng), không hẹp hơn `RONG_O_MIN`.
+const O_MOI_HANG: usize = 7;
+const RONG_O_MIN: f32 = 79.0;
+const CAO_O: f32 = 84.0;
 const KHE_O: f32 = 15.0;
 const KHE_HANG: f32 = 15.0;
-const CO_LOGO: f32 = 25.0;
+const CO_LOGO: f32 = 32.0;
 /// Bề rộng chung của hàng ô chức năng, khối gần đây và lưới thông tin (mép trái thẳng nhau).
 const RONG_KHOI: f32 = 780.0;
 const CAO_DONG: f32 = 42.0;
@@ -66,7 +69,7 @@ const CAC_O: [O; 10] = [
     O { cn: Some(ChonChucNang::Tach), logo: Logo::Tach, ten: "Tách văn bản", tom: "Tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), tự bỏ trang trắng, gợi ý trang bị xoay; người duyệt nhãn trước khi tách.", dang_phat_trien: false },
     O { cn: Some(ChonChucNang::MucLuc), logo: Logo::MucLuc, ten: "Sinh mục lục", tom: "Sinh mục lục văn bản cho từng hồ sơ từ file biên mục Excel/CSV theo mẫu DOCX của đơn vị; xem trước từng hồ sơ, xuất DOCX hàng loạt.", dang_phat_trien: false },
     O { cn: Some(ChonChucNang::BocTach), logo: Logo::BocTach, ten: "Bóc tách dữ liệu", tom: "Đọc văn bản PDF bằng AI (máy chủ nội bộ, ChatGPT, Gemini, Claude) để lấy số ký hiệu, ngày, trích yếu, cơ quan ban hành, người ký; ghi ra Excel và Google Sheet.", dang_phat_trien: false },
-    O { cn: None, logo: Logo::XoaGhim, ten: "Xóa ghim", tom: "Xoá vết ghim / kẹp giấy trên ảnh scan trước khi tách / đóng gói. Chức năng đang phát triển.", dang_phat_trien: true },
+    O { cn: Some(ChonChucNang::XoaGhim), logo: Logo::XoaGhim, ten: "Xóa ghim", tom: "Xoá vết ghim / kẹp giấy / bóng mép trên ảnh scan theo vùng góc, cạnh hoặc vẽ tay; giữ nét chữ, xem trước trước khi xuất. Nên làm trước khi tách.", dang_phat_trien: false },
     O { cn: Some(ChonChucNang::ChuanTen), logo: Logo::ChuanTen, ten: "Chuẩn hoá tên", tom: "Đổi tên hàng loạt file văn bản theo quy tắc thống nhất (số ký hiệu, ngày, loại văn bản… lấy từ kết quả Bóc tách); xem trước trước khi đổi. Chức năng đang phát triển.", dang_phat_trien: true },
     O { cn: Some(ChonChucNang::Ky), logo: Logo::Ky, ten: "Ký văn bản", tom: "Ký số hàng loạt văn bản PDF đã tách bằng chứng thư số của đơn vị, chèn hình chữ ký. Chức năng đang phát triển.", dang_phat_trien: true },
     O { cn: Some(ChonChucNang::Aip), logo: Logo::Aip, ten: "Đóng gói AIP", tom: "Đóng gói hồ sơ lưu trữ thông tin số (AIP): gom văn bản PDF, siêu dữ liệu và mục lục thành gói chuẩn, kiểm tra toàn vẹn. Chức năng đang phát triển.", dang_phat_trien: true },
@@ -212,10 +215,12 @@ fn dai_dau(ui: &egui::Ui, r: Rect) {
     p.galley(egui::pos2(r.center().x - moi.size().x / 2.0, y), moi, CHU_PHU);
 }
 
-/// Vị trí 10 ô: cân trái từ `x0`, đầy hàng (vừa bề rộng `rong`) mới xuống hàng.
+/// Vị trí 10 ô: cân trái từ `x0`; đủ chỗ thì hàng đầu 7 ô chia đều bề rộng `rong` (ô rộng → tên 1 dòng), hẹp thì ô
+/// `RONG_O_MIN`, đầy hàng mới xuống hàng.
 fn vi_tri_o(x0: f32, y0: f32, rong: f32) -> Vec<Rect> {
-    let moi_hang = (((rong + KHE_O) / (RONG_O + KHE_O)).floor() as usize).max(1);
-    (0..CAC_O.len()).map(|i| Rect::from_min_size(egui::pos2(x0 + (i % moi_hang) as f32 * (RONG_O + KHE_O), y0 + (i / moi_hang) as f32 * (CAO_O + KHE_HANG)), egui::vec2(RONG_O, CAO_O))).collect()
+    let rong_o = ((rong - (O_MOI_HANG - 1) as f32 * KHE_O) / O_MOI_HANG as f32).max(RONG_O_MIN);
+    let moi_hang = (((rong + KHE_O) / (rong_o + KHE_O)).floor() as usize).max(1);
+    (0..CAC_O.len()).map(|i| Rect::from_min_size(egui::pos2(x0 + (i % moi_hang) as f32 * (rong_o + KHE_O), y0 + (i / moi_hang) as f32 * (CAO_O + KHE_HANG)), egui::vec2(rong_o, CAO_O))).collect()
 }
 
 /// Chia tên ô thành dòng vừa `rong` (tên dài xuống 2 dòng).
@@ -240,7 +245,7 @@ fn o_chuc_nang(ui: &egui::Ui, r: Rect, o: &O, re: bool) {
     p.rect(r, 5.0, Color32::WHITE, Stroke::new(1.0, if re { XANH_COBALT } else { VIEN }), StrokeKind::Inside);
     let mo = |c: Color32| if o.dang_phat_trien { c.gamma_multiply(0.4) } else { c };
     let f = font(11.0, true);
-    let dong = dong_ten(p, o.ten, &f, RONG_O - 6.0);
+    let dong = dong_ten(p, o.ten, &f, r.width() - 6.0);
     let gal: Vec<_> = dong.into_iter().map(|d| p.layout_no_wrap(d, f.clone(), mo(CHU))).collect();
     let cao_chu: f32 = gal.iter().map(|g| g.size().y).sum();
     let mut y = r.center().y - (CO_LOGO + 5.0 + cao_chu) / 2.0;
@@ -468,11 +473,12 @@ mod tests {
     fn o_can_trai_day_hang_moi_xuong_hang() {
         let o = vi_tri_o(100.0, 50.0, RONG_KHOI);
         assert_eq!(o.len(), 10);
-        assert!(o[..8].iter().all(|r| r.top() == 50.0) && o[8..].iter().all(|r| r.top() > 50.0), "780 px: 8 ô hàng 1, 2 ô hàng 2");
-        assert_eq!((o[0].left(), o[8].left()), (100.0, 100.0), "mép trái ô đầu mỗi hàng = mép trái khối dưới");
-        assert!(o[7].right() <= 100.0 + RONG_KHOI);
+        assert!(o[..7].iter().all(|r| r.top() == 50.0) && o[7..].iter().all(|r| r.top() > 50.0), "780 px: 7 ô hàng 1, 3 ô hàng 2");
+        assert_eq!((o[0].left(), o[7].left()), (100.0, 100.0), "mép trái ô đầu mỗi hàng = mép trái khối dưới");
+        assert!((o[6].right() - (100.0 + RONG_KHOI)).abs() < 0.01, "hàng đầu vừa khít bề ngang khối");
+        assert!(o[0].width() > 95.0);
         let hep = vi_tri_o(0.0, 0.0, 500.0);
-        assert_eq!(hep.iter().filter(|r| r.top() == 0.0).count(), 5, "hẹp hơn → ít ô mỗi hàng, vẫn theo thứ tự");
+        assert_eq!(hep.iter().filter(|r| r.top() == 0.0).count(), 5, "hẹp hơn → ô cỡ tối thiểu, ít ô mỗi hàng, vẫn theo thứ tự");
     }
 
     fn harness(gan: Vec<MucGanDay>, mat: Vec<bool>) -> (egui_kittest::Harness<'static>, std::rc::Rc<std::cell::Cell<Option<ChonTrangChu>>>) {
@@ -494,16 +500,25 @@ mod tests {
         (h, chon)
     }
 
+    /// Chụp Trang chủ ra PNG để xem bằng mắt: `DEMA4_ANH=<file.png> cargo test chup_trang_chu -- --ignored`.
+    #[test]
+    #[ignore]
+    fn chup_trang_chu() {
+        let Some(f) = std::env::var_os("DEMA4_ANH") else { return };
+        let (mut h, _) = harness(vec![], vec![]);
+        h.render().unwrap().save(f).unwrap();
+    }
+
     #[test]
     fn bam_o_tra_dung_chuc_nang() {
         use egui_kittest::kittest::Queryable;
         let (mut h, chon) = harness(vec![], vec![]);
-        for (ten, cn) in [("Đếm trang A4", ChonChucNang::Dem), ("Tách văn bản", ChonChucNang::Tach), ("Sinh mục lục", ChonChucNang::MucLuc), ("Bóc tách dữ liệu", ChonChucNang::BocTach), ("Chuẩn hoá tên", ChonChucNang::ChuanTen), ("Ký văn bản", ChonChucNang::Ky), ("Đóng gói AIP", ChonChucNang::Aip)] {
+        for (ten, cn) in [("Đếm trang A4", ChonChucNang::Dem), ("Tách văn bản", ChonChucNang::Tach), ("Sinh mục lục", ChonChucNang::MucLuc), ("Bóc tách dữ liệu", ChonChucNang::BocTach), ("Chuẩn hoá tên", ChonChucNang::ChuanTen), ("Ký văn bản", ChonChucNang::Ky), ("Đóng gói AIP", ChonChucNang::Aip), ("Xóa ghim", ChonChucNang::XoaGhim)] {
             h.get_by_label(ten).click();
             h.run_steps(3);
             assert_eq!(chon.take(), Some(ChonTrangChu::ChucNang(cn)), "{ten}");
         }
-        for ten in ["Xóa ghim", "Scan tài liệu", "Nghiệm thu DA"] {
+        for ten in ["Scan tài liệu", "Nghiệm thu DA"] {
             h.get_by_label(ten).click();
             h.run_steps(3);
             assert_eq!(chon.take(), None, "{ten}: đang phát triển, bấm không mở");

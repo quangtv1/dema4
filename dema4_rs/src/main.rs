@@ -30,6 +30,7 @@ mod gui_phien;
 mod gui_boc_tach;
 #[allow(dead_code)] // nối dần vào giao diện
 mod gui_tach;
+mod gui_xoa_ghim;
 #[allow(dead_code)] // dùng dần từ các phần phân tích / giao diện tách văn bản
 mod tach_vb;
 mod telegram;

@@ -85,6 +85,7 @@ enum Man {
     ChuanTen,
     Ky,
     Aip,
+    XoaGhim,
 }
 
 impl Man {
@@ -98,6 +99,7 @@ impl Man {
             Man::ChuanTen => "Chuẩn hoá tên (Giải pháp số Sao Mai)",
             Man::Ky => "Ký văn bản (Giải pháp số Sao Mai)",
             Man::Aip => "Đóng gói AIP (Giải pháp số Sao Mai)",
+            Man::XoaGhim => crate::gui_xoa_ghim::TIEU_DE,
         }
     }
 }
@@ -110,6 +112,7 @@ struct UngDungChinh {
     tach: crate::gui_tach::ManTach,
     muc_luc: crate::gui_muc_luc::ManMucLuc,
     boc_tach: crate::gui_boc_tach::ManBocTach,
+    xoa_ghim: crate::gui_xoa_ghim::ManXoaGhim,
     trang_chu: crate::trang_chu::TrangChu,
     cfg: crate::cau_hinh::CauHinh,
     hop_cau_hinh: Option<crate::gui_tach::hop_cau_hinh::HopCauHinh>,
@@ -144,7 +147,7 @@ impl Default for UngDungChinh {
         let mut boc_tach = crate::gui_boc_tach::ManBocTach::default();
         boc_tach.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, xoa_ghim: Default::default(), trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false }
     }
 }
 
@@ -354,6 +357,9 @@ impl UngDungChinh {
 
     /// Đổi màn. Sang Sinh mục lục từ màn khác: mở như lần đầu (không giữ file / mẫu cũ).
     fn chuyen_man(&mut self, man: Man) {
+        if self.man == Man::XoaGhim && man != Man::XoaGhim {
+            self.xoa_ghim.ghi_ngay();
+        }
         if man != self.man {
             self.ghi_gan_day();
             if man == Man::TrangChu {
@@ -435,6 +441,7 @@ impl UngDungChinh {
                 ChonChucNang::ChuanTen => Man::ChuanTen,
                 ChonChucNang::Ky => Man::Ky,
                 ChonChucNang::Aip => Man::Aip,
+                ChonChucNang::XoaGhim => Man::XoaGhim,
             }),
             ChonTrangChu::GanDay(i) => self.mo_gan_day(i, ctx),
             ChonTrangChu::XoaGanDay(i) => self.gan_day.xoa(i),
@@ -499,7 +506,7 @@ impl UngDungChinh {
                 ui.add_enabled_ui(!khoa, |ui| {
                     egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::MenuLuoi, 14.0, xam), "Chức năng", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
-                        for (man, ten, icon) in [(Man::TrangChu, "Trang chủ", BieuTuong::TrangChu), (Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::BocTach, "Bóc tách dữ liệu", BieuTuong::BocTach), (Man::ChuanTen, "Chuẩn hoá tên", BieuTuong::ChuanTen), (Man::Ky, "Ký văn bản", BieuTuong::But), (Man::Aip, "Đóng gói AIP", BieuTuong::GoiAip)] {
+                        for (man, ten, icon) in [(Man::TrangChu, "Trang chủ", BieuTuong::TrangChu), (Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::BocTach, "Bóc tách dữ liệu", BieuTuong::BocTach), (Man::XoaGhim, "Xóa ghim", BieuTuong::TaiLieu), (Man::ChuanTen, "Chuẩn hoá tên", BieuTuong::ChuanTen), (Man::Ky, "Ký văn bản", BieuTuong::But), (Man::Aip, "Đóng gói AIP", BieuTuong::GoiAip)] {
                             if muc_menu_day(ui, icon, ten, self.man == man, None, 190.0).clicked() {
                                 self.chuyen_man(man);
                                 ui.close();
@@ -636,6 +643,7 @@ impl eframe::App for UngDungChinh {
                 }
             }
             Man::Dem => self.dem.ve(ui),
+            Man::XoaGhim => self.xoa_ghim.ve(ui),
             Man::Tach => {
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN).inner_margin(Margin { left: 12, right: 12, top: 8, bottom: 0 })).show(ui, |ui| self.tach.ve(ui, &mut self.cfg));
                 if std::mem::take(&mut self.tach.cfg_doi) {

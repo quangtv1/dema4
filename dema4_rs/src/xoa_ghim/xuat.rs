@@ -117,6 +117,16 @@ fn them_trang_anh(dst: &mut PdfDocument, thu_tu: usize, rong: f32, cao: f32, anh
     dst.insert_page(thu_tu as i32, &obj).map_err(loi)
 }
 
+/// Vẽ trang `so` (từ 0) như lúc xuất: ở DPI chọn (`dpi_chon`, 0 = theo ảnh scan, chặn 600). Trả (ảnh RGB, DPI đã vẽ,
+/// khổ trang điểm). Xem trước dùng đúng hàm này + `xoa_ghim_trang` nên ảnh xem trước = ảnh ghi vào PDF (trước nén JPEG).
+pub fn ve_trang(doc: &PdfDocument, so: usize, dpi_chon: u16) -> Result<(Anh, u16, (f32, f32)), String> {
+    let dpi = if dpi_chon == 0 { dpi_anh_trang(doc, so) } else { dpi_chon.min(DPI_TOI_DA) };
+    let trang = doc.load_page(so as i32).map_err(loi)?;
+    let khung = trang.bounds().map_err(loi)?;
+    let anh = crate::tach_vb::phan_tich::render_rgb(&trang, dpi as f32)?;
+    Ok((anh, dpi, (khung.x1 - khung.x0, khung.y1 - khung.y0)))
+}
+
 /// Kết quả xoá ghim 1 file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KetQuaFile {
@@ -145,12 +155,9 @@ pub fn xoa_ghim_pdf(nguon: &Path, vung: &[Vung], tc: &TuyChon, xuat: &CauHinhXua
             crate::tach_vb::cat_pdf::ghep_trang(&src, so, &mut dst, &mut ghep, so, 0)?;
             continue;
         }
-        let dpi = if xuat.dpi == 0 { dpi_anh_trang(&src, so) } else { xuat.dpi.min(DPI_TOI_DA) };
-        let trang = src.load_page(so as i32).map_err(loi)?;
-        let khung = trang.bounds().map_err(loi)?;
-        let mut anh = crate::tach_vb::phan_tich::render_rgb(&trang, dpi as f32)?;
+        let (mut anh, dpi, (rong, cao)) = ve_trang(&src, so, xuat.dpi)?;
         xoa_ghim_trang(&mut anh, vung, so as u32, dpi as f64, tc, &[]);
-        them_trang_anh(&mut dst, so, khung.x1 - khung.x0, khung.y1 - khung.y0, &anh_pdf(&anh, xuat)?)?;
+        them_trang_anh(&mut dst, so, rong, cao, &anh_pdf(&anh, xuat)?)?;
         kq.trang_xu_ly.push(so as u32);
         kq.dpi = kq.dpi.max(dpi);
     }
