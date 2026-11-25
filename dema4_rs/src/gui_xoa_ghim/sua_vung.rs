@@ -214,6 +214,83 @@ impl BoVung {
     }
 }
 
+/// Phần của vùng đang kéo: thân (di chuyển) hoặc các cạnh (đổi cỡ).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Canh {
+    pub trai: bool,
+    pub tren: bool,
+    pub phai: bool,
+    pub duoi: bool,
+}
+
+impl Canh {
+    pub fn than(&self) -> bool {
+        !(self.trai || self.tren || self.phai || self.duoi)
+    }
+}
+
+/// Cạnh kéo được của vùng: vùng vẽ — mọi cạnh + thân; góc / cạnh có sẵn — chỉ cạnh phía trong trang (đổi kích thước,
+/// vị trí bám mép).
+pub fn canh_keo_duoc(v: ViTri) -> Canh {
+    let c = |trai, tren, phai, duoi| Canh { trai, tren, phai, duoi };
+    match v {
+        ViTri::Tay => c(true, true, true, true),
+        ViTri::GocTrenTrai => c(false, false, true, true),
+        ViTri::GocTrenPhai => c(true, false, false, true),
+        ViTri::GocDuoiTrai => c(false, true, true, false),
+        ViTri::GocDuoiPhai => c(true, true, false, false),
+        ViTri::CanhTrai => c(false, false, true, false),
+        ViTri::CanhPhai => c(true, false, false, false),
+        ViTri::CanhTren => c(false, false, false, true),
+        ViTri::CanhDuoi => c(false, true, false, false),
+    }
+}
+
+/// Vùng sau khi kéo `canh` của `goc` một đoạn `(dx, dy)` điểm ảnh trên ảnh trang `w × h` vẽ ở `dpi`.
+/// Vùng vẽ: đổi tỉ lệ, giữ trong trang, cỡ tối thiểu; có sẵn: đổi kích thước điểm ảnh @120 dpi (tối thiểu 5).
+pub fn keo_vung(goc: &Vung, canh: Canh, (dx, dy): (f64, f64), (w, h): (f64, f64), dpi: f64) -> Vung {
+    let mut v = goc.clone();
+    if goc.vi_tri == ViTri::Tay {
+        let (fx, fy) = (dx / w, dy / h);
+        let min = VE_TOI_THIEU;
+        if canh.than() {
+            v.x = (goc.x + fx).clamp(0.0, 1.0 - goc.rong);
+            v.y = (goc.y + fy).clamp(0.0, 1.0 - goc.cao);
+            return v;
+        }
+        let (mut x1, mut y1, mut x2, mut y2) = (goc.x, goc.y, goc.x + goc.rong, goc.y + goc.cao);
+        if canh.trai {
+            x1 = (x1 + fx).clamp(0.0, x2 - min);
+        }
+        if canh.phai {
+            x2 = (x2 + fx).clamp(x1 + min, 1.0);
+        }
+        if canh.tren {
+            y1 = (y1 + fy).clamp(0.0, y2 - min);
+        }
+        if canh.duoi {
+            y2 = (y2 + fy).clamp(y1 + min, 1.0);
+        }
+        (v.x, v.y, v.rong, v.cao) = (x1, y1, x2 - x1, y2 - y1);
+        return v;
+    }
+    let doi = |px: u32, d: f64| ((px as f64 + d * crate::xoa_ghim::vung::DPI_GOC / dpi).round().clamp(5.0, 10_000.0)) as u32;
+    let duoc = canh_keo_duoc(goc.vi_tri);
+    if canh.phai && duoc.phai {
+        v.rong_px = doi(goc.rong_px, dx);
+    }
+    if canh.trai && duoc.trai {
+        v.rong_px = doi(goc.rong_px, -dx);
+    }
+    if canh.duoi && duoc.duoi {
+        v.cao_px = doi(goc.cao_px, dy);
+    }
+    if canh.tren && duoc.tren {
+        v.cao_px = doi(goc.cao_px, -dy);
+    }
+    v
+}
+
 fn thu_tu(v: ViTri) -> usize {
     ViTri::CO_SAN.iter().position(|x| *x == v).unwrap_or(usize::MAX)
 }
@@ -267,6 +344,26 @@ mod tests {
         assert_eq!(b.vf.vung.len(), 2);
         assert!(b.xoa_het_ve(true));
         assert!(b.vf.vung.is_empty());
+    }
+
+    #[test]
+    fn keo_than_canh_vung_ve_va_canh_trong_cua_vung_co_san() {
+        let tay = Vung { vi_tri: ViTri::Tay, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.1, y: 0.1, rong: 0.2, cao: 0.2, rong_px: 0, cao_px: 0, nguong: 5 };
+        let co = (1000.0, 2000.0);
+        let than = keo_vung(&tay, Canh::default(), (100.0, 200.0), co, 300.0);
+        assert!((than.x - 0.2).abs() < 1e-9 && (than.y - 0.2).abs() < 1e-9 && than.rong == tay.rong);
+        let ra_ngoai = keo_vung(&tay, Canh::default(), (5000.0, 0.0), co, 300.0);
+        assert!((ra_ngoai.x + ra_ngoai.rong - 1.0).abs() < 1e-9, "không ra khỏi trang");
+        let phai_duoi = keo_vung(&tay, Canh { phai: true, duoi: true, ..Default::default() }, (100.0, -1000.0), co, 300.0);
+        assert!((phai_duoi.rong - 0.3).abs() < 1e-9 && phai_duoi.cao >= VE_TOI_THIEU - 1e-12 && phai_duoi.y == tay.y);
+        // Góc trên phải: kéo cạnh trái sang trái 250 điểm ảnh @300 dpi = +100 @120
+        let g = co_san(ViTri::GocTrenPhai);
+        let g2 = keo_vung(&g, Canh { trai: true, ..Default::default() }, (-250.0, 0.0), co, 300.0);
+        assert_eq!((g2.rong_px, g2.cao_px), (230, 130));
+        let g3 = keo_vung(&g, Canh { phai: true, tren: true, ..Default::default() }, (500.0, 500.0), co, 300.0);
+        assert_eq!(g3, g, "cạnh bám mép không kéo được");
+        let c = keo_vung(&co_san(ViTri::CanhDuoi), Canh { tren: true, ..Default::default() }, (0.0, 10_000.0), co, 300.0);
+        assert_eq!(c.cao_px, 5, "tối thiểu 5");
     }
 
     #[test]

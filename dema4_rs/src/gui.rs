@@ -185,6 +185,7 @@ impl UngDungChinh {
             Man::Tach => crate::tro_giup::TabHuongDan::Tach,
             Man::MucLuc => crate::tro_giup::TabHuongDan::MucLuc,
             Man::BocTach => crate::tro_giup::TabHuongDan::BocTach,
+            Man::XoaGhim => crate::tro_giup::TabHuongDan::XoaGhim,
             _ => crate::tro_giup::TabHuongDan::Dem,
         }
     }

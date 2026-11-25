@@ -53,6 +53,7 @@ pub enum TabHuongDan {
     Tach,
     MucLuc,
     BocTach,
+    XoaGhim,
 }
 
 pub enum HopTroGiup {
@@ -103,7 +104,7 @@ impl HopTroGiup {
                 })
             }
             HopTroGiup::HuongDan(tab) => kh::hop(ctx, "hop_tro_giup", RONG, "Hướng dẫn sử dụng", |ui| {
-                kh::hang_tab(ui, &[(TabHuongDan::Dem, "Đếm trang A4"), (TabHuongDan::Tach, "Tách văn bản"), (TabHuongDan::MucLuc, "Sinh mục lục"), (TabHuongDan::BocTach, "Bóc tách dữ liệu")], tab);
+                kh::hang_tab(ui, &[(TabHuongDan::Dem, "Đếm trang A4"), (TabHuongDan::Tach, "Tách văn bản"), (TabHuongDan::MucLuc, "Sinh mục lục"), (TabHuongDan::BocTach, "Bóc tách dữ liệu"), (TabHuongDan::XoaGhim, "Xóa ghim")], tab);
                 kh::than(ui, "than_huong_dan", CAO_THAN, Margin { left: 22, right: 22, top: 4, bottom: 16 }, |ui| {
                     ve_khoi(
                         ui,
@@ -112,6 +113,7 @@ impl HopTroGiup {
                             TabHuongDan::Tach => HD_TACH,
                             TabHuongDan::MucLuc => HD_MUC_LUC,
                             TabHuongDan::BocTach => HD_BOC_TACH,
+                            TabHuongDan::XoaGhim => HD_XOA_GHIM,
                         },
                     );
                 });
@@ -267,6 +269,24 @@ const HD_BOC_TACH: &[Khoi] = &[
         ("Lượt chạy", "Mỗi lần *Bắt đầu* / *Tiếp tục* / *Chạy lại* có ít nhất 1 file đọc được = 1 lượt; *Thử đọc* không tính. Đóng app khi đang bóc tách thì app hỏi trước — file đang đọc dở sẽ mất."),
     ]),
     Khoi::Ghi("Mỗi trang cần đọc được gửi tới mô hình đọc đã chọn: máy chủ nội bộ thì ảnh không ra khỏi mạng đơn vị; dịch vụ đám mây (Gemini, Claude, GPT, OpenRouter) thì ảnh gửi tới máy chủ của hãng — không dùng cho tài liệu mật. Khoá API lưu mã hoá trên máy."),
+];
+
+const HD_XOA_GHIM: &[Khoi] = &[
+    Khoi::Muc("Các bước"),
+    Khoi::Buoc(&[
+        "*Chọn thư mục* (hoặc kéo thả thư mục / PDF vào cửa sổ) chứa PDF scan; thư mục kết quả `*_xoaghim` bên trong bị bỏ qua.",
+        "*Có sẵn*: bật góc / cạnh có vết ghim, kẹp, bóng mép. Bấm vào khung vùng trên ảnh *Gốc* để chọn rồi chỉnh kích thước, *ngưỡng* (nhỏ = xoá nhiều hơn); kéo cạnh phía trong để đổi cỡ.",
+        "*Vẽ vùng* (phím [V]): kéo trên ảnh Gốc. Loại: *Xoá*; *Bảo vệ* (không xoá gì trong vùng — chữ, dấu sát ghim); *Xoá vô đối* (xoá cả trong vùng bảo vệ). Phạm vi: *Chung thư mục*, *Riêng file*, *Riêng trang*; áp mọi trang / lẻ / chẵn. Kéo thân / cạnh vùng vẽ để di chuyển / đổi cỡ.",
+        "*Chọn* (phím [C]) · [Delete] xoá vùng chọn · [Ctrl+Z] hoàn tác · [[] []] đổi file · [PageUp] [PageDown] đổi trang · [Ctrl] + cuộn chuột hoặc [+] [-] [=] phóng.",
+        "Ảnh *Kết quả* là đúng ảnh sẽ ghi vào file (cùng độ phân giải, cùng cách xoá) — chỉ khác ở bước nén JPEG.",
+    ]),
+    Khoi::Muc("Lưu ý"),
+    Khoi::Bang(&[
+        ("Lưu vùng", "Tự lưu trên máy: vùng chung theo thư mục (đổi tên thư mục thì phải chọn lại vùng chung), vùng riêng theo nội dung từng PDF (đổi tên / di chuyển file vẫn còn). Mang sang máy khác bằng *Xuất / Nhập phiên làm việc*."),
+        ("Thứ tự", "Nên *Xóa ghim trước* rồi mới gắn nhãn ở Tách: file kết quả là file mới, nhãn Tách gắn trên file gốc không theo sang."),
+        ("Kết quả", "Ghi vào thư mục `<tên nguồn>_xoaghim` cạnh nguồn, giữ thư mục con và tên file; file gốc không bị sửa. Chạy lại cùng thư mục thì ghi đè kết quả cũ."),
+        ("Bảo mật", "Xóa ghim chỉ tô lại vùng ảnh có vết — không phải công cụ che thông tin."),
+    ]),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

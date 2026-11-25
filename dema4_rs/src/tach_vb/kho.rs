@@ -695,6 +695,11 @@ impl Kho {
         self.duong_dan.values().filter(|d| d.lan_cuoi >= truoc).map(|d| d.id).collect()
     }
 
+    /// Kho mở chỉ đọc (nơi khác đang ghi) — phần sửa không lưu được.
+    pub fn chi_doc(&self) -> bool {
+        self.chi_doc
+    }
+
     /// Dung lượng file kho (byte).
     pub fn dung_luong(&self) -> u64 {
         self.cuoi + self.dem.len() as u64
