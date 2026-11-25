@@ -2014,8 +2014,9 @@ mod tests {
     const BT_DAU: &str = r#"{"loai_van_ban": "Tờ trình", "so_ky_hieu": "15/TTr-TCKH", "ngay_thang": "20/01/2015", "tac_gia": "Phòng A", "trich_yeu": "Dự toán", "nguoi_ky": ""}"#;
     const BT_CUOI: &str = r#"{"nguoi_ky": "Trần Thị B"}"#;
 
+    /// Chờ tối đa ~15 s (chạy cả bộ test song song thì máy giả mô hình trả chậm hơn nhiều so với chạy lẻ).
     fn cho_boc_tach(h: &mut egui_kittest::Harness<'_, UngDungChinh>, xong: impl Fn(&UngDungChinh) -> bool) {
-        for _ in 0..200 {
+        for _ in 0..750 {
             h.run_steps(1);
             if xong(h.state()) {
                 return;

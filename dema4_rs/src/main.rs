@@ -89,6 +89,10 @@ fn hop_loi_windows(_chu: &str) {}
 fn bat_dau_luot(kt: &license::KiemTra, cn: license::ChucNang) -> Result<license::LanChay, i32> {
     kt.bat_dau(cn).map_err(|qd| {
         // Hạn mức dùng chung mọi chức năng
+        if matches!(qd, license::QuyetDinh::CanMangLanDau(_)) {
+            eprintln!("{} Mã máy: {}", hop_license::LY_DO_CAN_MANG_DONG_LENH, kt.ma_may());
+            return 3;
+        }
         eprintln!("Số lần dùng còn lại (0). Liên hệ với Sao Mai để được hỗ trợ: {} · {} · Mã máy: {}", hop_license::DIEN_THOAI, hop_license::EMAIL, kt.ma_may());
         if matches!(qd, license::QuyetDinh::HetLuotOffline(_)) {
             eprintln!("Chưa kết nối được máy chủ — kết nối mạng rồi chạy lại.");

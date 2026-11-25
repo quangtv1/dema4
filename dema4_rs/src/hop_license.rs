@@ -1,4 +1,5 @@
-//! Popup "Liên hệ Sao Mai" khi hết lượt Đếm / Tách (theo prototype `#het-luot`): logo, ổ khoá đỏ + lý do,
+//! Popup "Liên hệ Sao Mai" khi bị chặn chạy (hết lượt, mất mạng quá số lần offline, máy chưa kích hoạt mà không có mạng)
+//! — theo prototype `#het-luot`: logo, ổ khoá đỏ + lý do,
 //! mã máy / điện thoại / email (mỗi dòng có Copy), website; nút Đóng, Kiểm tra lại (hỏi trạm, chờ tối đa 15 s).
 
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -26,6 +27,11 @@ pub enum KetQuaHop {
     DuocChay,
 }
 
+/// Lý do khi máy chưa được trạm kích hoạt mà không có mạng (popup + dòng lệnh dùng chung).
+pub const LY_DO_CAN_MANG: &str = "Lần đầu dùng trên máy này cần kết nối mạng để kích hoạt — kết nối rồi bấm Kiểm tra lại.";
+/// Cùng lý do cho dòng lệnh (không có nút Kiểm tra lại).
+pub const LY_DO_CAN_MANG_DONG_LENH: &str = "Lần đầu dùng trên máy này cần kết nối mạng để kích hoạt — kết nối rồi chạy lại lệnh.";
+
 pub struct HopLicense {
     pub qd: QuyetDinh,
     dang_kiem: Option<(Receiver<()>, Instant)>,
@@ -39,7 +45,7 @@ impl HopLicense {
 
     fn chuc_nang(&self) -> ChucNang {
         match self.qd {
-            QuyetDinh::HetLuot(cn) | QuyetDinh::HetLuotOffline(cn) => cn,
+            QuyetDinh::HetLuot(cn) | QuyetDinh::HetLuotOffline(cn) | QuyetDinh::CanMangLanDau(cn) => cn,
             QuyetDinh::Cho => ChucNang::Dem,
         }
     }
@@ -82,13 +88,17 @@ impl HopLicense {
                     o_khoa(ui, egui::Rect::from_min_size(o.left_center() - egui::vec2(0.0, 15.0), egui::vec2(30.0, 30.0)), DO);
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 4.0;
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 0.0;
-                            ui.label(RichText::new("Lý do: Số lần dùng còn lại (").size(13.0).color(CHU));
-                            ui.label(RichText::new("0").size(13.0).color(DO).dam());
-                            ui.label(RichText::new(")").size(13.0).color(CHU));
-                        });
-                        ui.label(RichText::new("Liên hệ với Sao Mai để được hỗ trợ.").size(13.0).color(CHU));
+                        if matches!(self.qd, QuyetDinh::CanMangLanDau(_)) {
+                            ui.add(egui::Label::new(RichText::new(LY_DO_CAN_MANG).size(13.0).color(CHU)).wrap());
+                        } else {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 0.0;
+                                ui.label(RichText::new("Lý do: Số lần dùng còn lại (").size(13.0).color(CHU));
+                                ui.label(RichText::new("0").size(13.0).color(DO).dam());
+                                ui.label(RichText::new(")").size(13.0).color(CHU));
+                            });
+                            ui.label(RichText::new("Liên hệ với Sao Mai để được hỗ trợ.").size(13.0).color(CHU));
+                        }
                     });
                 });
             });
@@ -180,6 +190,25 @@ fn ma_url(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn may_chua_kich_hoat_popup_bao_can_mang_khong_bao_het_luot() {
+        use egui_kittest::kittest::Queryable;
+        let kt = KiemTra::gia(std::sync::Arc::new(crate::tram::KhoGia::moi(10)));
+        let mut hop = HopLicense::moi(QuyetDinh::CanMangLanDau(ChucNang::Dem));
+        let mut da_cai = false;
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(700.0, 600.0)).build_ui(move |ui| {
+            if !da_cai {
+                crate::gui::cai_giao_dien(ui.ctx()); // phông tiếng Việt như app thật
+                da_cai = true;
+            }
+            hop.ve(ui.ctx(), &kt);
+        });
+        h.run_steps(2);
+        h.get_by_label(LY_DO_CAN_MANG);
+        assert!(h.query_by_label("Lý do: Số lần dùng còn lại (").is_none(), "không báo nhầm là hết lượt");
+        h.get_by_label("Kiểm tra lại");
+    }
 
     #[test]
     fn mailto_ma_hoa_tieng_viet() {

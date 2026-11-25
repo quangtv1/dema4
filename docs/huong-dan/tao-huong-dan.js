@@ -156,7 +156,7 @@ them(H2('1.2 Môi trường hoạt động'),
     ['Hệ điều hành', 'Windows 10/11 64-bit (`dema4_saomai.exe`) · macOS máy chip Apple (`dema4_saomai`)'],
     ['Cài đặt', 'Không cần — một file chạy duy nhất.'],
     ['Bộ nhớ', 'Khuyến nghị RAM 8 GB trở lên khi tách / bóc tách thư mục lớn.'],
-    ['Mạng', 'Cần khi: kiểm tra lượt chạy, kiểm tra cập nhật, Bóc tách bằng dịch vụ đám mây, ghi Google Sheet. Các chức năng khác chạy được khi mất mạng (lượt dùng được ghi bù khi có mạng).'],
+    ['Mạng', 'Cần khi: kiểm tra lượt chạy, kiểm tra cập nhật, Bóc tách bằng dịch vụ đám mây, ghi Google Sheet. Lần đầu dùng trên mỗi máy (máy mới, cài lại hệ điều hành, bản 2.3 trở lên lần đầu) phải có mạng để kích hoạt; sau đó các chức năng khác chạy được khi mất mạng tối đa 2 lần (lượt dùng được ghi bù khi có mạng).'],
     ['Định dạng hỗ trợ', 'PDF (kể cả PDF scan) · Excel `.xlsx .xlsb .xls` · CSV · mẫu Word `.docx`'],
   ], [2200, 6826]),
 );

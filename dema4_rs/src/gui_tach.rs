@@ -2006,6 +2006,7 @@ impl ManTach {
             "phan_tich_lai" => self.hoi_phan_tich_lai = true,
             "dang_tach" => self.tach = Some(nut_tach::DangTach::mau()),
             "het_luot" => self.hop_license = Some(crate::hop_license::HopLicense::moi(crate::license::QuyetDinh::HetLuot(crate::license::ChucNang::Tach))),
+            "can_mang" => self.hop_license = Some(crate::hop_license::HopLicense::moi(crate::license::QuyetDinh::CanMangLanDau(crate::license::ChucNang::Tach))),
             "het_luot_offline" => self.hop_license = Some(crate::hop_license::HopLicense::moi(crate::license::QuyetDinh::HetLuotOffline(crate::license::ChucNang::Tach))),
             _ => self.xong_tach = Some(nut_tach::XongTach::mau()),
         }
