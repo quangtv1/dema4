@@ -149,7 +149,7 @@ pub fn xoa_ghim_pdf(nguon: &Path, vung: &[Vung], tc: &TuyChon, xuat: &CauHinhXua
     let mut kq = KetQuaFile { so_trang: so_trang as u32, trang_xu_ly: Vec::new(), dpi: 0 };
     for so in 0..so_trang {
         if dung.load(Ordering::Relaxed) {
-            return Err("đã dừng".into());
+            return Err(super::lo::DA_DUNG.into());
         }
         if !vung.iter().any(|v| v.ap_trang.ap_dung(so as u32)) {
             crate::tach_vb::cat_pdf::ghep_trang(&src, so, &mut dst, &mut ghep, so, 0)?;
@@ -229,7 +229,7 @@ pub fn trang_thai(nk: Option<&NhatKy>, id_dich: Option<Id>, ma_cau_hinh_hien_tai
 }
 
 /// Đường dẫn chưa chắc tồn tại → id nội dung (đọc 64 KB đầu + cuối) mà không ghi nhớ vào bảng đường dẫn.
-fn id_file(p: &Path) -> Option<Id> {
+pub(crate) fn id_file(p: &Path) -> Option<Id> {
     let n = std::fs::metadata(p).ok()?.len();
     Some((crate::tach_vb::cache_trang::van_tay_file(p, n).ok()?, n))
 }

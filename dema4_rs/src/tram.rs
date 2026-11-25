@@ -196,6 +196,22 @@ pub fn so_lieu_muc_luc(du_lieu: &str, mau: &str, ho_so: usize, van_ban: usize, t
     }})
 }
 
+/// Số liệu 1 lần Xóa ghim: **chỉ số đếm** — không đường dẫn, không tên file.
+#[allow(clippy::too_many_arguments)]
+pub fn so_lieu_xoa_ghim(so_file: usize, ok: usize, loi: usize, so_trang: u64, trang_xu_ly: u64, so_vung: usize, dpi: u16, ai: bool, thoi_gian: Duration) -> Value {
+    json!({ "so_lieu": {
+        "so_file": so_file,
+        "ok": ok,
+        "loi": loi,
+        "so_trang": so_trang,
+        "trang_xu_ly": trang_xu_ly,
+        "so_vung": so_vung,
+        "dpi": dpi,
+        "ai": ai,
+        "thoi_gian_ms": thoi_gian.as_millis() as u64,
+    }})
+}
+
 /// Số liệu 1 lần Bóc tách: chỉ số đếm + tên mô hình đọc (không nội dung văn bản, không khoá API).
 #[allow(clippy::too_many_arguments)]
 pub fn so_lieu_boc_tach(thu_muc: &str, loai: &str, mo_hinh: &str, van_ban: usize, ok: usize, loi: usize, trang: usize, truong: (usize, usize), thoi_gian: Duration) -> Value {

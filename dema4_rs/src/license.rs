@@ -13,6 +13,7 @@ pub enum ChucNang {
     Tach,
     MucLuc,
     BocTach,
+    XoaGhim,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +78,7 @@ impl ChucNang {
             ChucNang::Tach => "tach",
             ChucNang::MucLuc => "muc_luc",
             ChucNang::BocTach => "boc_tach",
+            ChucNang::XoaGhim => "xoa_ghim",
         }
     }
     fn tu_ma(s: &str) -> Option<Self> {
@@ -85,6 +87,7 @@ impl ChucNang {
             "tach" => Some(ChucNang::Tach),
             "muc_luc" => Some(ChucNang::MucLuc),
             "boc_tach" => Some(ChucNang::BocTach),
+            "xoa_ghim" => Some(ChucNang::XoaGhim),
             _ => None,
         }
     }
@@ -951,12 +954,12 @@ mod tests {
     #[test]
     fn lan_chay_chuc_nang_la_cua_ban_moi_duoc_giu_va_tinh_vao_gioi_han_offline() {
         let (so, d) = so_luot("cn_la");
-        let la = serde_json::json!({ "lan": [{ "ma": "m1", "cn": "xoa_ghim", "luc": "2026-11-25 10:00:00", "trang_thai": "da_chay", "them": 1 }], "tra_loi": null });
+        let la = serde_json::json!({ "lan": [{ "ma": "m1", "cn": "chuc_nang_moi", "luc": "2026-11-25 10:00:00", "trang_thai": "da_chay", "them": 1 }], "tra_loi": null });
         for n in ["a", "b"] {
             std::fs::create_dir_all(d.join(n)).unwrap();
             std::fs::write(d.join(n).join(TEN_FILE), la.to_string()).unwrap();
         }
-        // Bản này không biết "xoa_ghim": không gửi trạm, nhưng không được bỏ khi ghi lại sổ
+        // Bản này không biết "chuc_nang_moi": không gửi trạm, nhưng không được bỏ khi ghi lại sổ
         assert!(so.cho_ghi().is_empty());
         assert_eq!(so.so_cho_la(), 1);
         let l = so.dat_cho(ChucNang::Tach);

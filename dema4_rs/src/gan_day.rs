@@ -15,6 +15,7 @@ pub enum ChucNang {
     Tach,
     MucLuc,
     BocTach,
+    XoaGhim,
 }
 
 /// Tình trạng lúc rời màn: chữ + thanh tiến độ (khi `tong > 0`).
@@ -343,7 +344,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         let f = d.join(TEN_FILE);
-        let la = serde_json::json!({ "cn": "XoaGhim", "duong_dan": "/x/ho_so", "tinh": { "chu": "3/10" }, "luc": 5, "them": true });
+        let la = serde_json::json!({ "cn": "ChucNangMoi", "duong_dan": "/x/ho_so", "tinh": { "chu": "3/10" }, "luc": 5, "them": true });
         let cu = serde_json::json!([la, { "cn": "Tach", "duong_dan": "/x/tach", "tinh": { "chu": "ok" }, "luc": 4 }, "hỏng"]);
         std::fs::write(&f, cu.to_string()).unwrap();
         let mut ds = DanhSach { ds: doc(&f), la: doc_la(&f), file: Some(f.clone()), phien: 1, ..Default::default() };

@@ -288,6 +288,7 @@ fn logo_cn(cn: gan_day::ChucNang) -> Logo {
         gan_day::ChucNang::Tach => Logo::Tach,
         gan_day::ChucNang::MucLuc => Logo::MucLuc,
         gan_day::ChucNang::BocTach => Logo::BocTach,
+        gan_day::ChucNang::XoaGhim => Logo::XoaGhim,
     }
 }
 

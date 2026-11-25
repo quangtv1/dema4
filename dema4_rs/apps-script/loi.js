@@ -15,7 +15,7 @@ var COT = { MA: 1, TEN: 2, MAC: 3, IP_NB: 4, IP_PUB: 5, PHIEN_BAN: 6, NGAY_DK: 7
 var SO_COT_MAY = 14;
 // Số mã lần gần nhất giữ trong dòng máy để chống trùng (app gửi lại tối đa vài lần chưa được xác nhận)
 var GIU_MA_LAN = 20;
-var TEN_CN = { dem: 'Đếm', tach: 'Tách', muc_luc: 'Mục lục', boc_tach: 'Bóc tách' };
+var TEN_CN = { dem: 'Đếm', tach: 'Tách', muc_luc: 'Mục lục', boc_tach: 'Bóc tách', xoa_ghim: 'Xóa ghim' };
 // Sao lưu kết quả Bóc tách (dữ liệu để nâng chất lượng bóc / đánh nhãn): giới hạn kích thước, số lần mỗi máy
 var SAO_LUU = { DONG: 5000, COT: 60, O: 5000, MOI_GIO: 120 };
 
@@ -120,7 +120,7 @@ function chuyenDongCu(r) {
 function xuLy(yc, kho, bayGio) {
   yc = yc || {};
   var hd = yc.hanh_dong;
-  if (['kiem_tra', 'ghi_lan', 'thong_ke_dem', 'thong_ke_tach', 'thong_ke_muc_luc', 'thong_ke_boc_tach', 'sao_luu_boc_tach'].indexOf(hd) < 0) return { ok: false, loi: 'hanh_dong' };
+  if (['kiem_tra', 'ghi_lan', 'thong_ke_dem', 'thong_ke_tach', 'thong_ke_muc_luc', 'thong_ke_boc_tach', 'thong_ke_xoa_ghim', 'sao_luu_boc_tach'].indexOf(hd) < 0) return { ok: false, loi: 'hanh_dong' };
   if (!MAU_MA_MAY.test(String(yc.ma_may))) return { ok: false, loi: 'ma_may' };
   // Sao lưu không đụng bảng license (license.gs gọi ngoài khoá trạm): chỉ kiểm dữ liệu rồi giao cho kho ghi file
   if (hd === 'sao_luu_boc_tach') return saoLuu(yc, kho, bayGio);
@@ -193,6 +193,7 @@ function thongKe(hd, yc, may, kho, bayGio) {
   var tin = hd === 'thong_ke_dem' ? tinDem(yc.ma_may, may, sl, luc, luot)
     : hd === 'thong_ke_muc_luc' ? tinMucLuc(yc.ma_may, may, sl, luc, luot)
     : hd === 'thong_ke_boc_tach' ? tinBocTach(yc.ma_may, may, sl, luc, luot)
+    : hd === 'thong_ke_xoa_ghim' ? tinXoaGhim(yc.ma_may, may, sl, luc, luot)
     : tinTach(yc.ma_may, may, sl, ng, luc, luot);
   var hang = { ma: maNgauNhien(), luc: 0, trang_thai: 'cho', so_lan_thu: 0, noi_dung: tin, ten_csv: '', csv: '' };
   if (hd === 'thong_ke_tach' && ng) {
@@ -392,6 +393,18 @@ function tinBocTach(maMay, may, sl, luc, luot) {
     'Văn bản: ' + soNguyen(sl.ok) + '/' + soNguyen(sl.van_ban) + ' file · lỗi ' + soNguyen(sl.loi),
     'Trang đã đọc: ' + soNguyen(sl.trang),
     'Trường: ' + soNguyen(sl.truong_co) + '/' + soNguyen(sl.truong_tong),
+    'Thời điểm: ' + luc,
+    'Thời gian chạy: ' + phutGiay(sl.thoi_gian_ms),
+  ]);
+}
+
+/** Xóa ghim: chỉ số đếm (app không gửi đường dẫn / tên file). */
+function tinXoaGhim(maMay, may, sl, luc, luot) {
+  return soanTin(kemLuot('🧷 XÓA GHIM', luot), maMay, may, [
+    'File: ' + soNguyen(sl.ok) + '/' + soNguyen(sl.so_file) + ' · lỗi ' + soNguyen(sl.loi),
+    'Trang đã xoá ghim: ' + soNguyen(sl.trang_xu_ly) + '/' + soNguyen(sl.so_trang),
+    'Vùng: ' + soNguyen(sl.so_vung) + ' · DPI ' + (soKhongAm(sl.dpi) === 0 ? 'Gốc' : soNguyen(sl.dpi)),
+    'AI bảo vệ chữ: ' + (sl.ai === true ? 'bật' : 'tắt'),
     'Thời điểm: ' + luc,
     'Thời gian chạy: ' + phutGiay(sl.thoi_gian_ms),
   ]);

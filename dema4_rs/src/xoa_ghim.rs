@@ -3,6 +3,7 @@
 
 mod hinh_thai;
 pub mod kho;
+pub mod lo;
 pub mod vung;
 pub mod xu_ly;
 pub mod xuat;

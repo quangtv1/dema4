@@ -2,6 +2,7 @@
 //! mục, riêng file, riêng trang; tất cả / lẻ / chẵn), xem trước **Gốc | Kết quả** ở đúng độ phân giải sẽ xuất.
 //! Vùng chung + tuỳ chọn lưu kho Xóa ghim theo thư mục, vùng riêng theo nội dung PDF; ghi trễ ngắn sau mỗi thay đổi.
 
+mod chay;
 mod sua_vung;
 mod xem_truoc;
 
@@ -100,6 +101,19 @@ pub struct ManXoaGhim {
     anh: Option<AnhXem>,
     loi: Option<String>,
     can_ghi: Option<Instant>,
+    pub license: std::sync::Arc<crate::license::KiemTra>,
+    /// Trạng thái từng file (theo `ds`); trống = đang đọc.
+    tinh_trang: Vec<crate::xoa_ghim::lo::TinhTrangFile>,
+    nhan_tt: Option<std::sync::mpsc::Receiver<Vec<crate::xoa_ghim::lo::TinhTrangFile>>>,
+    chay: Option<chay::DangChay>,
+    da_chay: Option<chay::DaChay>,
+    hop_license: Option<crate::hop_license::HopLicense>,
+    /// Hết lượt rồi được cấp thêm → chạy tiếp đúng kiểu đã bấm (`true` = cả thư mục).
+    cho_chay: Option<bool>,
+    /// Lần chạy gần nhất: (file ra, tổng) — cho Làm tiếp gần đây.
+    so_da_xoa: Option<(usize, usize)>,
+    /// Bấm "Mở ở Tách" ở hộp kết quả → màn chính chuyển sang Tách với thư mục này.
+    pub mo_o_tach: Option<PathBuf>,
 }
 
 impl Default for ManXoaGhim {
@@ -125,6 +139,15 @@ impl Default for ManXoaGhim {
             anh: None,
             loi: None,
             can_ghi: None,
+            license: crate::license::KiemTra::mac_dinh(),
+            tinh_trang: Vec::new(),
+            nhan_tt: None,
+            chay: None,
+            da_chay: None,
+            hop_license: None,
+            cho_chay: None,
+            so_da_xoa: None,
+            mo_o_tach: None,
         }
     }
 }
@@ -141,6 +164,9 @@ impl ManXoaGhim {
         self.thu_muc = Some(p);
         self.chon = usize::MAX;
         self.chon_file(0);
+        self.tinh_trang.clear();
+        self.so_da_xoa = None;
+        self.doc_trang_thai();
         if self.ds.is_empty() && self.loi.is_none() {
             self.loi = Some("Thư mục không có PDF".into());
         }
@@ -217,6 +243,9 @@ impl ManXoaGhim {
     pub fn ve(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         self.nhan_xem_truoc(&ctx);
+        self.nhan_trang_thai();
+        self.nhan_chay();
+        self.cac_hop(&ctx);
         if (self.bo.doi_chung || self.bo.doi_rieng) && self.can_ghi.is_none() {
             self.can_ghi = Some(Instant::now());
         }
@@ -225,8 +254,10 @@ impl ManXoaGhim {
         } else if self.can_ghi.is_some() {
             ctx.request_repaint_after(TRE_GHI);
         }
-        self.phim(&ctx);
-        self.tha_vao(&ctx);
+        if self.chay.is_none() && self.hop_license.is_none() && self.da_chay.is_none() {
+            self.phim(&ctx);
+            self.tha_vao(&ctx);
+        }
         self.thanh_cong_cu(ui);
         if self.thu_muc.is_some() {
             self.cot_file(ui);
@@ -236,6 +267,38 @@ impl ManXoaGhim {
         if self.yc_cuoi.as_ref().is_some_and(|y| self.anh.is_none() && y.so == self.so_yc) && self.loi.is_none() {
             ctx.request_repaint_after(Duration::from_millis(50));
         }
+    }
+
+    /// Nút chạy: "Xóa ghim (n file)" chạy file chưa xoá / đổi cấu hình / kết quả mất; menu chạy lại cả thư mục.
+    fn nut_chay(&mut self, ui: &mut egui::Ui) {
+        if self.ds.is_empty() {
+            return;
+        }
+        let can = self.can_chay().len();
+        let dang_doc = self.tinh_trang.is_empty();
+        let chu = if dang_doc { "Xóa ghim".to_string() } else { format!("Xóa ghim ({can} file)") };
+        let nut = egui::Button::new(RichText::new(chu).strong().color(Color32::WHITE)).fill(crate::gui::XANH_COBALT);
+        let r = ui.add_enabled(!dang_doc && can > 0, nut).on_hover_text("Xoá ghim các file chưa xoá, đã đổi vùng / tuỳ chọn hoặc mất kết quả; ghi vào thư mục <tên nguồn>_xoaghim").on_disabled_hover_text(if dang_doc { "Đang đọc trạng thái các file…" } else { "Mọi file đã xoá ghim đúng vùng / tuỳ chọn hiện tại" });
+        if r.clicked() {
+            self.bam_chay(false);
+        }
+        egui::containers::menu::MenuButton::from_button(egui::Button::new(atom_mau(BieuTuong::ChevronXuong, 13.0, CHU))).ui(ui, |ui| {
+            if ui.button(format!("Chạy lại cả thư mục ({} file)", self.ds.len())).clicked() {
+                ui.close();
+                self.bam_chay(true);
+            }
+        });
+    }
+
+    /// Dòng Làm tiếp gần đây khi rời màn.
+    pub fn muc_gan_day(&self) -> Option<crate::gan_day::MucGanDay> {
+        use crate::gan_day::{ChucNang, MucGanDay, TinhTrang};
+        let tm = self.thu_muc.as_ref()?;
+        let tinh = match self.so_da_xoa {
+            Some((ok, tong)) => TinhTrang { chu: format!("Đã xoá ghim {ok}/{tong} file"), xong: ok as u32, tong: tong as u32, loi: ok < tong },
+            None => TinhTrang { chu: format!("{} file", self.ds.len()), ..Default::default() },
+        };
+        Some(MucGanDay::moi(ChucNang::XoaGhim, tm.display().to_string(), tinh))
     }
 
     /// Kéo thả thư mục (mở) hoặc 1 PDF (mở thư mục chứa nó, chọn đúng file) vào cửa sổ.
@@ -314,16 +377,18 @@ impl ManXoaGhim {
                         self.mo_thu_muc(p);
                     }
                 }
-                match &self.thu_muc {
-                    Some(p) => ui.label(p.display().to_string()),
-                    None => ui.label(RichText::new("Chưa chọn thư mục").color(CHU_PHU)),
-                };
+                self.nut_chay(ui);
+                ui.add_space(8.0);
                 if let Some(e) = &self.loi {
                     ui.label(RichText::new(e).color(DO));
                 }
                 if kho_xg::kho().chi_doc() {
                     ui.label(RichText::new("Dữ liệu Xóa ghim đang mở ở nơi khác — chỉ xem, phần chỉnh không được lưu").color(DO));
                 }
+                match &self.thu_muc {
+                    Some(p) => ui.add(egui::Label::new(p.display().to_string()).truncate()).on_hover_text(p.display().to_string()),
+                    None => ui.label(RichText::new("Chưa chọn thư mục").color(CHU_PHU)),
+                };
             });
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
@@ -500,9 +565,21 @@ impl ManXoaGhim {
             egui::ScrollArea::vertical().auto_shrink([false, false]).show_rows(ui, 20.0, hien.len(), |ui, hang| {
                 for i in hang.map(|k| hien[k]) {
                     let ten = self.ds[i].0.strip_prefix(&goc).unwrap_or(&self.ds[i].0).display().to_string();
-                    if ui.selectable_label(i == self.chon, ten).clicked() {
-                        chon = Some(i);
-                    }
+                    ui.horizontal(|ui| {
+                        let (mau, goi_y) = match self.trang_thai_file(i) {
+                            None => (Color32::TRANSPARENT, "Đang đọc trạng thái…"),
+                            Some(crate::xoa_ghim::xuat::TrangThai::ChuaXoa) => (VIEN_NHAT, "Chưa xoá ghim"),
+                            Some(crate::xoa_ghim::xuat::TrangThai::DaXoa { dung_cau_hinh: true }) => (crate::gui::XANH_LA, "Đã xoá ghim (đúng vùng / tuỳ chọn hiện tại)"),
+                            Some(crate::xoa_ghim::xuat::TrangThai::DaXoa { dung_cau_hinh: false }) => (Color32::from_rgb(0xD9, 0x82, 0x2B), "Đã xoá ghim nhưng vùng / tuỳ chọn đã đổi — sẽ chạy lại"),
+                            Some(crate::xoa_ghim::xuat::TrangThai::KetQuaMat) => (DO, "File kết quả không còn / đã bị thay — sẽ chạy lại"),
+                        };
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(10.0, 10.0), Sense::hover());
+                        ui.painter().circle_filled(r.center(), 4.0, mau);
+                        ui.interact(r, ui.scope_id().with(("xg_tt", i)), Sense::hover()).on_hover_text(goi_y);
+                        if ui.selectable_label(i == self.chon, ten).clicked() {
+                            chon = Some(i);
+                        }
+                    });
                 }
             });
             if let Some(i) = chon {
@@ -733,6 +810,17 @@ mod tests {
         man.mo_thu_muc(PathBuf::from(mau));
         man.bo.them_ve((0.6, 0.05, 0.3, 0.06), LoaiVung::BaoVe, PhamVi::File, ApTrang::TatCa, 0);
         man.phong = 1.5;
+        if std::env::var_os("DEMA4_CHAY_XG").is_some() {
+            man.license = crate::license::KiemTra::gia(std::sync::Arc::new(crate::tram::KhoGia::moi(10)));
+            for _ in 0..200 {
+                man.nhan_trang_thai();
+                if !man.tinh_trang.is_empty() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            man.bam_chay(false);
+        }
         let mut da_cai = false;
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui(move |ui| {
             if !std::mem::replace(&mut da_cai, true) {

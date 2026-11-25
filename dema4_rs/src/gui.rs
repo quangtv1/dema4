@@ -146,8 +146,10 @@ impl Default for UngDungChinh {
         muc_luc.license = dem.license.clone();
         let mut boc_tach = crate::gui_boc_tach::ManBocTach::default();
         boc_tach.license = dem.license.clone();
+        let mut xoa_ghim = crate::gui_xoa_ghim::ManXoaGhim::default();
+        xoa_ghim.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, xoa_ghim: Default::default(), trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, xoa_ghim, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false }
     }
 }
 
@@ -161,6 +163,7 @@ struct ViecDangChay {
     tach: bool,
     muc_luc: bool,
     boc_tach: Option<(usize, usize)>,
+    xoa_ghim: bool,
 }
 
 impl ViecDangChay {
@@ -172,7 +175,7 @@ impl ViecDangChay {
         if let Some((xong, tong)) = self.boc_tach {
             return Some(format!("bóc tách {xong}/{tong} file — file đang đọc dở sẽ mất, lượt gọi mô hình đã tốn"));
         }
-        [(self.tach, "tách văn bản"), (self.muc_luc, "sinh mục lục"), (self.phan_tich, "phân tích"), (self.dem, "đếm trang")]
+        [(self.tach, "tách văn bản"), (self.muc_luc, "sinh mục lục"), (self.xoa_ghim, "xoá ghim — file đang làm dở không ghi"), (self.phan_tich, "phân tích"), (self.dem, "đếm trang")]
             .into_iter()
             .find(|(co, _)| *co)
             .map(|(_, chu)| chu.to_string())
@@ -252,6 +255,7 @@ impl UngDungChinh {
             tach: self.tach.dang_tach(),
             muc_luc: self.muc_luc.dang_chay(),
             boc_tach: self.boc_tach.tien_do_chay(),
+            xoa_ghim: self.xoa_ghim.dang_chay(),
         }
     }
 
@@ -383,6 +387,7 @@ impl UngDungChinh {
             Man::Tach => self.tach.muc_gan_day(),
             Man::MucLuc => self.muc_luc.muc_gan_day(),
             Man::BocTach => self.boc_tach.muc_gan_day(),
+            Man::XoaGhim => self.xoa_ghim.muc_gan_day(),
             _ => None,
         };
         if let Some(m) = m {
@@ -400,6 +405,7 @@ impl UngDungChinh {
             ChucNang::Tach => Man::Tach,
             ChucNang::MucLuc => Man::MucLuc,
             ChucNang::BocTach => Man::BocTach,
+            ChucNang::XoaGhim => Man::XoaGhim,
         };
         if self.man == man {
             // Mở từ menu Gần đây ngay trong màn đó: ghi dòng của việc đang làm rồi đặt lại màn như khi chuyển màn
@@ -425,6 +431,11 @@ impl UngDungChinh {
             }
             ChucNang::BocTach => self.boc_tach.mo_tu_gan_day(&m.duong_dan, m.loai.as_deref(), ctx),
             ChucNang::MucLuc => self.muc_luc.mo_tu_gan_day(&m.duong_dan, m.sheet.clone(), m.dong_tieu_de, m.mau.as_deref(), ctx),
+            ChucNang::XoaGhim => {
+                if self.xoa_ghim.thu_muc.as_deref() != Some(Path::new(m.duong_dan.trim())) {
+                    self.xoa_ghim.mo_thu_muc(PathBuf::from(m.duong_dan.trim()));
+                }
+            }
         }
         m.luc = crate::gan_day::bay_gio_ms();
         self.gan_day.them(m);
@@ -524,6 +535,7 @@ impl UngDungChinh {
                                         crate::gan_day::ChucNang::Tach => "Tách",
                                         crate::gan_day::ChucNang::MucLuc => "Mục lục",
                                         crate::gan_day::ChucNang::BocTach => "Bóc tách",
+                                        crate::gan_day::ChucNang::XoaGhim => "Xóa ghim",
                                     };
                                     let nut = ui.add_enabled(!self.gan_day.mat(i), egui::Button::new(format!("{cn} · {}", m.ten())).frame(false)).on_hover_text(&m.duong_dan).on_disabled_hover_text("Không tìm thấy — chọn lại ở Trang chủ");
                                     if nut.clicked() {
@@ -644,7 +656,13 @@ impl eframe::App for UngDungChinh {
                 }
             }
             Man::Dem => self.dem.ve(ui),
-            Man::XoaGhim => self.xoa_ghim.ve(ui),
+            Man::XoaGhim => {
+                self.xoa_ghim.ve(ui);
+                if let Some(ra) = self.xoa_ghim.mo_o_tach.take() {
+                    self.chuyen_man(Man::Tach);
+                    self.tach.mo_tu_gan_day(&ra.display().to_string());
+                }
+            }
             Man::Tach => {
                 egui::CentralPanel::default().frame(egui::Frame::new().fill(NEN).inner_margin(Margin { left: 12, right: 12, top: 8, bottom: 0 })).show(ui, |ui| self.tach.ve(ui, &mut self.cfg));
                 if std::mem::take(&mut self.tach.cfg_doi) {

@@ -242,6 +242,20 @@ test('boc_tach_dem_luot_va_tin_thong_ke', () => {
   assert.equal(goi(k, { hanh_dong: 'thong_ke_bat_ky', so_lieu: {} }).loi, 'hanh_dong');
 });
 
+test('xoa_ghim_dem_luot_chung_va_tin_thong_ke', () => {
+  const k = khoGia();
+  goi(k, { hanh_dong: 'kiem_tra' });
+  const r = goi(k, { hanh_dong: 'ghi_lan', lan: [{ ma_lan: ML(971), cn: 'xoa_ghim', nguon: 'online' }] });
+  assert.equal(r.ok, true);
+  assert.deepEqual([r.du_lieu.han, r.du_lieu.da_dung], [10, 1], 'lượt Xóa ghim tính chung hạn mức');
+  assert.equal(k.may[0].length, 14, 'không thêm cột');
+  const tk = goi(k, { hanh_dong: 'thong_ke_xoa_ghim', so_lieu: { so_file: 108, ok: 107, loi: 1, so_trang: 266, trang_xu_ly: 266, so_vung: 5, dpi: 0, ai: false, thoi_gian_ms: 95000 } });
+  assert.equal(tk.ok, true);
+  const tin = k.hangDoi.slice(-1)[0].noi_dung;
+  assert.equal(tin.split('\n')[0], '🧷 XÓA GHIM (1/10)');
+  for (const d of ['- File: 107/108 · lỗi 1', '- Trang đã xoá ghim: 266/266', '- Vùng: 5 · DPI Gốc', '- AI bảo vệ chữ: tắt', '- Thời gian chạy: 1 phút, 35,0 giây']) assert.ok(tin.includes(d), d);
+});
+
 test('sao_luu_boc_tach', () => {
   const k = khoGia();
   const sl = { thu_muc: 'D:\\SoHoa\\Van_ban', loai: 'Văn bản hành chính', mo_hinh: 'Gemini', tieu_de: ['Tên file', 'Trích yếu'], dong: [['VB01.pdf', '=HYPERLINK("x")'], ['VB02.pdf']] };
