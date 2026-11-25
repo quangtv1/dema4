@@ -690,7 +690,11 @@ impl eframe::App for UngDungChinh {
                 // Dọn ở luồng nền (kho lớn: vài giây) — không đứng giao diện
                 std::thread::spawn(|| {
                     let mot_nam = 365 * 86_400_000;
-                    let _ = crate::tach_vb::kho::kho().don(crate::tach_vb::moc_sua::bay_gio_ms().saturating_sub(mot_nam));
+                    let truoc = crate::tach_vb::moc_sua::bay_gio_ms().saturating_sub(mot_nam);
+                    // Tập PDF còn dùng lấy từ kho Tách **trước** khi dọn nó; mỗi lần chỉ giữ 1 khoá kho
+                    let con_song = crate::tach_vb::kho::kho().id_con_song(truoc);
+                    let _ = crate::xoa_ghim::kho::don(&mut crate::xoa_ghim::kho::kho(), &con_song, truoc);
+                    let _ = crate::tach_vb::kho::kho().don(truoc);
                 });
                 self.tach.bao_tin("Đang dọn dữ liệu của PDF không mở lại quá 12 tháng (chạy ngầm)…".into());
             }

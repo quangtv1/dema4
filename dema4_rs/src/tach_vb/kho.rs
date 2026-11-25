@@ -8,6 +8,8 @@
 //! - `ghi_ngay` (nhãn người sửa): đẩy xuống đĩa ngay. `ghi_dem` (phân tích): gom, đẩy khi `day` (~1 s / khi đóng).
 //!   Ghi lỗi (ổ đầy…) → giữ trong bộ nhớ, thử lại lần sau; không cắt mất dữ liệu đã có.
 //! - `nen`: viết lại chỉ bản ghi còn dùng (file tạm → đổi tên), bản trước giữ `.bak`.
+//! - Loại bản ghi từ `KHAC_TU` trở lên (vd kho Xóa ghim `kho_xoa_ghim.bin` mở bằng cùng code): khoá (loại, id) → nội dung
+//!   tuỳ nơi dùng; `nen` giữ lại nguyên — bản sau thêm loại mới không làm mất dữ liệu khi bản này nén kho.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
@@ -27,6 +29,8 @@ const TACH: u8 = 2;
 const DUONG_DAN: u8 = 3;
 /// Con trỏ kết quả Bóc tách: id → file `boc_tach.jsonl` đang giữ kết quả của PDF đó.
 const BOC: u8 = 4;
+/// Loại bản ghi từ đây trở lên: nội dung tuỳ nơi dùng (`khac`, `ghi_khac`), kho chỉ giữ vị trí + nén giữ lại.
+pub const KHAC_TU: u8 = 5;
 
 /// id nội dung PDF: (mã kiểm tra, kích thước).
 pub type Id = (u64, u64);
@@ -212,6 +216,10 @@ pub struct Kho {
     chi_muc: HashMap<Id, ViTri>,
     duong_dan: HashMap<u64, DauFile>,
     boc: HashMap<Id, String>,
+    /// Bản ghi loại ≥ `KHAC_TU`: (loại, khoá) → (vị trí nội dung, độ dài).
+    khac: HashMap<(u8, Id), (u64, u32)>,
+    /// Mở chỉ đọc (nơi khác có thể đang ghi): không ghi gì xuống file.
+    chi_doc: bool,
     /// Bản ghi chờ ghi xuống đĩa + nội dung của chúng (đọc được ngay trước khi ghi).
     dem: Vec<u8>,
     cho: HashMap<(u8, Id), Vec<u8>>,
@@ -225,20 +233,47 @@ pub struct Kho {
 impl Kho {
     /// Kho chỉ trong bộ nhớ (không ghi file).
     pub fn bo_nho() -> Self {
-        Kho { file: None, doc: None, chi_muc: HashMap::new(), duong_dan: HashMap::new(), boc: HashMap::new(), dem: Vec::new(), cho: HashMap::new(), cuoi: DAU_FILE.len() as u64, so_ban_ghi: 0, so_hong: 0 }
+        Kho {
+            file: None,
+            doc: None,
+            chi_muc: HashMap::new(),
+            duong_dan: HashMap::new(),
+            boc: HashMap::new(),
+            khac: HashMap::new(),
+            chi_doc: false,
+            dem: Vec::new(),
+            cho: HashMap::new(),
+            cuoi: DAU_FILE.len() as u64,
+            so_ban_ghi: 0,
+            so_hong: 0,
+        }
     }
 
     pub fn mo(file: &Path) -> std::io::Result<Self> {
-        let mut kho = Kho { file: Some(file.to_path_buf()), ..Kho::bo_nho() };
-        if let Some(cha) = file.parent() {
-            std::fs::create_dir_all(cha)?;
+        Kho::mo_voi(file, false)
+    }
+
+    /// Mở chỉ đọc: không tạo / sửa / cắt file; ghi (`day`) báo lỗi. Chưa có file → kho rỗng.
+    pub fn mo_chi_doc(file: &Path) -> std::io::Result<Self> {
+        Kho::mo_voi(file, true)
+    }
+
+    fn mo_voi(file: &Path, chi_doc: bool) -> std::io::Result<Self> {
+        let mut kho = Kho { file: Some(file.to_path_buf()), chi_doc, ..Kho::bo_nho() };
+        if chi_doc && !file.exists() {
+            return Ok(kho);
         }
-        // Kho mất (sự cố giữa lúc dọn của bản trước) mà còn bản sao → dùng bản sao
-        let bak = file.with_extension("bak");
-        if !file.exists() && bak.exists() {
-            std::fs::copy(&bak, file)?;
+        if !chi_doc {
+            if let Some(cha) = file.parent() {
+                std::fs::create_dir_all(cha)?;
+            }
+            // Kho mất (sự cố giữa lúc dọn của bản trước) mà còn bản sao → dùng bản sao
+            let bak = file.with_extension("bak");
+            if !file.exists() && bak.exists() {
+                std::fs::copy(&bak, file)?;
+            }
         }
-        let f = std::fs::OpenOptions::new().read(true).write(true).create(true).truncate(false).open(file)?;
+        let f = std::fs::OpenOptions::new().read(true).write(!chi_doc).create(!chi_doc).truncate(false).open(file)?;
         let dai = f.metadata()?.len();
         let mut r = BufReader::with_capacity(1 << 20, &f);
         let mut dau = [0u8; 8];
@@ -266,7 +301,9 @@ impl Kho {
             }
         }
         drop(r);
-        if !co_dau {
+        if chi_doc {
+            // Chỉ đọc: không sửa file (đuôi ghi dở / file lạ để nơi đang ghi xử lý)
+        } else if !co_dau {
             // File mới / không phải kho → bắt đầu lại (file lạ được giữ ở .hong để xem)
             if dai > 0 {
                 let _ = std::fs::copy(file, file.with_extension("hong"));
@@ -309,6 +346,13 @@ impl Kho {
                     }
                 }
             }
+            l if l >= KHAC_TU => {
+                if nd.len() == 16 {
+                    self.khac.remove(&(l, id));
+                } else {
+                    self.khac.insert((l, id), (vi_tri, n));
+                }
+            }
             _ => {}
         }
     }
@@ -340,6 +384,16 @@ impl Kho {
         if loai == DUONG_DAN || loai == BOC {
             return;
         }
+        if loai >= KHAC_TU {
+            if du_lieu.is_empty() {
+                self.khac.remove(&(loai, id));
+                self.cho.remove(&(loai, id));
+            } else {
+                self.khac.insert((loai, id), (vi_tri, nd.len() as u32));
+                self.cho.insert((loai, id), nd);
+            }
+            return;
+        }
         if du_lieu.is_empty() {
             self.dat_vi_tri(loai, id, 0, 0);
             self.cho.remove(&(loai, id));
@@ -356,6 +410,9 @@ impl Kho {
         }
         if self.file.is_none() {
             return Err(std::io::Error::other("không mở được kho dữ liệu (thư mục dữ liệu không ghi được) — phần vừa làm chưa được lưu"));
+        }
+        if self.chi_doc {
+            return Err(std::io::Error::other("kho dữ liệu đang mở chỉ đọc (có thể app đang mở ở nơi khác) — phần vừa làm chưa được lưu"));
         }
         let f = self.doc.as_mut().ok_or_else(|| std::io::Error::other("kho chưa mở"))?;
         let kq = f.seek(SeekFrom::Start(self.cuoi)).and_then(|_| f.write_all(&self.dem)).and_then(|_| f.sync_data());
@@ -377,7 +434,7 @@ impl Kho {
         if let Some(nd) = self.cho.get(&(loai, id)) {
             return Some(nd[16..].to_vec());
         }
-        let (vi_tri, n) = self.chi_muc.get(&id)?.lay(loai)?;
+        let (vi_tri, n) = if loai >= KHAC_TU { *self.khac.get(&(loai, id))? } else { self.chi_muc.get(&id)?.lay(loai)? };
         let f = self.doc.as_mut()?;
         let mut b = vec![0u8; n as usize];
         f.seek(SeekFrom::Start(vi_tri)).ok()?;
@@ -473,7 +530,7 @@ impl Kho {
     }
 
     fn so_ban_ghi_song(&self) -> usize {
-        self.chi_muc.values().map(ViTri::so_ban_ghi).sum::<usize>() + self.duong_dan.len() + self.boc.len()
+        self.chi_muc.values().map(ViTri::so_ban_ghi).sum::<usize>() + self.duong_dan.len() + self.boc.len() + self.khac.len()
     }
 
     /// Viết lại kho chỉ còn bản ghi mới nhất của mỗi khoá: file tạm → kho cũ thành `.bak` → file tạm thành kho.
@@ -481,8 +538,12 @@ impl Kho {
     pub fn nen(&mut self) -> std::io::Result<()> {
         self.day()?;
         let Some(file) = self.file.clone() else { return Ok(()) };
+        if self.chi_doc {
+            return Ok(());
+        }
         let tam = file.with_extension("tmp");
         let mut chi_muc_moi: HashMap<Id, ViTri> = HashMap::with_capacity(self.chi_muc.len());
+        let mut khac_moi: HashMap<(u8, Id), (u64, u32)> = HashMap::with_capacity(self.khac.len());
         {
             let mut w = std::io::BufWriter::with_capacity(1 << 20, std::fs::File::create(&tam)?);
             w.write_all(DAU_FILE)?;
@@ -527,6 +588,15 @@ impl Kho {
                 nd.extend(p.as_bytes());
                 viet(&mut w, BOC, &nd)?;
             }
+            let mut ds_khac: Vec<((u8, Id), (u64, u32))> = self.khac.iter().map(|(k, v)| (*k, *v)).collect();
+            ds_khac.sort_unstable_by_key(|(_, (vi_tri, _))| *vi_tri);
+            for (khoa, (vi_tri, n)) in ds_khac {
+                let mut nd = vec![0u8; n as usize];
+                let f = self.doc.as_mut().ok_or_else(|| std::io::Error::other("kho chưa mở"))?;
+                f.seek(SeekFrom::Start(vi_tri))?;
+                f.read_exact(&mut nd)?;
+                khac_moi.insert(khoa, (viet(&mut w, khoa.0, &nd)?, n));
+            }
             w.flush()?;
             w.get_ref().sync_all()?;
         }
@@ -545,6 +615,7 @@ impl Kho {
         self.doc = Some(mo_lai(&file)?);
         self.cuoi = std::fs::metadata(&file)?.len();
         self.chi_muc = chi_muc_moi;
+        self.khac = khac_moi;
         self.so_ban_ghi = self.so_ban_ghi_song();
         Ok(())
     }
@@ -582,6 +653,46 @@ impl Kho {
         }
         self.nen()?;
         Ok(bo.len())
+    }
+
+    /// Nội dung bản ghi loại `loai` (≥ `KHAC_TU`) của khoá `id`.
+    pub fn khac(&mut self, loai: u8, id: Id) -> Option<Vec<u8>> {
+        debug_assert!(loai >= KHAC_TU);
+        self.doc_nd(loai, id)
+    }
+
+    /// Thêm / thay bản ghi loại `loai` (≥ `KHAC_TU`) của `id`; nội dung rỗng = bỏ. Gom, ghi khi `day`.
+    pub fn ghi_khac(&mut self, loai: u8, id: Id, nd: &[u8]) {
+        assert!(loai >= KHAC_TU, "loại {loai} dành cho kho Tách");
+        if nd.is_empty() && !self.khac.contains_key(&(loai, id)) {
+            return;
+        }
+        self.them(loai, id, nd);
+    }
+
+    /// Các khoá đang có bản ghi loại `loai`.
+    pub fn khoa_khac(&self, loai: u8) -> Vec<Id> {
+        self.khac.keys().filter(|(l, _)| *l == loai).map(|(_, id)| *id).collect()
+    }
+
+    /// Bỏ các bản ghi loại khác mà `giu(loại, id, nội dung)` trả `false`, rồi viết lại kho. Trả số bản ghi đã bỏ.
+    pub fn don_khac(&mut self, giu: impl Fn(u8, Id, &[u8]) -> bool) -> std::io::Result<usize> {
+        let khoa: Vec<(u8, Id)> = self.khac.keys().copied().collect();
+        let mut bo = 0;
+        for (loai, id) in khoa {
+            let Some(nd) = self.doc_nd(loai, id) else { continue };
+            if !giu(loai, id, &nd) {
+                self.them(loai, id, &[]);
+                bo += 1;
+            }
+        }
+        self.nen()?;
+        Ok(bo)
+    }
+
+    /// Id của các PDF còn thấy lại từ `truoc` (ms) trở đi — phần `don` sẽ giữ.
+    pub fn id_con_song(&self, truoc: u64) -> std::collections::HashSet<Id> {
+        self.duong_dan.values().filter(|d| d.lan_cuoi >= truoc).map(|d| d.id).collect()
     }
 
     /// Dung lượng file kho (byte).
@@ -719,17 +830,23 @@ fn cu_luc(k: &mut Kho, id: Id) -> Option<u64> {
 /// Giữ khoá "app đang chạy" (`<gốc dữ liệu>/app.lock`, khoá của hệ điều hành — app tắt đột ngột thì tự nhả) suốt
 /// đời tiến trình. `false` = đã có cửa sổ app / lệnh `--tach` khác đang chạy (chỉ 1 tiến trình ghi kho).
 pub fn giu_khoa_ung_dung() -> bool {
+    giu_khoa_that().unwrap_or(true) // không tạo / khoá được file (ổ chỉ đọc…) → không chặn mở app
+}
+
+/// `Some(true)` = tiến trình này giữ khoá "app đang chạy"; `Some(false)` = nơi khác đang giữ; `None` = không khoá được
+/// (khi đó không chắc chỉ 1 nơi ghi kho — kho mới nên mở chỉ đọc).
+pub fn giu_khoa_that() -> Option<bool> {
     static GIU: std::sync::OnceLock<std::fs::File> = std::sync::OnceLock::new();
     if GIU.get().is_some() {
-        return true;
+        return Some(true);
     }
     match thu_khoa(&super::du_lieu_an::goc_du_lieu().join("app.lock")) {
         Some(Some(tep)) => {
             let _ = GIU.set(tep);
-            true
+            Some(true)
         }
-        Some(None) => false,
-        None => true, // không tạo / khoá được file (ổ chỉ đọc…) → không chặn mở app
+        Some(None) => Some(false),
+        None => None,
     }
 }
 
@@ -1014,5 +1131,71 @@ mod tests {
         }
         println!("DO|tra_100000|{:.2} s ({thay})", t.elapsed().as_secs_f64());
         let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    #[test]
+    fn ban_ghi_loai_khac_ghi_mo_lai_nen_giu_rong_la_bo() {
+        let d = tam("khac");
+        let f = d.join("kho_xg.bin");
+        let mut k = Kho::mo(&f).unwrap();
+        k.ghi_khac(5, (1, 10), b"vung a");
+        k.ghi_khac(5, (1, 10), b"vung b");
+        k.ghi_khac(7, (2, 20), b"nhat ky");
+        k.ghi_khac(6, (3, 0), b"thu muc");
+        assert_eq!(k.khac(5, (1, 10)).as_deref(), Some(&b"vung b"[..]), "đọc được trước khi đẩy xuống đĩa");
+        k.day().unwrap();
+        k.ghi_khac(6, (3, 0), &[]);
+        k.day().unwrap();
+        drop(k);
+        let mut k = Kho::mo(&f).unwrap();
+        assert_eq!(k.khac(5, (1, 10)).as_deref(), Some(&b"vung b"[..]));
+        assert_eq!(k.khac(7, (2, 20)).as_deref(), Some(&b"nhat ky"[..]));
+        assert_eq!(k.khac(6, (3, 0)), None, "nội dung rỗng = đã bỏ");
+        assert_eq!(k.khoa_khac(5), vec![(1, 10)]);
+        let truoc = k.dung_luong();
+        k.nen().unwrap();
+        assert!(k.dung_luong() < truoc);
+        assert_eq!(k.khac(5, (1, 10)).as_deref(), Some(&b"vung b"[..]), "nén giữ bản mới nhất");
+        drop(k);
+        let mut k = Kho::mo(&f).unwrap();
+        assert_eq!(k.khac(7, (2, 20)).as_deref(), Some(&b"nhat ky"[..]));
+        assert_eq!(k.so_hong, 0);
+    }
+
+    #[test]
+    fn mo_chi_doc_doc_duoc_khong_ghi_khong_sua_file() {
+        let d = tam("chi_doc");
+        let f = d.join("kho_xg.bin");
+        assert!(Kho::mo_chi_doc(&f).unwrap().khac(5, (1, 1)).is_none());
+        assert!(!f.exists(), "chỉ đọc không tạo file");
+        let mut k = Kho::mo(&f).unwrap();
+        k.ghi_khac(5, (1, 1), b"x");
+        k.day().unwrap();
+        drop(k);
+        // Đuôi ghi dở: chỉ đọc không cắt
+        std::fs::OpenOptions::new().append(true).open(&f).unwrap().write_all(&DAU_BAN_GHI).unwrap();
+        let truoc = std::fs::read(&f).unwrap();
+        let mut k = Kho::mo_chi_doc(&f).unwrap();
+        assert_eq!(k.khac(5, (1, 1)).as_deref(), Some(&b"x"[..]));
+        k.ghi_khac(5, (1, 1), b"y");
+        assert!(k.day().is_err());
+        assert!(k.nen().is_err(), "còn phần chưa lưu được → báo lỗi, không viết lại");
+        drop(k);
+        assert_eq!(std::fs::read(&f).unwrap(), truoc);
+    }
+
+    #[test]
+    fn don_khac_bo_theo_dieu_kien_va_id_con_song() {
+        let d = tam("don_khac");
+        let mut k = Kho::mo(&d.join("kho_xg.bin")).unwrap();
+        k.ghi_khac(5, (1, 1), b"giu");
+        k.ghi_khac(5, (2, 2), b"bo");
+        assert_eq!(k.don_khac(|_, id, _| id == (1, 1)).unwrap(), 1);
+        assert!(k.khac(5, (2, 2)).is_none());
+        assert!(k.khac(5, (1, 1)).is_some());
+        let mut t = Kho::mo(&d.join("kho_tach.bin")).unwrap();
+        t.ghi_duong_dan(9, DauFile { kich_thuoc: 1, sua_giay: 1, id: (1, 1), lan_cuoi: 5_000 });
+        t.ghi_duong_dan(8, DauFile { kich_thuoc: 1, sua_giay: 1, id: (2, 2), lan_cuoi: 100 });
+        assert_eq!(t.id_con_song(1_000), [(1, 1)].into_iter().collect());
     }
 }

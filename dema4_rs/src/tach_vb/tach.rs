@@ -15,16 +15,30 @@ pub const TIEU_DE_LOG: &str = "STT\tFile đầu vào\tDải trang\tFile đầu r
 
 /// Thư mục ra: `<cha>/<tên nguồn>_vanban`; `cha` trống = cha của thư mục nguồn. Không được nằm trong nguồn.
 pub fn thu_muc_ra(nguon: &Path, cha: Option<&Path>) -> Result<PathBuf, String> {
+    thu_muc_ra_hau_to(nguon, cha, "_vanban")
+}
+
+/// Thư mục kết quả `<cha>/<tên nguồn><hau_to>` (`cha` mặc định = thư mục cha của nguồn). Báo lỗi khi thư mục kết quả
+/// nằm trong nguồn — so sau khi chuẩn hoá (NFC, không phân biệt hoa / thường như Windows / macOS).
+pub fn thu_muc_ra_hau_to(nguon: &Path, cha: Option<&Path>, hau_to: &str) -> Result<PathBuf, String> {
     let ten = nguon.file_name().ok_or("thư mục nguồn không có tên")?.to_string_lossy().into_owned();
     let cha = match cha {
         Some(c) => c.to_path_buf(),
         None => nguon.parent().ok_or("thư mục nguồn không có thư mục cha")?.to_path_buf(),
     };
-    let ra = cha.join(format!("{ten}_vanban"));
-    if ra.starts_with(nguon) {
+    let ra = cha.join(format!("{ten}{hau_to}"));
+    if nam_trong(&ra, nguon) {
         return Err(format!("thư mục lưu kết quả {} nằm trong thư mục nguồn — lần quét sau sẽ lẫn kết quả", ra.display()));
     }
     Ok(ra)
+}
+
+/// `con` nằm trong (hoặc là) `cha`: so từng phần đường dẫn tuyệt đối sau khi chuẩn hoá NFC + chữ thường.
+pub fn nam_trong(con: &Path, cha: &Path) -> bool {
+    let chuan = |p: &Path| -> Vec<String> {
+        std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf()).components().map(|c| super::nhan::nfc(&c.as_os_str().to_string_lossy()).to_lowercase()).collect()
+    };
+    chuan(con).starts_with(&chuan(cha))
 }
 
 /// Thẻ số đệm 0 trong mẫu: `{n3}` → 3 chữ số (001), `{n7}` → 7 chữ số (0000001)… Trả (thẻ, số chữ số) của thẻ đầu tiên.
@@ -313,6 +327,18 @@ pub fn dong_log_loi(loi: &[(PathBuf, String)], canh_bao: &[String]) -> String {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn thu_muc_ra_theo_hau_to_chan_ra_trong_nguon_ca_khac_hoa_thuong_va_nfd() {
+        let nguon = Path::new("/a/Hồ sơ");
+        assert_eq!(thu_muc_ra_hau_to(nguon, None, "_xoaghim").unwrap(), Path::new("/a/Hồ sơ_xoaghim"));
+        assert_eq!(thu_muc_ra(nguon, None).unwrap(), Path::new("/a/Hồ sơ_vanban"));
+        assert_eq!(thu_muc_ra_hau_to(nguon, Some(Path::new("/b")), "_xoaghim").unwrap(), Path::new("/b/Hồ sơ_xoaghim"));
+        // Thư mục cha chọn nằm trong nguồn, viết khác hoa / thường và dạng NFD (macOS)
+        let nfd: String = unicode_normalization::UnicodeNormalization::nfd("/A/hỒ SƠ/con").collect();
+        assert!(thu_muc_ra_hau_to(nguon, Some(Path::new(&nfd)), "_xoaghim").is_err());
+        assert!(!nam_trong(Path::new("/a/Hồ sơ_xoaghim"), nguon), "cùng tiền tố chữ nhưng là thư mục khác");
+    }
 
     #[test]
     fn file_bi_thay_ban_khac_giu_thoi_diem_sua_khong_tach_theo_nhan_cu() {

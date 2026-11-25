@@ -31,7 +31,7 @@ impl Default for TuyChon {
 
 /// Xám 8 bit đúng `cv2.cvtColor(BGR2GRAY)` (OpenCV 4.12: hệ số 15 bit).
 #[inline]
-fn xam(r: u8, g: u8, b: u8) -> i32 {
+pub(super) fn xam(r: u8, g: u8, b: u8) -> i32 {
     ((r as i32 * 9798 + g as i32 * 19235 + b as i32 * 3735 + (1 << 14)) >> 15) as i32
 }
 

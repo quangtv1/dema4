@@ -26,27 +26,33 @@ pub fn cat_bang_ghep(nguon: &Path, trang: &[(usize, u16)], dich: &Path) -> Resul
     let mut dst = PdfDocument::new();
     let mut ghep = dst.new_graft_map().map_err(loi)?;
     for (thu_tu, &(so, goc)) in trang.iter().enumerate() {
-        let trang_nguon = src.find_page(so as i32 - 1).map_err(loi)?;
-        let mut moi = dst.new_dict().map_err(loi)?;
-        for cap in trang_nguon.dict_iter().map_err(loi)? {
-            let (khoa, gia_tri) = cap.map_err(loi)?;
-            if khoa.as_name().map_err(loi)? == b"Parent" {
-                continue;
-            }
-            moi.dict_put(khoa, ghep.graft_object(&gia_tri).map_err(loi)?).map_err(loi)?;
-        }
-        for khoa in KHOA_KE_THUA {
-            if moi.get_dict(khoa).map_err(loi)?.is_none() {
-                if let Some(v) = trang_nguon.get_dict_inheritable(khoa).map_err(loi)? {
-                    moi.dict_put(khoa, ghep.graft_object(&v).map_err(loi)?).map_err(loi)?;
-                }
-            }
-        }
-        dat_goc(&dst, &mut moi, goc)?;
-        let obj = dst.add_object(&moi).map_err(loi)?;
-        dst.insert_page(thu_tu as i32, &obj).map_err(loi)?;
+        ghep_trang(&src, so - 1, &mut dst, &mut ghep, thu_tu, goc)?;
     }
     dst.save_with_options(dich.to_str().ok_or("đường dẫn không hợp lệ")?, PdfWriteOptions::default()).map_err(loi)
+}
+
+/// Chép nguyên trang `so` (từ 0) của `src` vào vị trí `thu_tu` của `dst` qua bảng ghép `ghep` (tài nguyên dùng chung
+/// giữa các trang chỉ chép 1 lần), xoay thêm `goc`. Thuộc tính kế thừa từ cây trang được đặt thẳng vào trang mới.
+pub(crate) fn ghep_trang(src: &PdfDocument, so: usize, dst: &mut PdfDocument, ghep: &mut mupdf::pdf::PdfGraftMap, thu_tu: usize, goc: u16) -> Result<(), String> {
+    let trang_nguon = src.find_page(so as i32).map_err(loi)?;
+    let mut moi = dst.new_dict().map_err(loi)?;
+    for cap in trang_nguon.dict_iter().map_err(loi)? {
+        let (khoa, gia_tri) = cap.map_err(loi)?;
+        if khoa.as_name().map_err(loi)? == b"Parent" {
+            continue;
+        }
+        moi.dict_put(khoa, ghep.graft_object(&gia_tri).map_err(loi)?).map_err(loi)?;
+    }
+    for khoa in KHOA_KE_THUA {
+        if moi.get_dict(khoa).map_err(loi)?.is_none() {
+            if let Some(v) = trang_nguon.get_dict_inheritable(khoa).map_err(loi)? {
+                moi.dict_put(khoa, ghep.graft_object(&v).map_err(loi)?).map_err(loi)?;
+            }
+        }
+    }
+    dat_goc(dst, &mut moi, goc)?;
+    let obj = dst.add_object(&moi).map_err(loi)?;
+    dst.insert_page(thu_tu as i32, &obj).map_err(loi)
 }
 
 /// Như `cat_bang_ghep` nhưng mở lại nguồn, xoá trang ngoài danh sách (giữ thứ tự gốc) rồi dọn đối tượng thừa.

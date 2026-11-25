@@ -109,3 +109,40 @@ fn doi_chieu_xoaghim_python_tren_bo_mau() {
     eprintln!("{} trang: khớp từng điểm {khop}, IoU nhỏ nhất {iou_min:.5}; {:.1}s", kq.len(), bat_dau.elapsed().as_secs_f64());
     assert!(iou_min >= 0.99, "IoU mặt nạ xoá < 0,99");
 }
+
+/// Xuất thật vài file mẫu (vùng lấy từ `doi_chieu.json`) cạnh kết quả Python để so bằng mắt / dung lượng:
+/// `DEMA4_DOI_CHIEU_XG=<thư mục> DEMA4_MAU_XG=<thư mục mẫu> cargo test xuat_mau -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn xuat_mau_that_so_dung_luong_voi_python() {
+    use super::kho::CauHinhXuat;
+    use std::sync::atomic::AtomicBool;
+    let (Some(goc), Some(mau)) = (std::env::var_os("DEMA4_DOI_CHIEU_XG").map(std::path::PathBuf::from), std::env::var_os("DEMA4_MAU_XG").map(std::path::PathBuf::from)) else {
+        eprintln!("bỏ qua: chưa đặt DEMA4_DOI_CHIEU_XG / DEMA4_MAU_XG");
+        return;
+    };
+    let ds: Vec<serde_json::Value> = serde_json::from_slice(&std::fs::read(goc.join("doi_chieu.json")).unwrap()).unwrap();
+    let mut theo_file: std::collections::BTreeMap<String, Vec<serde_json::Value>> = Default::default();
+    for m in &ds {
+        let v = theo_file.entry(m["file"].as_str().unwrap().to_string()).or_default();
+        for z in m["vung"].as_array().unwrap() {
+            if !v.iter().any(|x| x["id"] == z["id"]) {
+                v.push(z.clone());
+            }
+        }
+    }
+    let ra = goc.join("rust_xuat");
+    let (mut tong_rs, mut tong_py) = (0u64, 0u64);
+    let bat_dau = std::time::Instant::now();
+    for (file, z) in theo_file.iter().take(12) {
+        let vung: Vec<Vung> = z.iter().map(vung_tu_json).collect();
+        let (b, kq) = super::xuat::xoa_ghim_pdf(&mau.join(file), &vung, &TuyChon::default(), &CauHinhXuat::default(), &AtomicBool::new(false)).unwrap();
+        std::fs::create_dir_all(&ra).unwrap();
+        std::fs::write(ra.join(file), &b).unwrap();
+        let py = std::fs::metadata(mau.join(file.replace(".pdf", "_clean.pdf"))).unwrap().len();
+        eprintln!("{file}: {} trang, xử lý {}, dpi {}, Rust {} KB, Python {} KB", kq.so_trang, kq.trang_xu_ly.len(), kq.dpi, b.len() / 1024, py / 1024);
+        tong_rs += b.len() as u64;
+        tong_py += py;
+    }
+    eprintln!("tổng Rust {} KB, Python {} KB; {:.1}s", tong_rs / 1024, tong_py / 1024, bat_dau.elapsed().as_secs_f64());
+}

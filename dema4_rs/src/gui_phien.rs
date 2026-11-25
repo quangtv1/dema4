@@ -324,6 +324,9 @@ fn tom_tat(bc: &BaoCaoGop) -> String {
     if bc.boc_nhan + bc.boc_giu > 0 {
         s += &format!("\nBóc tách: nhận {} kết quả · giữ {} của máy này", bc.boc_nhan, bc.boc_giu);
     }
+    if bc.xoa_ghim_nhan + bc.xoa_ghim_giu > 0 {
+        s += &format!("\nXóa ghim: nhận {} mục vùng / nhật ký · giữ {} của máy này", bc.xoa_ghim_nhan, bc.xoa_ghim_giu);
+    }
     if !bc.loai_moi.is_empty() {
         s += &format!("\nThêm loại tài liệu: {}", bc.loai_moi.join(", "));
     }
@@ -346,6 +349,8 @@ mod tests {
         let bc = BaoCaoGop { nhan: 3, giu: 2, boc_nhan: 1, bo_qua: vec!["x.pdf".into()], loai_moi: vec!["HĐ".into()], ..Default::default() };
         let s = tom_tat(&bc);
         assert!(s.contains("nhận 3 hồ sơ · giữ 2 của máy này · 0 trùng") && s.contains("Bóc tách: nhận 1") && s.contains("Bỏ qua 1") && s.contains("HĐ"), "{s}");
+        assert!(!s.contains("Xóa ghim"), "không có phần Xóa ghim thì không nhắc");
+        assert!(tom_tat(&BaoCaoGop { xoa_ghim_nhan: 2, ..Default::default() }).contains("Xóa ghim: nhận 2"));
     }
 
     fn mot_khung(hp: &mut HopPhien) -> Option<HanhDong> {

@@ -2,12 +2,14 @@
 //! dung PDF — và kết quả bóc tách) của các PDF trong 1 thư mục đầu vào sang máy khác để làm tiếp.
 //!
 //! - **Xuất**: 1 file zip: `manifest.json` (PDF: đường dẫn tương đối, kích thước, mã nội dung), `tach.bin` + `phan_tich.bin`
-//!   (bản ghi kho theo id), `boc_tach.jsonl` (kèm id). Không bao giờ có khoá API, license, cấu hình, mã máy.
+//!   (bản ghi kho theo id), `boc_tach.jsonl` (kèm id), `xoa_ghim.bin` (vùng + nhật ký Xóa ghim — mục tuỳ chọn, bản cũ bỏ
+//!   qua). Không bao giờ có khoá API, license, cấu hình, mã máy.
 //! - **Nhập**: khớp **theo nội dung PDF** (id) với PDF trong thư mục đang mở — máy nhận mở thư mục ở cấp nào, đổi tên
 //!   thế nào cũng khớp; gộp theo luật `gop` (mốc sau cùng thắng; kết quả lỗi không đè kết quả tốt). Gói bản 2.3
 //!   (theo đường dẫn) vẫn nhập được. Không tin gì trong zip: chỉ đọc đúng tên cần, có giới hạn dung lượng.
 
 mod gop;
+mod xoa_ghim;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::{Read, Write};
@@ -120,6 +122,9 @@ pub struct BaoCaoGop {
     pub loai_loi: Vec<String>,
     /// Số mốc trong gói vượt giờ máy này + 1 ngày (đồng hồ máy gửi sai) → đã kẹp.
     pub lech_dong_ho: usize,
+    /// Bản ghi Xóa ghim (vùng, nhật ký) lấy từ gói / giữ bản máy này.
+    pub xoa_ghim_nhan: usize,
+    pub xoa_ghim_giu: usize,
 }
 
 // ---------- Khoá liên tiến trình ----------
@@ -201,7 +206,7 @@ fn khoa_hop_le(k: &str) -> bool {
 
 /// Đóng gói phần việc của các PDF trong thư mục `goc` vào `file_zip`. Nơi gọi đã ghi hết trạng thái trong bộ nhớ.
 pub fn xuat(goc: &Path, file_zip: &Path) -> Result<TomTatXuat, String> {
-    xuat_trong(goc, file_zip, &loai_tai_lieu::file_mac_dinh(), kho::chung())
+    xuat_trong(goc, file_zip, &loai_tai_lieu::file_mac_dinh(), kho::chung(), crate::xoa_ghim::kho::chung())
 }
 
 fn ghi_ban(b: &mut Vec<u8>, id: Id, nd: &[u8]) {
@@ -227,7 +232,7 @@ fn doc_ban(b: &[u8]) -> Vec<(Id, &[u8])> {
     ds
 }
 
-fn xuat_trong(goc: &Path, file_zip: &Path, file_loai: &Path, kho: &std::sync::Mutex<Kho>) -> Result<TomTatXuat, String> {
+fn xuat_trong(goc: &Path, file_zip: &Path, file_loai: &Path, kho: &std::sync::Mutex<Kho>, kho_xg: &std::sync::Mutex<Kho>) -> Result<TomTatXuat, String> {
     let an = thu_muc_an(goc);
     let _khoa = KhoaPhien::lay(&an)?;
     // Id **thật** (đọc nội dung) của mọi PDF — file bị thay mà giữ thời điểm sửa không mang nhãn cũ đi
@@ -258,6 +263,10 @@ fn xuat_trong(goc: &Path, file_zip: &Path, file_loai: &Path, kho: &std::sync::Mu
             }
         }
     }
+    let xoa_ghim = {
+        let ids: HashSet<Id> = theo_khoa.values().copied().collect();
+        xoa_ghim::dong_goi(&mut kho_xg.lock().unwrap_or_else(|e| e.into_inner()), goc, &ids)
+    };
     // Kết quả bóc tách: bản ghi chưa có id (bản cũ) gắn id theo PDF hiện tại
     let jsonl = std::fs::read_to_string(an.join(F_JSONL)).unwrap_or_default();
     let mut ban_ghi: Vec<BanGhi> = luu::doc_tat_ca(&jsonl).into_values().collect();
@@ -293,6 +302,9 @@ fn xuat_trong(goc: &Path, file_zip: &Path, file_loai: &Path, kho: &std::sync::Mu
         them(F_TACH, &tach)?;
         them(F_PHAN_TICH, &phan_tich)?;
         them(F_JSONL, jsonl_goi.as_bytes())?;
+        if !xoa_ghim.is_empty() {
+            them(xoa_ghim::F_XOA_GHIM, &xoa_ghim)?;
+        }
         z.finish().map_err(|e| loi(&e))?;
         Ok(())
     };
@@ -472,10 +484,10 @@ fn xem_truoc_trong(goc: &Path, file_zip: &Path, file_loai: &Path, kho: &std::syn
 /// Nhập gói vào thư mục `goc` đang mở, gộp theo nội dung PDF. Nơi gọi đã ghi hết trạng thái trong bộ nhớ xuống đĩa và
 /// sẽ nạp lại sau khi nhập (không ghi bản cũ trong bộ nhớ đè lên).
 pub fn nhap(goc: &Path, file_zip: &Path) -> Result<BaoCaoGop, String> {
-    nhap_trong(goc, file_zip, &loai_tai_lieu::file_mac_dinh(), kho::chung())
+    nhap_trong(goc, file_zip, &loai_tai_lieu::file_mac_dinh(), kho::chung(), crate::xoa_ghim::kho::chung())
 }
 
-fn nhap_trong(goc: &Path, file_zip: &Path, file_loai: &Path, kho: &std::sync::Mutex<Kho>) -> Result<BaoCaoGop, String> {
+fn nhap_trong(goc: &Path, file_zip: &Path, file_loai: &Path, kho: &std::sync::Mutex<Kho>, kho_xg: &std::sync::Mutex<Kho>) -> Result<BaoCaoGop, String> {
     let an = thu_muc_an(goc);
     let _khoa = KhoaPhien::lay(&an)?;
     let mut goi = Goi::mo(file_zip)?;
@@ -541,6 +553,19 @@ fn nhap_trong(goc: &Path, file_zip: &Path, file_loai: &Path, kho: &std::sync::Mu
             }
         }
         k.day().map_err(|e| format!("không ghi được vào kho: {e}"))?;
+    }
+
+    // --- Xóa ghim: mục tuỳ chọn; khoá kho Xóa ghim sau khi đã nhả kho Tách ---
+    if let Some(b) = goi.doc(xoa_ghim::F_XOA_GHIM, TOI_DA_KHO)? {
+        let co: HashSet<Id> = may_id.keys().copied().collect();
+        let mut k = kho_xg.lock().unwrap_or_else(|e| e.into_inner());
+        let kq = xoa_ghim::nhap(&mut k, goc, &b, &co, bay_gio);
+        bc.xoa_ghim_nhan = kq.nhan;
+        bc.xoa_ghim_giu = kq.giu;
+        bc.lech_dong_ho += kq.lech_dong_ho;
+        if kq.nhan > 0 {
+            k.day().map_err(|e| format!("không ghi được vào kho Xóa ghim: {e}"))?;
+        }
     }
 
     // --- Bóc tách: theo (file, loại) của máy này; bản lỗi không bao giờ thắng bản đọc được ---

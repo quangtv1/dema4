@@ -75,9 +75,11 @@ fn main() {
             }
             // Dọn kho (bỏ bản ghi cũ đã bị thay) khi cần — ở luồng nền, không chậm lúc mở
             std::thread::spawn(|| {
-                let mut k = tach_vb::kho::kho();
-                if k.nen_don() {
-                    let _ = k.nen();
+                for kho in [tach_vb::kho::chung(), xoa_ghim::kho::chung()] {
+                    let mut k = kho.lock().unwrap_or_else(|e| e.into_inner());
+                    if k.nen_don() {
+                        let _ = k.nen();
+                    }
                 }
             });
             if let Err(e) = gui::chay() {
