@@ -13,7 +13,8 @@ use super::phan_tich::KetQuaTrang;
 use std::path::{Path, PathBuf};
 
 const DAU_FILE: &[u8; 4] = b"SMD4";
-const PHIEN_BAN: u16 = 1;
+/// 2: thêm vân tay nội dung PDF (bản 1 không đọc nữa — từ 2.3 cache nằm ở chỗ lưu mới, không có bản 1).
+const PHIEN_BAN: u16 = 2;
 
 /// Bit trạng thái duyệt của người dùng (không ghi vào `index_and_blank.txt`).
 pub const GIU_NOI_DUNG: u8 = 1;
@@ -28,20 +29,55 @@ pub struct TrangCache {
     pub trang_thai: u8,
 }
 
-/// Khoá nhận diện PDF: đổi kích thước / thời điểm sửa → cache không còn đúng.
+/// Khoá nhận diện PDF. Khớp cache khi cùng đường dẫn + kích thước **và** (cùng thời điểm sửa tính theo giây **hoặc**
+/// cùng vân tay nội dung). Vân tay giúp dùng lại cache khi chép thư mục qua USB / sang máy khác (thời điểm sửa đổi).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KhoaFile {
     pub duong_dan: String,
     pub kich_thuoc: u64,
+    /// ns từ epoch; so ở độ mịn giây (mỗi hệ điều hành / ổ đĩa giữ độ mịn khác nhau).
     pub sua_luc: u128,
+    /// `van_tay_file`; 0 = chưa tính (tính lúc ghi cache).
+    pub van_tay: u64,
 }
 
 impl KhoaFile {
+    /// Chỉ đọc thông tin file (không đọc nội dung) — vân tay để 0.
     pub fn cua(pdf: &Path, duong_dan_tuong_doi: &str) -> Option<Self> {
         let md = std::fs::metadata(pdf).ok()?;
         let sua_luc = md.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_nanos();
-        Some(Self { duong_dan: duong_dan_tuong_doi.to_string(), kich_thuoc: md.len(), sua_luc })
+        Some(Self { duong_dan: duong_dan_tuong_doi.to_string(), kich_thuoc: md.len(), sua_luc, van_tay: 0 })
     }
+}
+
+const NUA_VAN_TAY: u64 = 64 * 1024;
+
+/// Vân tay nội dung: FNV-1a 64 của (kích thước ‖ 64 KB đầu ‖ 64 KB cuối); file ≤ 128 KB → cả file.
+/// Giới hạn chấp nhận: sửa vài byte ở giữa file mà giữ nguyên kích thước thì không phát hiện (PDF scan sửa nội dung
+/// hầu như luôn đổi kích thước hoặc bảng xref cuối file).
+pub fn van_tay_file(pdf: &Path, kich_thuoc: u64) -> std::io::Result<u64> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(pdf)?;
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut tron = |b: &[u8]| {
+        for &x in b {
+            h = (h ^ x as u64).wrapping_mul(0x100_0000_01b3);
+        }
+    };
+    tron(&kich_thuoc.to_le_bytes());
+    let mut buf = vec![0u8; NUA_VAN_TAY as usize];
+    if kich_thuoc <= 2 * NUA_VAN_TAY {
+        let mut ca = Vec::with_capacity(kich_thuoc as usize);
+        f.read_to_end(&mut ca)?;
+        tron(&ca);
+    } else {
+        f.read_exact(&mut buf)?;
+        tron(&buf);
+        f.seek(SeekFrom::Start(kich_thuoc - NUA_VAN_TAY))?;
+        f.read_exact(&mut buf)?;
+        tron(&buf);
+    }
+    Ok(h.max(1))
 }
 
 /// File cache của 1 PDF: tên = băm đường dẫn tương đối (ổn định giữa các lần chạy).
@@ -95,6 +131,7 @@ pub fn ma_hoa(khoa: &KhoaFile, trang: &[TrangCache]) -> Vec<u8> {
     g.chuoi(&khoa.duong_dan);
     g.u64(khoa.kich_thuoc);
     g.u128(khoa.sua_luc);
+    g.u64(khoa.van_tay);
     g.u32(trang.len() as u32);
     for t in trang {
         g.u32(t.thong_tin.dung_luong);
@@ -133,7 +170,7 @@ pub fn giai_ma(du_lieu: &[u8]) -> Option<(KhoaFile, Vec<TrangCache>)> {
     if d.lay(4)? != DAU_FILE || d.u16()? != PHIEN_BAN {
         return None;
     }
-    let khoa = KhoaFile { duong_dan: d.chuoi()?, kich_thuoc: d.u64()?, sua_luc: d.u128()? };
+    let khoa = KhoaFile { duong_dan: d.chuoi()?, kich_thuoc: d.u64()?, sua_luc: d.u128()?, van_tay: d.u64()? };
     let n = d.u32()? as usize;
     let mut trang = Vec::with_capacity(n.min(100_000));
     for _ in 0..n {
@@ -164,20 +201,39 @@ pub fn giai_ma(du_lieu: &[u8]) -> Option<(KhoaFile, Vec<TrangCache>)> {
     d.0.is_empty().then_some((khoa, trang))
 }
 
-/// Đọc cache của 1 PDF; `None` khi chưa có, hỏng, hoặc PDF đã đổi (khoá khác).
-pub fn doc(thu_muc_cache: &Path, khoa: &KhoaFile) -> Option<Vec<TrangCache>> {
+/// Đọc cache của PDF `pdf` (khoá `khoa` lấy từ thông tin file hiện tại). Trả khoá đầy đủ (kèm vân tay đã lưu) + trang;
+/// `None` khi chưa có, hỏng, hoặc PDF đã đổi. Thời điểm sửa lệch (chép sang máy khác) mà vân tay khớp → vẫn dùng và
+/// ghi lại phần đầu file cache với thời điểm mới (lần sau khớp ngay, không đọc lại PDF).
+pub fn doc(thu_muc_cache: &Path, pdf: &Path, khoa: &KhoaFile) -> Option<(KhoaFile, Vec<TrangCache>)> {
     let du_lieu = std::fs::read(file_cache(thu_muc_cache, &khoa.duong_dan)).ok()?;
-    let (k, trang) = giai_ma(&du_lieu)?;
-    (k == *khoa).then_some(trang)
+    let (luu, trang) = giai_ma(&du_lieu)?;
+    if luu.duong_dan != khoa.duong_dan || luu.kich_thuoc != khoa.kich_thuoc {
+        return None;
+    }
+    if luu.sua_luc / 1_000_000_000 == khoa.sua_luc / 1_000_000_000 {
+        return Some((KhoaFile { van_tay: luu.van_tay, ..khoa.clone() }, trang));
+    }
+    if luu.van_tay == 0 || van_tay_file(pdf, khoa.kich_thuoc).ok()? != luu.van_tay {
+        return None;
+    }
+    let moi = KhoaFile { van_tay: luu.van_tay, ..khoa.clone() };
+    let _ = ghi_file_cache(thu_muc_cache, &moi, &trang);
+    Some((moi, trang))
 }
 
-/// Ghi cache của 1 PDF (file tạm rồi đổi tên — tắt app giữa chừng không để lại file hỏng).
-pub fn ghi(thu_muc_cache: &Path, khoa: &KhoaFile, trang: &[TrangCache]) -> std::io::Result<()> {
-    std::fs::create_dir_all(thu_muc_cache)?;
-    let dich = file_cache(thu_muc_cache, &khoa.duong_dan);
-    let tam = dich.with_extension("tmp");
-    std::fs::write(&tam, ma_hoa(khoa, trang))?;
-    std::fs::rename(&tam, &dich)
+/// Ghi cache của 1 PDF; khoá chưa có vân tay thì tính từ `pdf` (lỗi đọc → để 0, cache vẫn ghi). Trả khoá đã ghi.
+pub fn ghi(thu_muc_cache: &Path, pdf: &Path, khoa: &KhoaFile, trang: &[TrangCache]) -> std::io::Result<KhoaFile> {
+    let mut k = khoa.clone();
+    if k.van_tay == 0 {
+        k.van_tay = van_tay_file(pdf, k.kich_thuoc).unwrap_or(0);
+    }
+    ghi_file_cache(thu_muc_cache, &k, trang)?;
+    Ok(k)
+}
+
+/// File tạm rồi đổi tên — tắt app giữa chừng không để lại file hỏng.
+fn ghi_file_cache(thu_muc_cache: &Path, khoa: &KhoaFile, trang: &[TrangCache]) -> std::io::Result<()> {
+    crate::ghi_file::ghi_an_toan(&file_cache(thu_muc_cache, &khoa.duong_dan), ma_hoa(khoa, trang))
 }
 
 /// Phân tích lại: xoá toàn bộ cache.
@@ -210,7 +266,7 @@ mod tests {
 
     #[test]
     fn khu_hoi_giu_nguyen_va_xac_suat_lam_tron_1_255() {
-        let khoa = KhoaFile { duong_dan: "HOP 462/4766/4766.pdf".into(), kich_thuoc: 9, sua_luc: 123 };
+        let khoa = KhoaFile { duong_dan: "HOP 462/4766/4766.pdf".into(), kich_thuoc: 9, sua_luc: 123, van_tay: 0xabc };
         let (k, t) = giai_ma(&ma_hoa(&khoa, &mau_trang())).unwrap();
         assert_eq!(k, khoa);
         assert_eq!(t[..2], mau_trang()[..2]);
@@ -220,21 +276,99 @@ mod tests {
         assert_eq!(t[2].trang_thai, DANG_CHINH_XOAY);
     }
 
+    fn tam(ten: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("dema4_cache_{ten}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// PDF giả: nội dung bất kỳ (vân tay chỉ đọc byte), `n` byte.
+    fn pdf_gia(d: &Path, n: usize) -> PathBuf {
+        let f = d.join("a.pdf");
+        std::fs::write(&f, (0..n).map(|i| (i * 7 % 251) as u8).collect::<Vec<_>>()).unwrap();
+        f
+    }
+
     #[test]
     fn file_hong_hoac_pdf_doi_thi_bo_cache() {
-        let thu_muc = std::env::temp_dir().join(format!("dema4_cache_{}", std::process::id()));
-        let khoa = KhoaFile { duong_dan: "a.pdf".into(), kich_thuoc: 9, sua_luc: 1 };
-        ghi(&thu_muc, &khoa, &mau_trang()).unwrap();
-        assert_eq!(doc(&thu_muc, &khoa).map(|t| t.len()), Some(3));
-        assert!(doc(&thu_muc, &KhoaFile { sua_luc: 2, ..khoa.clone() }).is_none(), "PDF đã sửa");
+        let d = tam("hong");
+        let (thu_muc, pdf) = (d.join("cache"), pdf_gia(&d, 9));
+        let khoa = KhoaFile::cua(&pdf, "a.pdf").unwrap();
+        ghi(&thu_muc, &pdf, &khoa, &mau_trang()).unwrap();
+        assert_eq!(doc(&thu_muc, &pdf, &khoa).map(|(_, t)| t.len()), Some(3));
+        assert!(doc(&thu_muc, &pdf, &KhoaFile { kich_thuoc: 10, ..khoa.clone() }).is_none(), "PDF đổi kích thước");
         let du_lieu = ma_hoa(&khoa, &mau_trang());
         for cat in [0, 5, du_lieu.len() - 1] {
             assert!(giai_ma(&du_lieu[..cat]).is_none(), "cắt ở {cat}");
         }
         std::fs::write(file_cache(&thu_muc, "a.pdf"), b"rac").unwrap();
-        assert!(doc(&thu_muc, &khoa).is_none());
+        assert!(doc(&thu_muc, &pdf, &khoa).is_none());
         xoa_het(&thu_muc).unwrap();
         assert!(!thu_muc.exists());
         xoa_het(&thu_muc).unwrap();
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn chep_sang_may_khac_mtime_doi_van_dung_cache_nho_van_tay() {
+        let d = tam("van_tay");
+        let (thu_muc, pdf) = (d.join("cache"), pdf_gia(&d, 200_000));
+        let khoa = KhoaFile::cua(&pdf, "a.pdf").unwrap();
+        ghi(&thu_muc, &pdf, &khoa, &mau_trang()).unwrap();
+        let (luu, _) = giai_ma(&std::fs::read(file_cache(&thu_muc, "a.pdf")).unwrap()).unwrap();
+        assert_ne!(luu.van_tay, 0, "vân tay tính và lưu ngay lúc ghi (máy nguồn)");
+        // Máy khác / chép USB: cùng nội dung, mtime lệch nhiều giây
+        let khac = KhoaFile { sua_luc: khoa.sua_luc + 3_600_000_000_000, van_tay: 0, ..khoa.clone() };
+        let (k, t) = doc(&thu_muc, &pdf, &khac).expect("khớp nhờ vân tay");
+        assert_eq!((t.len(), k.sua_luc, k.van_tay), (3, khac.sua_luc, luu.van_tay));
+        let (luu2, _) = giai_ma(&std::fs::read(file_cache(&thu_muc, "a.pdf")).unwrap()).unwrap();
+        assert_eq!(luu2.sua_luc, khac.sua_luc, "ghi lại header → lần sau đi đường tắt theo mtime");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn doi_noi_dung_cung_kich_thuoc_va_mtime_lech_thi_bo_cache() {
+        let d = tam("doi_byte");
+        let (thu_muc, pdf) = (d.join("cache"), pdf_gia(&d, 200_000));
+        let khoa = KhoaFile::cua(&pdf, "a.pdf").unwrap();
+        ghi(&thu_muc, &pdf, &khoa, &mau_trang()).unwrap();
+        let mut b = std::fs::read(&pdf).unwrap();
+        b[10] ^= 0xff;
+        std::fs::write(&pdf, b).unwrap();
+        let khac = KhoaFile { sua_luc: khoa.sua_luc + 5_000_000_000, van_tay: 0, ..khoa.clone() };
+        assert!(doc(&thu_muc, &pdf, &khac).is_none());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn mtime_lech_duoi_1_giay_khop_ngay_khong_can_van_tay() {
+        let d = tam("giay");
+        let (thu_muc, pdf) = (d.join("cache"), pdf_gia(&d, 50));
+        let khoa = KhoaFile { duong_dan: "a.pdf".into(), kich_thuoc: 50, sua_luc: 7_000_000_000, van_tay: 0 };
+        std::fs::create_dir_all(&thu_muc).unwrap();
+        std::fs::write(file_cache(&thu_muc, "a.pdf"), ma_hoa(&khoa, &mau_trang())).unwrap(); // không có vân tay
+        let gan = KhoaFile { sua_luc: 7_000_500_000, ..khoa.clone() };
+        assert!(doc(&thu_muc, &pdf, &gan).is_some(), "cùng giây (độ mịn khác nhau giữa HĐH)");
+        let xa = KhoaFile { sua_luc: 9_000_000_000, ..khoa.clone() };
+        assert!(doc(&thu_muc, &pdf, &xa).is_none(), "khác giây và không có vân tay lưu → bỏ");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn van_tay_file_nho_ca_file_file_lon_dau_cuoi() {
+        let d = tam("vt");
+        let nho = pdf_gia(&d, 1000);
+        assert_eq!(van_tay_file(&nho, 1000).unwrap(), van_tay_file(&nho, 1000).unwrap());
+        let lon = pdf_gia(&d, 300_000);
+        let goc = van_tay_file(&lon, 300_000).unwrap();
+        let mut b = std::fs::read(&lon).unwrap();
+        b[150_000] ^= 1; // giữa file: ngoài 64 KB đầu / cuối (giới hạn đã chấp nhận)
+        std::fs::write(&lon, &b).unwrap();
+        assert_eq!(van_tay_file(&lon, 300_000).unwrap(), goc);
+        b[299_999] ^= 1; // cuối file (xref) → khác
+        std::fs::write(&lon, &b).unwrap();
+        assert_ne!(van_tay_file(&lon, 300_000).unwrap(), goc);
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

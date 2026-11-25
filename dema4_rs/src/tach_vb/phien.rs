@@ -135,8 +135,8 @@ impl PhienPhanTich {
             .map(|pdf| {
                 let tuong_doi = duong_dan_ghi(goc, &pdf);
                 let khoa = KhoaFile::cua(&pdf, &tuong_doi);
-                if let Some(trang) = khoa.as_ref().and_then(|k| cache_trang::doc(&cache, k)) {
-                    return HoSoPhanTich { pdf, tuong_doi, khoa, trang, loi: None };
+                if let Some((k, trang)) = khoa.as_ref().and_then(|k| cache_trang::doc(&cache, &pdf, k)) {
+                    return HoSoPhanTich { pdf, tuong_doi, khoa: Some(k), trang, loi: None };
                 }
                 match doc_thong_tin_file(&pdf) {
                     Ok(tt) => HoSoPhanTich { pdf, tuong_doi, khoa, trang: tt.into_iter().map(|thong_tin| TrangCache { thong_tin, ..Default::default() }).collect(), loi: None },
@@ -160,7 +160,7 @@ impl PhienPhanTich {
         let cache = thu_muc_an(goc).join("cache");
         let so: Vec<Option<usize>> = tat_ca
             .par_iter()
-            .map(|pdf| KhoaFile::cua(pdf, &duong_dan_ghi(goc, pdf)).and_then(|k| cache_trang::doc(&cache, &k)).map(|t| t.len()))
+            .map(|pdf| KhoaFile::cua(pdf, &duong_dan_ghi(goc, pdf)).and_then(|k| cache_trang::doc(&cache, pdf, &k)).map(|(_, t)| t.len()))
             .collect();
         let _ = gui.send(XemTruocSuKien::SoTrang(so));
     }
@@ -203,9 +203,22 @@ impl PhienPhanTich {
     }
 
     /// Ghi cache mọi hồ sơ (song song). Trả số file ghi lỗi (thư mục chỉ đọc… — app vẫn chạy không cache).
-    pub fn ghi_cache(&self) -> usize {
+    /// Vân tay tính 1 lần rồi giữ trong khoá của hồ sơ (lần ghi sau không đọc lại PDF).
+    pub fn ghi_cache(&mut self) -> usize {
         let cache = thu_muc_an(&self.goc).join("cache");
-        self.ho_so.par_iter().filter(|h| h.khoa.as_ref().is_some_and(|k| cache_trang::ghi(&cache, k, &h.trang).is_err())).count()
+        self.ho_so
+            .par_iter_mut()
+            .map(|h| {
+                let Some(k) = &h.khoa else { return 0 };
+                match cache_trang::ghi(&cache, &h.pdf, k, &h.trang) {
+                    Ok(k) => {
+                        h.khoa = Some(k);
+                        0
+                    }
+                    Err(_) => 1,
+                }
+            })
+            .sum()
     }
 
     /// Nhãn tự động theo Cấu hình (chỉ index / trắng; trang nội dung không ghi).
