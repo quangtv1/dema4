@@ -227,6 +227,7 @@ const HD_TACH: &[Khoi] = &[
         ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc nút − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước/sau · [F1] hướng dẫn"),
     ]),
     Khoi::Ghi("Nhãn, góc xoay, log và cache lưu trong thư mục dữ liệu của ứng dụng (Windows `%LOCALAPPDATA%\\sm-dema4`, macOS `~/Library/Application Support/sm-dema4`), mỗi thư mục đầu vào 1 thư mục con riêng dưới `viec/` — dời file chạy đi chỗ khác không mất (từ bản 2.3; dữ liệu bản cũ để cạnh file chạy không được mang sang: nên tách / xuất xong phần đang làm trước khi nâng cấp); thư mục đầu vào và file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
+    Khoi::Ghi("*Làm tiếp trên máy khác*: *Chức năng › Xuất phiên làm việc…* đóng gói nhãn, góc xoay, cache phân tích và kết quả bóc tách của thư mục đang mở thành `<tên>.sm-dema4.zip` (không có khoá API, license, cấu hình). Ở máy kia mở cùng thư mục (Drive, USB…) rồi *Nhập phiên làm việc…*: mỗi hồ sơ giữ bản sửa sau cùng — nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, để đồng hồ máy đúng giờ."),
 ];
 
 const HD_MUC_LUC: &[Khoi] = &[

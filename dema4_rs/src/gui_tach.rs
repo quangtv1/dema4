@@ -717,6 +717,27 @@ impl ManTach {
         }
     }
 
+    /// Trước Xuất / Nhập phiên: ghi nhãn chưa lưu, cờ duyệt (cache) và mốc sửa xuống đĩa.
+    pub fn ghi_het_xuong_dia(&mut self) {
+        if self.chua_luu() {
+            self.luu_nhan();
+        }
+        self.ghi_cache();
+    }
+
+    /// Trước khi Nhập phiên ghi vào thư mục: bỏ phiên đang mở **không lưu** — không đường nào (đóng app, đổi thư mục, ⓧ)
+    /// ghi bản cũ trong bộ nhớ đè lên dữ liệu vừa nhập.
+    pub fn bo_phien_khong_luu(&mut self) {
+        self.bang = None;
+        self.phien = None;
+        self.khong_ghi_cache = true;
+    }
+
+    /// Sau Nhập phiên: mở lại thư mục từ đĩa (nhãn, cache, mốc vừa gộp), không bước lưu.
+    pub fn mo_lai_tu_dia(&mut self, ch: &CauHinhPhanTich) {
+        self.bat_dau(ch, false);
+    }
+
     /// Ghi mốc sửa từng hồ sơ (gộp phiên giữa 2 máy: bản sửa sau cùng thắng) theo đúng nội dung **đã ghi xuống đĩa**.
     /// Hồ sơ lỗi đọc không đưa vào (giữ mốc cũ — trục trặc đọc file không thành "xoá hết nhãn").
     fn cap_nhat_moc(&mut self, bo_co_duyet: bool) {
@@ -2741,6 +2762,47 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
             man.nhan_su_kien(&ch, None);
         }
+        let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Xuất / Nhập phiên: ghi hết xuống đĩa (cả nhãn chưa lưu); sau khi bỏ phiên, mọi đường lưu (đóng app, đổi thư mục)
+    /// không ghi bản cũ trong bộ nhớ đè lên dữ liệu vừa nhập; mở lại từ đĩa thấy dữ liệu đã nhập.
+    #[test]
+    fn nhap_phien_khong_bi_ban_cu_trong_bo_nho_ghi_de() {
+        let goc = std::env::temp_dir().join(format!("dema4_tach_phien_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        std::fs::create_dir_all(&goc).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 3);
+        let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
+        let cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
+        let mut man = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };
+        let ch = cfg.cau_hinh_phan_tich();
+        let cho = |man: &mut ManTach| {
+            let t = Instant::now();
+            while man.dang_chay() {
+                assert!(t.elapsed() < Duration::from_secs(30));
+                std::thread::sleep(Duration::from_millis(20));
+                man.nhan_su_kien(&ch, None);
+            }
+        };
+        man.bam_phan_tich(&ch);
+        cho(&mut man);
+        // Nhãn sửa tay chưa lưu → Xuất phải ghi xuống đĩa trước
+        man.bang.as_mut().unwrap().trang[1].sua.tay = Some(Nhan::Index);
+        man.bang.as_mut().unwrap().chua_luu = true;
+        man.ghi_het_xuong_dia();
+        assert!(std::fs::read_to_string(thu_muc_an(&goc).join("index_and_blank.txt")).unwrap().contains("a.pdf;2;index"));
+        // Nhập: bỏ phiên không lưu, gói ghi nhãn mới, rồi mọi đường lưu cũ không đè
+        man.bo_phien_khong_luu();
+        std::fs::write(thu_muc_an(&goc).join("index_and_blank.txt"), "a.pdf;3;index\n").unwrap();
+        man.ghi_cache();
+        man.luu_nhan();
+        assert_eq!(std::fs::read_to_string(thu_muc_an(&goc).join("index_and_blank.txt")).unwrap(), "a.pdf;3;index\n");
+        man.mo_lai_tu_dia(&ch);
+        cho(&mut man);
+        let b = man.bang.as_ref().expect("mở lại từ đĩa → có bảng (nút Tách dùng được)");
+        assert_eq!((b.trang[2].nhan(), b.trang[1].nhan()), (Nhan::Index, Nhan::NoiDung), "thấy nhãn vừa nhập");
         let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
         let _ = std::fs::remove_dir_all(&goc);
     }

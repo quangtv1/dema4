@@ -122,6 +122,8 @@ struct UngDungChinh {
     hoi_dong_chay: bool,
     /// Thư mục người dùng không ghi được → dữ liệu đang lưu ở thư mục tạm: báo 1 lần lúc mở app.
     bao_goc_tam: bool,
+    /// Xuất / Nhập phiên làm việc (menu Chức năng).
+    hop_phien: crate::gui_phien::HopPhien,
     cho_dong: bool,
 }
 
@@ -136,13 +138,15 @@ impl Default for UngDungChinh {
         let mut boc_tach = crate::gui_boc_tach::ManBocTach::default();
         boc_tach.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), cho_dong: false }
     }
 }
 
 /// Việc đang chạy lúc người dùng đóng app; `boc_tach` = (file đã xong, tổng file của lần chạy).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 struct ViecDangChay {
+    /// Đang chọn file / xuất / nhập phiên làm việc.
+    phien: bool,
     dem: bool,
     phan_tich: bool,
     tach: bool,
@@ -153,6 +157,9 @@ struct ViecDangChay {
 impl ViecDangChay {
     /// Câu mô tả cho hộp hỏi khi đóng; `None` = không có gì đang chạy → đóng luôn.
     fn mo_ta(&self) -> Option<String> {
+        if self.phien {
+            return Some("xuất / nhập phiên làm việc — chờ xong".into());
+        }
         if let Some((xong, tong)) = self.boc_tach {
             return Some(format!("bóc tách {xong}/{tong} file — file đang đọc dở sẽ mất, lượt gọi mô hình đã tốn"));
         }
@@ -173,9 +180,52 @@ impl UngDungChinh {
         }
     }
 
+    /// Thư mục đang mở ở màn hiện tại dùng được cho Xuất / Nhập phiên (chỉ Tách và Bóc tách).
+    fn thu_muc_phien(&self) -> Option<PathBuf> {
+        let tm = match self.man {
+            Man::Tach => &self.tach.thu_muc,
+            Man::BocTach => &self.boc_tach.thu_muc,
+            _ => return None,
+        };
+        Some(PathBuf::from(tm.trim())).filter(|p| !tm.trim().is_empty() && p.is_dir())
+    }
+
+    /// Màn Tách đang mở đúng thư mục `goc` → ghi nhãn chưa lưu, cờ duyệt, mốc xuống đĩa (Bóc tách ghi từng bản ghi ngay).
+    fn ghi_xuong_dia_neu_dang_mo(&mut self, goc: &Path) {
+        if Path::new(self.tach.thu_muc.trim()) == goc {
+            self.tach.ghi_het_xuong_dia();
+        }
+    }
+
+    /// Hộp Xuất / Nhập phiên và việc sau đó: trước khi nhập thì ghi xuống đĩa + bỏ phiên Tách đang mở (không lưu lại);
+    /// nhập xong thì nạp lại Tách / Bóc tách từ đĩa.
+    fn hop_phien(&mut self, ctx: &egui::Context) {
+        use crate::gui_phien::HanhDong;
+        match self.hop_phien.ve(ctx) {
+            Some(HanhDong::XacNhanNhap { goc, zip }) => {
+                self.ghi_xuong_dia_neu_dang_mo(&goc);
+                if Path::new(self.tach.thu_muc.trim()) == goc {
+                    self.tach.bo_phien_khong_luu();
+                }
+                self.hop_phien.nhap(goc, zip, ctx);
+            }
+            Some(HanhDong::DaNhap { goc }) => {
+                if Path::new(self.tach.thu_muc.trim()) == goc {
+                    self.tach.mo_lai_tu_dia(&self.cfg.cau_hinh_phan_tich());
+                }
+                self.boc_tach.ds_loai = crate::boc_tach::loai_tai_lieu::doc(&crate::boc_tach::loai_tai_lieu::file_mac_dinh());
+                if Path::new(self.boc_tach.thu_muc.trim()) == goc {
+                    self.boc_tach.nap_ket_qua();
+                }
+            }
+            None => {}
+        }
+    }
+
     /// Việc đang chạy ở mọi màn (đóng app lúc này thì phần dở dang bị mất).
     fn viec_dang_chay(&self) -> ViecDangChay {
         ViecDangChay {
+            phien: self.hop_phien.dang_chay(),
             dem: self.dem.dang_dem.is_some(),
             phan_tich: self.tach.dang_chay() && !self.tach.dang_tach(),
             tach: self.tach.dang_tach(),
@@ -328,6 +378,25 @@ impl UngDungChinh {
                                 ui.close();
                             }
                         }
+                        // Mang phần đang làm dở của thư mục đang mở (Tách / Bóc tách) sang máy khác
+                        ui.separator();
+                        let goc = self.thu_muc_phien();
+                        let ly_do = "Mở thư mục ở màn Tách văn bản hoặc Bóc tách dữ liệu trước";
+                        ui.add_enabled_ui(goc.is_some(), |ui| {
+                            if muc_menu_day(ui, BieuTuong::TaiLieu, "Xuất phiên làm việc…", false, None, 190.0).on_disabled_hover_text(ly_do).clicked() {
+                                if let Some(g) = goc.clone() {
+                                    self.ghi_xuong_dia_neu_dang_mo(&g);
+                                    self.hop_phien.xuat(g, ui.ctx());
+                                }
+                                ui.close();
+                            }
+                            if muc_menu_day(ui, BieuTuong::TaiLieu, "Nhập phiên làm việc…", false, None, 190.0).on_disabled_hover_text(ly_do).clicked() {
+                                if let Some(g) = goc.clone() {
+                                    self.hop_phien.chon_goi(g, ui.ctx());
+                                }
+                                ui.close();
+                            }
+                        });
                     });
                 })
                 .response
@@ -390,6 +459,7 @@ impl eframe::App for UngDungChinh {
         }
         self.hop_hoi_dong(&ctx);
         self.hop_goc_tam(&ctx);
+        self.hop_phien(&ctx);
         self.hop_hoi_dong_chay(&ctx);
         if self.tro_giup.is_none() && self.hop_cau_hinh.is_none() && ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(self.tab_huong_dan()));
@@ -1668,6 +1738,26 @@ impl UngDung {
 mod tests {
     use super::*;
     use crate::boc_tach::mo_hinh::NhaCungCap;
+
+    #[test]
+    fn xuat_nhap_phien_chi_o_tach_va_boc_tach_khi_da_mo_thu_muc() {
+        let d = std::env::temp_dir().join(format!("dema4_menu_phien_{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        let mut app = UngDungChinh::default();
+        for man in [Man::TrangChu, Man::Dem, Man::MucLuc] {
+            app.man = man;
+            assert!(app.thu_muc_phien().is_none());
+        }
+        app.man = Man::BocTach;
+        assert!(app.thu_muc_phien().is_none(), "chưa chọn thư mục");
+        app.boc_tach.thu_muc = d.display().to_string();
+        assert_eq!(app.thu_muc_phien(), Some(d.clone()));
+        app.man = Man::Tach;
+        app.tach.thu_muc = d.join("khong_co").display().to_string();
+        assert!(app.thu_muc_phien().is_none(), "thư mục không tồn tại");
+        assert_eq!(ViecDangChay { phien: true, ..Default::default() }.mo_ta().as_deref(), Some("xuất / nhập phiên làm việc — chờ xong"), "đang xuất / nhập → khoá menu, đóng app thì hỏi");
+        let _ = std::fs::remove_dir_all(&d);
+    }
 
     #[test]
     fn dong_app_hoi_khi_bat_ky_chuc_nang_nao_dang_chay() {

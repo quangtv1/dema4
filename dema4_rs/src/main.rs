@@ -25,6 +25,7 @@ mod tram;
 mod hop_license;
 mod gui;
 mod gui_muc_luc;
+mod gui_phien;
 mod gui_boc_tach;
 #[allow(dead_code)] // nối dần vào giao diện
 mod gui_tach;

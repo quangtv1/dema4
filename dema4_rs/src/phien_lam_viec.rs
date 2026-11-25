@@ -7,9 +7,6 @@
 //!   cần, có giới hạn dung lượng, mọi khoá hồ sơ phải trùng 1 PDF có trên máy nhận, tên file cache dựng lại từ khoá.
 //! - Mỗi file đích ghi an toàn (file tạm + đổi tên); nhập lại cùng gói cho cùng kết quả.
 
-// Giao diện Xuất / Nhập phiên chưa nối vào app: gỡ dòng này khi menu gọi `xuat` / `xem_truoc` / `nhap`.
-#![allow(dead_code)]
-
 mod gop;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
