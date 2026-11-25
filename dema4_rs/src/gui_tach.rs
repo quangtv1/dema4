@@ -215,8 +215,10 @@ pub struct ManTach {
     /// Đang gõ ô thư mục (chưa quét cho tới khi gõ xong) / hộp chọn thư mục chạy luồng riêng (Windows).
     dang_go_tm: bool,
     chon_tm: Option<Receiver<Option<PathBuf>>>,
-    /// Mở lại thư mục từ đĩa ở lần vẽ tới (sau Nhập phiên).
+    /// Mở lại thư mục từ đĩa ở lần vẽ tới (sau Nhập phiên / mở từ Làm tiếp gần đây).
     cho_mo_lai: bool,
+    /// Lần tách gần nhất của thư mục đang mở: (số hồ sơ, số văn bản) — cho tình trạng Làm tiếp gần đây.
+    da_tach: Option<(usize, usize)>,
     /// Hộp Xuất / Nhập phiên đang mở: tắt phím tắt (modal chỉ chặn chuột).
     pub khoa_phim: bool,
 }
@@ -305,6 +307,7 @@ impl Default for ManTach {
             dang_go_tm: false,
             chon_tm: None,
             cho_mo_lai: false,
+            da_tach: None,
             khoa_phim: false,
         }
     }
@@ -469,6 +472,7 @@ impl ManTach {
         self.trang_thai = "Đang đọc thư mục…".into();
         self.bat_dau_pt = Some(Instant::now());
         self.khong_ghi_cache = false;
+        self.da_tach = None;
         let (gui, nhan) = mpsc::channel();
         let dung = Arc::new(AtomicBool::new(false));
         let dung2 = dung.clone();
@@ -744,6 +748,43 @@ impl ManTach {
     pub fn cung_du_lieu(&self, goc: &Path) -> bool {
         let dang = self.phien.as_ref().map_or_else(|| PathBuf::from(self.thu_muc.trim()), |p| p.goc.clone());
         !dang.as_os_str().is_empty() && thu_muc_an(&dang) == thu_muc_an(goc)
+    }
+
+    /// Dòng Làm tiếp gần đây của thư mục đang mở (chỉ khi đã Phân tích): số hồ sơ đã duyệt hết trang nghi, hoặc kết quả tách.
+    pub fn muc_gan_day(&self) -> Option<crate::gan_day::MucGanDay> {
+        use crate::gan_day::{so, ChucNang, MucGanDay, TinhTrang};
+        let (phien, bang) = (self.phien.as_ref()?, self.bang.as_ref()?);
+        let tong = bang.ho_so.len();
+        let tinh = match self.da_tach {
+            Some((hs, vb)) => TinhTrang { chu: format!("Đã tách {} hồ sơ → {} văn bản", so(hs), so(vb)), xong: tong as u32, tong: tong as u32, loi: false },
+            None => {
+                let xong = (0..tong as u32).filter(|&h| {
+                    let d = bang.dem_ho_so(h);
+                    d.nghi_trang == 0 && d.nghi_xoay == 0
+                });
+                let xong = xong.count();
+                let mut chu = format!("{}/{} hồ sơ đã duyệt", so(xong), so(tong));
+                let (t, x) = (bang.tong.nghi_trang, bang.tong.nghi_xoay);
+                if t + x > 0 {
+                    chu += &format!(" · {t} nghi trắng, {x} xoay");
+                }
+                TinhTrang { chu, xong: xong as u32, tong: tong as u32, loi: false }
+            }
+        };
+        Some(MucGanDay::moi(ChucNang::Tach, phien.goc.display().to_string(), tinh))
+    }
+
+    /// Mở thư mục từ Làm tiếp gần đây: đang mở đúng thư mục → giữ nguyên; thư mục khác đang mở → ghi xuống đĩa trước,
+    /// rồi mở thư mục mới (nhãn + cache đã lưu) ở lần vẽ tới.
+    pub fn mo_tu_gan_day(&mut self, thu_muc: &str) {
+        if self.co_phien() && self.cung_du_lieu(Path::new(thu_muc)) {
+            return;
+        }
+        if self.co_phien() {
+            self.ghi_het_xuong_dia();
+        }
+        self.thu_muc = thu_muc.to_string();
+        self.cho_mo_lai = true;
     }
 
     /// Đang mở thư mục (đã Phân tích) — sau Nhập phiên cần mở lại từ đĩa.

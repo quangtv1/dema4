@@ -184,6 +184,39 @@ impl ManBocTach {
         self.loai_chon().map_or(0, |l| self.files.iter().map(|f| l.trang_doc.cac_trang(f.so_trang).len()).sum())
     }
 
+    /// Dòng Làm tiếp gần đây: số file đã có kết quả của loại đang chọn (+ số lỗi).
+    pub fn muc_gan_day(&self) -> Option<crate::gan_day::MucGanDay> {
+        use crate::gan_day::{so, ChucNang, MucGanDay, TinhTrang};
+        use ket_qua::TrangThai;
+        if self.thu_muc.trim().is_empty() || self.files.is_empty() {
+            return None;
+        }
+        let tong = self.files.len();
+        Some(match self.loai_chon() {
+            Some(l) => {
+                let xong = self.tt.iter().filter(|t| matches!(t, TrangThai::Xong(_))).count();
+                let loi = self.tt.iter().filter(|t| matches!(t, TrangThai::Loi(_))).count();
+                let mut chu = format!("{}/{} file", so(xong), so(tong));
+                if loi > 0 {
+                    chu += &format!(" · {loi} lỗi");
+                }
+                let mut m = MucGanDay::moi(ChucNang::BocTach, self.thu_muc.trim(), TinhTrang { chu, xong: (xong + loi) as u32, tong: tong as u32, loi: loi > 0 });
+                m.loai = Some(l.ten.clone());
+                m
+            }
+            None => MucGanDay::moi(ChucNang::BocTach, self.thu_muc.trim(), TinhTrang { chu: format!("{} file PDF · chưa chọn loại tài liệu", so(tong)), ..Default::default() }),
+        })
+    }
+
+    /// Mở từ Làm tiếp gần đây: thư mục + loại tài liệu (còn trong danh sách) + tab Kết quả; kết quả cũ nạp khi quét xong.
+    pub fn mo_tu_gan_day(&mut self, thu_muc: &str, loai: Option<&str>, ctx: &egui::Context) {
+        self.loai = loai.and_then(|t| self.ds_loai.iter().position(|l| l.ten == t));
+        if self.loai.is_some() {
+            self.tab = Tab::KetQua;
+        }
+        self.chon_thu_muc(thu_muc.to_string(), ctx);
+    }
+
     pub fn chon_thu_muc(&mut self, thu_muc: String, ctx: &egui::Context) {
         self.thu_muc = thu_muc;
         self.files.clear();

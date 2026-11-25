@@ -318,6 +318,7 @@ impl ManTach {
         so_lieu.so_trang = kq.dong.iter().map(|d| d.so_trang).sum();
         so_lieu.sao_nguyen = kq.sao_nguyen;
         so_lieu.ho_so_loi = kq.loi.len();
+        self.da_tach = Some((so_lieu.ho_so, so_lieu.van_ban));
         let thoi_gian = t.bat_dau.elapsed();
         // Gửi trạm ở luồng gửi của license (trạm soạn tin + CSV Telegram, ghi 1 hàng tab "Ngưỡng trắng"); test dùng kho giả
         let (thu_muc, sl, tk, nguong) = (self.thu_muc.trim().to_string(), so_lieu.clone(), t.thong_ke, t.nguong);

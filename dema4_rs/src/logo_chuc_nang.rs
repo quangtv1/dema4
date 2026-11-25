@@ -1,7 +1,8 @@
 //! Logo lớn của từng chức năng (màn giới thiệu): nét mảnh một màu kiểu cổ điển, không nền —
 //! Đếm trang A4 (chồng trang + "A4"), Tách văn bản (một văn bản rẽ nhánh thành hai),
 //! Sinh mục lục (trang danh sách đánh số), Bóc tách dữ liệu (văn bản → bảng), Chuẩn hoá tên (văn bản + ô tên có con trỏ),
-//! Ký văn bản (trang có chữ ký + bút), Đóng gói AIP (hộp gói).
+//! Ký văn bản (trang có chữ ký + bút), Đóng gói AIP (hộp gói), Xóa ghim (trang + kẹp ghim + dấu ✕),
+//! Scan tài liệu (máy quét có trang + tia quét), Nghiệm thu DA (bảng kiểm có dấu tích + con dấu tích).
 //! Các nét không chồng lên nhau nên không cần tô nền che (đặt được trên nền trắng hay xám).
 
 use eframe::egui::{self, Color32, Pos2, Rect, Shape, Stroke};
@@ -15,6 +16,9 @@ pub enum Logo {
     ChuanTen,
     Ky,
     Aip,
+    XoaGhim,
+    Scan,
+    NghiemThu,
 }
 
 /// Màu nét chung của mọi logo.
@@ -145,6 +149,44 @@ pub fn ve_mau(p: &egui::Painter, o: Rect, logo: Logo, mau: Color32) {
             p.add(Shape::closed_line(vec![dau + ngang, co + ngang, ngoi, co - ngang, dau - ngang], net));
             p.line_segment([co + ngang, co - ngang], net_manh);
             p.line_segment([dau + ngang + huong * s * 0.07, dau - ngang + huong * s * 0.07], net_manh);
+        }
+        Logo::XoaGhim => {
+            // Trang có dòng chữ, kẹp ghim chữ U ở mép trên trái, dấu ✕ ngoài mép phải
+            trang(p, hcn(0.20, 0.18, 0.68, 0.86), s * 0.10, net);
+            for (y, x1) in [(0.45, 0.58), (0.57, 0.58), (0.69, 0.47)] {
+                p.line_segment([q(0.30, y), q(x1, y)], net_manh);
+            }
+            let mut ghim = vec![q(0.29, 0.10), q(0.29, 0.30)];
+            ghim.extend((1..8).map(|i| {
+                let a = std::f32::consts::PI * i as f32 / 8.0;
+                q(0.335 - 0.045 * a.cos(), 0.30 + 0.045 * a.sin())
+            }));
+            ghim.extend([q(0.38, 0.30), q(0.38, 0.14)]);
+            p.add(Shape::line(ghim, net));
+            p.line_segment([q(0.75, 0.14), q(0.91, 0.30)], net);
+            p.line_segment([q(0.91, 0.14), q(0.75, 0.30)], net);
+        }
+        Logo::Scan => {
+            // Thân máy quét hình thang, trang giấy cắm vào, tia quét nét đứt, đèn báo
+            trang(p, hcn(0.25, 0.20, 0.75, 0.55), s * 0.12, net);
+            p.add(Shape::closed_line(vec![q(0.10, 0.55), q(0.90, 0.55), q(0.82, 0.80), q(0.18, 0.80)], net));
+            let mut x = 0.06;
+            while x < 0.94 {
+                p.line_segment([q(x, 0.44), q((x + 0.05).min(0.94), 0.44)], net_manh);
+                x += 0.09;
+            }
+            p.line_segment([q(0.66, 0.68), q(0.76, 0.68)], net);
+        }
+        Logo::NghiemThu => {
+            // Bảng kẹp hồ sơ: kẹp trên, 2 dòng có dấu tích; con dấu tròn có tích ở góc dưới phải
+            p.rect_stroke(hcn(0.16, 0.18, 0.64, 0.88), 2.0, net, egui::StrokeKind::Middle);
+            p.rect_stroke(hcn(0.30, 0.11, 0.50, 0.24), 1.5, net_manh, egui::StrokeKind::Middle);
+            for y in [0.42, 0.64] {
+                p.add(Shape::line(vec![q(0.24, y), q(0.29, y + 0.05), q(0.38, y - 0.05)], net));
+                p.line_segment([q(0.44, y), q(0.56, y)], net_manh);
+            }
+            p.circle_stroke(q(0.79, 0.76), s * 0.13, net);
+            p.add(Shape::line(vec![q(0.73, 0.76), q(0.775, 0.805), q(0.86, 0.71)], net));
         }
     }
 }

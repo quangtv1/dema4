@@ -189,7 +189,8 @@ const HD_DEM: &[Khoi] = &[
         ("Lớn hơn A0", "Cạnh dài > 1399 mm: ~theo diện tích ÷ A4~ (vd 1500×900 mm ≈ 21,64) hoặc ~hệ số cố định~ ≥ hệ số A0."),
         ("Ranh giới khổ", "Kéo vạch trên thước (mặc định ở giữa 2 khổ, vd A3|A4 = 358,5 mm). Gõ *Thử cạnh dài* để xem trang thuộc khổ nào."),
         ("Lưu · Mặc định", "Áp cho lần Đếm sau (file `.dema4_saomai.cfg` trong thư mục dữ liệu của ứng dụng). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
-    ]),
+    ]),    Khoi::Muc("Trang chủ › Làm tiếp gần đây"),
+    Khoi::Ghi("Trang chủ giữ 5 thư mục / file vừa làm (Đếm, Tách, Mục lục, Bóc tách) kèm tình trạng lúc rời màn — bấm 1 dòng là mở lại đúng chức năng, đúng thư mục (Bóc tách: cả loại tài liệu; Mục lục: cả sheet, dòng tiêu đề, mẫu). Cùng danh sách ở *Chức năng › Gần đây*. Thư mục đã đổi chỗ → *Chọn lại…*; dấu × cuối dòng bỏ 1 dòng, *Xoá lịch sử* bỏ hết. Danh sách lưu riêng từng máy, không nằm trong gói Xuất phiên."),
 ];
 
 const HD_TACH: &[Khoi] = &[

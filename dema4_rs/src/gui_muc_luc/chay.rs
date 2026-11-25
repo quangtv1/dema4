@@ -92,6 +92,7 @@ impl ManMucLuc {
             let (mau, ho_so, van_ban, tk2) = (ten_mau(&self.mau_chon), s.tong, s.van_ban, tk.clone());
             self.license.thong_ke("thong_ke_muc_luc", move |_| crate::tram::so_lieu_muc_luc(&du_lieu, &mau, ho_so, van_ban, &tk2, 0))
         };
+        self.so_da_sinh = Some(tk.docx);
         self.da_sinh = Some(DaSinh { tk, tong: s.tong, van_ban: s.van_ban, thu_muc: s.thu_muc, co_telegram });
     }
 

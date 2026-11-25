@@ -65,7 +65,7 @@ pub(crate) fn mui_ten_chon(ui: &egui::Ui, r: Rect, _: &egui::style::WidgetVisual
 }
 
 /// Mẫu đang dùng: "" = chưa chọn, "1".."4" = mẫu nhúng sẵn, còn lại = đường dẫn DOCX riêng.
-fn ten_mau(ma: &str) -> String {
+pub(crate) fn ten_mau(ma: &str) -> String {
     if ma.is_empty() {
         return "— Chọn mẫu mục lục —".into();
     }
@@ -186,6 +186,8 @@ pub struct ManMucLuc {
     du_truoc: Option<bool>,
     sinh: Option<DangSinh>,
     da_sinh: Option<DaSinh>,
+    /// Số DOCX lần Sinh gần nhất của file biên mục đang mở (tình trạng Làm tiếp gần đây).
+    pub(crate) so_da_sinh: Option<usize>,
     hop_license: Option<crate::hop_license::HopLicense>,
     yeu_cau_sinh: bool,
     /// Hộp Ghép biến đang mở: ràng buộc lúc mở (Huỷ trả lại); `mo_hop` = biến đang sửa trong hộp.
@@ -238,6 +240,7 @@ impl ManMucLuc {
             du_truoc: None,
             sinh: None,
             da_sinh: None,
+            so_da_sinh: None,
             hop_license: None,
             yeu_cau_sinh: false,
             hop_ghep: None,
@@ -312,7 +315,32 @@ impl ManMucLuc {
     }
 
     /// Đọc file ở luồng nền: danh sách sheet, bảng (sheet chọn / sheet đã nhớ / sheet đầu), số giá trị khác nhau.
+    /// Dòng Làm tiếp gần đây: file biên mục + sheet + dòng tiêu đề + mẫu; đã sinh bao nhiêu mục lục.
+    pub fn muc_gan_day(&self) -> Option<crate::gan_day::MucGanDay> {
+        use crate::gan_day::{so, ChucNang, MucGanDay, TinhTrang};
+        let d = self.du_lieu.as_ref()?;
+        let chu = self.so_da_sinh.map_or_else(|| "Chưa sinh".into(), |n| format!("Đã sinh {} mục lục", so(n)));
+        let mut m = MucGanDay::moi(ChucNang::MucLuc, d.duong_dan.display().to_string(), TinhTrang { chu, ..Default::default() });
+        m.sheet = Some(d.sheet.clone());
+        m.dong_tieu_de = Some(self.dong_tieu_de() as u32);
+        m.mau = (!self.mau_chon.is_empty()).then(|| self.mau_chon.clone());
+        Some(m)
+    }
+
+    /// Mở từ Làm tiếp gần đây: file biên mục + sheet + dòng tiêu đề + mẫu (đọc ở luồng nền như khi chọn file).
+    pub fn mo_tu_gan_day(&mut self, file: &str, sheet: Option<String>, dong: Option<u32>, mau: Option<&str>, ctx: &egui::Context) {
+        self.file = file.to_string();
+        if let Some(d) = dong {
+            self.o_dong = d.to_string();
+        }
+        self.mau_chon = mau.unwrap_or_default().to_string();
+        self.nap_mau();
+        self.cfg_doi = true;
+        self.doc_du_lieu(Some(ctx), sheet);
+    }
+
     pub fn doc_du_lieu(&mut self, ctx: Option<&egui::Context>, sheet: Option<String>) {
+        self.so_da_sinh = None;
         let p = PathBuf::from(self.file.trim());
         let dong = self.dong_tieu_de();
         let (gui, nhan) = mpsc::channel();
@@ -1228,7 +1256,7 @@ fn luu_file_nen(ten: &str, ctx: &egui::Context) -> Receiver<Option<PathBuf>> {
     nhan
 }
 
-fn chon_file_nen(hien_tai: &str, ctx: &egui::Context, tieu_de: &'static str, duoi: &'static [&'static str]) -> Receiver<Option<PathBuf>> {
+pub(crate) fn chon_file_nen(hien_tai: &str, ctx: &egui::Context, tieu_de: &'static str, duoi: &'static [&'static str]) -> Receiver<Option<PathBuf>> {
     let (gui, nhan) = mpsc::channel();
     let dau = PathBuf::from(hien_tai.trim());
     let ctx = ctx.clone();

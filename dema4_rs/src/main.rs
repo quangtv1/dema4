@@ -24,6 +24,7 @@ mod phien_lam_viec;
 mod tram;
 mod hop_license;
 mod gui;
+mod gan_day;
 mod gui_muc_luc;
 mod gui_phien;
 mod gui_boc_tach;

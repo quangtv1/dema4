@@ -126,6 +126,10 @@ struct UngDungChinh {
     hop_phien: crate::gui_phien::HopPhien,
     /// Lúc nhập, màn Tách đang mở đúng thư mục → nhập xong mở lại từ đĩa.
     mo_lai_tach_sau_nhap: bool,
+    /// Làm tiếp gần đây (Trang chủ, menu Chức năng › Gần đây).
+    gan_day: crate::gan_day::DanhSach,
+    /// "Chọn lại…" dòng gần đây đang mở hộp chọn: (dòng, kết quả).
+    chon_lai: Option<(usize, std::sync::mpsc::Receiver<Option<PathBuf>>)>,
     cho_dong: bool,
 }
 
@@ -140,7 +144,7 @@ impl Default for UngDungChinh {
         let mut boc_tach = crate::gui_boc_tach::ManBocTach::default();
         boc_tach.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false }
     }
 }
 
@@ -347,6 +351,9 @@ impl UngDungChinh {
 
     /// Đổi màn. Sang Sinh mục lục từ màn khác: mở như lần đầu (không giữ file / mẫu cũ).
     fn chuyen_man(&mut self, man: Man) {
+        if man != self.man {
+            self.ghi_gan_day();
+        }
         if man == Man::MucLuc && self.man != Man::MucLuc {
             self.muc_luc.dat_lai();
         }
@@ -354,6 +361,94 @@ impl UngDungChinh {
             self.boc_tach.dat_lai();
         }
         self.man = man;
+    }
+
+    /// Rời màn (đổi chức năng, về Trang chủ, đóng app): ghi thư mục / file đang làm + tình trạng vào Làm tiếp gần đây.
+    fn ghi_gan_day(&mut self) {
+        let m = match self.man {
+            Man::Dem => self.dem.muc_gan_day(),
+            Man::Tach => self.tach.muc_gan_day(),
+            Man::MucLuc => self.muc_luc.muc_gan_day(),
+            Man::BocTach => self.boc_tach.muc_gan_day(),
+            _ => None,
+        };
+        if let Some(m) = m {
+            self.gan_day.them(m);
+        }
+    }
+
+    /// Bấm dòng gần đây thứ `i`: mở đúng chức năng với đúng thư mục / file (Bóc tách: + loại tài liệu, tab Kết quả;
+    /// Mục lục: + sheet, dòng tiêu đề, mẫu), đưa dòng lên đầu. Thư mục / file không còn → không làm gì.
+    fn mo_gan_day(&mut self, i: usize, ctx: &egui::Context) {
+        use crate::gan_day::ChucNang;
+        let Some(mut m) = self.gan_day.ds.get(i).cloned().filter(|_| !self.gan_day.mat(i)) else { return };
+        self.chuyen_man(match m.cn {
+            ChucNang::Dem => Man::Dem,
+            ChucNang::Tach => Man::Tach,
+            ChucNang::MucLuc => Man::MucLuc,
+            ChucNang::BocTach => Man::BocTach,
+        });
+        match m.cn {
+            ChucNang::Dem => {
+                if self.dem.thu_muc.trim() != m.duong_dan.trim() {
+                    self.dem.chon_thu_muc(m.duong_dan.clone(), ctx);
+                }
+            }
+            ChucNang::Tach => self.tach.mo_tu_gan_day(&m.duong_dan),
+            ChucNang::BocTach => self.boc_tach.mo_tu_gan_day(&m.duong_dan, m.loai.as_deref(), ctx),
+            ChucNang::MucLuc => self.muc_luc.mo_tu_gan_day(&m.duong_dan, m.sheet.clone(), m.dong_tieu_de, m.mau.as_deref(), ctx),
+        }
+        m.luc = crate::gan_day::bay_gio_ms();
+        self.gan_day.them(m);
+    }
+
+    /// Việc bấm trên Trang chủ.
+    fn chon_trang_chu(&mut self, chon: crate::trang_chu::ChonTrangChu, ctx: &egui::Context) {
+        use crate::trang_chu::{ChonChucNang, ChonTrangChu};
+        match chon {
+            ChonTrangChu::ChucNang(cn) => self.chuyen_man(match cn {
+                ChonChucNang::Dem => Man::Dem,
+                ChonChucNang::Tach => Man::Tach,
+                ChonChucNang::MucLuc => Man::MucLuc,
+                ChonChucNang::BocTach => Man::BocTach,
+                ChonChucNang::ChuanTen => Man::ChuanTen,
+                ChonChucNang::Ky => Man::Ky,
+                ChonChucNang::Aip => Man::Aip,
+            }),
+            ChonTrangChu::GanDay(i) => self.mo_gan_day(i, ctx),
+            ChonTrangChu::XoaGanDay(i) => self.gan_day.xoa(i),
+            ChonTrangChu::XoaHet => self.gan_day.xoa_het(),
+            ChonTrangChu::ChonLai(i) => {
+                if self.chon_lai.is_none() {
+                    if let Some(m) = self.gan_day.ds.get(i) {
+                        let nhan = if m.cn == crate::gan_day::ChucNang::MucLuc {
+                            crate::gui_muc_luc::chon_file_nen("", ctx, "Chọn lại file biên mục", &["xlsx", "xlsb", "xls", "xlsm", "csv"])
+                        } else {
+                            crate::gui_tach::chon_thu_muc_nen("", ctx)
+                        };
+                        self.chon_lai = Some((i, nhan));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Nhận kết quả hộp "Chọn lại…" (cập nhật đường dẫn của dòng) + kiểm thư mục còn không.
+    fn nhan_gan_day(&mut self, ctx: &egui::Context) {
+        if let Some((i, n)) = &self.chon_lai {
+            match n.try_recv() {
+                Ok(p) => {
+                    let i = *i;
+                    self.chon_lai = None;
+                    if let Some(p) = p {
+                        self.gan_day.doi_duong_dan(i, &p);
+                    }
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => self.chon_lai = None,
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            }
+        }
+        self.gan_day.cap_nhat_mat(ctx);
     }
 
     /// Có chức năng nào đang chạy (khoá menu chuyển màn; đóng app thì hỏi). Một nguồn với hộp hỏi khi đóng.
@@ -388,6 +483,36 @@ impl UngDungChinh {
                                 self.chuyen_man(man);
                                 ui.close();
                             }
+                        }
+                        // Làm tiếp gần đây: cùng danh sách Trang chủ
+                        ui.separator();
+                        let mut chon_gd = None;
+                        ui.add_enabled_ui(!self.gan_day.ds.is_empty(), |ui| {
+                            ui.menu_button("Gần đây", |ui| {
+                                for (i, m) in self.gan_day.ds.iter().enumerate() {
+                                    let cn = match m.cn {
+                                        crate::gan_day::ChucNang::Dem => "Đếm",
+                                        crate::gan_day::ChucNang::Tach => "Tách",
+                                        crate::gan_day::ChucNang::MucLuc => "Mục lục",
+                                        crate::gan_day::ChucNang::BocTach => "Bóc tách",
+                                    };
+                                    let nut = ui.add_enabled(!self.gan_day.mat(i), egui::Button::new(format!("{cn} · {}", m.ten())).frame(false)).on_hover_text(&m.duong_dan).on_disabled_hover_text("Không tìm thấy — chọn lại ở Trang chủ");
+                                    if nut.clicked() {
+                                        chon_gd = Some(crate::trang_chu::ChonTrangChu::GanDay(i));
+                                        ui.close();
+                                    }
+                                }
+                                ui.separator();
+                                if ui.add(egui::Button::new("Xoá lịch sử").frame(false)).clicked() {
+                                    chon_gd = Some(crate::trang_chu::ChonTrangChu::XoaHet);
+                                    ui.close();
+                                }
+                            });
+                        })
+                        .response
+                        .on_disabled_hover_text("Chưa có thư mục / file nào làm gần đây");
+                        if let Some(c) = chon_gd {
+                            self.chon_trang_chu(c, &ui.ctx().clone());
                         }
                         // Mang phần đang làm dở của thư mục đang mở (Tách / Bóc tách) sang máy khác
                         ui.separator();
@@ -458,8 +583,10 @@ impl eframe::App for UngDungChinh {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.man.tieu_de().into()));
             self.tieu_de_da_dat = self.man;
         }
+        self.nhan_gan_day(&ctx);
         if ctx.input(|i| i.viewport().close_requested()) {
             if self.cho_dong {
+                self.ghi_gan_day();
                 self.tach.ghi_cache();
             } else if self.dang_chay() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -468,6 +595,7 @@ impl eframe::App for UngDungChinh {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                 self.hoi_dong = true;
             } else {
+                self.ghi_gan_day();
                 self.tach.ghi_cache();
             }
         }
@@ -482,17 +610,8 @@ impl eframe::App for UngDungChinh {
         self.thanh_menu(ui);
         match self.man {
             Man::TrangChu => {
-                use crate::trang_chu::ChonChucNang;
-                if let Some(cn) = self.trang_chu.ve(ui, &self.dem.license) {
-                    self.chuyen_man(match cn {
-                        ChonChucNang::Dem => Man::Dem,
-                        ChonChucNang::Tach => Man::Tach,
-                        ChonChucNang::MucLuc => Man::MucLuc,
-                        ChonChucNang::BocTach => Man::BocTach,
-                        ChonChucNang::ChuanTen => Man::ChuanTen,
-                        ChonChucNang::Ky => Man::Ky,
-                        ChonChucNang::Aip => Man::Aip,
-                    });
+                if let Some(c) = self.trang_chu.ve(ui, &self.dem.license, &self.gan_day.ds, &self.gan_day.mat) {
+                    self.chon_trang_chu(c, &ctx);
                 }
             }
             Man::Dem => self.dem.ve(ui),
@@ -784,6 +903,8 @@ struct UngDung {
     hop_license: Option<crate::hop_license::HopLicense>,
     /// Số file PDF của thư mục vừa chọn (quét nền, chưa đếm) — hiện ở "File PDF:" và thay lời giới thiệu bằng lời nhắc bấm Đếm.
     so_pdf: Option<usize>,
+    /// Lần đếm gần nhất: (thư mục, số trang A4 quy đổi, số file) — tình trạng Làm tiếp gần đây.
+    da_dem: Option<(String, f64, usize)>,
     quet_pdf: Option<Receiver<usize>>,
 }
 
@@ -814,6 +935,7 @@ impl Default for UngDung {
             license: crate::license::KiemTra::mac_dinh(),
             hop_license: None,
             so_pdf: None,
+            da_dem: None,
             quet_pdf: None,
         }
     }
@@ -997,6 +1119,20 @@ impl UngDung {
     }
 
     /// Chọn thư mục mới: xoá kết quả cũ rồi quét nền số file PDF (cùng cách tìm như khi Đếm).
+    /// Dòng Làm tiếp gần đây của thư mục đang chọn: kết quả lần đếm gần nhất, chưa đếm thì số file PDF.
+    fn muc_gan_day(&self) -> Option<crate::gan_day::MucGanDay> {
+        use crate::gan_day::{so, ChucNang, MucGanDay, TinhTrang};
+        let tm = self.thu_muc.trim();
+        if tm.is_empty() {
+            return None;
+        }
+        let chu = match &self.da_dem {
+            Some((d, a4, n)) if d.trim() == tm => format!("{} trang A4 · {} file", so(a4.round() as usize), so(*n)),
+            _ => self.so_pdf.map_or_else(|| "Chưa đếm".into(), |n| format!("{} file PDF · chưa đếm", so(n))),
+        };
+        Some(MucGanDay::moi(ChucNang::Dem, tm, TinhTrang { chu, ..Default::default() }))
+    }
+
     fn chon_thu_muc(&mut self, thu_muc: String, ctx: &egui::Context) {
         self.thu_muc = thu_muc;
         self.xoa_ket_qua();
@@ -1192,6 +1328,7 @@ impl UngDung {
     fn luu_va_thong_bao(&mut self, kq: &KetQuaDem, xong: DaXong) {
         self.ket_qua_chep = Some(kq.tong_hop.trim_start_matches('\n').to_string());
         self.thoi_gian_dem = Some(xong.thoi_gian);
+        self.da_dem = Some((xong.thu_muc.clone(), kq.quy_a4.unwrap_or(0.0), kq.dong_tong_hop.len()));
         let duong_dan = dem_pdf::duong_dan_luu_mac_dinh(&xong.thu_muc);
         let ket_qua = match dem_pdf::luu_ket_qua(kq, &duong_dan) {
             Ok(_) => Ok(duong_dan),
@@ -1927,6 +2064,54 @@ mod tests {
             h.run();
         }
         assert!(h.state().dem.dang_dem.is_some() || h.state().dem.thong_bao.is_some(), "được cấp lượt → đếm chạy luôn");
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Làm tiếp gần đây: rời màn Tách (đã Phân tích) → dòng Tách lên đầu, đúng tình trạng; bấm dòng Tách ở Trang chủ →
+    /// về màn Tách và mở lại thư mục; bấm dòng Bóc tách → đúng thư mục + loại tài liệu + tab Kết quả; thư mục mất → không mở.
+    #[test]
+    fn lam_tiep_gan_day_ghi_khi_roi_man_va_mo_lai_dung_cho() {
+        use crate::gan_day::{ChucNang, MucGanDay, TinhTrang};
+        let goc = std::env::temp_dir().join(format!("dema4_gan_day_app_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        std::fs::create_dir_all(&goc).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 2);
+        let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&goc));
+        let mut h = harness_chinh(Man::Tach);
+        h.state_mut().cfg.quet_ma = false;
+        h.state_mut().cfg.quet_xoay = false;
+        h.state_mut().tach.mo_tu_gan_day(&goc.display().to_string());
+        let t = Instant::now();
+        while h.state().tach.muc_gan_day().is_none() || h.state().tach.dang_chay() {
+            assert!(t.elapsed() < Duration::from_secs(30), "không mở được thư mục");
+            std::thread::sleep(Duration::from_millis(20));
+            h.run_steps(2);
+        }
+        h.state_mut().chuyen_man(Man::TrangChu);
+        let m = h.state().gan_day.ds[0].clone();
+        assert_eq!((m.cn, Path::new(&m.duong_dan) == goc, m.tinh.tong), (ChucNang::Tach, true, 1), "dòng Tách đứng đầu: {m:?}");
+        assert!(m.tinh.chu.contains("hồ sơ"), "{}", m.tinh.chu);
+        // Dòng Bóc tách: loại đầu tiên của danh sách có sẵn
+        let loai = crate::boc_tach::loai_tai_lieu::doc(&crate::boc_tach::loai_tai_lieu::file_mac_dinh())[0].ten.clone();
+        let mut bt = MucGanDay::moi(ChucNang::BocTach, goc.display().to_string(), TinhTrang::default());
+        bt.loai = Some(loai.clone());
+        h.state_mut().gan_day.them(bt);
+        h.state_mut().gan_day.them(MucGanDay::moi(ChucNang::Dem, "/khong/co/HS", TinhTrang::default()));
+        let t = Instant::now();
+        while !h.state().gan_day.mat(0) {
+            assert!(t.elapsed() < Duration::from_secs(5), "chưa kiểm xong thư mục mất");
+            std::thread::sleep(Duration::from_millis(10));
+            h.run_steps(1);
+        }
+        let ctx = h.ctx.clone();
+        h.state_mut().mo_gan_day(0, &ctx);
+        assert_eq!(h.state().man, Man::TrangChu, "thư mục không còn → không chuyển màn");
+        h.state_mut().mo_gan_day(1, &ctx);
+        let s = h.state();
+        assert_eq!((s.man, s.boc_tach.thu_muc.as_str(), s.boc_tach.loai_chon().map(|l| l.ten.clone()), s.boc_tach.tab == crate::gui_boc_tach::Tab::KetQua), (Man::BocTach, goc.to_str().unwrap(), Some(loai), true));
+        assert_eq!(s.gan_day.ds[0].cn, ChucNang::BocTach, "dòng vừa mở lên đầu");
+        h.state_mut().gan_day.xoa_het();
+        let _ = std::fs::remove_dir_all(crate::tach_vb::du_lieu_an::thu_muc_an(&goc));
         let _ = std::fs::remove_dir_all(&goc);
     }
 
@@ -2764,6 +2949,37 @@ mod tests {
             h.run_steps(3);
             h.render().unwrap().save(thu_muc_anh.join(ten)).unwrap();
         }
+    }
+
+    /// Trang chủ có Làm tiếp gần đây (5 dòng mẫu, 1 dòng thư mục không còn) cho `docs/anh/trang-chu.png`.
+    /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_trang_chu_gan_day
+    #[test]
+    #[ignore = "cần GPU"]
+    fn chup_trang_chu_gan_day() {
+        use crate::gan_day::{ChucNang, MucGanDay, TinhTrang};
+        let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
+        let gio = crate::gan_day::bay_gio_ms();
+        let muc = |cn, p: &str, chu: &str, xong, tong, loi, truoc_phut: u64| MucGanDay { luc: gio - truoc_phut * 60_000, ..MucGanDay::moi(cn, p, TinhTrang { chu: chu.into(), xong, tong, loi }) };
+        let mut bt = muc(ChucNang::BocTach, r"D:\SoHoa\Phong_Noi_vu\VB_2023", "60/100 file · 2 lỗi", 62, 100, true, 12);
+        bt.loai = Some("Văn bản hành chính".into());
+        let mut ml = muc(ChucNang::MucLuc, r"D:\SoHoa\Bien_muc\bien_muc_2024.xlsx", "Đã sinh 35 mục lục", 0, 0, false, 60 * 26);
+        ml.mau = Some("1".into());
+        let ds = vec![
+            muc(ChucNang::Tach, r"D:\SoHoa\Phong_Noi_vu\HS_2024", "42/120 hồ sơ đã duyệt · 3 nghi trắng, 1 xoay", 42, 120, false, 3),
+            bt,
+            muc(ChucNang::Tach, r"\\NAS\SoHoa\Phong_Tai_chinh\HS_2022", "Đã tách 118 hồ sơ → 1.204 văn bản", 118, 118, false, 60 * 5),
+            ml,
+            muc(ChucNang::Dem, r"E:\USB\Ho_so_ban_giao", "1.234 trang A4 · 87 file", 0, 0, false, 60 * 24 * 3),
+        ];
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_pixels_per_point(1.5).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut app = UngDungChinh { cfg: crate::cau_hinh::CauHinh::default(), muc_luc: crate::gui_muc_luc::ManMucLuc::tu_cau_hinh(&Default::default()), trang_chu: crate::trang_chu::TrangChu::thu("192.168.1.5"), ..Default::default() };
+            app.gan_day.ds = ds.clone();
+            app.gan_day.mat = vec![false, false, false, false, true];
+            app
+        });
+        h.run_steps(3);
+        h.render().unwrap().save(thu_muc_anh.join("trang-chu.png")).unwrap();
     }
 
     /// Cấu hình › Bóc tách: Mô hình đọc (Nội bộ, Gemini có khoá, Nâng cao), Nguồn văn bản, Ghi kết quả.
