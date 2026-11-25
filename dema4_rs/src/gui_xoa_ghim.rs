@@ -60,6 +60,15 @@ impl LocTrang {
     }
 }
 
+/// Tab thanh công cụ (như XoaGhim).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TabCongCu {
+    TepTin,
+    Xem,
+    ChinhSua,
+    CaiDat,
+}
+
 /// Ảnh 1 trang đang hiện: gốc + đích (đích theo cấu hình mã `ma`).
 struct AnhTrang {
     goc: TextureHandle,
@@ -84,6 +93,13 @@ pub struct ManXoaGhim {
     /// Đang vẽ vùng tay: `Some(Xoa)` = "−", `Some(BaoVe)` = "+"; `None` = chọn / kéo vùng.
     ve: Option<LoaiVung>,
     loc_trang: LocTrang,
+    tab: TabCongCu,
+    /// Thu gọn thanh công cụ (chỉ còn hàng tab).
+    an_cong_cu: bool,
+    /// Ẩn khung Đích (khung Gốc rộng hết).
+    an_dich: bool,
+    /// Hiện cột Trang thu nhỏ.
+    hien_anh_nho: bool,
     /// Kéo vẽ vùng mới: (trang, điểm bắt đầu).
     keo: Option<(u32, Pos2)>,
     /// Đang kéo vùng có sẵn: (vùng, cạnh, vùng lúc bắt đầu, điểm bắt đầu).
@@ -137,6 +153,10 @@ impl Default for ManXoaGhim {
             bo: BoVung::moi(thu_muc_mac_dinh()),
             ve: None,
             loc_trang: LocTrang::TatCa,
+            tab: TabCongCu::ChinhSua,
+            an_cong_cu: false,
+            an_dich: false,
+            hien_anh_nho: true,
             keo: None,
             keo_vung: None,
             xem: XemTruoc::default(),
@@ -309,11 +329,36 @@ impl ManXoaGhim {
         }
         self.thanh_tren(ui);
         self.thanh_duoi(ui);
-        self.danh_sach(ui);
+        if !self.ds.is_empty() {
+            self.danh_sach(ui);
+        }
         egui::CentralPanel::default().frame(egui::Frame::new().fill(crate::gui::NEN)).show(ui, |ui| self.khung_trang(ui));
         let cho_mo = self.kho_trang.is_empty() && !self.ds.is_empty() && self.loi.is_none();
         if !self.cho_anh.is_empty() || !self.cho_nho.is_empty() || cho_mo || self.nhan_so_trang.is_some() || self.nhan_tt.is_some() {
             ctx.request_repaint_after(Duration::from_millis(60));
+        }
+    }
+
+    /// Hộp chọn thư mục PDF.
+    fn chon_thu_muc(&mut self) {
+        if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục PDF cần xoá ghim").pick_folder() {
+            self.mo_thu_muc(p);
+        }
+    }
+
+    /// Hộp chọn 1 file PDF: mở thư mục chứa nó, chọn đúng file.
+    fn chon_file_pdf(&mut self) {
+        if let Some(p) = rfd::FileDialog::new().set_title("Chọn file PDF cần xoá ghim").add_filter("PDF", &["pdf", "PDF"]).pick_file() {
+            self.mo_pdf(p);
+        }
+    }
+
+    fn mo_pdf(&mut self, p: PathBuf) {
+        if let Some(cha) = p.parent() {
+            self.mo_thu_muc(cha.to_path_buf());
+            if let Some(i) = self.ds.iter().position(|(n, _)| *n == p) {
+                self.chon_file(i);
+            }
         }
     }
 
@@ -323,12 +368,7 @@ impl ManXoaGhim {
         if p.is_dir() {
             self.mo_thu_muc(p);
         } else if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf")) {
-            if let Some(cha) = p.parent() {
-                self.mo_thu_muc(cha.to_path_buf());
-                if let Some(i) = self.ds.iter().position(|(n, _)| *n == p) {
-                    self.chon_file(i);
-                }
-            }
+            self.mo_pdf(p);
         }
     }
 

@@ -28,14 +28,7 @@ impl ManXoaGhim {
         egui::Panel::left("xg_ds").resizable(true).default_size(300.0).size_range(220.0..=520.0).frame(egui::Frame::new().fill(Color32::WHITE).inner_margin(egui::Margin::symmetric(6, 6))).show(ui, |ui| {
             let so_chon = self.chon_chay.iter().filter(|&&c| c).count();
             ui.horizontal(|ui| {
-                ui.label(RichText::new(format!("Danh sách ({so_chon}/{})", self.ds.len())).strong());
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Chọn thư mục…").on_hover_text("Hoặc kéo thả thư mục / PDF vào cửa sổ").clicked() {
-                        if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục PDF cần xoá ghim").pick_folder() {
-                            self.mo_thu_muc(p);
-                        }
-                    }
-                });
+                ui.label(RichText::new(format!("Danh sách ({so_chon}/{})", self.ds.len())));
             });
             ui.separator();
             // Hàng tiêu đề: chọn tất cả · Tên file ↑↓ · Trang

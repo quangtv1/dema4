@@ -23,6 +23,22 @@ const GIU_QUANH: u32 = 4;
 const CAC_PHONG: [u16; 9] = [25, 50, 75, 100, 125, 150, 200, 300, 400];
 const NEN_KHUNG: Color32 = Color32::from_rgb(0xE6, 0xE6, 0xE6);
 
+/// Nút biểu tượng vừa ngang (|↔|) / vừa cao (‾↕_) vẽ bằng nét, như XoaGhim.
+fn nut_vua(ui: &mut egui::Ui, doc: bool, dang: bool) -> egui::Response {
+    let (o, ph) = ui.allocate_exact_size(egui::vec2(28.0, 24.0), Sense::click());
+    let nen = if dang { Color32::from_gray(0xD4) } else if ph.hovered() { Color32::from_gray(0xE6) } else { Color32::from_gray(0xF0) };
+    let p = ui.painter();
+    p.rect(o, 2.0, nen, Stroke::new(1.0, VIEN), StrokeKind::Inside);
+    let c = o.center();
+    let net = Stroke::new(1.4, CHU);
+    let (a, b) = if doc { (egui::vec2(0.0, 7.0), egui::vec2(5.0, 0.0)) } else { (egui::vec2(8.0, 0.0), egui::vec2(0.0, 5.0)) };
+    p.line_segment([c - a, c + a], net);
+    p.line_segment([c - a - b, c - a + b], net);
+    p.line_segment([c + a - b, c + a + b], net);
+    ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, dang, if doc { "Vừa cao" } else { "Vừa ngang" }));
+    ph
+}
+
 impl ManXoaGhim {
     pub(super) fn thanh_duoi(&mut self, ui: &mut egui::Ui) {
         egui::Panel::bottom("xg_duoi").frame(egui::Frame::new().fill(NEN_TIEU_DE).inner_margin(egui::Margin::symmetric(10, 4)).stroke(Stroke::new(1.0, VIEN_NHAT))).show(ui, |ui| {
@@ -51,11 +67,11 @@ impl ManXoaGhim {
                     })
                     .response
                     .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, "Phóng"));
-                    if ui.selectable_label(self.ty_le.is_none() && self.vua_cao, "Vừa cao").on_hover_text("Cả trang vừa chiều cao khung").clicked() {
+                    if nut_vua(ui, true, self.ty_le.is_none() && self.vua_cao).on_hover_text("Vừa chiều cao khung").clicked() {
                         self.ty_le = None;
                         self.vua_cao = true;
                     }
-                    if ui.selectable_label(self.ty_le.is_none() && !self.vua_cao, "Vừa ngang").on_hover_text("Trang vừa bề ngang khung (=)").clicked() {
+                    if nut_vua(ui, false, self.ty_le.is_none() && !self.vua_cao).on_hover_text("Vừa bề ngang khung (=)").clicked() {
                         self.ty_le = None;
                         self.vua_cao = false;
                     }
@@ -135,37 +151,71 @@ impl ManXoaGhim {
     }
 
     pub(super) fn khung_trang(&mut self, ui: &mut egui::Ui) {
-        if self.ds.is_empty() {
-            ui.centered_and_justified(|ui| ui.label(RichText::new("Chọn hoặc kéo thả thư mục chứa PDF scan để xoá ghim.").size(14.0).color(CHU_PHU)));
-            return;
-        }
-        self.cot_anh_nho(ui);
-        // Thanh tiêu đề 2 khung
-        let khung = ui.available_rect_before_wrap();
-        let nua = ((khung.width() - KHE) / 2.0).max(50.0);
+        // Thanh tiêu đề: "Gốc:" phủ cả cột Trang thu nhỏ; "Đích:" + nút thu gọn / mở khung Đích
+        let tong = ui.available_rect_before_wrap();
+        let rong_nho = if self.hien_anh_nho { RONG_ANH_NHO as f32 + 34.0 } else { 0.0 };
+        let con = (tong.width() - rong_nho).max(100.0);
+        let nua = if self.an_dich { con } else { ((con - KHE) / 2.0).max(50.0) };
+        let co_file = !self.ds.is_empty();
         let (pdf, ra) = self.ds.get(self.chon).cloned().unwrap_or_default();
-        let (dong, _) = ui.allocate_exact_size(egui::vec2(khung.width(), 28.0), Sense::hover());
+        let (dong, _) = ui.allocate_exact_size(egui::vec2(tong.width(), 28.0), Sense::hover());
         ui.painter().rect_filled(dong, 0.0, NEN_TIEU_DE);
-        let o_trai = Rect::from_min_size(dong.min, egui::vec2(nua, dong.height()));
-        let o_phai = Rect::from_min_size(dong.min + egui::vec2(nua + KHE, 0.0), egui::vec2(nua, dong.height()));
+        ui.painter().hline(dong.x_range(), dong.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
+        let o_trai = Rect::from_min_size(dong.min, egui::vec2(rong_nho + nua, dong.height()));
+        let o_phai = Rect::from_min_max(egui::pos2(o_trai.right() + KHE, dong.top()), dong.max);
+        if !self.an_dich {
+            ui.painter().vline(o_trai.right() + KHE / 2.0, dong.y_range(), Stroke::new(1.0, VIEN_NHAT));
+        }
         {
-            let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(o_trai.shrink2(egui::vec2(4.0, 1.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
-            let ui = &mut ui;
+            let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(o_trai.shrink2(egui::vec2(6.0, 1.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
             ui.spacing_mut().item_spacing.x = 4.0;
-            {
-                if ui.add_enabled(self.chon > 0, egui::Button::new(atom_mau(BieuTuong::TraiChevron, 13.0, CHU))).on_hover_text("File trước ([)").clicked() {
+            if co_file {
+                if ui.add_enabled(self.chon > 0, egui::Button::new(atom_mau(BieuTuong::TraiChevron, 12.0, CHU))).on_hover_text("File trước ([)").clicked() {
                     self.chon_file(self.chon - 1);
                 }
-                if ui.add_enabled(self.chon + 1 < self.ds.len(), egui::Button::new(atom_mau(BieuTuong::PhaiChevron, 13.0, CHU))).on_hover_text("File sau (])").clicked() {
+                if ui.add_enabled(self.chon + 1 < self.ds.len(), egui::Button::new(atom_mau(BieuTuong::PhaiChevron, 12.0, CHU))).on_hover_text("File sau (])").clicked() {
                     self.chon_file(self.chon + 1);
                 }
                 ui.label(RichText::new(format!("({}/{})", self.chon + 1, self.ds.len())).color(CHU_PHU));
                 ui.add(egui::Label::new(format!("Gốc: {}", pdf.display())).truncate()).on_hover_text(pdf.display().to_string());
+            } else {
+                ui.label("Gốc:");
             }
         }
         {
-            let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(o_phai.shrink2(egui::vec2(4.0, 1.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
-            ui.add(egui::Label::new(format!("Đích: {}", ra.display())).truncate()).on_hover_text(ra.display().to_string());
+            // Nút ›/‹ ở mép phải: thu gọn / mở khung Đích
+            let o_nut = Rect::from_min_size(egui::pos2(dong.right() - 24.0, dong.top() + 3.0), egui::vec2(20.0, 22.0));
+            let ph = ui.interact(o_nut, ui.scope_id().with("xg_an_dich"), Sense::click());
+            ui.painter().rect(o_nut, 2.0, if ph.hovered() { Color32::from_gray(0xD8) } else { Color32::from_gray(0xE4) }, Stroke::new(1.0, VIEN), StrokeKind::Inside);
+            let c = o_nut.center();
+            let h = if self.an_dich { -1.0 } else { 1.0 };
+            let net = Stroke::new(1.4, CHU);
+            ui.painter().line_segment([c + egui::vec2(-2.0 * h, -4.0), c + egui::vec2(2.0 * h, 0.0)], net);
+            ui.painter().line_segment([c + egui::vec2(2.0 * h, 0.0), c + egui::vec2(-2.0 * h, 4.0)], net);
+            ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Thu gọn / mở khung Đích"));
+            if ph.on_hover_text(if self.an_dich { "Mở khung Đích" } else { "Thu gọn khung Đích" }).clicked() {
+                self.an_dich = !self.an_dich;
+            }
+            if !self.an_dich {
+                let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_max(o_phai.min + egui::vec2(6.0, 1.0), egui::pos2(o_nut.left() - 4.0, o_phai.bottom() - 1.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
+                if co_file {
+                    ui.add(egui::Label::new(format!("Đích: {}", ra.display())).truncate()).on_hover_text(ra.display().to_string());
+                } else {
+                    ui.label("Đích:");
+                }
+            }
+        }
+        if self.hien_anh_nho {
+            self.cot_anh_nho(ui);
+        }
+        let khung = ui.available_rect_before_wrap();
+        ui.painter().rect_filled(khung, 0.0, NEN_KHUNG);
+        if !self.an_dich {
+            ui.painter().vline(khung.left() + nua + KHE / 2.0, khung.y_range(), Stroke::new(1.0, Color32::from_gray(0xF8)));
+        }
+        if !co_file {
+            self.man_trong(ui, Rect::from_min_size(khung.min, egui::vec2(nua, khung.height())));
+            return;
         }
         if self.kho_trang.is_empty() {
             ui.centered_and_justified(|ui| {
@@ -200,7 +250,8 @@ impl ManXoaGhim {
             dinh.push((t, y, egui::vec2(w * ty, h * ty)));
             y += h * ty + KHE_TRANG;
         }
-        let tong = egui::vec2((2.0 * rong_max * ty + KHE + 2.0 * LE).max(khung.width()), y + LE);
+        let so_cot = if self.an_dich { 1.0 } else { 2.0 };
+        let tong = egui::vec2((so_cot * rong_max * ty + (so_cot - 1.0) * KHE + 2.0 * LE).max(khung.width()), y + LE);
         let (ch, ma) = self.cau_hinh_xem();
         let mut cuon = egui::ScrollArea::both().id_salt(("xg_cuon", self.the_he, self.lien_tiep)).auto_shrink([false, false]);
         if let Some(t) = self.cuon_toi.take() {
@@ -212,7 +263,7 @@ impl ManXoaGhim {
         let mut trang_tren = None;
         let ra_cuon = cuon.show(ui, |ui| {
             let (r, _) = ui.allocate_exact_size(tong, Sense::hover());
-            let cot = r.left() + ((r.width() - 2.0 * rong_max * ty - KHE) / 2.0).max(LE);
+            let cot = r.left() + ((r.width() - so_cot * rong_max * ty - (so_cot - 1.0) * KHE) / 2.0).max(LE);
             let nhin = ui.clip_rect();
             for &(t, y0, co) in &dinh {
                 let o_goc = Rect::from_min_size(egui::pos2(cot + (rong_max * ty - co.x) / 2.0, r.top() + y0), co);
@@ -231,7 +282,8 @@ impl ManXoaGhim {
                     self.xem.gui(YeuCau::Trang { the_he: self.the_he, trang: t, ma, ch: ch.clone() });
                 }
                 let p = ui.painter();
-                for o in [o_goc, o_dich] {
+                let cac_o: &[Rect] = if self.an_dich { &[o_goc] } else { &[o_goc, o_dich] };
+                for &o in cac_o {
                     p.rect_filled(o.translate(egui::vec2(0.0, 2.0)), 0.0, Color32::from_black_alpha(25));
                     p.rect_filled(o, 0.0, Color32::WHITE);
                 }
@@ -239,8 +291,10 @@ impl ManXoaGhim {
                 match self.anh.get(&t) {
                     Some(a) => {
                         p.image(a.goc.id(), o_goc, uv, Color32::WHITE);
-                        p.image(a.dich.id(), o_dich, uv, Color32::WHITE);
-                        if a.ma != ma {
+                        if !self.an_dich {
+                            p.image(a.dich.id(), o_dich, uv, Color32::WHITE);
+                        }
+                        if a.ma != ma && !self.an_dich {
                             p.text(o_dich.right_top() + egui::vec2(-8.0, 8.0), egui::Align2::RIGHT_TOP, "đang cập nhật…", egui::FontId::proportional(11.0), CHU_PHU);
                         }
                     }
@@ -248,7 +302,7 @@ impl ManXoaGhim {
                         p.text(o_goc.center(), egui::Align2::CENTER_CENTER, "Đang vẽ trang…", egui::FontId::proportional(12.0), CHU_PHU);
                     }
                 }
-                for o in [o_goc, o_dich] {
+                for &o in cac_o {
                     p.rect_stroke(o, 0.0, Stroke::new(1.0, VIEN), StrokeKind::Outside);
                 }
                 self.vung_tren_trang(ui, t, o_goc, &ctx);
@@ -263,6 +317,47 @@ impl ManXoaGhim {
         // Bỏ texture trang ở xa trang đang xem (giới hạn bộ nhớ đồ hoạ)
         let giu = self.trang.saturating_sub(GIU_QUANH)..=self.trang + GIU_QUANH;
         self.anh.retain(|t, _| giu.contains(t));
+    }
+
+    /// Chưa mở gì: 2 biểu tượng lớn "Mở file pdf", "Mở thư mục" giữa khung Gốc (như XoaGhim).
+    fn man_trong(&mut self, ui: &mut egui::Ui, o: Rect) {
+        let mau = Color32::from_gray(0xA8);
+        let net = Stroke::new(1.4, mau);
+        for (i, ten) in ["Mở file pdf", "Mở thư mục"].into_iter().enumerate() {
+            let tam = o.center() + egui::vec2(if i == 0 { -80.0 } else { 80.0 }, 0.0);
+            let vung = Rect::from_center_size(tam + egui::vec2(0.0, 12.0), egui::vec2(120.0, 96.0));
+            let ph = ui.interact(vung, ui.scope_id().with(("xg_mo", i)), Sense::click());
+            let p = ui.painter();
+            if ph.hovered() {
+                p.rect_filled(vung, 6.0, Color32::from_black_alpha(10));
+            }
+            let mau_chu = if ph.hovered() { CHU_PHU } else { mau };
+            let net = if ph.hovered() { Stroke::new(1.4, CHU_PHU) } else { net };
+            if i == 0 {
+                // Tờ PDF góc gấp
+                let t = Rect::from_center_size(tam - egui::vec2(0.0, 6.0), egui::vec2(36.0, 46.0));
+                let g = 10.0;
+                let diem = vec![t.left_top(), egui::pos2(t.right() - g, t.top()), egui::pos2(t.right(), t.top() + g), t.right_bottom(), t.left_bottom(), t.left_top()];
+                p.add(egui::Shape::line(diem, net));
+                p.line_segment([egui::pos2(t.right() - g, t.top()), egui::pos2(t.right() - g, t.top() + g)], net);
+                p.line_segment([egui::pos2(t.right() - g, t.top() + g), egui::pos2(t.right(), t.top() + g)], net);
+                p.text(t.center() + egui::vec2(0.0, 4.0), egui::Align2::CENTER_CENTER, "PDF", egui::FontId::proportional(10.0), mau_chu);
+            } else {
+                // Thư mục
+                let t = Rect::from_center_size(tam - egui::vec2(0.0, 4.0), egui::vec2(46.0, 34.0));
+                let diem = vec![egui::pos2(t.left(), t.top() + 6.0), egui::pos2(t.left(), t.bottom()), t.right_bottom(), egui::pos2(t.right(), t.top() + 6.0), egui::pos2(t.left() + 20.0, t.top() + 6.0), egui::pos2(t.left() + 16.0, t.top()), egui::pos2(t.left(), t.top()), egui::pos2(t.left(), t.top() + 6.0)];
+                p.add(egui::Shape::line(diem, net));
+            }
+            p.text(tam + egui::vec2(0.0, 36.0), egui::Align2::CENTER_CENTER, ten, egui::FontId::proportional(12.5), mau_chu);
+            ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, ten));
+            if ph.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                if i == 0 {
+                    self.chon_file_pdf();
+                } else {
+                    self.chon_thu_muc();
+                }
+            }
+        }
     }
 
     /// Khung các vùng trên ảnh Gốc của trang `t` + thao tác chuột (vẽ / chọn / kéo).

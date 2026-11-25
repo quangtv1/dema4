@@ -82,6 +82,19 @@ fn chup_man_xoa_ghim() {
     let cao: f32 = std::env::var("DEMA4_CAO").ok().and_then(|v| v.parse().ok()).unwrap_or(860.0);
     let mut man = ManXoaGhim::default();
     man.license = crate::license::KiemTra::gia(std::sync::Arc::new(crate::tram::KhoGia::moi(10)));
+    // Màn trống (chưa mở thư mục)
+    {
+        let mut trong = ManXoaGhim::default();
+        let mut da_cai = false;
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(rong, cao)).with_pixels_per_point(1.25).build_ui(move |ui| {
+            if !std::mem::replace(&mut da_cai, true) {
+                crate::gui::cai_giao_dien(ui.ctx());
+            }
+            trong.ve(ui);
+        });
+        h.run_steps(3);
+        h.render().unwrap().save(anh.join("xoa-ghim-trong.png")).unwrap();
+    }
     man.mo_thu_muc(PathBuf::from(mau));
     if !man.bo.tm.vung.iter().any(|z| z.vi_tri == ViTri::CanhTrai) {
         man.bo.bat_tat(ViTri::CanhTrai);
