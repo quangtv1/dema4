@@ -35,6 +35,8 @@ mod tach_vb;
 mod telegram;
 mod tro_giup;
 mod trang_chu;
+#[allow(dead_code)] // nối dần vào màn Xóa ghim
+mod xoa_ghim;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;

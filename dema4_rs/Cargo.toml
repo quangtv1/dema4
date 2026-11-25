@@ -58,3 +58,5 @@ strip = true
 # Tạo cặp khoá RSA trong test chữ ký trạm license
 rand_core = { version = "0.6", features = ["getrandom"] }
 egui_kittest = { version = "0.37", features = ["wgpu", "snapshot", "eframe"] }
+# Đọc ảnh PNG đối chiếu của test Xóa ghim (đã có sẵn trong cây phụ thuộc)
+png = "0.18"

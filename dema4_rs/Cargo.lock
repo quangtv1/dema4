@@ -1071,6 +1071,7 @@ dependencies = [
  "mac_address",
  "mupdf",
  "ort",
+ "png 0.18.1",
  "quick-xml 0.42.0",
  "rand_core",
  "rayon",
