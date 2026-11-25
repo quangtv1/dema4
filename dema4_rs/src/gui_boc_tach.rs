@@ -737,7 +737,8 @@ fn quet_pdf(goc: &Path) -> Result<Vec<FilePdf>, String> {
         .into_iter()
         .map(|p| {
             let so_trang = mupdf::Document::open(p.to_string_lossy().as_ref()).and_then(|d| d.page_count()).map_or(0, |n| n.max(0) as usize);
-            let ten = p.strip_prefix(goc).unwrap_or(&p).to_string_lossy().into_owned();
+            // Khoá file dùng chung với Tách: tương đối, `/`, NFC — giống nhau trên Mac và Windows
+            let ten = crate::tach_vb::nhan::duong_dan_ghi(goc, &p);
             FilePdf { duong_dan: p, ten, so_trang }
         })
         .collect())

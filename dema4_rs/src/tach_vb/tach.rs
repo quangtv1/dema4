@@ -237,8 +237,9 @@ pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung
 /// Trả hồ sơ + cảnh báo (dòng nhãn trỏ tới file không có trong thư mục).
 pub fn ghep_ho_so(pdf: &[PathBuf], nhan: super::nhan::BangNhan, goc_nhan: &Path, xoay: super::nhan::BangXoay, thu_muc: &Path) -> (Vec<HoSoTach>, Vec<String>) {
     use super::nhan::duong_dan_that;
-    let chuan = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
-    let mut theo_file: std::collections::HashMap<PathBuf, HoSoTach> = pdf.iter().map(|p| (chuan(p), HoSoTach { pdf: p.clone(), nhan: BTreeMap::new(), xoay: BTreeMap::new() })).collect();
+    // Khớp theo đường dẫn tuyệt đối dạng NFC: khoá trong file nhãn đã NFC, tên trên đĩa (Drive trên Mac) có thể NFD
+    let chuan = |p: &Path| super::nhan::nfc(&std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf()).to_string_lossy());
+    let mut theo_file: std::collections::HashMap<String, HoSoTach> = pdf.iter().map(|p| (chuan(p), HoSoTach { pdf: p.clone(), nhan: BTreeMap::new(), xoay: BTreeMap::new() })).collect();
     let mut canh_bao = Vec::new();
     for (p, n) in nhan {
         match theo_file.get_mut(&chuan(&duong_dan_that(goc_nhan, &p))) {
@@ -282,6 +283,24 @@ pub fn dong_log_loi(loi: &[(PathBuf, String)], canh_bao: &[String]) -> String {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn ghep_ho_so_khop_ten_file_nfd_tren_dia_voi_khoa_nfc() {
+        let d = std::env::temp_dir().join(format!("dema4_ghep_nfd_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let nfd = "Ha\u{0309}i Du\u{031b}o\u{031b}ng";
+        std::fs::create_dir_all(d.join(nfd)).unwrap();
+        let pdf = d.join(nfd).join("a.pdf");
+        tao_pdf(&pdf, 2);
+        let khoa = super::super::nhan::duong_dan_ghi(&d, &pdf); // NFC
+        let mut nhan = super::super::nhan::BangNhan::new();
+        nhan.entry(khoa).or_default().insert(2, super::super::nhan::Nhan::Index);
+        let (ho_so, canh_bao) = ghep_ho_so(&[pdf.clone()], nhan, &d, Default::default(), &d);
+        assert!(canh_bao.is_empty(), "{canh_bao:?}");
+        assert_eq!(ho_so.len(), 1);
+        assert_eq!(ho_so[0].nhan.len(), 1, "nhãn khoá NFC gắn đúng file tên NFD trên đĩa");
+        let _ = std::fs::remove_dir_all(&d);
+    }
     use mupdf::pdf::PdfDocument;
 
     /// PDF `so_trang` trang A4, mỗi trang chữ "Trang n" (nội dung khác nhau để so) — ghi tay đủ bảng xref.

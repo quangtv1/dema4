@@ -53,9 +53,16 @@ pub type BangNhan = BTreeMap<String, BTreeMap<usize, Nhan>>;
 /// Góc xoay theo hồ sơ: đường dẫn → trang → xoay.
 pub type BangXoay = BTreeMap<String, BTreeMap<usize, Xoay>>;
 
-/// Chuẩn hoá đường dẫn trong file: bỏ khoảng trắng hai đầu, `\` → `/`.
+/// Unicode NFC: Drive trên macOS đặt tên tiếng Việt dạng tách dấu (NFD), Windows dạng dựng sẵn (NFC) —
+/// không chuẩn hoá thì cùng 1 hồ sơ ra 2 khoá khác nhau giữa 2 máy.
+pub fn nfc(s: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    s.nfc().collect()
+}
+
+/// Chuẩn hoá đường dẫn trong file: bỏ khoảng trắng hai đầu, `\` → `/`, NFC.
 pub fn chuan_duong_dan(p: &str) -> String {
-    p.trim().replace('\\', "/")
+    nfc(&p.trim().replace('\\', "/"))
 }
 
 /// Đường dẫn thật của hồ sơ ghi trong file nhãn: tuyệt đối giữ nguyên; tương đối tính từ `goc`
@@ -66,10 +73,11 @@ pub fn duong_dan_that(goc: &std::path::Path, p: &str) -> std::path::PathBuf {
     if tuyet_doi { std::path::PathBuf::from(p) } else { p.split('/').filter(|t| !t.is_empty()).fold(goc.to_path_buf(), |d, t| d.join(t)) }
 }
 
-/// Đường dẫn ghi vào file nhãn: tương đối từ `goc`, luôn dùng `/` (cả trên Windows).
+/// Khoá hồ sơ ghi vào file nhãn / cache / kết quả bóc: tương đối từ `goc`, luôn `/` (cả trên Windows), NFC —
+/// cùng 1 file ra cùng khoá trên Mac và Windows.
 pub fn duong_dan_ghi(goc: &std::path::Path, p: &std::path::Path) -> String {
     let rel = p.strip_prefix(goc).unwrap_or(p);
-    rel.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect::<Vec<_>>().join("/")
+    nfc(&rel.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect::<Vec<_>>().join("/"))
 }
 
 /// Đọc chung 2 loại file `đường_dẫn;trang;giá_trị[;…]`: bỏ dòng trống, kiểm số trang theo `so_trang_cua`
@@ -242,6 +250,21 @@ pub fn tinh_dai(so_trang: usize, nhan: &BTreeMap<usize, Nhan>, xoay: &BTreeMap<u
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// "Hải Dương" dạng NFD (Drive trên macOS) và NFC (Windows) phải ra cùng khoá.
+    const NFD: &str = "Ha\u{0309}i Du\u{031b}o\u{031b}ng";
+    const NFC: &str = "H\u{1ea3}i D\u{01b0}\u{01a1}ng";
+
+    #[test]
+    fn khoa_ho_so_giong_nhau_tren_mac_va_windows() {
+        assert_ne!(NFD, NFC);
+        let goc = std::path::Path::new("/goc");
+        let k_mac = duong_dan_ghi(goc, &goc.join(NFD).join("a.pdf"));
+        let k_win = duong_dan_ghi(goc, &goc.join(NFC).join("a.pdf"));
+        assert_eq!(k_mac, k_win, "NFD và NFC cùng 1 khoá");
+        assert_eq!(k_mac, format!("{NFC}/a.pdf"));
+        assert_eq!(chuan_duong_dan(&format!("{NFD}\\a.pdf")), k_win, "khoá đọc vào (file nhãn Windows, `\\`) cũng chuẩn hoá");
+    }
 
     fn nhan_tu(ds: &[(usize, Nhan)]) -> BTreeMap<usize, Nhan> {
         ds.iter().copied().collect()

@@ -44,7 +44,7 @@ pub fn chuyen_du_lieu_cu(goc: &Path) {
 /// Đường dẫn tuyệt đối thống nhất (cùng thư mục gõ khác kiểu → cùng chuỗi), giữ nguyên hoa thường.
 fn chuan_hoa(goc: &Path) -> String {
     let p = std::fs::canonicalize(goc).or_else(|_| std::path::absolute(goc)).unwrap_or_else(|_| goc.to_path_buf());
-    let s = p.to_string_lossy();
+    let s = super::nhan::nfc(&p.to_string_lossy());
     s.strip_prefix(r"\\?\").unwrap_or(&s).trim_end_matches(['/', '\\']).to_string()
 }
 
