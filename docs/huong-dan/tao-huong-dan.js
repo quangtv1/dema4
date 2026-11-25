@@ -9,8 +9,8 @@ const {
   AlignmentType, HeadingLevel, PageBreak, Header, Footer, PageNumber, TableOfContents, LevelFormat, TabStopType,
 } = require('docx');
 
-const PHIEN_BAN = '2.2.0';
-const NGAY = '02/11/2026';
+const PHIEN_BAN = '2.3.0';
+const NGAY = '25/11/2026';
 // HD_DIR: chạy bản chép ở thư mục khác (nơi đã cài docx) mà vẫn đọc ảnh / ghi file ở docs/huong-dan
 const GOC = process.env.HD_DIR || __dirname;
 const ANH = path.join(GOC, 'anh');
@@ -165,12 +165,12 @@ them(H2('1.3 Tải về và mở lần đầu'),
 );
 batDauThaoTac();
 them(...buoc('Tải file chạy ở trang **github.com/quangtv1/dema4/releases** (bản mới nhất): Windows chọn `dema4_saomai.exe`, macOS chọn `dema4_saomai`.'),
-  ...buoc('Chép file vào một thư mục cố định (ví dụ `D:\\SoHoa\\Ung_dung`). Phần mềm lưu cấu hình và dữ liệu làm việc cạnh file chạy.'),
+  ...buoc('Chép file vào một thư mục cố định (ví dụ `D:\\SoHoa\\Ung_dung`). Cấu hình và dữ liệu làm việc lưu ở thư mục dữ liệu của người dùng (xem mục 1.5), không phụ thuộc chỗ đặt file chạy.'),
   ...buoc('Mở file. Lần đầu, hệ điều hành có thể chặn vì file chưa ký số với Microsoft / Apple:', null),
   dau('**Windows** (SmartScreen): bấm **More info › Run anyway**.'),
   dau('**macOS**: **System Settings › Privacy & Security › Open Anyway**.'),
   ...buoc('Phần mềm mở vào **Trang chủ**.', 'Thấy các ô chức năng như Hình 2-1.'),
-  ...hop('meo', ['Kiểm tra bản mới: menu **Trợ giúp › Kiểm tra cập nhật**. Nếu có bản mới, bấm **Tải bản mới** rồi thay file chạy cũ (giữ nguyên thư mục để không mất cấu hình).']),
+  ...hop('meo', ['Kiểm tra bản mới: menu **Trợ giúp › Kiểm tra cập nhật**. Nếu có bản mới, bấm **Tải bản mới** rồi thay file chạy cũ (dữ liệu làm việc nằm ở thư mục dữ liệu nên không mất khi thay hay dời file chạy).']),
   ...hinh('02-cap-nhat.png', 'Hộp Kiểm tra cập nhật', 420),
 );
 them(H2('1.4 Lượt chạy (bản quyền)'),
@@ -184,7 +184,14 @@ them(H2('1.5 An toàn dữ liệu'),
     'Khi dùng **Bóc tách dữ liệu** với dịch vụ đám mây (Gemini, Claude, GPT, OpenRouter), ảnh trang văn bản được gửi tới máy chủ của hãng. **Không dùng dịch vụ đám mây cho tài liệu mật** — hãy dùng máy chủ nội bộ.',
     'Kết quả Bóc tách (kể cả phần sửa tay) được gửi về trạm Sao Mai để sao lưu và nâng chất lượng bóc tách. Thông tin thống kê lượt chạy (tên máy, thư mục, số lượng) cũng được ghi nhận.',
   ]),
-  ...hop('luuy', ['Nhãn, cache, log của Tách văn bản và kết quả Sinh mục lục nằm trong thư mục ẩn `.sm-dema4` cạnh file chạy. Không xoá thư mục này khi đang xử lý dở.']),
+  ...hop('luuy', ['Cấu hình, khoá API (mã hoá), lượt chạy, nhãn / cache / log của Tách văn bản, kết quả Bóc tách và lịch sử gần đây nằm trong **thư mục dữ liệu** của người dùng: Windows `%LOCALAPPDATA%\\sm-dema4`, macOS `~/Library/Application Support/sm-dema4`. Không xoá thư mục này khi đang xử lý dở.']),
+);
+them(H2('1.6 Làm tiếp trên máy khác'),
+  P('Mang phần đang làm dở của một thư mục (Tách văn bản, Bóc tách dữ liệu) sang máy khác để làm tiếp hoặc chia việc cho nhiều người.'),
+  ...buoc('Ở màn **Tách văn bản** hoặc **Bóc tách dữ liệu**, mở thư mục cần mang đi, chọn **Chức năng › Xuất phiên làm việc…**.', 'Phần mềm ghi file `<tên thư mục>.sm-dema4.zip` (mặc định vào thư mục Tải về) gồm nhãn, góc xoay, cache phân tích và kết quả bóc tách — không có khoá API, lượt chạy, cấu hình.'),
+  ...buoc('Ở máy kia, mở **cùng thư mục** hồ sơ (qua Drive dùng chung, USB…) ở màn tương ứng, chọn **Chức năng › Nhập phiên làm việc…** và chọn file `.zip`.', 'Hộp xác nhận cho biết số hồ sơ, % PDF khớp với thư mục đang mở và loại tài liệu mới sẽ thêm.'),
+  ...buoc('Bấm **Nhập**.', 'Mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói); kết quả bóc tách đọc được không bị bản lỗi đè. Hộp kết quả liệt kê hồ sơ hai máy cùng sửa.'),
+  ...hop('chuy', ['Nên **chia hồ sơ** cho từng người; không đổi ngưỡng hay **Phân tích lại** giữa chừng; để **đồng hồ máy đúng giờ** (phần mềm chọn bản sửa theo thời điểm sửa).']),
 );
 
 // ===== Chương 2 =====
@@ -196,8 +203,8 @@ them(H2('2.1 Tên gọi các phần của Trang chủ'), ...hinh('01-trang-chu-c
     ['Trợ giúp', 'Hướng dẫn sử dụng (`F1`), Kiểm tra cập nhật, Thông tin phần mềm.'],
     ['Logo Sao Mai', 'Logo động; bấm để mở website saomaiso.com.'],
     ['Ô chức năng', 'Bấm để mở chức năng. Rê chuột xem tóm tắt mục đích.'],
-    ['Ô đang phát triển', 'Chức năng sắp có (Chuẩn hoá tên, Ký văn bản, Đóng gói AIP).'],
-    ['Thông tin nhanh', 'Đặc điểm chính: xử lý trên máy, giữ nguyên file gốc, lượt chạy, định dạng hỗ trợ…'],
+    ['Ô đang phát triển', 'Chức năng sắp có (Xóa ghim, Chuẩn hoá tên, Ký văn bản, Đóng gói AIP, Scan tài liệu, Nghiệm thu DA).'],
+    ['Làm tiếp gần đây', '5 thư mục / file vừa làm kèm tình trạng; bấm 1 dòng để mở lại đúng chức năng, đúng thư mục (Bóc tách: cả loại tài liệu; Mục lục: cả sheet, dòng tiêu đề, mẫu). Thư mục đã đổi chỗ → **Chọn lại…**; × bỏ 1 dòng, **Xoá lịch sử** bỏ hết. Chưa làm gì → chỗ này là các thông tin nhanh của phần mềm.'],
     ['Thanh trạng thái', 'Website, email hỗ trợ, tên máy, MAC, IP, phiên bản đang dùng.'],
   ]),
 );
@@ -430,11 +437,13 @@ them(P('Khi gặp sự cố, tra bảng dưới đây trước khi liên hệ h�
 them(batDauChuong('Phụ lục'));
 them(H2('A. Tệp và thư mục phần mềm tạo ra'),
   ...bang(['Tệp / thư mục', 'Vị trí', 'Nội dung'], [
-    ['`.dema4_saomai.cfg`', 'Cạnh file chạy (ẩn)', 'Cấu hình người dùng.'],
-    ['`.sm-dema4/`', 'Cạnh file chạy (ẩn)', 'Nhãn, cache, log Tách; kết quả Sinh mục lục mặc định.'],
+    ['`.dema4_saomai.cfg`', 'Thư mục dữ liệu', 'Cấu hình người dùng.'],
+    ['`viec/<thư mục>-…/`', 'Thư mục dữ liệu', 'Nhãn, cache, log Tách; kết quả Bóc tách của từng thư mục đầu vào.'],
+    ['`gan_day.json`', 'Thư mục dữ liệu', 'Danh sách Làm tiếp gần đây.'],
+    ['`<tên>.sm-dema4.zip`', 'Nơi người dùng chọn (mặc định Tải về)', 'Gói Xuất phiên làm việc.'],
     ['`<thư mục>_dem.txt`, `_dem_chitiet.txt`', 'Cạnh thư mục đếm', 'Kết quả Đếm trang A4.'],
     ['`<gốc>_vanban/`', 'Cạnh thư mục gốc', 'Văn bản đã tách.'],
-    ['`index_and_blank.txt`', 'Trong `.sm-dema4/`', 'Nhãn đã duyệt của Tách văn bản.'],
+    ['`index_and_blank.txt`', 'Trong `viec/<thư mục>-…/`', 'Nhãn đã duyệt của Tách văn bản.'],
     ['`<thư mục>_boc_tach.xlsx`', 'Cạnh thư mục nguồn', 'Kết quả Bóc tách dữ liệu.'],
   ], [3000, 2400, 3626]),
 );
@@ -461,7 +470,8 @@ them(H2('C. Liên hệ hỗ trợ'),
 );
 them(H2('D. Lịch sử sửa đổi'),
   ...bang(['Phiên bản tài liệu', 'Ngày', 'Phiên bản phần mềm', 'Nội dung'], [
-    ['1.0', NGAY, PHIEN_BAN, 'Ban hành lần đầu.'],
+    ['1.0', '02/11/2026', '2.2.0', 'Ban hành lần đầu.'],
+    ['1.1', NGAY, PHIEN_BAN, 'Thư mục dữ liệu chung theo người dùng; Làm tiếp trên máy khác (Xuất / Nhập phiên); Trang chủ có Làm tiếp gần đây.'],
   ], [2000, 1700, 2000, 3326]),
 );
 

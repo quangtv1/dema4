@@ -16,11 +16,15 @@ Lần đầu mở (file chưa ký số với Apple / Microsoft):
 - **Windows** (SmartScreen): **More info › Run anyway**.
 - **Windows, mở không lên cửa sổ** (máy card Intel driver cũ): từ v2.2.2 app không còn dò Vulkan nên không còn crash ở `igvk64.dll`. Vẫn không lên → cập nhật driver card đồ hoạ, hoặc thử chạy trong PowerShell: `$env:WGPU_BACKEND="gl"; .\dema4_saomai.exe`.
 
+**Nâng cấp lên v2.3.0**: dữ liệu làm việc chuyển sang thư mục dữ liệu của người dùng (xem [Dữ liệu làm việc](#dữ-liệu-làm-việc-và-làm-tiếp-trên-máy-khác)); bản mới **không mang dữ liệu bản cũ sang** — làm xong / xuất Excel phần đang dở trước khi nâng cấp, sau đó dán lại khoá API và chỉnh lại Cấu hình. Số lượt chạy lấy từ trạm: máy chưa từng kích hoạt, và máy Windows lần chạy đầu sau nâng cấp, **cần có mạng**. Thư mục `.sm-dema4` cạnh file chạy của bản cũ không còn dùng, xoá tay được (quay lại bản cũ thì bản cũ vẫn đọc thư mục đó, không thấy phần làm trên bản mới).
+
 **Hướng dẫn sử dụng chi tiết** (có hình minh hoạ): [docs/huong-dan/huong-dan-su-dung-dema4.docx](docs/huong-dan/huong-dan-su-dung-dema4.docx) · [bản PDF](docs/huong-dan/huong-dan-su-dung-dema4.pdf).
 
 ## Trang chủ
 
 Mở app vào Trang chủ: bấm ô chức năng để bắt đầu (rê chuột xem tóm tắt). Về Trang chủ: menu **Chức năng › Trang chủ** hoặc bấm logo Sao Mai góc dưới phải màn giới thiệu.
+
+**Làm tiếp gần đây**: 5 thư mục / file vừa làm (Đếm, Tách, Mục lục, Bóc tách) kèm tình trạng lúc rời màn — bấm 1 dòng là mở lại đúng chức năng, đúng thư mục (Bóc tách: cả loại tài liệu; Mục lục: cả sheet, dòng tiêu đề, mẫu). Thư mục đã đổi chỗ → **Chọn lại…**; × bỏ 1 dòng, **Xoá lịch sử** bỏ hết. Cùng danh sách ở **Chức năng › Gần đây**.
 
 ![Trang chủ](docs/anh/trang-chu.png)
 
@@ -42,7 +46,7 @@ Chọn thư mục (gồm cả thư mục con) → **Đếm**. Lọc theo khổ (
 
 ![Tab Văn bản](docs/anh/tach-van-ban.png)
 
-Nhãn, cache và log nằm trong thư mục ẩn `.sm-dema4/` cạnh file chạy, không ghi vào thư mục đầu vào.
+Nhãn, cache và log nằm trong [thư mục dữ liệu](#dữ-liệu-làm-việc-và-làm-tiếp-trên-máy-khác), không ghi vào thư mục đầu vào.
 
 ## Sinh mục lục hồ sơ
 
@@ -63,7 +67,7 @@ Ví dụ **Mẫu 04 – Vĩnh Phúc** với file biên mục có đủ cột (S�
 1. **Nguồn văn bản**: chọn thư mục PDF (gồm thư mục con).
 2. **Mô hình đọc**: mô hình đã khai ở **Cấu hình › Bóc tách** — máy chủ nội bộ (vLLM / Ollama / LM Studio, địa chỉ chuẩn OpenAI `http://<máy>:<cổng>/v1`), Gemini (Vertex AI express mode hoặc AI Studio), Claude, GPT, OpenRouter. Dịch vụ đám mây có sẵn địa chỉ và danh sách model: chỉ cần dán khoá API (Gemini mặc định `gemini-3.7-flash` qua Vertex AI); địa chỉ sửa được khi đi qua proxy riêng (bắt buộc `https://`).
 3. **Loại tài liệu**: Văn bản hành chính, Hồ sơ đất đai, Hợp đồng hoặc loại riêng. Tab **Trường dữ liệu** xem các trường và câu lệnh gửi mô hình, sửa tên cột / mô tả / chuẩn hoá; **Thử đọc** file đang xem (không trừ lượt chạy).
-4. **Bắt đầu**: tab **Kết quả bóc** hiện từng file (PDF bên trái, các trường bên phải), sửa tay rồi **Lưu**; lọc `lỗi` / `5/6` rồi **Chạy lại (n)** chỉ đọc lại các file đang hiện.
+4. **Bắt đầu**: tab **Kết quả bóc** hiện từng file (PDF bên trái, các trường bên phải), sửa tay rồi **Lưu**; lọc `lỗi` / `5/6` rồi **Chạy lại (n)** chỉ đọc lại các file đang hiện. Tắt app giữa chừng (app hỏi trước khi tắt) → mở lại qua **Làm tiếp gần đây**: kết quả đã đọc còn nguyên, nút **Tiếp tục (n)** chỉ đọc n file còn lại.
 5. Kết quả: `<thư mục>_boc_tach.xlsx` cạnh thư mục nguồn — mỗi file 1 dòng, nạp thẳng vào **Sinh mục lục** làm file biên mục; bật **Google Sheet** để có tab bản sao kết quả (tab trống = tên thư mục nguồn): có thay đổi thì tự ghi lại cả tab, tối đa 1 lần mỗi phút (khoá service account hoặc Apps Script — script mẫu `dema4_rs/apps-script-mau/boc_tach.gs`; bản trước v2.1.2 cần dán lại script mới). Kết quả (cả phần sửa tay) còn được gửi về trạm Sao Mai để sao lưu, nâng chất lượng bóc tách — mỗi máy 1 thư mục theo mã máy.
 
 Mỗi trang cần đọc được gửi tới mô hình đọc đã chọn: máy chủ nội bộ thì ảnh không ra khỏi mạng đơn vị; dịch vụ đám mây thì ảnh gửi tới máy chủ của hãng (không dùng cho tài liệu mật). Khoá API lưu mã hoá trên máy.
@@ -74,7 +78,7 @@ Mỗi trang cần đọc được gửi tới mô hình đọc đã chọn: máy
 
 ## Cấu hình
 
-Menu **Cấu hình** (4 tab Đếm trang A4 / Tách PDF / Sinh mục lục / Bóc tách), lưu ở file ẩn `.dema4_saomai.cfg` cạnh file chạy.
+Menu **Cấu hình** (4 tab Đếm trang A4 / Tách PDF / Sinh mục lục / Bóc tách), lưu ở file `.dema4_saomai.cfg` trong thư mục dữ liệu.
 
 ![Cấu hình Đếm trang A4](docs/anh/cau-hinh-dem.png)
 
@@ -83,6 +87,17 @@ Menu **Cấu hình** (4 tab Đếm trang A4 / Tách PDF / Sinh mục lục / Bó
 ![Cấu hình Sinh mục lục](docs/anh/cau-hinh-muc-luc.png)
 
 ![Cấu hình Bóc tách](docs/anh/cau-hinh-boc-tach.png)
+
+## Dữ liệu làm việc và làm tiếp trên máy khác
+
+Mọi dữ liệu làm việc (cấu hình, khoá API mã hoá, license, nhãn / cache / log Tách, kết quả Bóc tách, lịch sử gần đây) nằm ở **một chỗ cố định theo người dùng**, không phụ thuộc chỗ đặt file chạy — dời / chép file chạy sang thư mục khác vẫn làm tiếp được:
+
+- Windows: `%LOCALAPPDATA%\sm-dema4`
+- macOS: `~/Library/Application Support/sm-dema4`
+
+Mỗi thư mục đầu vào có 1 thư mục con trong `viec/`. Cache phân tích nhận PDF theo nội dung, nên thư mục chép qua USB / Drive sang máy khác không phải phân tích lại.
+
+**Làm tiếp trên máy khác** (màn Tách hoặc Bóc tách, đã mở thư mục): **Chức năng › Xuất phiên làm việc…** đóng gói nhãn, góc xoay, cache phân tích và kết quả bóc tách của thư mục đó thành `<tên>.sm-dema4.zip` (mặc định vào thư mục Tải về; không có khoá API, license, cấu hình). Ở máy kia mở **cùng thư mục** (Drive, USB…) rồi **Chức năng › Nhập phiên làm việc…**: hộp xác nhận cho biết % PDF khớp, loại tài liệu mới; mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói), kết quả bóc tách đọc được không bị bản lỗi đè; báo cáo liệt kê hồ sơ hai máy cùng sửa. Nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, và để đồng hồ máy đúng giờ.
 
 ## Dòng lệnh
 
