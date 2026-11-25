@@ -46,9 +46,9 @@ pub struct DaChay {
 }
 
 impl ManXoaGhim {
-    /// File cần chạy: chưa xoá, cấu hình đã đổi, kết quả mất (hoặc chưa biết trạng thái).
+    /// File đã đánh dấu cần chạy: chưa xoá, cấu hình đã đổi, kết quả mất (hoặc chưa biết trạng thái).
     pub(super) fn can_chay(&self) -> Vec<usize> {
-        (0..self.ds.len()).filter(|&i| !matches!(self.trang_thai_file(i), Some(TrangThai::DaXoa { dung_cau_hinh: true }))).collect()
+        (0..self.ds.len()).filter(|&i| self.chon_chay.get(i).copied().unwrap_or(false) && !matches!(self.trang_thai_file(i), Some(TrangThai::DaXoa { dung_cau_hinh: true }))).collect()
     }
 
     pub(super) fn trang_thai_file(&self, i: usize) -> Option<TrangThai> {
@@ -83,7 +83,7 @@ impl ManXoaGhim {
 
     /// Bấm Xóa ghim: `tat_ca` = cả thư mục, không thì chỉ file cần chạy.
     pub(super) fn bam_chay(&mut self, tat_ca: bool) {
-        let viec = if tat_ca { (0..self.ds.len()).collect() } else { self.can_chay() };
+        let viec = if tat_ca { (0..self.ds.len()).filter(|&i| self.chon_chay.get(i).copied().unwrap_or(false)).collect() } else { self.can_chay() };
         if viec.is_empty() || self.chay.is_some() {
             return;
         }
