@@ -468,6 +468,27 @@ impl BangTrang {
         b
     }
 
+    /// Chữ ký nội dung từng hồ sơ (nhãn + góc xoay + cờ duyệt) cho mốc sửa (`tach_vb::moc_sua`). Mọi hồ sơ đều có
+    /// mục; hồ sơ không còn gì → `CHU_KY_RONG` (bia mộ nếu trước đó từng có).
+    pub fn chu_ky_ho_so(&self) -> BTreeMap<String, u64> {
+        use std::fmt::Write;
+        let mut nd: BTreeMap<String, String> = self.ho_so.iter().map(|k| (k.clone(), String::new())).collect();
+        for t in &self.trang {
+            let s = nd.entry(self.ho_so[t.ho_so as usize].clone()).or_default();
+            if let Some(c) = t.nhan().chu() {
+                let _ = write!(s, "n{}:{c};", t.so);
+            }
+            let xac_nhan = t.sua.co & CO_XAC_NHAN != 0;
+            if t.sua.goc != 0 || xac_nhan {
+                let _ = write!(s, "x{}:{}:{};", t.so, t.sua.goc, xac_nhan as u8);
+            }
+            if t.trang_thai_cache() != 0 {
+                let _ = write!(s, "d{}:{};", t.so, t.trang_thai_cache());
+            }
+        }
+        nd.into_iter().map(|(k, v)| (k, crate::tach_vb::moc_sua::chu_ky(&v))).collect()
+    }
+
     /// Góc xoay + xác nhận (ghi `xoay_trang.txt`).
     pub fn bang_xoay(&self) -> BangXoay {
         let mut b = BangXoay::new();

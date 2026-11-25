@@ -869,7 +869,7 @@ fn luu_sua(m: &mut ManBocTach, loai: &LoaiTaiLieu, i: usize, ten: &str, so_trang
     let Some((_, goc, ban)) = m.kq.sua.clone() else { return };
     let mut b = match m.tt.get(i) {
         Some(TrangThai::Xong(b)) => b.clone(),
-        _ => BanGhi { file: ten.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: None, sua: vec![], canh_bao: None, giay: 0.0, tho: vec![] },
+        _ => BanGhi { file: ten.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: None, sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc: 0 },
     };
     // Chỉ ghi các trường người dùng đã sửa (trường khác giữ giá trị hiện có)
     for (k, tr) in loai.truong.iter().enumerate() {
@@ -883,6 +883,7 @@ fn luu_sua(m: &mut ManBocTach, loai: &LoaiTaiLieu, i: usize, ten: &str, so_trang
         b.gia_tri.insert(tr.bien.clone(), moi);
     }
     b.loi = None;
+    b.luc = crate::tach_vb::moc_sua::bay_gio_ms(); // sửa tay = lần sửa mới nhất của file này
     let _ = luu::ghi_them(&luu::file_jsonl(Path::new(m.thu_muc.trim())), &b);
     m.tt[i] = TrangThai::Xong(b);
     m.kq.sua = None;
@@ -1140,7 +1141,7 @@ mod tests {
 
     fn xong(n: usize) -> TrangThai {
         let gia_tri = (0..6).map(|k| (format!("b{k}"), if k < n { "x".to_string() } else { String::new() })).collect();
-        TrangThai::Xong(BanGhi { file: String::new(), loai: String::new(), so_trang: 1, gia_tri, loi: None, sua: vec![], canh_bao: None, giay: 1.0, tho: vec![] })
+        TrangThai::Xong(BanGhi { file: String::new(), loai: String::new(), so_trang: 1, gia_tri, loi: None, sua: vec![], canh_bao: None, giay: 1.0, tho: vec![], luc: 0 })
     }
 
     #[test]

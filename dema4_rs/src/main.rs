@@ -176,10 +176,12 @@ fn chay_tach(kt: &license::KiemTra, tham_so: &[String]) -> i32 {
         let phien = tach_vb::phien::phan_tich_thu_muc(&thu_muc, &ch, &|xong, tong| {
             if xong % 500 == 0 || xong == tong { eprintln!("  {xong}/{tong} trang"); }
         });
-        if let Err(e) = std::fs::create_dir_all(&an).and_then(|_| std::fs::write(&file_nhan, nhan::ghi_file_nhan(&phien.bang_nhan_tu_dong(&ch)))) {
+        let bang = phien.bang_nhan_tu_dong(&ch);
+        if let Err(e) = std::fs::create_dir_all(&an).and_then(|_| std::fs::write(&file_nhan, nhan::ghi_file_nhan(&bang))) {
             eprintln!("Không ghi được {}: {e}", file_nhan.display());
             return 1;
         }
+        let _ = tach_vb::moc_sua::cap_nhat(&an.join(tach_vb::moc_sua::TEN_FILE), &tach_vb::moc_sua::chu_ky_tu_nhan(&bang), tach_vb::moc_sua::bay_gio_ms());
     }
     let Ok(noi_dung) = std::fs::read_to_string(&file_nhan) else {
         eprintln!("Không đọc được file nhãn {}", file_nhan.display());

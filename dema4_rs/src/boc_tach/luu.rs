@@ -35,6 +35,9 @@ pub struct BanGhi {
     /// Câu trả lời thô từng trang (soát khi mô hình trả sai).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tho: Vec<(usize, String)>,
+    /// Lúc tạo / sửa tay bản ghi (unix ms) — gộp phiên giữa 2 máy: bản sau cùng thắng. Bản ghi cũ không có = 0.
+    #[serde(default)]
+    pub luc: u64,
 }
 
 impl BanGhi {
@@ -49,11 +52,12 @@ impl BanGhi {
             canh_bao: (!kq.loi_trang.is_empty()).then(|| format!("Trang {} không trả JSON", kq.loi_trang.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", "))),
             giay: kq.thoi_gian.as_secs_f32(),
             tho: kq.tho.clone(),
+            luc: crate::tach_vb::moc_sua::bay_gio_ms(),
         }
     }
 
     pub fn loi(file: &str, loai: &LoaiTaiLieu, so_trang: usize, loi: &str) -> Self {
-        Self { file: file.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: Some(loi.into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![] }
+        Self { file: file.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: Some(loi.into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc: crate::tach_vb::moc_sua::bay_gio_ms() }
     }
 
     /// Giá trị theo thứ tự trường của loại (biến thiếu → rỗng).
@@ -100,6 +104,14 @@ pub fn doc(f: &Path, loai: &str) -> HashMap<String, BanGhi> {
 mod tests {
     use super::super::loai_tai_lieu::co_san;
     use super::*;
+
+    #[test]
+    fn ban_ghi_moi_co_moc_luc_ban_ghi_cu_khong_co_thi_bang_0() {
+        let loai = super::super::loai_tai_lieu::co_san().remove(0);
+        assert!(BanGhi::loi("a.pdf", &loai, 1, "x").luc > 0);
+        let cu: BanGhi = serde_json::from_str(r#"{"file":"a.pdf","loai":"x"}"#).unwrap();
+        assert_eq!(cu.luc, 0, "bản ghi trước 2.3 (không có `luc`) coi như cũ nhất");
+    }
 
     #[test]
     fn ghi_doc_ban_ghi_sau_thang_va_bo_dong_hong() {

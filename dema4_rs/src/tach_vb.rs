@@ -9,6 +9,7 @@ pub mod du_lieu_an;
 pub mod dung_luong;
 pub mod hang_doi;
 pub mod huong_trang;
+pub mod moc_sua;
 pub mod nhan;
 pub mod phan_tich;
 pub mod phien;

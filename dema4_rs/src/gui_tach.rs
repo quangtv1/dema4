@@ -709,6 +709,17 @@ impl ManTach {
             Ok(()) => b.chua_luu = false,
             Err(e) => self.trang_thai = format!("Không ghi được nhãn: {e}"),
         }
+        self.cap_nhat_moc();
+    }
+
+    /// Ghi mốc sửa từng hồ sơ (gộp phiên giữa 2 máy: bản sửa sau cùng thắng). Gọi ở mọi chỗ ghi nhãn / cờ duyệt.
+    fn cap_nhat_moc(&self) {
+        let Some(b) = &self.bang else { return };
+        let goc = self.phien.as_ref().map(|p| p.goc.clone()).unwrap_or_else(|| PathBuf::from(self.thu_muc.trim()));
+        let f = thu_muc_an(&goc).join(crate::tach_vb::moc_sua::TEN_FILE);
+        if let Err(e) = crate::tach_vb::moc_sua::cap_nhat(&f, &b.chu_ky_ho_so(), crate::tach_vb::moc_sua::bay_gio_ms()) {
+            eprintln!("Không ghi được mốc sửa: {e}");
+        }
     }
 
     /// Cấu hình vừa lưu: đổi ngưỡng / mã index / độ tin cậy → gán lại nhãn tự động ngay (không render lại,
@@ -761,6 +772,7 @@ impl ManTach {
             b.chep_trang_thai(p);
             p.ghi_cache();
         }
+        self.cap_nhat_moc();
     }
 
     // ---- Thứ tự hiện ----
@@ -2669,6 +2681,42 @@ mod tests {
         let ds: Vec<String> = ["HOP 462/4766/4766.pdf", "HOP 463/4766.pdf", "x/L1_05_13.pdf", "a.PDF"].map(String::from).into();
         assert_eq!(ten_hien_ho_so(&ds), ["4766/4766", "HOP 463/4766", "L1_05_13", "a"]);
         assert_eq!(kem_duoi(&ten_hien_ho_so(&ds), &ds), ["4766/4766.pdf", "HOP 463/4766.pdf", "L1_05_13.pdf", "a.PDF"]);
+    }
+
+    /// Gán nhãn 1 hồ sơ → chỉ mốc sửa của hồ sơ đó tăng; ghi cache (đóng / đổi thư mục) với cờ duyệt mới cũng tăng mốc.
+    #[test]
+    fn gan_nhan_chi_tang_moc_sua_ho_so_do() {
+        use crate::tach_vb::moc_sua;
+        let goc = std::env::temp_dir().join(format!("dema4_moc_tach_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        std::fs::create_dir_all(&goc).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 3);
+        crate::tach_vb::tach::tests::tao_pdf(&goc.join("b.pdf"), 2);
+        let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
+        let mut cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
+        let mut man = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };
+        let ch = cfg.cau_hinh_phan_tich();
+        man.bam_phan_tich(&ch);
+        let bat_dau = Instant::now();
+        while man.dang_chay() {
+            assert!(bat_dau.elapsed() < Duration::from_secs(30));
+            std::thread::sleep(Duration::from_millis(20));
+            man.nhan_su_kien(&ch, None);
+        }
+        man.ghi_cache();
+        let f = thu_muc_an(&goc).join(moc_sua::TEN_FILE);
+        let truoc = moc_sua::doc(&f);
+        std::thread::sleep(Duration::from_millis(5));
+        man.cap_nhat_thu_tu();
+        let b = man.bang.as_ref().unwrap();
+        let t = man.thu_tu.iter().copied().filter(|&t| b.ho_so[b.trang[t as usize].ho_so as usize] == "a.pdf").nth(1).unwrap(); // trang 2 của a.pdf
+        man.chon.chon_rieng(t);
+        man.lam(Viec::Gan(Nhan::Index), &mut cfg);
+        let sau = moc_sua::doc(&f);
+        assert!(sau["a.pdf"].luc > truoc.get("a.pdf").map_or(0, |m| m.luc), "a.pdf vừa gán nhãn → mốc mới");
+        assert_eq!(sau.get("b.pdf"), truoc.get("b.pdf"), "b.pdf không đụng → mốc giữ nguyên");
+        let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
+        let _ = std::fs::remove_dir_all(&goc);
     }
 
     /// Phân tích thư mục nhỏ qua màn Tách (không mở cửa sổ): lưới đủ trang, gán nhãn tự lưu file.

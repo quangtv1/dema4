@@ -24,7 +24,8 @@ impl Nhan {
         }
     }
 
-    fn chu(self) -> Option<&'static str> {
+    /// Chữ ghi trong file nhãn; trang nội dung → `None` (không ghi).
+    pub fn chu(self) -> Option<&'static str> {
         match self {
             Nhan::Index => Some("index"),
             Nhan::Trang => Some("blank"),
