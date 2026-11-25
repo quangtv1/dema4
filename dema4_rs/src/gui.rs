@@ -37,12 +37,32 @@ pub(crate) const CHU_MO: Color32 = Color32::from_rgb(0xA8, 0xA8, 0xA8);
 pub(crate) const XAM_TIEN_DO: Color32 = Color32::from_rgb(0xA8, 0xD1, 0xF5);
 pub(crate) const XANH_COBALT: Color32 = Color32::from_rgb(0x00, 0x47, 0xAB);
 
+/// Kiểu vẽ wgpu được dò lúc mở app. Windows: chỉ DirectX 12 (+ OpenGL dự phòng), **không dò Vulkan** — driver
+/// Vulkan Intel cũ (`igvk64.dll` 31.0.101.x) crash cả tiến trình (0xC0000005) ngay khi wgpu liệt kê adapter,
+/// không bắt được như lỗi thường. Biến môi trường `WGPU_BACKEND` (vd `vulkan`, `gl`) vẫn ghi đè để chẩn đoán.
+fn backend_wgpu(windows: bool, bien_moi_truong: Option<&str>) -> eframe::wgpu::Backends {
+    use eframe::wgpu::Backends;
+    match bien_moi_truong.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(ds) => Backends::from_comma_list(ds),
+        None if windows => Backends::DX12 | Backends::GL,
+        None => Backends::PRIMARY | Backends::GL,
+    }
+}
+
+fn cau_hinh_wgpu() -> eframe::egui_wgpu::WgpuConfiguration {
+    let mut c = eframe::egui_wgpu::WgpuConfiguration::default();
+    if let eframe::egui_wgpu::WgpuSetup::CreateNew(tao) = &mut c.wgpu_setup {
+        tao.instance_descriptor.backends = backend_wgpu(cfg!(windows), std::env::var("WGPU_BACKEND").ok().as_deref());
+    }
+    c
+}
+
 pub fn chay() -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default().with_inner_size([1100.0, 720.0]).with_min_inner_size([800.0, 420.0]).with_title(TIEU_DE);
     if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../../icon.png")) {
         viewport = viewport.with_icon(Arc::new(icon));
     }
-    let options = eframe::NativeOptions { viewport, centered: true, ..Default::default() };
+    let options = eframe::NativeOptions { viewport, centered: true, wgpu_options: cau_hinh_wgpu(), ..Default::default() };
     eframe::run_native(
         TIEU_DE,
         options,
@@ -1590,6 +1610,18 @@ impl UngDung {
 mod tests {
     use super::*;
     use crate::boc_tach::mo_hinh::NhaCungCap;
+
+    #[test]
+    fn windows_khong_do_vulkan_tru_khi_ep_bang_bien_moi_truong() {
+        use eframe::wgpu::Backends;
+        let w = backend_wgpu(true, None);
+        assert!(!w.contains(Backends::VULKAN), "driver Vulkan Intel cũ crash khi bị dò");
+        assert!(w.contains(Backends::DX12) && w.contains(Backends::GL));
+        assert_eq!(backend_wgpu(true, Some("  ")), w, "biến rỗng = mặc định");
+        assert_eq!(backend_wgpu(true, Some("vulkan")), Backends::VULKAN, "WGPU_BACKEND vẫn ép được để chẩn đoán");
+        assert_eq!(backend_wgpu(true, Some("gl")), Backends::GL);
+        assert_eq!(backend_wgpu(false, None), Backends::PRIMARY | Backends::GL, "macOS / Linux giữ như cũ");
+    }
 
     #[test]
     fn dinh_dang_so_kieu_viet_nam() {

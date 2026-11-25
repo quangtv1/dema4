@@ -60,12 +60,29 @@ fn main() {
         }
         None => {
             if let Err(e) = gui::chay() {
-                eprintln!("Không mở được giao diện: {e}");
+                let chu = format!("Không mở được giao diện: {e}\n\nThử cập nhật driver card đồ hoạ, hoặc chạy với biến môi trường WGPU_BACKEND=gl.");
+                eprintln!("{chu}");
+                hop_loi_windows(&chu);
                 std::process::exit(1);
             }
         }
     }
 }
+
+/// Lỗi mở giao diện: app cửa sổ trên Windows không có console nên `eprintln!` không ai thấy → hiện hộp thông báo.
+#[cfg(windows)]
+fn hop_loi_windows(chu: &str) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+    let w = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let (noi_dung, tieu_de) = (w(chu), w("dema4 – Sao Mai"));
+    // SAFETY: 2 chuỗi UTF-16 kết thúc bằng 0, sống tới hết lời gọi; không có cửa sổ cha
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), noi_dung.as_ptr(), tieu_de.as_ptr(), MB_OK | MB_ICONERROR);
+    }
+}
+
+#[cfg(not(windows))]
+fn hop_loi_windows(_chu: &str) {}
 
 /// Hết lượt: in lý do + cách liên hệ + mã máy, mã thoát 3.
 fn bat_dau_luot(kt: &license::KiemTra, cn: license::ChucNang) -> Result<license::LanChay, i32> {

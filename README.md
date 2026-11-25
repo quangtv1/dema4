@@ -14,6 +14,7 @@ Lần đầu mở (file chưa ký số với Apple / Microsoft):
 
 - **macOS**: **System Settings › Privacy & Security › Open Anyway**, hoặc `xattr -d com.apple.quarantine ~/Downloads/dema4_saomai && chmod +x ~/Downloads/dema4_saomai`.
 - **Windows** (SmartScreen): **More info › Run anyway**.
+- **Windows, mở không lên cửa sổ** (máy card Intel driver cũ): từ v2.2.2 app không còn dò Vulkan nên không còn crash ở `igvk64.dll`. Vẫn không lên → cập nhật driver card đồ hoạ, hoặc thử chạy trong PowerShell: `$env:WGPU_BACKEND="gl"; .\dema4_saomai.exe`.
 
 **Hướng dẫn sử dụng chi tiết** (có hình minh hoạ): [docs/huong-dan/huong-dan-su-dung-dema4.docx](docs/huong-dan/huong-dan-su-dung-dema4.docx) · [bản PDF](docs/huong-dan/huong-dan-su-dung-dema4.pdf).
 
