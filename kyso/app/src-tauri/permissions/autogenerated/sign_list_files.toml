@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sign-list-files"
+description = "Enables the sign_list_files command without any pre-configured scope."
+commands.allow = ["sign_list_files"]
+
+[[permission]]
+identifier = "deny-sign-list-files"
+description = "Denies the sign_list_files command without any pre-configured scope."
+commands.deny = ["sign_list_files"]

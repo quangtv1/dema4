@@ -1,0 +1,43 @@
+/*
+ * Biến thiết kế, chép nguyên văn từ :root của prototype App_Ky_So/sao-mai-ky-so_1.html (dòng 12–22).
+ * Prototype chỉ có một giao diện sáng. Không sửa giá trị ở đây khi chưa đối chiếu lại prototype.
+ */
+:root {
+  --accent: #0a54b8;
+  --accent-h: #1567cc;
+  --accent-a: #063f8f;
+  --brand2: #1088e8;
+  --star: #f5a000;
+  --orange: #e08a12;
+
+  --bg: #f2f3f5;
+  --surface: #fff;
+  --panel: #f7f8fa;
+  --view: #e7e9ed;
+
+  --line: #dfe3e8;
+  --line2: #eceff2;
+  --ctl: #c9cfd6;
+  --ctl-b: #b3bac3;
+
+  --tx: #1b2029;
+  --tx2: #5a6371;
+  --tx3: #8b94a1;
+  --ink: #3c4858;
+
+  --ok: #127a2d;
+  --ok-bg: #eaf6ec;
+  --ok-b: #bfe0c6;
+  --danger: #c42b1c;
+  --danger-bg: #fdeeec;
+  --danger-b: #f3c2bd;
+  --warn-bg: #fff6e0;
+  --warn-b: #f2dc9e;
+
+  --sel: #e7f0fc;
+  --sel-b: #a8c8f0;
+  --hover: #f0f3f7;
+
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'Cascadia Mono', Consolas, 'Courier New', monospace;
+}

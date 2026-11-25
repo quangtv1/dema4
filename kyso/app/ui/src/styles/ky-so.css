@@ -1,0 +1,159 @@
+/* Màn Ký số văn bản — prototype L138, L162–175 (menu lọc), L200–205 + L454 (nhãn phủ trang), L305–307 (tab), L316–320 (nhật ký). */
+
+/* Khung nguồn: dùng lưới .nguon của Tạo văn bản; nhãn "Chữ ký / con dấu" dài hơn nên cột nhãn rộng hơn. */
+.nguon.ks{grid-template-columns:118px minmax(200px,1fr) 0 auto auto auto}
+.nguon.ks .ng-file > .quay{flex-shrink:0;color:var(--tx3)}
+.nguon .hop.tat{color:var(--tx3)}
+.nguon .ng-boc{display:flex;justify-self:stretch}
+.nguon .ng-boc > .nut{flex:1;height:30px;padding:0 10px}
+.fld.kieu-ky{flex:0 0 auto;width:150px}
+
+/* Tab đang chọn của màn này không gạch chân, chỉ đổi màu chữ (L306–307). */
+.ky-so .tab.chon{border-bottom-color:transparent;color:var(--accent);background:transparent}
+.ky-so .tab.chon .dem{color:var(--accent)}
+.lk.tron{text-decoration:none;font-size:12px;padding:2px 8px;border-radius:5px}
+.lk.tron:hover:not(:disabled){background:var(--line2)}
+
+/* Danh sách văn bản: lưới "# | tên | trạng thái" rộng 104 px (L1051). */
+.cot-ks{grid-template-columns:28px minmax(0,1fr) 104px}
+.dong.dang{box-shadow:inset 3px 0 0 var(--accent)}
+.dong .ten svg.i.loi-chu{color:var(--danger)}
+.dong .ten-cot .da-co{font-size:11.5px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trong-ds.giua-ds{margin:auto}
+
+/* Menu lọc theo trạng thái ở đầu bảng (L162–175) */
+.loc-th{position:relative;display:flex;align-items:center;justify-self:start;min-width:0}
+.loc-nut{display:inline-flex;align-items:center;gap:3px;border:0;background:transparent;cursor:pointer;font:inherit;font-size:12px;font-weight:600;color:var(--tx2);padding:2px 4px;border-radius:5px;max-width:100%}
+.loc-nut:hover{background:var(--line2)}
+.loc-nut.on{color:var(--accent)}
+.loc-nut>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc-nut svg.i{width:13px;height:13px;flex-shrink:0;opacity:.85}
+.loc-menu{position:absolute;top:calc(100% + 4px);right:0;z-index:30;min-width:168px;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(16,32,64,.16);padding:4px;font-weight:400}
+.loc-item{display:flex;align-items:center;gap:7px;width:100%;border:0;background:transparent;cursor:pointer;font:inherit;font-size:12.5px;color:var(--tx);padding:7px 8px;border-radius:6px;text-align:left}
+.loc-item:hover{background:var(--line2)}
+.loc-item.chon{color:var(--accent);font-weight:600}
+.loc-item svg.i{width:14px;height:14px;color:var(--accent);flex-shrink:0}
+.loc-item .loc-sp{width:14px;flex-shrink:0}
+.loc-item .loc-ten{flex:1}
+.loc-item .loc-dem{font-size:11px;color:var(--tx3);background:var(--line2);border-radius:20px;padding:1px 8px;min-width:22px;text-align:center}
+
+/* Nhãn phủ góc trên phải vùng xem (L200–205). Prototype gắn lên trang giấy; ở đây trang do pdf.js vẽ nên gắn lên
+   vùng xem và giữ cố định khi cuộn. */
+.nhan-trang{position:sticky;top:0;align-self:flex-end;margin:-10px -8px -40px 0;display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font:600 11px/1.5 var(--font);z-index:6;box-shadow:0 2px 6px rgba(16,32,64,.12);flex-shrink:0}
+.nhan-trang svg.i{width:13px;height:13px}
+.nhan-trang.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-b)}
+.nhan-trang.loi{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-b)}
+.nhan-trang.dang{background:var(--sel);color:var(--accent);border:1px solid var(--sel-b)}
+
+/* Nhật ký (L316–320). Màu nhãn chép từ ksStats() L987–1003. */
+.log{flex:1;min-height:0;overflow-y:auto;background:#161a20;padding:12px 16px;font:12.5px/1.7 var(--mono);user-select:text}
+.log .ln{display:flex;gap:12px;white-space:pre-wrap}
+.log .time{color:#7b8491;flex-shrink:0}
+.log .tag{width:56px;flex-shrink:0}
+.log .txt{color:#d0d5dc;min-width:0;overflow-wrap:anywhere}
+.log .t-info,.log .t-token{color:#9aa3ae}
+.log .t-ok{color:#6ccb7f}
+.log .t-loi{color:#ff9aa5}
+.log .t-xong{color:#fff}
+
+/* Hộp Xác nhận ký: danh sách chứng thư dạng nút chọn */
+.ct-ds{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.ct-pin{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.ct-pin-o{display:flex;align-items:center;gap:10px}
+.ct-pin-o .fld{flex:1;height:34px;letter-spacing:.12em}
+.ct-pin-o .fld::placeholder{letter-spacing:0}
+.ct-pin-luu{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.ct-pin-luu-o{display:flex;align-items:center;gap:8px}
+.ct-pin-luu-o.tat{color:var(--tx3)}
+.ct-dong{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.ct-dong:last-child{border-bottom:0}
+.ct-dong:hover:not(.tat){background:var(--hover)}
+.ct-dong.chon{background:var(--sel)}
+.ct-dong.tat{cursor:default;color:var(--tx3)}
+.ct-dong input[type=radio]{margin:3px 0 0;flex-shrink:0}
+.ct-noi{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ct-ten{display:flex;align-items:center;gap:8px;min-width:0}
+.ct-ten b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ct-dong.tat .ct-ten b{font-weight:500}
+.ct-the{display:inline-flex;align-items:center;gap:3px;flex-shrink:0;font-size:11px;font-weight:600;color:var(--accent);background:var(--sel);border:1px solid var(--sel-b);border-radius:999px;padding:0 7px}
+.ct-the svg.i{width:12px;height:12px}
+.ct-phu{font-size:12px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ct-dong.tat .ct-phu{color:var(--tx3)}
+.ct-lydo{font-size:12px;color:var(--danger)}
+.bao.ct-bao{margin-top:12px}
+.popup .than-p > .xem-tt{justify-content:center;padding:18px 0}
+
+/* Khung chữ ký trên bản xem trước (prototype L213–220, L445–449): lớp ngoài giữ tay nắm, lớp trong cắt nội dung.
+   Chữ dùng Times New Roman, màu đen, cỡ theo trang như khối thật của lõi. */
+.giay .chuky-o{position:absolute;z-index:2}
+.giay .chuky-o.keo-duoc{cursor:move;touch-action:none}
+.giay .chuky-o .chuky{position:absolute;inset:0;display:flex;align-items:center;gap:3%;overflow:hidden;border:1.5px dashed var(--accent);background:rgba(10,84,184,.05);border-radius:2px;user-select:none}
+.giay .chuky-o.keo-duoc:hover .chuky{background:rgba(10,84,184,.1)}
+.giay .chuky-o .chuky.text{align-items:flex-start}
+.giay .chuky-o .chuky.neo-phai{justify-content:flex-end}
+.giay .chuky-o .chuky.image{justify-content:center}
+.giay .chuky-o .chuky img{height:100%;max-width:45%;object-fit:contain;flex-shrink:0;pointer-events:none}
+.giay .chuky-o .chuky.image img{max-width:100%;width:100%}
+/* Vị trí ảnh so với chữ (kiểu "Ảnh + thông tin"), khớp cách lõi dựng khối (image_text_boxes). */
+.giay .chuky-o .chuky.bo-right{flex-direction:row-reverse;justify-content:space-between}
+.giay .chuky-o .chuky.bo-top,.giay .chuky-o .chuky.bo-bottom{flex-direction:column;justify-content:center;gap:4%}
+.giay .chuky-o .chuky.bo-bottom{flex-direction:column-reverse}
+.giay .chuky-o .chuky.bo-top img,.giay .chuky-o .chuky.bo-bottom img{flex:1 1 0;min-height:0;width:100%;height:auto;max-width:100%;object-fit:contain}
+.giay .chuky-o .chuky.bo-top .tt-ky,.giay .chuky-o .chuky.bo-bottom .tt-ky{flex:none;max-width:100%}
+/* Phần ảnh tự chỉnh (TD-51, lớp tu-chia, --anh = % khối theo chiều xếp); khoảng cách dùng đơn vị cqw / cqh của khung. */
+.giay .chuky-o{container-type:size}
+.giay .chuky-o .chuky.tu-chia img{flex:0 0 var(--anh);width:var(--anh);max-width:none;height:100%}
+.giay .chuky-o .chuky.tu-chia.bo-top,.giay .chuky-o .chuky.tu-chia.bo-bottom{justify-content:flex-start}
+.giay .chuky-o .chuky.tu-chia.bo-bottom{justify-content:space-between}
+.giay .chuky-o .chuky.tu-chia.bo-top img,.giay .chuky-o .chuky.tu-chia.bo-bottom img{flex:0 0 var(--anh);height:var(--anh);width:100%}
+/* Kiểu "Tự do" (TD-52): ảnh và chữ ở đúng ô kéo thả (--ax… ô ảnh, --cx… ô chữ), giống lõi. */
+.giay .chuky-o .chuky.tu-do{display:block}
+.giay .chuky-o .chuky.tu-do img{position:absolute;left:var(--ax);top:var(--ay);width:var(--aw);height:var(--ah);max-width:none;object-fit:contain}
+.giay .chuky-o .chuky.tu-do .tt-ky{position:absolute;left:var(--cx);top:var(--cy);width:var(--cw);height:var(--ch);display:flex;flex-direction:column;justify-content:safe center}
+.giay .chuky-o .tt-ky{font-family:'Times New Roman',Times,serif;line-height:1.15;color:#000;white-space:nowrap;min-width:0;overflow:hidden;pointer-events:none}
+.giay .chuky-o .tay{position:absolute;width:10px;height:10px;background:#fff;border:1.5px solid var(--accent);border-radius:2px;z-index:2}
+.giay .chuky-o .tay.tl{left:-5px;top:-5px;cursor:nwse-resize}
+.giay .chuky-o .tay.tr{right:-5px;top:-5px;cursor:nesw-resize}
+.giay .chuky-o .tay.bl{left:-5px;bottom:-5px;cursor:nesw-resize}
+.giay .chuky-o .tay.br{right:-5px;bottom:-5px;cursor:nwse-resize}
+/* Cạnh: dải trong suốt dọc mép (giữa hai góc), con trỏ kéo ngang / dọc. */
+.giay .chuky-o .tay.t,.giay .chuky-o .tay.b{left:5px;right:5px;width:auto;height:8px;background:none;border:0;cursor:ns-resize;z-index:1}
+.giay .chuky-o .tay.t{top:-4px}.giay .chuky-o .tay.b{bottom:-4px}
+.giay .chuky-o .tay.l,.giay .chuky-o .tay.r{top:5px;bottom:5px;height:auto;width:8px;background:none;border:0;cursor:ew-resize;z-index:1}
+.giay .chuky-o .tay.l{left:-4px}.giay .chuky-o .tay.r{right:-4px}
+/* Hộp File đã ký / trùng tên (prototype L176–183, L1462–1464) và hộp xác nhận Xóa file gốc. */
+.trung-bao{margin-bottom:12px}
+.trung-bao b{display:inline;margin:0}
+.trung-dong .co{flex-shrink:0;align-self:center;display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--danger);background:var(--danger-bg);border:1px solid var(--danger-b);border-radius:4px;padding:1px 7px}
+.trung-dong .co svg.i{width:12px;height:12px;color:var(--danger);margin-top:0}
+.trung-hint{margin-top:10px;line-height:1.6}
+.thay-ds{margin:12px 0 0;padding-left:18px;line-height:1.7}
+
+/* Hàng xem trước: cột ảnh thu nhỏ trang (văn bản từ 2 trang) + vùng xem. */
+.xem-hang{flex:1;min-height:0;display:flex}
+.xem-hang > .vungxem{flex:1;min-width:0}
+.trang-nho{width:118px;flex-shrink:0;overflow-y:auto;background:#f3f5f8;border-right:1px solid var(--line);padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:10px}
+.tn-trang{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px;border:0;border-radius:6px;background:transparent;cursor:default;color:var(--tx2);font-size:11.5px}
+.tn-trang:hover{background:var(--hover)}
+.tn-giay{display:block;width:84px;min-height:60px;background:#fff;box-shadow:0 1px 4px rgba(16,32,64,.18);outline:2px solid transparent;outline-offset:1px;border-radius:1px}
+.tn-giay canvas{display:block}
+.tn-trang.chon .tn-giay{outline-color:var(--accent)}
+.tn-trang.chon .tn-so{color:var(--accent);font-weight:600}
+.tn-trang.co-ky::after{content:'';position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px #fff}
+/* Khung chữ ký đang chọn (Delete để xoá). */
+.giay .chuky-o.chon .chuky{border-style:solid;border-width:2px;background:rgba(10,84,184,.1)}
+/* Lượt ký Chính / Nháy trên thanh xem trước. */
+.dieuhuong .luot-ky .seg{height:24px;padding:0 9px;font-size:12px}
+.ky-nhac{margin:8px 12px 0}
+/* Menu chuột phải trên bản xem trước. */
+.ky-menu{position:fixed;z-index:80;width:260px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(16,32,64,.2);padding:4px}
+.ky-menu .km-dau{padding:6px 10px 4px;font-size:11.5px;color:var(--tx3);font-weight:600}
+.ky-menu .km-muc{width:100%;display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border:0;border-radius:5px;background:transparent;text-align:left;cursor:default;color:var(--tx);font-size:12.5px}
+.ky-menu .km-muc:hover:not(:disabled){background:var(--sel)}
+.ky-menu .km-muc:disabled{opacity:.4}
+.ky-menu .km-muc svg.i{width:15px;height:15px;color:var(--tx2)}
+.ky-menu .km-muc kbd{font:11px var(--mono);color:var(--tx3);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+.ky-menu .km-bocuc{display:flex;align-items:center;gap:8px;padding:5px 10px}
+.ky-menu .km-nhan{flex:1;font-size:12.5px;color:var(--tx)}
+.ky-menu .km-bocuc .seg{height:24px;padding:0 8px;font-size:12px}
+.ky-menu .km-chu{padding:6px 10px 6px;margin-top:2px;border-top:1px solid var(--line);font-size:11px;color:var(--tx3)}

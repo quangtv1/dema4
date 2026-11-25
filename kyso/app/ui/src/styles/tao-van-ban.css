@@ -1,0 +1,136 @@
+/* Màn Tạo văn bản — prototype L227–277 (ghép biến, menu chọn nguồn, bảng Excel) và L371–373 (form nhập trực tiếp). */
+
+/* Các độ rộng prototype viết bằng style nội tuyến (L1188, L1220); ở đây thành class vì CSP chặn style nội tuyến. */
+.fld.sheet{flex:0 0 auto;width:128px}
+.fld.so.dong-td{flex:0 0 66px;width:66px}
+.cot-bien{grid-template-columns:minmax(0,1fr) 150px 24px}
+.ds-dau .so-dau{text-align:center}
+.bao.dai{max-width:none}
+.bao .dan{flex:1;min-width:0}
+.bao .nutma{margin:-4px -6px -4px 0;color:inherit}
+.chan .dan svg.i.loi-chu,.chan .dan .loi-chu{color:var(--danger)}
+
+/* Ghép biến (tab Mẫu) */
+.bien-wrap{flex:1;min-height:0;display:flex;flex-direction:column}
+.bien-rows{flex:1;min-height:0;overflow-y:auto}
+.bdong{display:grid;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line)}
+.bdong:last-child{border-bottom:0}
+.bchip{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bchip.da{background:#e6f6ec;border-color:#a9dfbb;color:#1c7a3b}
+.bchip.chua{background:#ffe9cc;border-color:#f3c98f;color:#9a5300}
+.btt{display:flex;align-items:center;justify-content:center}
+.btt svg.i{width:16px;height:16px;color:var(--ok)}
+.bcham{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;border-radius:50%;background:var(--danger);color:#fff;font-size:11px;font-weight:700;line-height:1}
+.daytrai .dem.loi-chu{color:var(--danger)}
+.daytrai .dem.ok-chu{color:var(--ok)}
+.daytrai > svg.i{color:var(--ok)}
+
+/* Menu chọn nguồn của biến. Prototype đặt position:absolute (L248) và để danh sách overflow:visible;
+   ở đây danh sách biến cuộn được nên menu dùng position:fixed, toạ độ tính từ nút bấm. */
+.lt-pick{position:relative;min-width:0}
+.lt-nut{display:flex;align-items:center;gap:4px;width:100%;height:28px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font:inherit;font-size:12px;padding:0 6px;color:var(--tx)}
+.lt-nut:hover:not(:disabled){border-color:var(--accent)}
+.lt-nut:disabled{cursor:default;background:#f4f5f7}
+.lt-nut.mo{border-color:var(--accent);box-shadow:0 0 0 2px var(--sel)}
+.lt-nut.chua{color:var(--tx3)}
+.lt-nut>span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.lt-nut svg.i{width:13px;height:13px;flex-shrink:0;color:var(--tx3)}
+.lt-menu{position:fixed;z-index:45;width:290px;max-width:84vw;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(16,32,64,.18);padding:6px}
+.lt-menu>.fld{width:100%;height:32px;margin-bottom:2px;padding-right:10px}
+.lt-nhom{font-size:11px;color:var(--tx3);padding:6px 8px 3px}
+.lt-cols{max-height:216px;overflow-y:auto}
+.lt-trong{font-size:12px;color:var(--tx3);padding:6px 8px}
+.lt-col{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;border:0;background:transparent;cursor:pointer;padding:6px 8px;border-radius:6px;text-align:left;font:inherit}
+.lt-col:hover{background:var(--line2)}
+.lt-col.chon{background:var(--sel)}
+.lt-col .vn{display:flex;flex-direction:column;min-width:0}
+.lt-col .vn b{font-weight:500;font-size:12.5px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lt-col .c{font-size:11px;color:var(--tx3);font-variant-numeric:tabular-nums}
+.lt-bo{display:flex;align-items:center;gap:5px;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;color:var(--danger);padding:7px 8px;border-radius:6px;font:inherit;font-size:12.5px;margin-top:3px;border-top:1px solid var(--line)}
+.lt-bo:hover{background:var(--danger-bg)}
+.lt-bo svg.i{width:13px;height:13px}
+
+/* Bảng xem nhanh dữ liệu */
+.xls-bang{flex-shrink:0;border:1px solid var(--line);border-radius:8px;margin-bottom:2px;background:#fff;overflow:hidden}
+.xls-dau{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);font-size:12px;background:var(--panel)}
+.xls-dau b{font-weight:600}
+.xls-dau .xq{color:var(--tx3)}
+.xls-dau .dan{flex:1}
+.xls-dau svg.i{width:14px;height:14px;color:var(--tx2)}
+.xls-cuon{max-height:224px;overflow:auto}
+.xls-grid{width:max-content;min-width:100%;font-size:12px}
+.xls-row{display:flex;border-bottom:1px solid var(--line);cursor:pointer}
+.xls-row:last-child{border-bottom:0}
+.xls-cell{flex:0 0 140px;padding:5px 10px;border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.xls-cell:first-child{border-left:1px solid var(--line)}
+.xls-cell.stt{flex:0 0 46px;text-align:center;color:var(--tx3)}
+.xls-row.hd{position:sticky;top:0;z-index:1;font-weight:600;background:#f3f5f8;color:var(--tx);cursor:default}
+.xls-row:hover:not(.hd){background:var(--line2)}
+.xls-row.chon{background:var(--sel)}
+.xls-row.them{cursor:default;color:var(--tx3)}
+.xls-row.them .xls-cell{flex:1 0 auto;border-left:0}
+/* Thanh sheet kiểu Excel ở chân bảng dữ liệu */
+.xls-sheets{display:flex;align-items:stretch;gap:2px;padding:0 8px;border-top:1px solid var(--line);background:var(--panel);overflow-x:auto;min-height:28px}
+.xls-sheet{border:0;border-bottom:2px solid transparent;background:none;padding:4px 14px;font-size:12px;color:var(--tx2);white-space:nowrap;cursor:pointer}
+.xls-sheet:hover:not(:disabled){background:var(--hover);color:var(--tx)}
+.xls-sheet.chon{background:#fff;color:var(--accent-a);font-weight:600;border-bottom-color:var(--accent);box-shadow:inset 1px 0 0 var(--line),inset -1px 0 0 var(--line)}
+.xls-sheet:disabled{cursor:default}
+.xls-dang{display:flex;align-items:center;gap:6px;margin-left:8px;font-size:12px;color:var(--tx3)}
+/* Khung nguồn: nhãn | ô file (giãn hết chỗ trống) | cột 0 px giữ chỉ số cột | khối nút 2 cột sát mép phải. Nâng cao theo đúng các cột đó. */
+.nguon{display:grid;grid-template-columns:104px minmax(200px,1fr) 0 auto auto auto;gap:8px 10px;align-items:center;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:8px;flex-shrink:0}
+.ng-nhan{grid-column:1;display:flex;align-items:center;gap:6px;white-space:nowrap;color:var(--tx);font-weight:500}
+.ng-file{grid-column:2;display:flex;align-items:center;gap:6px;min-width:0}
+.ng-file > .o,.ng-file > .fld{flex:1;min-width:0}
+.ng-file > .fld{padding-right:10px}
+.ng-file > .nut{min-width:0;padding:0 11px}
+.ng-c3{grid-column:4}
+.ng-c4{grid-column:5}
+.ng-c34{grid-column:4 / 6}
+.ng-o{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin:0}
+.nguon > .nut.ng-c3,.nguon > .nut.ng-c4{justify-self:stretch;height:30px;font-size:inherit;padding:0 10px}
+.ng-ghichu{grid-column:2 / 5;color:var(--tx2)}
+.ng-ngan{grid-column:1 / -1;height:0;border-top:1px dashed var(--line);margin:2px 0}
+.ng-vidu{flex:0 1 auto;max-width:45%;color:var(--tx3);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nut.xem-bang{gap:6px}
+.nut.xem-bang .mui{width:13px;height:13px;color:var(--tx3);transition:transform .15s}
+.nut.xem-bang.mo{background:var(--sel);border-color:var(--sel-b);color:var(--accent-a)}
+.nut.xem-bang.mo .mui{transform:rotate(180deg);color:var(--accent)}
+/* Ô Tô màu biến trên thanh xem trước */
+.dieuhuong .to-bien{font-size:12.5px;color:var(--tx2);flex-shrink:0}
+.dieuhuong .ngan-dh{width:1px;height:18px;background:var(--line);margin:0 6px;flex-shrink:0}
+
+/* Nhập trực tiếp */
+.form-truong{padding:12px 14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1}
+.form-truong label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--tx2)}
+.form-truong .fld{padding-right:10px}
+.form-truong code{font-family:var(--mono);font-size:11.5px}
+
+/* Danh sách Kết quả */
+.dong .canh-dong{display:inline-flex;color:#b07800}
+.dong .canh-dong svg.i{color:#b07800;width:14px;height:14px}
+.dong .ten-cot{display:flex;flex-direction:column;min-width:0}
+.dong .ten-cot .ly-do{font-size:11.5px;color:var(--danger);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Xem trước PDF: các trang (.giay chứa canvas do pdf.js vẽ) là con trực tiếp của .vungxem về mặt bố cục. */
+.trang-ds{display:contents}
+/* Bản xem trước có sẵn trong bộ đệm về gần như ngay: chỉ làm mờ, hiện "Đang tạo…" nếu chờ quá 0,3 giây. */
+.vungxem.mo-di .giay{animation:xem-mo .15s ease .3s both}
+@keyframes xem-mo{from{opacity:1}to{opacity:.45}}
+@keyframes xem-hien{from{opacity:0}to{opacity:1}}
+.xem-tt{display:flex;align-items:center;gap:8px;color:var(--tx2);font-size:12.5px;padding:8px 0}
+.xem-tt.noi{position:sticky;top:0;z-index:5;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 14px;box-shadow:0 4px 14px rgba(16,32,64,.12);animation:xem-hien .15s ease .3s both}
+
+/* Kéo thả file vào cửa sổ */
+.tha-file{position:absolute;inset:8px 12px 12px;z-index:55;border:2px dashed var(--accent);border-radius:10px;background:rgba(231,240,252,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--accent-a);font-size:14px;font-weight:600;pointer-events:none}
+.tha-file span{font-weight:400;font-size:12.5px;color:var(--tx2)}
+.tha-file svg.i{width:34px;height:34px;stroke-width:1.4}
+/* Nút thu gọn khung nguồn (cột cuối, dòng 1) và khung thu gọn một dòng */
+.ng-thu{grid-column:6;grid-row:1;align-self:center}
+.nguon-gon{display:flex;align-items:center;gap:14px;height:40px;padding:0 6px 0 14px;background:#fff;border:1px solid var(--line);border-radius:8px;flex-shrink:0;cursor:pointer;min-width:0;white-space:nowrap}
+.nguon-gon:hover{background:var(--line2)}
+.nguon-gon:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.gon-muc{display:inline-flex;align-items:center;gap:6px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.gon-muc svg.i{color:var(--tx2);flex-shrink:0}
+.gon-muc.trong{color:var(--tx3);font-weight:400}
+.gon-phu{color:var(--tx3);font-size:12px;flex-shrink:0}
+.nguon-gon .dan{flex:1}

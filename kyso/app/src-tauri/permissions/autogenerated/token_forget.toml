@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-token-forget"
+description = "Enables the token_forget command without any pre-configured scope."
+commands.allow = ["token_forget"]
+
+[[permission]]
+identifier = "deny-token-forget"
+description = "Denies the token_forget command without any pre-configured scope."
+commands.deny = ["token_forget"]

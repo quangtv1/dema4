@@ -1,0 +1,32 @@
+[package]
+name = "smks-notify"
+description = "Sao Mai Ký số: sự kiện nghiệp vụ, đăng ký thiết bị, thông báo Telegram (qua gateway hoặc trực tiếp), hàng đợi gửi lại. Không phụ thuộc Tauri."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]
+smks-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+getrandom = "0.3"
+tracing = "0.1"
+# HTTPS tới api.telegram.org / gateway bằng TLS của hệ điều hành (SChannel trên Windows): dùng kho chứng thư gốc
+# của Windows, không nhúng thêm thư viện mật mã hay danh sách CA vào file chạy.
+ureq = { version = "3", default-features = false, features = ["native-tls-no-default"] }
+
+[target.'cfg(windows)'.dependencies]
+# Đọc tên và phiên bản Windows từ registry bằng API an toàn.
+windows-registry = "0.6"
+# Địa chỉ MAC của card mạng đang dùng (chỉ khi người dùng cho phép), module `device::ffi`.
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Networking_WinSock",
+] }
+
+[lints]
+workspace = true

@@ -1,0 +1,292 @@
+<!-- Hộp Cấu hình — prototype mCauHinh() L1631–1638, cfgSig() L1558–1579, cfgToken() L1580–1591, cfgFolder() L1592–1602. -->
+@if (open()) {
+  @let d = draft();
+  @let p = profile();
+  @let b = box();
+  <app-popup title="Cấu hình" icon="gear" size="cauhinh" (closed)="close()">
+    <div class="tabch">
+      <button type="button" [class.chon]="tab() === 'sig'" (click)="setTab('sig')"><svg icon="stamp"></svg>Chữ ký theo khổ giấy</button>
+      <button type="button" [class.chon]="tab() === 'token'" (click)="setTab('token')"><svg icon="usb"></svg>USB Token &amp; chứng thư số</button>
+      <button type="button" [class.chon]="tab() === 'folder'" (click)="setTab('folder')"><svg icon="folder"></svg>Thư mục &amp; tên file</button>
+    </div>
+    <div class="cfg-than">
+      @if (!d) {
+        <div class="bao canh">
+          <svg icon="warn"></svg>
+          <span><b>Chưa đọc được cấu hình</b>{{ cfg.warning() ?? (cfg.config() ? '' : 'Đang đọc cấu hình…') }}</span>
+        </div>
+      } @else if (tab() === 'sig' && p && b) {
+        <div class="cfg-sig">
+          <!-- Cột trái: danh sách mẫu -->
+          <div class="cfg-mau">
+            <div class="cfg-mau-ds">
+              @for (pr of d.signature.profiles; track pr.id; let i = $index) {
+                <button type="button" class="pc" [class.chon]="i === sel()" (click)="sel.set(i)">
+                  <span class="pc-ten"><span class="dan">{{ pr.name }}</span>
+                    @if (pr.isDefault) {
+                      <span class="tag-pill">Mặc định</span>
+                    }
+                  </span>
+                  <span class="hint">{{ summary(pr) }} · {{ pageLabel[pr.page].toLowerCase() }}</span>
+                </button>
+              }
+            </div>
+            <button class="nut" type="button" (click)="addProfile()"><svg icon="plus"></svg>Thêm mẫu</button>
+          </div>
+
+          <!-- Cột giữa: mẫu đang chọn + thông tin chữ ký -->
+          <div class="the cfg-giua">
+            @let pos = d.signature.positions[0];
+            @let posMore = d.signature.positions.length - 1 + d.signature.initialPositions.length;
+            @let own = d.signature.perFile ? ownCount() : 0;
+            @if (pos || posMore > 0 || own) {
+              <div class="bao canh dai">
+                <svg icon="info"></svg>
+                <span class="dan">
+                  <b>Đang dùng vị trí tự đặt ở màn Vị trí chữ ký</b>
+                  @if (pos) {
+                    Trang {{ pos.page || 'cuối' }}, cách trái {{ pct(pos.xRatio) }}%, cách trên {{ pct(pos.yRatio) }}%, áp cho mọi văn bản thay cho mẫu theo khổ giấy.
+                  }
+                  @if (posMore > 0) {
+                    Thêm {{ posMore }} khung tự đặt (chữ ký chính / ký nháy).
+                  }
+                  @if (own) {
+                    {{ own }} file có vị trí riêng{{ pos ? '' : '; các file khác theo mẫu khổ giấy' }}.
+                  }
+                </span>
+                <button class="nut nho" type="button" (click)="clearPosition()">Dùng mẫu</button>
+              </div>
+            }
+            <div class="cfg-dau">
+              <h3 class="dan">{{ p.name }}
+                <span class="trai" tip="Mẫu tự áp dụng cho các văn bản có trang đầu khổ {{ p.paper }}.&#10;Khi ký, app chọn mẫu theo khổ giấy của từng văn bản; khổ không có mẫu thì dùng mẫu mặc định."></span>
+              </h3>
+              @if (!p.isDefault) {
+                <button class="lk tron" type="button" (click)="makeDefault()">Đặt làm mặc định</button>
+              }
+              @if (d.signature.profiles.length > 1 && !p.isDefault) {
+                <button class="lk tron nguy" type="button" (click)="deleteProfile()">Xóa mẫu</button>
+              }
+            </div>
+            <div class="grid-lbl">
+              <span>Khổ giấy</span>
+              <div class="cfg-kho">
+                <select class="fld" (change)="setProfile({ paper: $any(val($event)) })">
+                  @for (k of papers; track k) {
+                    <option [value]="k" [selected]="k === p.paper">{{ k }} ({{ paperMm[k][0] }} × {{ paperMm[k][1] }})</option>
+                  }
+                </select>
+                <button type="button" class="chip" [class.chon]="p.orientation === 'portrait'" (click)="setProfile({ orientation: 'portrait' })">Dọc</button>
+                <button type="button" class="chip" [class.chon]="p.orientation === 'landscape'" (click)="setProfile({ orientation: 'landscape' })">Ngang</button>
+              </div>
+              <span>Vị trí</span>
+              <div class="vt-pick">
+                <div class="vt-trang">
+                  <i></i><i></i><i></i>
+                  @for (a of anchors; track a) {
+                    <button type="button" [class]="'vt-o vt-' + a" [class.chon]="a === p.anchor" [title]="posLabel[a]" (click)="setProfile({ anchor: a })"></button>
+                  }
+                </div>
+                <span class="vt-nhan">{{ posLabel[p.anchor].charAt(0).toUpperCase() + posLabel[p.anchor].slice(1) }}</span>
+              </div>
+              <label for="cfg-scale">Tỉ lệ khung</label>
+              <div class="cfg-truot">
+                <input id="cfg-scale" type="range" min="40" max="200" step="10" [value]="p.scale" (input)="setProfile({ scale: num($event) })" />
+                <span>{{ p.scale }}%</span>
+              </div>
+              <label for="cfg-page">Trang ký</label>
+              <select id="cfg-page" class="fld" (change)="setProfile({ page: $any(val($event)) })">
+                @for (pg of pages; track pg) {
+                  <option [value]="pg" [selected]="pg === p.page">{{ pageLabel[pg] }}</option>
+                }
+              </select>
+            </div>
+            <div><button advBtn [open]="advSig()" (click)="advSig.set(!advSig())"></button></div>
+            @if (advSig()) {
+              <div class="the-nc grid-lbl">
+                <label for="cfg-ten">Tên mẫu</label>
+                <input id="cfg-ten" class="fld" [value]="p.name" (change)="setProfile({ name: val($event) })" />
+                <span>Cách lề (mm)</span>
+                <div class="cfg-le">
+                  <label class="hop hint">Ngang<input class="fld so" type="number" min="0" max="100" [value]="p.marginMm.x" (change)="setMargin('x', num($event))" /></label>
+                  <label class="hop hint">Dọc<input class="fld so" type="number" min="0" max="150" [value]="p.marginMm.y" (change)="setMargin('y', num($event))" /></label>
+                </div>
+              </div>
+            }
+
+            <div class="divider"></div>
+            <div class="nhom-p">Thông tin chữ ký (dùng cho mọi mẫu)</div>
+            <div class="grid-lbl">
+              <label for="cfg-mode">Hiển thị</label>
+              <select id="cfg-mode" class="fld" (change)="setDisplay($any(val($event)))">
+                @for (m of modes; track m.id) {
+                  <option [value]="m.id" [selected]="m.id === d.signature.display">{{ m.label }}</option>
+                }
+              </select>
+              <span>Ảnh</span>
+              <div class="cfg-anh">
+                <span pathInput [value]="d.signature.imagePath ?? ''" placeholder="Chưa chọn ảnh chữ ký / con dấu" (cleared)="clearImage()"></span>
+                <button class="nut" type="button" (click)="pickImage()"><svg icon="image"></svg>Chọn…</button>
+              </div>
+              @if (d.signature.display === 'imageAndText') {
+                <span>Vị trí ảnh</span>
+                <div class="cfg-kho">
+                  @for (l of imageLayouts; track l.id) {
+                    <button type="button" class="chip" [class.chon]="(d.signature.imageLayout ?? 'left') === l.id" [title]="l.title" (click)="setSig('imageLayout', l.id)">{{ l.label }}</button>
+                  }
+                </div>
+              }
+              <span>Loại ảnh</span>
+              <div class="cfg-kho">
+                <button type="button" class="chip" [class.chon]="d.signature.imageKind === 'seal'" (click)="setSig('imageKind', 'seal')">Con dấu</button>
+                <button type="button" class="chip" [class.chon]="d.signature.imageKind === 'wetSignature'" (click)="setSig('imageKind', 'wetSignature')">Chữ ký tay</button>
+              </div>
+              <label for="cfg-font">Font chữ</label>
+              <div class="cfg-font">
+                <select id="cfg-font" class="fld" (change)="setFont('family', val($event))">
+                  @for (f of fonts; track f) {
+                    <option [value]="f" [selected]="f === d.signature.font.family">{{ f }}</option>
+                  }
+                </select>
+                <label class="hop hint">Cỡ<input class="fld so" type="number" min="6" max="24" step="0.5" [value]="d.signature.font.size" (change)="setFont('size', num($event))" /></label>
+                <label class="hop hint">Màu<input class="mau" type="color" [value]="d.signature.font.color" (input)="setFont('color', val($event))" /></label>
+              </div>
+              <label for="cfg-reason">Lý do ký</label>
+              <input id="cfg-reason" class="fld" maxlength="200" [value]="d.signature.reason" (change)="setSig('reason', val($event))" />
+              <label for="cfg-loc">Nơi ký</label>
+              <input id="cfg-loc" class="fld" maxlength="200" [value]="d.signature.location" (change)="setSig('location', val($event))" />
+            </div>
+            <div><button advBtn label="Ảnh nâng cao" [open]="advImg()" (click)="advImg.set(!advImg())"></button></div>
+            @if (advImg()) {
+              <div class="the-nc grid-lbl">
+                <label for="cfg-dam">Độ đậm ảnh</label>
+                <div class="cfg-truot">
+                  <input id="cfg-dam" type="range" min="40" max="250" step="5" [value]="d.signature.image.darkness" (input)="setImage('darkness', num($event))" />
+                  <span>{{ d.signature.image.darkness }}</span>
+                </div>
+                @if (d.signature.imageKind === 'wetSignature') {
+                  <label for="cfg-net">Độ dày nét</label>
+                  <div class="cfg-truot">
+                    <input id="cfg-net" type="range" min="0" max="200" step="10" [value]="d.signature.image.stroke" (input)="setImage('stroke', num($event))" />
+                    <span>{{ d.signature.image.stroke }}%</span>
+                  </div>
+                  <span>Màu mực</span>
+                  <div class="cfg-font">
+                    <label class="hop"><input type="checkbox" [checked]="!!d.signature.image.inkColor" (change)="setImage('inkColor', checked($event) ? '#1a3fa0' : null)" />Đổi màu mực</label>
+                    @if (d.signature.image.inkColor; as ink) {
+                      <input class="mau" type="color" [value]="ink" (input)="setImage('inkColor', val($event))" />
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Cột phải: xem trước mẫu -->
+          <div class="the cfg-xem">
+            <b>Xem trước</b>
+            <div class="cfg-xem-nen">
+              <div class="cfg-giay" [style.width.px]="miniSize().w" [style.height.px]="miniSize().h">
+                <div class="cfg-vach"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                @if (d.signature.display !== 'hidden') {
+                  <div class="cfg-o" [class]="'cfg-o ' + d.signature.display + ' bo-' + (d.signature.imageLayout ?? 'left')" [style.left.%]="b.x" [style.top.%]="b.y" [style.width.%]="b.w" [style.height.%]="b.h">
+                    @if (d.signature.display !== 'text' && imageUrl(); as url) {
+                      <img alt="" [src]="url" />
+                    }
+                    @if (d.signature.display !== 'image') {
+                      <span class="cfg-tt" [style.color]="d.signature.font.color"><b>Ký bởi: [Tên chứng thư]</b>Ngày ký: dd/mm/yyyy</span>
+                    }
+                  </div>
+                }
+              </div>
+              <div class="hint">{{ p.paper }} {{ p.orientation === 'landscape' ? 'ngang' : 'dọc' }} · {{ p.scale }}% · {{ posLabel[p.anchor] }} · {{ pageLabel[p.page].toLowerCase() }}</div>
+              @if (d.signature.display === 'hidden') {
+                <div class="hint">Chữ ký ẩn: không có khối hiển thị trên trang.</div>
+              }
+            </div>
+          </div>
+        </div>
+      } @else if (tab() === 'token') {
+        <div class="the cfg-tk">
+          <div class="cfg-dau">
+            <b class="dan">Chứng thư số trên máy
+              <span class="trai" tip="Danh sách đọc từ kho chứng thư Windows (CurrentUser\My, LocalMachine\My); không hỏi PIN.&#10;Cắm USB Token và cài driver của token để chứng thư hiện ở đây."></span>
+            </b>
+            <button class="nut nho" type="button" [disabled]="certBusy()" (click)="scanCerts()"><svg icon="refresh" class="nho"></svg>Làm mới</button>
+          </div>
+          @if (certError(); as e) {
+            <div class="bao loi dai"><svg icon="alert"></svg><span>{{ e }}</span></div>
+          }
+          <div class="bang-tk">
+            <div class="h"><span>Tên chứng thư</span><span>Nhà cung cấp</span><span>Hiệu lực đến</span><span>Trạng thái</span><span></span></div>
+            @for (c of shownCerts(); track c.thumbprint) {
+              <div class="r" [title]="c.reason ?? (c.keyProvider ?? '')">
+                <span class="ten-tk"><svg [icon]="c.source === 'usbToken' ? 'usb' : 'file'"></svg><span class="dan">{{ c.commonName }}</span>
+                  @if (hasPin(c.thumbprint)) {
+                    <span class="tag-pill tk-pin" title="Mã PIN của chứng thư này đang lưu trên máy (mã hoá theo tài khoản Windows); app tự nhập khi mở token">Đã lưu PIN</span>
+                  }
+                </span>
+                <span class="hint">{{ c.issuerCommonName }}</span>
+                <span class="hint">{{ fmtDate(c.validTo) }}</span>
+                <span class="ketnoi" [class.tat]="!c.canSign"><i></i>{{ c.canSign ? (c.source === 'usbToken' ? 'USB Token · ký được' : 'Ký được') : 'Không ký được' }}</span>
+                <span class="tk-tac">
+                  @if (hasPin(c.thumbprint)) {
+                    <button class="nutma" type="button" title="Xoá mã PIN đã lưu của chứng thư này (xoá ngay)" [disabled]="pinBusy()" (click)="forgetPin(c.thumbprint)"><svg icon="key"></svg></button>
+                  }
+                  <button class="nutma" type="button" title="Xoá khỏi danh sách của ứng dụng (chứng thư vẫn còn trong Windows; hiện lại được)" (click)="hideCert(c.thumbprint)"><svg icon="trash"></svg></button>
+                </span>
+              </div>
+            } @empty {
+              <div class="hint cfg-trong">{{ certBusy() ? 'Đang đọc kho chứng thư…' : 'Không có chứng thư số nào.' }}</div>
+            }
+          </div>
+          @if (hiddenCount(); as n) {
+            <div class="hint tk-an">Đã xoá {{ n }} chứng thư khỏi danh sách (vẫn còn trong kho chứng thư Windows). <button class="lk" type="button" (click)="unhideAll()">Hiện lại tất cả</button></div>
+          }
+          @if (pinError(); as e) {
+            <div class="bao loi dai"><svg icon="alert"></svg><span>{{ e }}</span></div>
+          }
+          <div class="hint">Mã PIN: nhập ở hộp Xác nhận ký (hoặc hộp của token). Chọn "Lưu PIN trên máy này" thì app mã hoá PIN theo tài khoản Windows và tự nhập ở các lần sau; PIN sai sẽ bị xoá ngay, app không tự thử lại. Bấm <svg icon="key" class="nho"></svg> để xoá PIN đã lưu.</div>
+        </div>
+      } @else if (tab() === 'folder') {
+        <div class="cfg-tm">
+          <div class="the">
+            <div class="row">
+              <span class="dan">Thư mục lưu file đã ký <span class="trai" tip="Mặc định tạo thư mục con DaKySo bên trong thư mục của file cần ký. Ký cả thư mục thì tạo thư mục &lt;tên thư mục&gt;_DaKySo cùng cấp (hoặc trong thư mục cố định), giữ nguyên thư mục con. File gốc luôn giữ nguyên."></span></span>
+              <label class="hop"><input type="radio" name="cfg-out" [checked]="d.output.mode === 'subfolder'" (change)="setOut('mode', 'subfolder')" />Thư mục con cạnh file gốc</label>
+              <input class="fld cfg-ngan" [value]="d.output.subfolderName" [disabled]="d.output.mode !== 'subfolder'" (change)="setOut('subfolderName', val($event))" />
+            </div>
+            <div class="row vach-tren">
+              <span class="dan"></span>
+              <label class="hop"><input type="radio" name="cfg-out" [checked]="d.output.mode === 'fixed'" [disabled]="!d.output.fixedFolder" (change)="setOut('mode', 'fixed')" />Một thư mục cố định</label>
+              <span pathInput class="cfg-dai" [value]="d.output.fixedFolder ?? ''" placeholder="Chưa chọn thư mục" (cleared)="setOut('fixedFolder', null); setOut('mode', 'subfolder')"></span>
+              <button class="nut" type="button" (click)="pickFolder()"><svg icon="folder"></svg>Chọn…</button>
+            </div>
+            <div class="row vach-tren">
+              <span class="dan">Hậu tố khi ký thành công <span class="trai" [tip]="'Ví dụ: QD_001_2026' + d.output.suffix + '.pdf'"></span></span>
+              <input class="fld cfg-ngan" [value]="d.output.suffix" (change)="setOut('suffix', val($event))" />
+            </div>
+          </div>
+          <div><button advBtn [open]="advFolder()" (click)="advFolder.set(!advFolder())"></button></div>
+          @if (advFolder()) {
+            <div class="the">
+              <div class="row">
+                <span class="dan">Ghi đè khi trùng tên <span class="trai" tip="Tắt: tự thêm (1), (2)… vào tên file mới. Không bao giờ ghi đè file gốc."></span></span>
+                <span class="cfg-bt">{{ d.output.overwrite ? 'Bật' : 'Tắt' }}</span>
+                <button type="button" class="sw" [class.on]="d.output.overwrite" [attr.aria-pressed]="d.output.overwrite" aria-label="Ghi đè khi trùng tên" (click)="setOut('overwrite', !d.output.overwrite)"></button>
+              </div>
+            </div>
+          }
+          <div class="hint">Cấu hình lưu tại {{ cfg.path() }}</div>
+        </div>
+      }
+      @if (error(); as e) {
+        <div class="bao canh dai cfg-loi"><svg icon="warn"></svg><span class="dan">{{ e }}</span></div>
+      }
+    </div>
+    <button foot class="lk tron trai" type="button" [disabled]="!d" (click)="resetDefaults()">Khôi phục mặc định</button>
+    <span foot class="hint">{{ saved() ? '✓ Đã lưu cấu hình' : 'Thay đổi áp dụng khi bấm Lưu' }}</span>
+    <button foot class="nut" type="button" (click)="close()">Hủy</button>
+    <button foot class="nut chinh rong" type="button" [disabled]="!d || busy()" (click)="save()"><svg icon="save"></svg>Lưu cấu hình</button>
+  </app-popup>
+}

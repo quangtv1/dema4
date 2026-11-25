@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-verify-file"
+description = "Enables the verify_file command without any pre-configured scope."
+commands.allow = ["verify_file"]
+
+[[permission]]
+identifier = "deny-verify-file"
+description = "Denies the verify_file command without any pre-configured scope."
+commands.deny = ["verify_file"]

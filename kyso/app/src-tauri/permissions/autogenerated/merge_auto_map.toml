@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-merge-auto-map"
+description = "Enables the merge_auto_map command without any pre-configured scope."
+commands.allow = ["merge_auto_map"]
+
+[[permission]]
+identifier = "deny-merge-auto-map"
+description = "Denies the merge_auto_map command without any pre-configured scope."
+commands.deny = ["merge_auto_map"]

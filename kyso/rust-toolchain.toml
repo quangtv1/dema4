@@ -1,0 +1,7 @@
+# Ghim phiên bản Rust stable cho cả nhóm và CI.
+# Không ghi host triple: máy phát triển và CI dùng host mặc định của mình.
+# Bản phát hành phải build bằng x86_64-pc-windows-msvc (xem docs/TECHNICAL_DECISIONS.md, mục Toolchain).
+[toolchain]
+channel = "1.100.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

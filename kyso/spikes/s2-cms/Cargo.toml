@@ -1,0 +1,20 @@
+[package]
+name = "s2-cms"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Spike đứng riêng, không thuộc workspace chính.
+[workspace]
+
+[dependencies]
+smks-core = { path = "../../crates/smks-core" }
+cms = "0.3.0-rc.2"
+x509-tsp = "0.2.0-rc.0"
+x509-cert = "0.3"
+der = { version = "0.8", features = ["std", "oid"] }
+spki = "0.8"
+sha2 = "0.11"
+rsa = { version = "0.9", features = ["sha2"] }
+lopdf = "0.47"
+ureq = { version = "3", default-features = false }

@@ -1,0 +1,367 @@
+<!-- Màn Kiểm tra chữ ký số. Bố cục và nhãn theo prototype manKT() L1311–1356; nội dung kiểm theo Nghị định 68/2024 Điều 30 (TD-57). -->
+@let loaded = s.loaded();
+@let sigs = s.signatures();
+@let cur = s.current();
+@let busy = s.busy();
+
+<div class="kt-man">
+  <div class="hang">
+    <span class="nhan">Văn bản cần kiểm tra:</span>
+    <span pathInput [value]="s.path()" placeholder="Chọn file PDF đã ký số" [disabled]="busy" (cleared)="s.clear()"></span>
+    <button class="nut" type="button" [disabled]="!s.available || busy" (click)="s.pick()"><svg icon="file"></svg>Chọn file</button>
+    <label class="hop kt-thuhoi" [class.tat]="busy">
+      <input type="checkbox" [checked]="s.revocation()" [disabled]="busy" (change)="onRevocation($event)" />Kiểm tra thu hồi
+    </label>
+    <span class="trai" tip="Hỏi máy chủ CA (CRL / OCSP) xem chứng thư người ký có bị thu hồi không, như Nghị định 68/2024 Điều 31 yêu cầu. Cần mạng; mất mạng thì báo &quot;chưa kiểm tra được thu hồi&quot;."></span>
+    <div class="phai-hang kt-tt">
+      @if (busy) {
+        <span class="chip-tt dang"><svg icon="spin" class="quay"></svg>Đang kiểm tra…</span>
+      } @else if (loaded) {
+        @if (sigs.length) {
+          <span class="chip-tt" [class.ok]="s.validCount() === sigs.length" [class.loi]="s.validCount() !== sigs.length">
+            <svg [icon]="s.validCount() === sigs.length ? 'checkC' : 'alert'"></svg>{{ s.validCount() }}/{{ sigs.length }} hợp lệ
+          </span>
+        } @else {
+          <span class="chip-tt dung"><svg icon="warn"></svg>Chưa có chữ ký</span>
+        }
+        <button class="nutma" type="button" title="Kiểm tra lại" (click)="s.reload()"><svg icon="refresh"></svg></button>
+      } @else {
+        <span class="trai" tip="Hỗ trợ PDF có một hoặc nhiều chữ ký, kể cả ký nháy và dấu thời gian tài liệu."></span>
+      }
+    </div>
+  </div>
+
+  @if (!s.available) {
+    <div class="bao canh dai">
+      <svg icon="warn"></svg>
+      <span><b>Đang chạy trong trình duyệt, không có lõi ứng dụng</b>Kiểm tra chữ ký cần mở bằng ứng dụng Sao Mai Ký số.</span>
+    </div>
+  }
+  @if (s.error(); as message) {
+    <div class="bao loi dai kt-loi">
+      <svg icon="alert"></svg>
+      <span class="dan">{{ message }}</span>
+      <button class="nutma" type="button" title="Đóng" (click)="s.error.set(null)"><svg icon="x" class="nho"></svg></button>
+    </div>
+  }
+  @if (s.exportNote(); as note) {
+    <div class="bao dai kt-xuat" [class.ok]="note.ok" [class.loi]="!note.ok">
+      <svg [icon]="note.ok ? 'checkC' : 'alert'"></svg>
+      <span class="dan">{{ note.text }}</span>
+      @if (note.ok) {
+        <button class="lk" type="button" (click)="s.openExported()">Mở báo cáo</button>
+      }
+      <button class="nutma" type="button" title="Đóng" (click)="s.exportNote.set(null)"><svg icon="x" class="nho"></svg></button>
+    </div>
+  }
+
+  <div class="khung">
+    <div class="tabs">
+      <button class="tab" type="button" [class.chon]="s.tab() === 'sig'" (click)="s.tab.set('sig')">
+        <svg icon="shield"></svg>Chữ ký <span class="dem">({{ sigs.length }})</span>
+      </button>
+      <button class="tab" type="button" [class.chon]="s.tab() === 'vb'" (click)="s.tab.set('vb')"><svg icon="doc"></svg>Văn bản</button>
+      <div class="phai-tab"></div>
+    </div>
+
+    @if (s.tab() === 'sig') {
+      <div class="than">
+        <div class="cottrai" [style.width.px]="s.leftW()">
+          <div class="ds kt-ds">
+            @if (busy && !loaded) {
+              <div class="trong-ds"><svg icon="spin" class="quay"></svg><br />Đang kiểm tra…</div>
+            } @else if (!loaded) {
+              <div class="trong-ds"><svg icon="shield"></svg><br />Chưa chọn văn bản</div>
+            } @else {
+              @for (sig of sigs; track sig.fieldName; let i = $index) {
+                @let t = tone(sig);
+                <div class="dong kt-dong" [class.chon]="i === s.selected()" [title]="verdictText(sig)" (click)="s.select(i)">
+                  <span class="chip-tt" [class.ok]="t === 'ok'" [class.dung]="t === 'warn'" [class.loi]="t === 'fail'"><svg [icon]="toneIcon[t]"></svg></span>
+                  <span class="kt-ten">
+                    <span class="ten"><span>{{ i + 1 }}. {{ signerName(sig) }}</span></span>
+                    <span class="phuchu">{{ sig.displayTime ?? 'Không rõ thời điểm' }}</span>
+                    <span class="phuchu kt-kl" [class.ok]="t === 'ok'" [class.dung]="t === 'warn'" [class.loi]="t === 'fail'">{{ verdictText(sig) }}</span>
+                  </span>
+                </div>
+              } @empty {
+                <div class="trong-ds"><svg icon="warn"></svg><br />Văn bản chưa có chữ ký số</div>
+              }
+            }
+          </div>
+        </div>
+        <div class="keo" title="Kéo để đổi độ rộng cột" [class.dang]="resizing()" (pointerdown)="startResize($event)"></div>
+        <div class="phai">
+          @if (!loaded) {
+            <div class="mo-dau">
+              <svg class="logo-cn" bigIcon="kiemtra"></svg>
+              <h2>Kiểm tra chữ ký số <span tip="Kiểm tra người ký, thời điểm ký, hiệu lực chứng thư và văn bản có bị sửa sau khi ký, theo 5 điều kiện của Nghị định 68/2024/NĐ-CP Điều 30."></span></h2>
+              <p>Xác minh chữ ký số trong văn bản PDF.</p>
+              <div class="buoc">
+                <div>
+                  <span class="so">1</span><span class="t">Chọn văn bản</span>
+                  Bấm <button class="lk" type="button" [disabled]="!s.available || busy" (click)="s.pick()">Chọn file</button> PDF đã ký, hoặc kéo thả file vào đây.
+                </div>
+                <div><span class="so">2</span><span class="t">Xem từng chữ ký</span>Hợp lệ hay không, ai ký, lúc nào.</div>
+                <div><span class="so">3</span><span class="t">Xuất báo cáo</span>Lưu kết quả ra PDF.</div>
+              </div>
+              <button class="logo-goc" type="button" title="Trang chủ" (click)="ui.go('home')"><img alt="Sao Mai" src="img/full.png" /></button>
+            </div>
+          } @else if (!cur) {
+            <div class="vungxem kt-xem">
+              <div class="kt-than">
+                <div class="bao canh kt-kq">
+                  <svg icon="warn"></svg>
+                  <span><b>Văn bản chưa có chữ ký số</b>File này không có chữ ký số hay dấu thời gian nào để kiểm tra.</span>
+                </div>
+              </div>
+            </div>
+          } @else {
+            @let t = tone(cur);
+            <div class="dieuhuong">
+              <button class="nutma" type="button" title="Chữ ký trước (Ctrl+↑)" [disabled]="s.selected() <= 0" (click)="s.select(s.selected() - 1)"><svg icon="chevL"></svg></button>
+              <span class="tt kt-vt">Chữ ký <b>{{ s.selected() + 1 }}</b> / {{ sigs.length }}</span>
+              <button class="nutma" type="button" title="Chữ ký sau (Ctrl+↓)" [disabled]="s.selected() >= sigs.length - 1" (click)="s.select(s.selected() + 1)"><svg icon="chevR"></svg></button>
+              <span class="dan"></span>
+              <button class="nutma" type="button" title="Xem vị trí trên văn bản" [disabled]="!cur.placement" (click)="showOnPage()"><svg icon="eye"></svg></button>
+            </div>
+            <div class="vungxem kt-xem">
+              <div class="kt-than">
+                <div class="bao kt-kq" [class.ok]="t === 'ok'" [class.canh]="t === 'warn'" [class.loi]="t === 'fail'">
+                  <svg [icon]="toneIcon[t]"></svg>
+                  <span class="dan">
+                    <b>{{ verdictText(cur) }}</b>
+                    @if (cur.reason) {
+                      {{ cur.reason }}
+                    } @else if (t === 'ok') {
+                      Văn bản không bị chỉnh sửa sau khi ký. Chứng thư còn hiệu lực tại thời điểm ký.
+                    }
+                  </span>
+                </div>
+
+                <div class="the kt-the">
+                  <div class="luoi-tt">
+                    @if (cur.kind === 'docTimestamp') {
+                      <span class="k">Loại</span><span>Dấu thời gian tài liệu (không có người ký)</span>
+                      <span class="k">Máy chủ dấu thời gian</span><span>{{ cur.signedBy ?? '—' }}</span>
+                    } @else {
+                      <span class="k">Người ký</span><span class="kt-nguoi">{{ signerName(cur) }}</span>
+                      <span class="k">Đơn vị</span><span>{{ cur.organization || '—' }}</span>
+                    }
+                    <span class="k">Thời điểm ký</span>
+                    <span>
+                      {{ cur.displayTime ?? '—' }}
+                      @if (cur.trustedTime) {
+                        <span class="phuchu">theo dấu thời gian</span>
+                      } @else if (cur.displayTime) {
+                        <span class="phuchu">giờ tự khai, không có dấu thời gian</span>
+                      }
+                    </span>
+                  </div>
+                </div>
+
+                <div class="the kt-dk">
+                  <div class="kt-dk-dau">Điều kiện hợp lệ <span class="phuchu">Nghị định 68/2024/NĐ-CP, Điều 30</span></div>
+                  @for (c of cur.checks; track c.id) {
+                    <div class="kt-dk-dong" [attr.data-id]="c.id" [attr.data-state]="c.state">
+                      <span [class]="checkClass(c)"><svg [icon]="checkIcon(c.state)"></svg></span>
+                      <span class="kt-dk-noi"><b>{{ c.label }}</b><span>{{ c.detail }}</span></span>
+                    </div>
+                  }
+                </div>
+
+                @if (cur.warnings.length) {
+                  <div class="bao canh kt-canh">
+                    <svg icon="info"></svg>
+                    <span>
+                      <b>Lưu ý</b>
+                      @for (w of cur.warnings; track w) {
+                        <span class="kt-canh-dong">{{ w }}</span>
+                      }
+                    </span>
+                  </div>
+                }
+
+                <div><button advBtn label="Chi tiết chứng thư" [open]="s.detailOpen()" (click)="s.detailOpen.set(!s.detailOpen())"></button></div>
+                @if (s.detailOpen()) {
+                  <div class="the-nc kt-nc">
+                    <div class="luoi-tt">
+                      @if (cur.signReason) {
+                        <span class="k">Lý do ký</span><span>{{ cur.signReason }}</span>
+                      }
+                      @if (cur.location) {
+                        <span class="k">Nơi ký</span><span>{{ cur.location }}</span>
+                      }
+                      <span class="k">Vị trí chữ ký</span><span>{{ where(cur) }}</span>
+                      <span class="k">Nhà cung cấp CA</span><span>{{ cur.issuer ?? '—' }}</span>
+                      <span class="k">Số serial</span><span class="kt-so">{{ cur.signerSerial ?? '—' }}</span>
+                      <span class="k">Hiệu lực</span>
+                      <span>{{ cur.certValidFrom ? 'Từ ' + cur.certValidFrom + ' đến ' + cur.certValidTo : '—' }}</span>
+                      @if (cur.kind === 'signature') {
+                        <span class="k">Dấu thời gian</span>
+                        <span>{{ cur.trustedTime ? cur.timestampAuthority + ' · ' + cur.trustedTime : 'Không có' }}</span>
+                        <span class="k">Thu hồi</span>
+                        <span>{{ revText[cur.revocation] }}{{ cur.revokedAt ? ' (ngày ' + cur.revokedAt + ')' : '' }}{{ cur.revocationEmbedded ? ' — theo dữ liệu nhúng trong file' : '' }}</span>
+                        <span class="k">Ký dài hạn</span>
+                        <span>{{ cur.longTerm ? 'Có: file chứa dữ liệu kiểm tra thu hồi lúc ký (PAdES B-LT)' : 'Không có dữ liệu kiểm tra thu hồi trong file' }}</span>
+                      }
+                      <span class="k">Phạm vi ký</span><span>{{ scope(cur) }}</span>
+                      @if (cur.docmdp) {
+                        <span class="k">Chứng nhận</span><span>{{ docmdpText(cur.docmdp) }}</span>
+                      }
+                      <span class="k">Định dạng</span><span>{{ cur.subFilter || '—' }}{{ cur.digestAlgorithm ? ' · ' + cur.digestAlgorithm : '' }}</span>
+                    </div>
+                    @if (cur.changeNotes.length) {
+                      <div>
+                        <div class="hint">Thay đổi sau chữ ký này</div>
+                        @for (n of cur.changeNotes; track n.text) {
+                          <div class="kt-tdoi" [class.loi]="n.level === 'other'">{{ n.text }}</div>
+                        }
+                      </div>
+                    }
+                    @if (cur.chain.length) {
+                      <div>
+                        <div class="hint kt-chuoi-dau">Chuỗi chứng thư</div>
+                        @for (c of cur.chain.slice().reverse(); track c.serial; let i = $index) {
+                          <div class="kt-chuoi" [style.padding-left.px]="i * 18" [title]="'Serial ' + c.serial + ' · hiệu lực đến ' + c.validTo">
+                            <span class="chip-tt" [class.ok]="!!cur.signerRoot" [class.dung]="!cur.signerRoot"><svg [icon]="cur.signerRoot ? 'checkC' : 'warn'"></svg></span>{{ c.name }}
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="than">
+        <div class="phai">
+          @if (!loaded || !s.preview()) {
+            <div class="mo-dau">
+              <svg class="logo-cn" bigIcon="kiemtra"></svg>
+              <h2>Kiểm tra chữ ký số</h2>
+              <p>Chọn file PDF đã ký để xem vị trí các chữ ký.</p>
+              <div class="buoc">
+                <div>
+                  <span class="so">1</span><span class="t">Chọn văn bản</span>
+                  Bấm <button class="lk" type="button" [disabled]="!s.available || busy" (click)="s.pick()">Chọn file</button>.
+                </div>
+                <div><span class="so">2</span><span class="t">Xem vị trí</span>Khung cam là chữ ký đang chọn.</div>
+                <div><span class="so">3</span><span class="t">Đối chiếu</span>Xem chi tiết ở tab Chữ ký.</div>
+              </div>
+            </div>
+          } @else {
+            <div class="dieuhuong">
+              <span class="tt" style="margin-left: 0">Trang <b>{{ pv.currentPage() }}</b> / {{ pv.pageCount() || '…' }}</span>
+              <span class="trai" [tip]="'Văn bản có ' + sigs.length + ' mục ký (' + marks().length + ' hiển thị trên trang).\nKhung cam: chữ ký đang chọn. Bấm vào khung để chọn chữ ký đó.'"></span>
+              <span class="dan"></span>
+              <button class="nutma" type="button" title="Thu nhỏ (Ctrl + lăn chuột)" [disabled]="s.zoom() <= 40" (click)="s.zoomBy(-10)"><svg icon="zoomOut"></svg></button>
+              <span class="zm">{{ s.zoom() }} %</span>
+              <button class="nutma" type="button" title="Phóng to (Ctrl + lăn chuột)" [disabled]="s.zoom() >= 160" (click)="s.zoomBy(10)"><svg icon="zoomIn"></svg></button>
+            </div>
+            <div pdfView #pv="pdfView" class="kt-trang" [preview]="s.preview()" [zoom]="s.zoom()" [marks]="marks()" (zoomStep)="s.zoomBy($event)" (markClick)="onMarkClick($event)">
+              @if (sigs.length) {
+                <span class="nhan-trang" [class.ok]="s.intact()" [class.loi]="!s.intact()">
+                  <svg [icon]="s.intact() ? 'checkC' : 'alert'"></svg>{{ s.intact() ? 'Toàn vẹn' : 'Có chữ ký sai / bị sửa sau khi ký' }}
+                </span>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="chan">
+    <div class="dan">
+      @if (!loaded) {
+        <svg icon="info"></svg><span>Chọn file PDF đã ký để kiểm tra.</span>
+      } @else if (!sigs.length) {
+        <span class="chip-tt dung"><svg icon="warn"></svg></span><span>Văn bản chưa có chữ ký số</span>
+      } @else {
+        @let allOk = s.intact() && footText().ok === footText().n;
+        <span class="chip-tt" [class.ok]="allOk" [class.dung]="s.intact() && !allOk" [class.loi]="!s.intact()"><svg [icon]="allOk ? 'checkC' : s.intact() ? 'warn' : 'alert'"></svg></span>
+        <span>
+          {{ s.intact() ? 'Văn bản toàn vẹn' : 'Văn bản có chữ ký sai hoặc bị sửa sau khi ký' }} · <b>{{ footText().ok }}/{{ footText().n }}</b> hợp lệ
+          @if (!s.report()?.revocationChecked) {
+            · chưa kiểm tra thu hồi
+          }
+        </span>
+      }
+    </div>
+    <button class="nut" type="button" [disabled]="!loaded || busy || s.exporting()" (click)="s.exportReport()">
+      <svg [icon]="s.exporting() ? 'spin' : 'download'" [class.quay]="s.exporting()"></svg>Xuất báo cáo
+    </button>
+    @if (loaded) {
+      <button class="nut chinh rong" type="button" [disabled]="busy" (click)="s.pick()"><svg icon="shield"></svg>Kiểm tra file khác</button>
+    } @else {
+      <button class="nut chinh rong" type="button" [disabled]="!s.available || busy" (click)="s.pick()"><svg icon="shield"></svg>Kiểm tra</button>
+    }
+  </div>
+</div>
+
+<!-- Báo cáo (chỉ hiện khi in ra PDF bằng "Xuất báo cáo"). -->
+@if (s.report(); as r) {
+  <div class="kt-baocao">
+    <h1>Báo cáo kiểm tra chữ ký số</h1>
+    <table class="bc-tt">
+      <tr><th>Văn bản</th><td>{{ s.fileName() }}</td></tr>
+      <tr><th>Đường dẫn</th><td>{{ s.path() }}</td></tr>
+      <tr><th>Thời điểm kiểm tra</th><td>{{ s.checkedAt() }}</td></tr>
+      <tr><th>Kiểm tra thu hồi</th><td>{{ r.revocationChecked ? 'Có (CRL / OCSP)' : 'Không' }}</td></tr>
+      <tr>
+        <th>Kết luận chung</th>
+        <td>
+          <b>{{ sigs.length ? (s.intact() ? 'Văn bản toàn vẹn' : 'Văn bản có chữ ký sai hoặc bị sửa sau khi ký') : 'Văn bản chưa có chữ ký số' }}</b>
+          @if (sigs.length) {
+            · {{ s.validCount() }}/{{ sigs.length }} mục ký hợp lệ
+          }
+        </td>
+      </tr>
+    </table>
+    @for (sig of sigs; track sig.fieldName; let i = $index) {
+      <div class="bc-ky">
+        <h2>{{ i + 1 }}. {{ signerName(sig) }} — <span [class]="'bc-' + tone(sig)">{{ verdictText(sig) }}</span></h2>
+        @if (sig.reason) {
+          <p class="bc-lydo">{{ sig.reason }}</p>
+        }
+        <table class="bc-tt">
+          @if (sig.kind === 'signature') {
+            <tr><th>Đơn vị</th><td>{{ sig.organization || '—' }}</td></tr>
+          }
+          <tr><th>Thời điểm ký</th><td>{{ sig.displayTime ?? '—' }}{{ sig.trustedTime ? ' (dấu thời gian: ' + sig.timestampAuthority + ')' : ' (không có dấu thời gian)' }}</td></tr>
+          <tr><th>Nhà cung cấp CA</th><td>{{ sig.issuer ?? '—' }}</td></tr>
+          <tr><th>Số serial</th><td>{{ sig.signerSerial ?? '—' }}</td></tr>
+          <tr><th>Hiệu lực chứng thư</th><td>{{ sig.certValidFrom ? sig.certValidFrom + ' – ' + sig.certValidTo : '—' }}</td></tr>
+          @if (sig.kind === 'signature') {
+            <tr><th>Thu hồi</th><td>{{ revText[sig.revocation] }}{{ sig.revokedAt ? ' (ngày ' + sig.revokedAt + ')' : '' }}{{ sig.revocationEmbedded ? ' — theo dữ liệu nhúng trong file' : '' }}</td></tr>
+            <tr><th>Ký dài hạn</th><td>{{ sig.longTerm ? 'Có (PAdES B-LT)' : 'Không' }}</td></tr>
+          }
+          <tr><th>Vị trí</th><td>{{ where(sig) }} · {{ scope(sig) }}</td></tr>
+        </table>
+        <table class="bc-dk">
+          @for (c of sig.checks; track c.id) {
+            <tr>
+              <td [class]="'bc-' + (c.state === 'ok' ? 'ok' : c.state === 'fail' ? 'fail' : 'warn')">{{ c.state === 'ok' ? 'Đạt' : c.state === 'fail' ? 'Không đạt' : c.state === 'warn' ? 'Lưu ý' : 'Không xác định' }}</td>
+              <td><b>{{ c.label }}</b><br />{{ c.detail }}</td>
+            </tr>
+          }
+        </table>
+        @for (w of sig.warnings; track w) {
+          <p class="bc-luuy">Lưu ý: {{ w }}</p>
+        }
+      </div>
+    }
+    <p class="bc-chan">Kiểm tra theo Nghị định 68/2024/NĐ-CP (Điều 30–32): toàn vẹn dữ liệu, thông tin người ký, thời gian ký, hiệu lực chứng thư tại thời điểm ký và đường dẫn chứng thực về CA gốc của Ban Cơ yếu Chính phủ (Root G1 / G2). Báo cáo do phần mềm Sao Mai Ký số tạo.</p>
+  </div>
+}
+
+@if (dragging()) {
+  <div class="tha-file">
+    <svg icon="download"></svg>
+    Thả văn bản vào đây
+    <span>Một file PDF đã ký số</span>
+  </div>
+}

@@ -1,0 +1,58 @@
+# Nguồn tham chiếu (bản .NET 1.4.0 và prototype HTML): chỉ để đọc, không thuộc repo này.
+# Những gì bản Rust cần đã được chép sang certs/ và fixtures/.
+/Kytl-main/
+/App_Ky_So/
+
+# Rust
+/target/
+**/*.rs.bk
+
+# Node / Angular / Tauri
+node_modules/
+/app/ui/dist/
+/app/ui/.angular/
+/app/src-tauri/target/
+/app/src-tauri/gen/schemas/
+
+# Đóng gói
+/installer/drivers/*
+!/installer/drivers/.gitkeep
+/installer/installer-output/
+SaoMai-KySo-v*-Setup.exe
+SaoMai-KySo-v*.zip
+
+# Bí mật: không bao giờ commit khoá bí mật, PIN, biến môi trường
+*.pfx
+*.p12
+*.key
+.env
+.env.*
+# Cấu hình thông báo Telegram có Bot Token / khoá đăng ký thật (chỉ commit file *.example.*)
+notify.json
+gateway.env
+gateway-data/
+
+# Kết quả chạy thử
+DaKySo/
+*.tmp
+*.log
+
+# IDE / hệ điều hành
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+.DS_Store
+
+# Spike: thư mục build
+/spikes/**/target/
+/spikes/**/bin/
+/spikes/**/obj/
+
+# Spike: dữ liệu và kết quả chạy (bản lưu làm bằng chứng nằm ở docs/spikes/evidence/)
+/spikes/**/out/
+/spikes/**/data/
+/spikes/**/gen/
+
+# Gói chạy thử phát cho người dùng (có notify.json chứa Bot Token)
+/dist/

@@ -1,0 +1,43 @@
+[package]
+name = "smks-app"
+description = "Sao Mai Ký số: vỏ ứng dụng Tauri, commands, quản lý job, state, cấu hình."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+# Khoá thử đọc từ thư mục SMKS_DEV_PKI để kiểm màn Ký số khi chưa có token. KHÔNG dùng cho bản phát hành.
+dev-keys = ["smks-sign/dev-keys"]
+
+[dependencies]
+smks-core = { workspace = true }
+smks-crypto = { workspace = true }
+zeroize = "1"
+smks-merge = { path = "../../crates/smks-merge" }
+# Sự kiện nghiệp vụ, đăng ký thiết bị, thông báo Telegram (độc lập với nghiệp vụ ký số).
+smks-notify = { path = "../../crates/smks-notify" }
+smks-sign = { path = "../../crates/smks-sign" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# protocol-asset: giao diện đọc PDF qua asset protocol, với scope do lõi cấp từng file (kế hoạch 10.3).
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+# Đọc registry (nhận diện driver token) bằng API an toàn của Microsoft.
+windows-registry = "0.6"
+# In báo cáo Kiểm tra chữ ký ra PDF (ICoreWebView2_7::PrintToPdf); cùng phiên bản với wry của Tauri.
+webview2-com = "0.39"
+windows = "0.62"
+
+[lints]
+workspace = true

@@ -1,0 +1,12 @@
+@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/controls.css';
+@import './styles/shell.css';
+@import './styles/home.css';
+@import './styles/tao-van-ban.css';
+@import './styles/ky-so.css';
+@import './styles/config.css';
+@import './styles/vi-tri.css';
+@import './styles/kiem-tra.css';
+@import './styles/help.css';
+@import './styles/notify.css';

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notify-check"
+description = "Enables the notify_check command without any pre-configured scope."
+commands.allow = ["notify_check"]
+
+[[permission]]
+identifier = "deny-notify-check"
+description = "Denies the notify_check command without any pre-configured scope."
+commands.deny = ["notify_check"]

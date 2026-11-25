@@ -1,0 +1,28 @@
+/* Hướng dẫn sử dụng (prototype L433–443) và Cài đặt driver USB Token. */
+.popup.w940{width:940px}
+.popup.hd{height:620px}
+.hd-than{flex:1;min-height:0;display:flex}
+.hd-nav{width:250px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;padding:12px 8px;border-right:1px solid var(--line2);background:var(--panel);overflow-y:auto}
+.hd-nav .nav{position:relative;display:flex;align-items:center;gap:10px;width:100%;min-height:36px;padding:6px 12px;border:0;border-radius:6px;background:transparent;text-align:left;cursor:default;color:var(--tx);font:inherit}
+.hd-nav .nav:hover{background:rgba(0,0,0,.04)}
+.hd-nav .nav.chon{background:var(--sel);font-weight:600}
+.hd-nav .nav.chon::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--accent)}
+.hd-nav .nav svg.i{color:var(--ink);flex-shrink:0} .hd-nav .nav.chon svg.i{color:var(--accent)}
+.hd-noi{flex:1;min-width:0;overflow-y:auto;padding:20px 28px;background:var(--panel)}
+.hd-cot{max-width:700px;display:flex;flex-direction:column;gap:14px}
+.hd-cot h2{margin:0;font-size:21px;font-weight:600}
+.hd-mo{margin:0;color:var(--tx2)}
+.hd-the{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.hd-the h3{margin:0 0 10px;font-size:14.5px;font-weight:600}
+.hd-the ol,.hd-the ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.55}
+.hd-the b{font-weight:600}
+.hd-phim{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+kbd{display:inline-block;min-width:14px;padding:0 5px;border:1px solid #cfd4da;border-bottom-width:2px;border-radius:4px;background:#fafbfc;font:11px/16px var(--font);text-align:center;color:var(--tx)}
+
+.drv{display:flex;flex-direction:column;gap:10px}
+.drv-ds{display:flex;flex-direction:column;gap:8px}
+.drv-dong{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+.drv-dong > svg.i{flex-shrink:0;color:var(--ink)}
+.drv-ten{flex:1;min-width:0;display:flex;flex-direction:column}
+.drv-token{display:flex;align-items:center;gap:6px}
+.drv-hd{background:var(--panel)}

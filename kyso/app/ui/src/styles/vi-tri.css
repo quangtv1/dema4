@@ -1,0 +1,65 @@
+/* Màn Xem trước & vị trí chữ ký — prototype manTC() L1384–1413, CSS L354–368, L462–463. */
+.vi-tri .hang .tieu{font-size:15px;font-weight:600;margin-left:4px;white-space:nowrap}
+.vi-tri .vt-co{width:40px}
+.vi-tri .vt-nc{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.vi-tri .vt-nc .fld{flex:0 0 auto}
+/* Cỡ các ô theo prototype (CSP của app chặn thuộc tính style viết thẳng trong template). */
+.vi-tri .fld.vt-che-do{flex:0 0 auto;width:150px}
+.vi-tri .vt-thanh{width:110px;flex-shrink:0}
+.vi-tri .fld.vt-mau{width:200px}
+.vi-tri .fld.vt-neo{width:140px}
+.vi-tri .fld.vt-kieu{width:160px}
+.vi-tri .vt-cach{flex:1;min-width:8px;max-width:40px}
+/* Ảnh so với chữ (TD-51): xuống dòng riêng trong thanh Nâng cao. */
+.vi-tri .vt-xuong{flex-basis:100%;height:0}
+.vi-tri .vt-so{min-width:52px;font-variant-numeric:tabular-nums}
+.vi-tri .vt-so.tu{color:var(--tx3)}
+.vi-tri .dieuhuong .vt-ten{margin-left:2px;max-width:50%}
+.vi-tri .cottrai{min-width:180px}
+
+.mini{display:block;background:#fff;border:1px solid var(--line);flex-shrink:0;border-radius:2px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(16,32,64,.1)}
+.mini .vach{position:absolute;left:5px;right:5px;height:2px;background:#e3e6ea}
+.mini .o-ky{position:absolute;border:1px dashed var(--accent);background:rgba(10,84,184,.08)}
+.mini.loi{border-color:var(--danger)}
+.ab-luoi{flex:1;min-height:0;overflow-y:auto;display:flex;flex-wrap:wrap;gap:14px;align-content:flex-start;padding:16px}
+.ab-file{width:140px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;padding:8px;border:1px solid transparent;border-radius:8px;cursor:default;background:transparent;font:inherit}
+.ab-file:hover{background:var(--hover)}
+.ab-file.chon{background:var(--sel);border-color:var(--sel-b)}
+.ab-file .ten{font-size:11px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:124px}
+.ab-file .mini .vach{left:9px;right:9px}
+.tick{position:absolute;top:4px;right:4px;width:16px;height:16px;background:#1f9a3f;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff}
+.tick svg.i{width:11px;height:11px;stroke-width:3}
+
+/* Ô sửa phóng to của kiểu "Tự do" (TD-52): khung chữ ký to, ô ảnh và ô thông tin kéo thả được. */
+.vi-tri .vt-goiy{color:var(--tx3);font-size:12px}
+.vi-tri .vt-sua{position:relative;flex:none;margin-left:132px;background:#fff;border:1.5px dashed var(--accent);border-radius:3px;background-image:linear-gradient(var(--line2) 1px,transparent 1px),linear-gradient(90deg,var(--line2) 1px,transparent 1px);background-size:10% 20%}
+.vi-tri .vt-o{position:absolute;border:1px solid rgba(10,84,184,.55);background:rgba(10,84,184,.06);cursor:move;touch-action:none;user-select:none}
+.vi-tri .vt-o:hover{background:rgba(10,84,184,.12)}
+.vi-tri .vt-o.anh img{width:100%;height:100%;object-fit:contain;pointer-events:none;display:block}
+.vi-tri .vt-o.chu{display:flex;flex-direction:column;justify-content:safe center}
+.vi-tri .vt-chu{line-height:1.15;white-space:nowrap;pointer-events:none;max-width:100%;max-height:100%;overflow:hidden}
+/* Tay nắm đổi cỡ (4 góc, 4 cạnh). Ô ảnh / ô chữ: nằm trong mép ô; khung ngoài: nằm ngoài mép, màu đặc. */
+.vi-tri .vt-sua .tay{position:absolute;box-sizing:border-box;touch-action:none}
+.vi-tri .vt-sua .tay.tl,.vi-tri .vt-sua .tay.tr,.vi-tri .vt-sua .tay.bl,.vi-tri .vt-sua .tay.br,.vi-tri .vt-sua .tay::after{width:9px;height:9px;background:#fff;border:1.5px solid var(--accent);border-radius:2px;box-sizing:border-box}
+.vi-tri .vt-sua .tay.t,.vi-tri .vt-sua .tay.b{left:9px;right:9px;height:9px;cursor:ns-resize}
+.vi-tri .vt-sua .tay.l,.vi-tri .vt-sua .tay.r{top:9px;bottom:9px;width:9px;cursor:ew-resize}
+.vi-tri .vt-sua .tay.t::after,.vi-tri .vt-sua .tay.b::after,.vi-tri .vt-sua .tay.l::after,.vi-tri .vt-sua .tay.r::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.vi-tri .vt-sua .tay.tl,.vi-tri .vt-sua .tay.br{cursor:nwse-resize}
+.vi-tri .vt-sua .tay.tr,.vi-tri .vt-sua .tay.bl{cursor:nesw-resize}
+.vi-tri .vt-o .tay.tl,.vi-tri .vt-o .tay.t,.vi-tri .vt-o .tay.tr{top:0}
+.vi-tri .vt-o .tay.bl,.vi-tri .vt-o .tay.b,.vi-tri .vt-o .tay.br{bottom:0}
+.vi-tri .vt-o .tay.tl,.vi-tri .vt-o .tay.l,.vi-tri .vt-o .tay.bl{left:0}
+.vi-tri .vt-o .tay.tr,.vi-tri .vt-o .tay.r,.vi-tri .vt-o .tay.br{right:0}
+.vi-tri .vt-o:not(.tren):not(:hover) .tay{opacity:0}
+.vi-tri .vt-o.tren{z-index:1}
+.vi-tri .vt-o.mo{opacity:.45}
+.vi-tri .vt-sua>.tay.khoi{z-index:2}
+.vi-tri .vt-sua>.tay.khoi.tl,.vi-tri .vt-sua>.tay.khoi.t,.vi-tri .vt-sua>.tay.khoi.tr{top:-9px}
+.vi-tri .vt-sua>.tay.khoi.bl,.vi-tri .vt-sua>.tay.khoi.b,.vi-tri .vt-sua>.tay.khoi.br{bottom:-9px}
+.vi-tri .vt-sua>.tay.khoi.tl,.vi-tri .vt-sua>.tay.khoi.l,.vi-tri .vt-sua>.tay.khoi.bl{left:-9px}
+.vi-tri .vt-sua>.tay.khoi.tr,.vi-tri .vt-sua>.tay.khoi.r,.vi-tri .vt-sua>.tay.khoi.br{right:-9px}
+.vi-tri .vt-sua>.tay.khoi.tl,.vi-tri .vt-sua>.tay.khoi.tr,.vi-tri .vt-sua>.tay.khoi.bl,.vi-tri .vt-sua>.tay.khoi.br,.vi-tri .vt-sua>.tay.khoi::after{background:var(--accent);border-color:#fff;box-shadow:0 0 0 1px var(--accent)}
+/* Văn bản chưa gán chữ ký (TD-56) */
+.vi-tri .mini.chuagan{outline:2px solid #d97706;outline-offset:-2px}
+.vi-tri .mini.chuagan::after{content:'Chưa gán chữ ký';position:absolute;left:4px;right:4px;bottom:6px;font-size:9.5px;font-weight:600;color:#b45309;background:#fff7ed;border-radius:3px;text-align:center;padding:1px 0}
+.vi-tri .vt-chuagan-chan{color:#b45309}

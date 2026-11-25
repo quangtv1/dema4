@@ -1,0 +1,12 @@
+[package]
+name = "s4-calamine-read"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Spike đứng riêng, không thuộc workspace chính.
+[workspace]
+
+[dependencies]
+calamine = "0.38"
+serde_json = "1"

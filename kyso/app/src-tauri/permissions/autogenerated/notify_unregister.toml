@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notify-unregister"
+description = "Enables the notify_unregister command without any pre-configured scope."
+commands.allow = ["notify_unregister"]
+
+[[permission]]
+identifier = "deny-notify-unregister"
+description = "Denies the notify_unregister command without any pre-configured scope."
+commands.deny = ["notify_unregister"]

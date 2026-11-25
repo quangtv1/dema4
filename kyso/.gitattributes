@@ -1,0 +1,23 @@
+* text=auto
+
+# rustfmt dùng newline_style = "Unix": giữ LF kể cả khi core.autocrlf = true.
+*.rs text eol=lf
+*.toml text eol=lf
+
+# Chứng thư CA được nhúng bằng include_bytes!: không cho git đổi kiểu xuống dòng.
+*.crt -text
+*.pem -text
+
+# Script NSIS phải giữ UTF-8 có BOM (lưu ý từ bản 1.4.0).
+*.nsi -text
+*.nsh -text
+
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.xls binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.ttf binary

@@ -1,0 +1,24 @@
+===== out/pdfwriter.tampered.pdf
+che do doc: chat (strict)
+so chu ky: 1
+--- chu ky 1: field SaoMai_Signature_35
+  nguoi ky        : Common Name: Nguyễn Văn Thử Nghiệm, Organization: Sao Mai - THU NGHIEM, Country: VN
+  thuat toan      : rsassa_pkcs1v15 / sha256
+  signed attrs    : ['content_type', 'message_digest', 'signing_certificate_v2']
+  unsigned attrs  : ['signature_time_stamp_token']
+  /M tu khai      : 2026-11-18 14:18:56+07:00
+  gio TSA         : 2026-11-18 07:18:57+00:00
+  TSA             : Common Name: Máy chủ cấp dấu thời gian 02, Organization: Ban Cơ yếu Chính phủ, Country: VN
+  pham vi / thay doi: ENTIRE_FILE / NONE
+  bottom_line     : False
+  [KHONG] noi dung nguyen ven (intact)
+  [DAT] chu ky dung (valid)
+  [KHONG] nguoi ky tin cay (trusted)
+  [DAT] pham vi hop le
+  [DAT] SubFilter ETSI.CAdES.detached
+  [DAT] co signingCertificateV2
+  [DAT] KHONG co signing-time
+  [DAT] co dau thoi gian
+  [DAT] dau thoi gian dung (valid)
+  [DAT] TSA tin cay ve Root G2 (trusted)
+KET QUA CHUNG: KHONG DAT

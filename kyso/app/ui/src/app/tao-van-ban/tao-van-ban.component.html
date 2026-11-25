@@ -1,0 +1,703 @@
+<!-- Màn Tạo văn bản. Bố cục và nhãn theo prototype manTVB() L1182–1280. -->
+@let table = s.table();
+@let tpl = s.template();
+@let ready = s.ready();
+@let isTable = s.isTable();
+@let files = s.files();
+@let job = s.job();
+
+<!--
+  Khung nguồn: lưới nhãn | ô file (giãn hết chỗ trống) | khối 2 cột sát mép phải (Sheet, Dòng tiêu đề / Xem dữ liệu,
+  Nâng cao). Nâng cao mở ngay trong khung, thêm 2 dòng dùng đúng các cột đó.
+-->
+@if (s.sourceOpen()) {
+<div class="nguon">
+  <button class="nutma ng-thu" type="button" title="Thu gọn khung chọn file" aria-expanded="true" (click)="s.setSourceOpen(false)">
+    <svg icon="chevU"></svg>
+  </button>
+  <!-- Dòng 1: mẫu văn bản | Sheet, Dòng tiêu đề -->
+  <span class="ng-nhan">Mẫu văn bản <span [tip]="tipMau"></span></span>
+  <div class="ng-file">
+    <span pathInput [value]="tpl?.path ?? ''" placeholder="Chọn mẫu .docx" [disabled]="locked()" (cleared)="s.clearTemplate()"></span>
+    <button class="nut" type="button" [disabled]="!canPick() || s.templateBusy()" [title]="noCoreTitle()" (click)="s.pickTemplate()">
+      @if (s.templateBusy()) {
+        <svg icon="spin" class="quay"></svg>
+      } @else {
+        <svg icon="doc"></svg>
+      }
+      Chọn
+    </button>
+  </div>
+  @if (isTable) {
+    <label class="ng-o ng-c3">
+      <span class="nhanphu">Sheet</span>
+      <select class="fld sheet" [disabled]="!table || !sheets().length || locked() || s.tableBusy()" (change)="s.changeSheet(textValue($event))">
+        @for (sh of sheets(); track sh) {
+          <option [value]="sh" [selected]="sh === table?.sheet">{{ sh }}</option>
+        } @empty {
+          <option value="">{{ table ? 'CSV' : '—' }}</option>
+        }
+      </select>
+    </label>
+    <label class="ng-o ng-c4">
+      <span class="nhanphu">Dòng tiêu đề <span class="trai" [tip]="tipTieuDe"></span></span>
+      <input
+        class="fld so dong-td"
+        type="number"
+        min="1"
+        [value]="table?.headerRow ?? 1"
+        [disabled]="!table || locked() || s.tableBusy()"
+        (change)="s.changeHeaderRow(numberValue($event))"
+      />
+    </label>
+  }
+
+  <!-- Dòng 2: file dữ liệu (hoặc ghi chú nhập trực tiếp) | Xem dữ liệu, Nâng cao -->
+  @if (isTable) {
+    <span class="ng-nhan">File dữ liệu</span>
+    <div class="ng-file">
+      <span pathInput [value]="table?.path ?? ''" placeholder="Chọn file Excel hoặc CSV" [disabled]="locked()" (cleared)="s.clearData()"></span>
+      <button class="nut" type="button" [disabled]="!canPick() || s.tableBusy()" [title]="noCoreTitle()" (click)="s.pickData()">
+        @if (s.tableBusy()) {
+          <svg icon="spin" class="quay"></svg>
+        } @else {
+          <svg icon="table"></svg>
+        }
+        Chọn
+      </button>
+    </div>
+    <button
+      class="nut xem-bang ng-c3"
+      type="button"
+      [class.mo]="s.xlsOpen()"
+      [attr.aria-expanded]="s.xlsOpen()"
+      [disabled]="!table"
+      [title]="s.xlsOpen() ? 'Ẩn bảng dữ liệu' : 'Xem bảng dữ liệu Excel'"
+      (click)="s.xlsOpen.set(!s.xlsOpen())"
+    >
+      <svg icon="table"></svg><span class="chu">Xem dữ liệu</span><svg icon="chevD" class="mui"></svg>
+    </button>
+  } @else {
+    <span class="ng-nhan">Dữ liệu</span>
+    <span class="ng-ghichu">Nhập trực tiếp giá trị các biến của mẫu ở cột bên trái.</span>
+  }
+  <button advBtn class="ng-c4" [open]="s.advOpen()" (click)="toggleAdv()"></button>
+
+  @if (s.advOpen()) {
+    <div class="ng-ngan"></div>
+    <!-- Nâng cao dòng 1: tên file | định dạng -->
+    <span class="ng-nhan">Tên file <span class="trai" [tip]="tipTen"></span></span>
+    <div class="ng-file">
+      <input
+        class="fld"
+        type="text"
+        autocomplete="off"
+        [value]="s.pattern()"
+        [disabled]="locked()"
+        [title]="files[0] ? 'Ví dụ: ' + files[0].fileName : ''"
+        (input)="s.setPattern(textValue($event))"
+      />
+      @if (files[0]; as first) {
+        <span class="ng-vidu" [title]="first.fileName">→ {{ first.fileName }}</span>
+      }
+    </div>
+    <div class="ng-o ng-c34">
+      <span class="nhanphu">Định dạng</span>
+      <span class="seg-nhom">
+        <button
+          class="seg"
+          type="button"
+          [class.chon]="s.format() === 'pdf'"
+          [disabled]="locked() || !s.wordAvailable()"
+          [title]="s.wordAvailable() ? '' : 'Máy không có Microsoft Word nên không xuất được PDF'"
+          (click)="s.setFormat('pdf')"
+        >
+          PDF
+        </button>
+        <button class="seg" type="button" [class.chon]="s.format() === 'docx'" [disabled]="locked()" (click)="s.setFormat('docx')">DOCX</button>
+      </span>
+    </div>
+
+    <!-- Nâng cao dòng 2: thư mục lưu | nguồn dữ liệu -->
+    <span class="ng-nhan">Thư mục lưu <span class="trai" [tip]="tipThuMuc()"></span></span>
+    <div class="ng-file">
+      <span
+        pathInput
+        [value]="s.outputFolder()"
+        [placeholder]="isTable ? 'Để trống = cạnh file dữ liệu' : 'Để trống = cạnh file mẫu'"
+        [disabled]="locked()"
+        (cleared)="s.outputFolder.set('')"
+      ></span>
+      <button class="nut" type="button" [disabled]="!canPick()" [title]="noCoreTitle()" (click)="s.pickFolder()">
+        <svg icon="folder"></svg>Chọn
+      </button>
+    </div>
+    <div class="ng-o ng-c34">
+      <span class="nhanphu">Nguồn</span>
+      <span class="seg-nhom">
+        <button class="seg" type="button" [class.chon]="isTable" [disabled]="locked()" (click)="s.setSource('table')">
+          <svg icon="table"></svg>Từ Excel
+        </button>
+        <button class="seg" type="button" [class.chon]="!isTable" [disabled]="locked()" (click)="s.setSource('manual')">
+          <svg icon="edit"></svg>Nhập trực tiếp
+        </button>
+      </span>
+    </div>
+  }
+</div>
+} @else {
+  <!-- Khung thu gọn: một dòng tóm tắt, bấm để mở lại -->
+  <div class="nguon-gon" role="button" tabindex="0" title="Mở khung chọn file" aria-expanded="false"
+       (click)="s.setSourceOpen(true)" (keydown.enter)="s.setSourceOpen(true)" (keydown.space)="s.setSourceOpen(true); $event.preventDefault()">
+    <span class="gon-muc" [class.trong]="!tpl"><svg icon="doc" class="nho"></svg>{{ tpl?.fileName ?? 'Chưa chọn mẫu' }}</span>
+    @if (isTable) {
+      <span class="gon-muc" [class.trong]="!table"><svg icon="table" class="nho"></svg>{{ table?.fileName ?? 'Chưa chọn dữ liệu' }}</span>
+      @if (table) {
+        <span class="gon-phu">{{ table.sheet ? 'Sheet ' + table.sheet + ' · ' : '' }}{{ table.rows.length }} dòng · tiêu đề dòng {{ table.headerRow }}</span>
+      }
+    } @else {
+      <span class="gon-muc"><svg icon="edit" class="nho"></svg>Nhập trực tiếp</span>
+    }
+    <span class="gon-phu">{{ fmtLabel() }}</span>
+    <span class="dan"></span>
+    <span class="nutma" aria-hidden="true"><svg icon="chevD"></svg></span>
+  </div>
+}
+
+@if (isTable) {
+  @if (s.xlsOpen() && table) {
+    <div class="xls-bang">
+      <div class="xls-dau">
+        <svg icon="table" class="nho"></svg><b>{{ table.fileName }}</b>
+        <span class="xq">{{ table.sheet ? table.sheet + ' · ' : '' }}{{ table.rows.length }} dòng · dòng tiêu đề {{ table.headerRow }}</span>
+        <span class="dan"></span>
+        <button class="lk" type="button" (click)="s.xlsOpen.set(false)">Đóng</button>
+      </div>
+      <div class="xls-cuon">
+        <div class="xls-grid">
+          <div class="xls-row hd">
+            <div class="xls-cell stt">#</div>
+            @for (c of table.columns; track c.column) {
+              <div class="xls-cell" [title]="c.name">{{ c.name || 'Cột ' + c.column }}</div>
+            }
+          </div>
+          @for (r of xlsRows(); track r.rowNumber) {
+            <div class="xls-row" [class.chon]="r.rowNumber === s.selectedRow()" (click)="s.selectedRow.set(r.rowNumber)">
+              <div class="xls-cell stt">{{ r.rowNumber }}</div>
+              @for (v of r.values; track $index) {
+                <div class="xls-cell" [title]="v">{{ v }}</div>
+              }
+            </div>
+          }
+          @if (table.rows.length > xlsMax) {
+            <div class="xls-row them"><div class="xls-cell">… còn {{ table.rows.length - xlsMax }} dòng (xem đủ ở tab Kết quả)</div></div>
+          }
+        </div>
+      </div>
+      <!-- Thanh sheet như Excel: bấm để đổi sheet dữ liệu -->
+      @if (sheets().length) {
+        <div class="xls-sheets" role="tablist" aria-label="Sheet">
+          @for (sh of sheets(); track sh) {
+            <button
+              class="xls-sheet"
+              type="button"
+              role="tab"
+              [class.chon]="sh === table.sheet"
+              [attr.aria-selected]="sh === table.sheet"
+              [disabled]="locked() || s.tableBusy()"
+              [title]="'Dùng dữ liệu ở sheet ' + sh"
+              (click)="sh !== table.sheet && s.changeSheet(sh)"
+            >
+              {{ sh }}
+            </button>
+          }
+          @if (s.tableBusy()) {
+            <span class="xls-dang"><svg icon="spin" class="quay nho"></svg>Đang đọc…</span>
+          }
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (!s.available) {
+  <div class="bao canh dai">
+    <svg icon="warn"></svg>
+    <span>
+      <b>Đang chạy trong trình duyệt, không có lõi ứng dụng</b>
+      Chọn file, xem trước và tạo văn bản cần mở bằng ứng dụng Sao Mai Ký số.
+    </span>
+  </div>
+}
+@if (s.loadError(); as message) {
+  <div class="bao loi dai">
+    <svg icon="alert"></svg>
+    <span class="dan">{{ message }}</span>
+    <button class="nutma" type="button" title="Đóng" (click)="s.loadError.set(null)"><svg icon="x" class="nho"></svg></button>
+  </div>
+}
+
+<!-- Khung tab -->
+<div class="khung">
+  <div class="tabs">
+    <button class="tab" type="button" [class.chon]="s.view() === 'mau'" (click)="setView('mau')">
+      <svg icon="doc"></svg>
+      @if (ready && isTable) {
+        Mẫu <span class="dem">({{ s.mappedCount() }}/{{ s.fields().length }} biến)</span>
+      } @else {
+        Mẫu gốc
+      }
+    </button>
+    <button class="tab" type="button" [class.chon]="s.view() === 'ketqua'" (click)="setView('ketqua')">
+      <svg icon="eye"></svg>Kết quả
+      @if (ready && isTable) {
+        <span class="dem">({{ files.length }})</span>
+      }
+    </button>
+    <div class="phai-tab">
+      @if (job) {
+        @if (job.running) {
+          <span class="td-tt dang"><svg icon="spin" class="quay"></svg>{{ progressText() }}</span>
+        } @else if (job.summary; as sum) {
+          <span class="td-tt" [class.xong]="!sum.stopped" [class.dung]="sum.stopped">
+            <svg [icon]="sum.stopped ? 'stop' : 'checkC'"></svg>
+            {{ sum.stopped ? 'Đã dừng' : 'Xong' }} {{ sum.success + sum.failed }}/{{ sum.total }} · {{ fmtDur(sum.elapsedMs) }}
+          </span>
+          <span class="tdsep"></span>
+          <span class="so-ok"><b>{{ sum.success }}</b> thành công</span>
+          @if (sum.failed) {
+            <span class="so-loi"><b>{{ sum.failed }}</b> lỗi</span>
+          }
+        } @else if (job.error) {
+          <span class="td-tt dung" [title]="job.error"><svg icon="alert"></svg>Không chạy được: {{ job.error }}</span>
+        }
+      }
+    </div>
+    @if (job) {
+      <div class="td-line" [class.xong]="!!job.summary && !job.summary.stopped" [class.dung]="!!job.summary?.stopped" [style.width.%]="progressPct()"></div>
+    }
+  </div>
+
+  <div class="than">
+    @if (showList()) {
+      <div class="cottrai" [style.width.px]="s.leftW()">
+        @if (!ready) {
+          <div class="ds">
+            <div class="trong-ds"><svg icon="table"></svg><br />Chưa có dữ liệu</div>
+          </div>
+          <div class="daytrai">
+            <label class="tim"><svg icon="search" class="nho"></svg><input type="search" placeholder="Tìm" disabled /></label>
+            @if (canCollapse()) {
+              <button class="nutma thu" type="button" title="Thu gọn" (click)="s.listOpen.set(false)"><svg icon="panelL"></svg></button>
+            }
+          </div>
+        } @else if (isTable && s.view() === 'mau') {
+          <!-- Bảng ghép biến -->
+          <div class="bien-wrap">
+            <div class="ds-dau cot-bien"><span>Biến</span><span>Lấy từ</span><span></span></div>
+            <div class="bien-rows" (scroll)="closePick()">
+              @for (f of s.fields(); track f) {
+                @let ok = s.isMapped(f);
+                <div class="bdong cot-bien" [title]="f">
+                  <span class="bchip" [class.da]="ok" [class.chua]="!ok">{{ '{' + f + '}' }}</span>
+                  <span class="lt-pick">
+                    <button
+                      class="lt-nut"
+                      type="button"
+                      [class.chua]="!ok"
+                      [class.mo]="ui.sourcePick() === f"
+                      [disabled]="locked()"
+                      (click)="togglePick(f, $event)"
+                    >
+                      <span>{{ sourceLabel(f) }}</span><svg icon="chevD" class="nho"></svg>
+                    </button>
+                    @if (ui.sourcePick() === f) {
+                      <div
+                        class="lt-menu"
+                        [style.left.px]="pickPos().left"
+                        [style.top.px]="pickPos().top"
+                        [style.bottom.px]="pickPos().bottom"
+                      >
+                        <input
+                          #pickInp
+                          class="fld"
+                          autocomplete="off"
+                          placeholder="Gõ giá trị cố định rồi Enter…"
+                          [value]="fixedValue(f)"
+                          (keydown.enter)="applyFixed(f, pickInp.value, $event)"
+                        />
+                        <div class="lt-nhom">Cột trong file dữ liệu</div>
+                        <div class="lt-cols">
+                          @for (c of table?.columns ?? []; track c.column) {
+                            <button class="lt-col" type="button" [class.chon]="isColumn(f, c.column)" (click)="pickColumn(f, c.column)">
+                              <span class="vn"><b>{{ c.name || 'Cột ' + c.column }}</b></span>
+                              <span class="c">{{ c.distinct || '—' }}</span>
+                            </button>
+                          } @empty {
+                            <div class="lt-trong">File dữ liệu không có cột nào.</div>
+                          }
+                        </div>
+                        @if (ok) {
+                          <button class="lt-bo" type="button" (click)="unmap(f)"><svg icon="x" class="nho"></svg>Bỏ ghép</button>
+                        }
+                      </div>
+                    }
+                  </span>
+                  <span class="btt">
+                    @if (ok) {
+                      <svg icon="checkC" class="nho"></svg>
+                    } @else {
+                      <span class="bcham" title="Chưa ghép nguồn">!</span>
+                    }
+                  </span>
+                </div>
+              } @empty {
+                <div class="trong-ds">Mẫu không có biến nào dạng {{ '{ten_bien}' }}.</div>
+              }
+            </div>
+          </div>
+          <div class="daytrai">
+            @if (s.mappedCount() < s.fields().length) {
+              <span class="bcham">!</span><span class="dem loi-chu">Chưa ghép {{ s.fields().length - s.mappedCount() }} biến</span>
+            } @else {
+              <svg icon="checkC" class="nho"></svg><span class="dem ok-chu">Đã ghép đủ {{ s.fields().length }} biến</span>
+            }
+          </div>
+        } @else if (isTable) {
+          <!-- Danh sách Kết quả -->
+          <div class="ds">
+            <div class="ds-dau" [style.grid-template-columns]="gridKq()">
+              <span class="so-dau">#</span><span>Tên file sẽ tạo</span>
+              @if (job) {
+                <span>Trạng thái</span>
+              }
+            </div>
+            @for (it of s.filteredFiles(); track it.index) {
+              @let st = s.rowStatus(it.index);
+              @let reason = resultReason(it.index);
+              <div
+                class="dong"
+                [class.chon]="it.index === s.selectedIndex()"
+                [class.dang-tao]="st === 'dang'"
+                [style.grid-template-columns]="gridKq()"
+                [title]="rowTitle(it.file, it.index)"
+                (click)="s.selectIndex(it.index)"
+              >
+                <span class="so">{{ it.index + 1 }}</span>
+                <span class="ten">
+                  <span class="ten-cot">
+                    <span>{{ it.file.fileName }}</span>
+                    @if (reason) {
+                      <span class="ly-do">{{ reason }}</span>
+                    }
+                  </span>
+                  @if (it.file.warnings.length) {
+                    <span class="canh-dong" [title]="it.file.warnings.join('\n')"><svg icon="warn"></svg></span>
+                  }
+                </span>
+                @if (job) {
+                  @switch (st) {
+                    @case ('ok') {
+                      <span class="chip-tt ok"><svg icon="checkC"></svg>Xong</span>
+                    }
+                    @case ('loi') {
+                      <span class="chip-tt loi" [title]="reason ?? ''"><svg icon="alert"></svg>Lỗi</span>
+                    }
+                    @case ('dang') {
+                      <span class="chip-tt dang"><svg icon="spin" class="quay"></svg>Đang tạo</span>
+                    }
+                    @default {
+                      <span class="chip-tt cho"><svg icon="clock"></svg>Chờ</span>
+                    }
+                  }
+                }
+              </div>
+            } @empty {
+              <div class="trong-ds">
+                @if (s.planBusy()) {
+                  Đang lập danh sách…
+                } @else if (s.search().trim()) {
+                  Không có dòng khớp
+                } @else {
+                  Không có dòng dữ liệu
+                }
+              </div>
+            }
+          </div>
+          <div class="daytrai">
+            <label class="tim">
+              <svg icon="search" class="nho"></svg>
+              <input type="search" placeholder="Tìm theo tên file / nội dung" autocomplete="off" [value]="s.search()" (input)="s.search.set(textValue($event))" />
+            </label>
+            <span class="dem">{{ s.search().trim() ? s.filteredFiles().length + ' / ' + files.length : files.length + ' dòng' }}</span>
+            <button class="nutma thu" type="button" title="Thu gọn danh sách" (click)="s.listOpen.set(false)"><svg icon="panelL"></svg></button>
+          </div>
+        } @else {
+          <!-- Nhập trực tiếp: form theo biến của mẫu -->
+          <div class="form-truong">
+            @for (f of s.fields(); track f) {
+              <label>
+                <code>{{ '{' + f + '}' }}</code>
+                <input class="fld" type="text" autocomplete="off" [value]="manualValue(f)" [disabled]="locked()" (input)="s.setManual(f, textValue($event))" />
+              </label>
+            } @empty {
+              <div class="trong-ds">Mẫu không có biến nào dạng {{ '{ten_bien}' }}.</div>
+            }
+          </div>
+        }
+      </div>
+      <div class="keo" [class.dang]="resizing()" (pointerdown)="startResize($event)"></div>
+    } @else {
+      <!-- Rail số khi thu gọn -->
+      <div class="rail-ds">
+        @if (ready) {
+          <div class="rail-dau" title="Số thứ tự">#</div>
+          <div class="rail-ds-list">
+            @for (it of s.filteredFiles(); track it.index) {
+              @let st = s.rowStatus(it.index);
+              <button
+                class="rail-stt"
+                type="button"
+                [class.chon]="it.index === s.selectedIndex()"
+                [class.st-ok]="st === 'ok'"
+                [class.st-loi]="st === 'loi'"
+                [class.st-dang]="st === 'dang'"
+                [title]="it.file.fileName"
+                (click)="s.selectIndex(it.index)"
+              >
+                {{ it.index + 1 }}
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="rail-trong"></div>
+        }
+        <button class="nutma" type="button" title="Mở danh sách" (click)="s.listOpen.set(true)"><svg icon="panelR"></svg></button>
+      </div>
+    }
+
+    <!-- Cột phải -->
+    <div class="phai">
+      @if (!ready) {
+        <div class="mo-dau">
+          <svg class="logo-cn" bigIcon="tao"></svg>
+          <h2>Tạo văn bản từ mẫu <span [tip]="tipGioiThieu"></span></h2>
+          <p>Điền dữ liệu vào mẫu để sinh hàng loạt văn bản.</p>
+          <div class="buoc">
+            <div>
+              <span class="so">1</span><span class="t">Chọn mẫu</span>
+              Bấm <button class="lk" type="button" [disabled]="!canPick()" (click)="s.pickTemplate()">Chọn</button> mẫu .docx.
+            </div>
+            <div>
+              <span class="so">2</span><span class="t">Chọn dữ liệu</span>
+              <button class="lk" type="button" [disabled]="!canPick()" (click)="s.pickData()">File Excel</button> hoặc
+              <button class="lk" type="button" [disabled]="locked()" (click)="useManual()">nhập trực tiếp</button>.
+            </div>
+            <div><span class="so">3</span><span class="t">Tạo văn bản</span>Xem trước từng văn bản rồi bấm Tạo.</div>
+          </div>
+          <button class="logo-goc" type="button" title="Trang chủ" (click)="ui.go('home')"><img alt="Sao Mai" src="img/full.png" /></button>
+        </div>
+      } @else {
+        <div class="dieuhuong">
+          @if (s.view() === 'ketqua' && isTable) {
+            <button class="nutma" type="button" title="Văn bản trước (Ctrl+←)" [disabled]="s.selectedIndex() <= 0" (click)="s.selectIndex(s.selectedIndex() - 1)">
+              <svg icon="chevL"></svg>
+            </button>
+            <input class="so" [value]="files.length ? s.selectedIndex() + 1 : 0" (change)="s.selectIndex(numberValue($event) - 1)" />
+            <span class="tong">/ {{ files.length }}</span>
+            <button
+              class="nutma"
+              type="button"
+              title="Văn bản sau (Ctrl+→)"
+              [disabled]="s.selectedIndex() >= files.length - 1"
+              (click)="s.selectIndex(s.selectedIndex() + 1)"
+            >
+              <svg icon="chevR"></svg>
+            </button>
+          }
+          <span class="tt"><b>{{ navTitle() }}</b></span>
+          @if (s.view() === 'mau') {
+            <span class="trai" [tip]="tipXemMau"></span>
+          }
+          <span class="dan"></span>
+          <button
+            class="nutma sua-mau"
+            type="button"
+            [disabled]="!canPick()"
+            title="Mở file mẫu bằng Microsoft Word để sửa. Sửa xong bấm Lưu trong Word rồi bấm Tải lại."
+            (click)="s.editTemplate()"
+          >
+            <svg icon="edit"></svg>Sửa mẫu
+          </button>
+          <button
+            class="nutma tai-lai"
+            type="button"
+            [disabled]="!canPick() || s.reloadBusy() || s.templateBusy() || s.tableBusy()"
+            title="Đọc lại file mẫu và file dữ liệu từ đĩa (sau khi sửa và lưu)"
+            (click)="s.reload()"
+          >
+            <svg icon="refresh" [class.quay]="s.reloadBusy()"></svg>Tải lại
+          </button>
+          <span class="ngan-dh"></span>
+          <label
+            class="hop to-bien"
+            [title]="s.view() === 'mau' ? 'Tô nền vàng các biến {ten_bien} của mẫu' : 'Tô nền vàng giá trị đã điền; biến chưa có giá trị tô đỏ'"
+          >
+            <input type="checkbox" [checked]="s.highlight()" (change)="s.setHighlight(checkedValue($event))" />Tô màu biến
+          </label>
+          <span class="ngan-dh"></span>
+          <button class="nutma" type="button" title="Thu nhỏ (Ctrl + lăn chuột)" [disabled]="s.zoom() <= 40" (click)="s.zoomBy(-10)"><svg icon="zoomOut"></svg></button>
+          <span class="zm">{{ s.zoom() }} %</span>
+          <button class="nutma" type="button" title="Phóng to (Ctrl + lăn chuột)" [disabled]="s.zoom() >= 160" (click)="s.zoomBy(10)"><svg icon="zoomIn"></svg></button>
+        </div>
+        <div pdfView [selectable]="true" [preview]="s.preview()" [zoom]="s.zoom()" (zoomStep)="s.zoomBy($event)" [class.mo-di]="s.previewBusy() && !!s.preview()">
+          @if (!s.available) {
+            <div class="bao canh"><svg icon="warn"></svg><span>Xem trước cần lõi ứng dụng (không có khi chạy trong trình duyệt).</span></div>
+          } @else if (s.running()) {
+            <div class="bao xanh"><svg icon="info"></svg><span>Đang tạo văn bản — bản xem trước tạm dừng tới khi xong.</span></div>
+          }
+          @if (s.previewBusy()) {
+            <div class="xem-tt" [class.noi]="!!s.preview()"><svg icon="spin" class="quay"></svg>Đang tạo bản xem trước…</div>
+          }
+          @if (s.previewError(); as e) {
+            <div class="bao loi"><svg icon="alert"></svg><span><b>Không tạo được bản xem trước</b>{{ e }}</span></div>
+          }
+          @for (w of s.preview()?.warnings ?? []; track $index) {
+            <div class="bao canh"><svg icon="warn"></svg><span>{{ w }}</span></div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Chân màn -->
+<div class="chan">
+  <div class="dan">
+    @if (!s.available) {
+      <svg icon="info"></svg><span>Mở bằng ứng dụng Sao Mai Ký số để chọn mẫu, dữ liệu và tạo văn bản.</span>
+    } @else if (!ready) {
+      <svg icon="info"></svg><span>Chọn mẫu văn bản và nguồn dữ liệu để bắt đầu.</span>
+    } @else if (s.planError(); as e) {
+      <svg icon="alert" class="loi-chu"></svg><span class="loi-chu" [title]="e">{{ e }}</span>
+    } @else if (!s.plan()) {
+      <svg icon="spin" class="quay"></svg><span>Đang kiểm tra dữ liệu…</span>
+    } @else if (s.format() === 'pdf' && !s.wordAvailable()) {
+      <svg icon="warn" class="loi-chu"></svg>
+      <span class="loi-chu">Máy không có Microsoft Word nên không xuất được PDF. Chọn định dạng DOCX ở Nâng cao.</span>
+    } @else {
+      <svg icon="checkC"></svg><span>Sẽ tạo <b>{{ files.length }}</b> văn bản <b>{{ fmtLabel() }}</b></span>
+      <span class="tren trai" [tip]="footerTip()"></span>
+    }
+  </div>
+  <button
+    class="nut chinh rong"
+    type="button"
+    [disabled]="s.running() ? !job?.jobId || job?.stopping : !s.canRun()"
+    (click)="s.primaryAction()"
+  >
+    @if (s.running()) {
+      <svg icon="stop"></svg>{{ job?.stopping ? 'Đang dừng…' : 'Dừng' }}
+    } @else {
+      <svg icon="tao"></svg>{{ runLabel() }}
+    }
+  </button>
+</div>
+
+@if (dragging()) {
+  <div class="tha-file">
+    <svg icon="download"></svg>
+    Thả file vào đây
+    <span>Mẫu .docx hoặc dữ liệu .xlsx, .xls, .csv</span>
+  </div>
+}
+
+<!-- Hộp xác nhận trước khi chạy -->
+@let dlg = ui.dialog();
+@if (dlg?.kind === 'tvb-confirm' && s.plan(); as p) {
+  <app-popup title="Tạo văn bản" icon="tao" size="w560" (closed)="ui.close()">
+    <div class="than-p">
+      <div class="bao canh dai">
+        <svg icon="warn"></svg>
+        <span>
+          <b>Kiểm tra lại trước khi tạo {{ p.files.length }} văn bản</b>
+          Các mục dưới đây không chặn việc tạo, nhưng văn bản có thể thiếu nội dung.
+        </span>
+      </div>
+      @if (p.unmappedFields.length) {
+        <div class="nhom-p">Biến chưa ghép nguồn — sẽ để trống ({{ p.unmappedFields.length }})</div>
+        <div class="trung-ds">
+          <div class="trung-dong canh"><svg icon="alert"></svg><span class="ten"><span>{{ unmappedText() }}</span></span></div>
+        </div>
+      }
+      @if (p.warnings.length) {
+        <div class="nhom-p">Cảnh báo chung</div>
+        <div class="trung-ds">
+          @for (w of p.warnings; track $index) {
+            <div class="trung-dong canh"><svg icon="warn"></svg><span class="ten"><span>{{ w }}</span></span></div>
+          }
+        </div>
+      }
+      @if (fileWarnings().length) {
+        <div class="nhom-p">Cảnh báo theo dòng ({{ fileWarnings().length }})</div>
+        <div class="trung-ds">
+          @for (f of fileWarnings(); track f.rowNumber) {
+            <div class="trung-dong canh">
+              <svg icon="warn"></svg>
+              <span class="ten"><b>{{ f.fileName }}</b><span>Dòng {{ f.rowNumber }}: {{ f.warnings.join('; ') }}</span></span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+    <button foot class="nut" type="button" (click)="ui.close()">Hủy</button>
+    <button foot class="nut chinh" type="button" (click)="s.run()"><svg icon="tao"></svg>Vẫn tạo</button>
+  </app-popup>
+}
+
+<!-- Hộp kết quả sau khi chạy (prototype mTaoFile() L1475–1479) -->
+@if (dlg?.kind === 'tvb-done' && job; as j) {
+  @let sum = j.summary;
+  <app-popup title="Tạo văn bản" icon="tao" size="w470" (closed)="ui.close()">
+    <div class="than-p giua">
+      <div class="icon-lon" [class.ok]="!!sum && !sum.stopped && !sum.failed" [class.canh]="!sum || sum.stopped || sum.failed > 0">
+        <svg [icon]="!!sum && !sum.stopped && !sum.failed ? 'check' : 'warn'"></svg>
+      </div>
+      <div class="tieu-p">{{ doneTitle() }}</div>
+      @if (sum) {
+        <div class="so-lon">
+          <div><b>{{ sum.total }}</b><span>Tổng số</span></div>
+          <div class="so-ok"><b>{{ sum.success }}</b><span>Thành công</span></div>
+          <div class="so-loi"><b>{{ sum.failed }}</b><span>Lỗi</span></div>
+        </div>
+        <div class="hint mo-ta">
+          Đã tạo <b>{{ sum.success }}</b> văn bản {{ fmtLabel() }} từ mẫu {{ tpl?.fileName }}<br />
+          Lưu tại {{ j.outputFolder }}
+          @if (sum.stopped) {
+            <br />Đã dừng giữa chừng: {{ sum.total - sum.success - sum.failed }} văn bản chưa tạo.
+          }
+        </div>
+      }
+      @if (failedFiles().length) {
+        <div class="nhom-p">Văn bản lỗi ({{ failedFiles().length }})</div>
+        <div class="trung-ds">
+          @for (f of failedFiles(); track f.rowNumber) {
+            <div class="trung-dong loi">
+              <svg icon="alert"></svg>
+              <span class="ten"><b>{{ f.fileName }}</b><span>Dòng {{ f.rowNumber }}: {{ f.reason }}</span></span>
+            </div>
+          }
+        </div>
+      }
+      @if (j.error) {
+        <div class="nhom-p">Lỗi</div>
+        <div class="trung-ds"><div class="trung-dong loi"><svg icon="alert"></svg><span class="ten"><span>{{ j.error }}</span></span></div></div>
+      }
+    </div>
+    <span foot class="trai" title="Chức năng ký số đang phát triển">
+      <button class="nut" type="button" disabled><svg icon="pen"></svg>Ký số các văn bản này</button>
+    </span>
+    <button foot class="nut" type="button" [disabled]="!j.outputFolder" (click)="s.openOutputFolder()"><svg icon="folderOpen"></svg>Mở thư mục</button>
+    <button foot class="nut chinh" type="button" (click)="ui.close()">Đóng</button>
+  </app-popup>
+}

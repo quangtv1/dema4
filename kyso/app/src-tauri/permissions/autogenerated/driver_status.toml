@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-driver-status"
+description = "Enables the driver_status command without any pre-configured scope."
+commands.allow = ["driver_status"]
+
+[[permission]]
+identifier = "deny-driver-status"
+description = "Denies the driver_status command without any pre-configured scope."
+commands.deny = ["driver_status"]

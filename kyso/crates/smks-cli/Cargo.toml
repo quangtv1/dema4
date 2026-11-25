@@ -1,0 +1,29 @@
+[package]
+name = "smks-cli"
+description = "Sao Mai Ký số: công cụ dòng lệnh để kiểm thử lõi độc lập với giao diện."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "smks-cli"
+path = "src/main.rs"
+
+[features]
+# Khoá thử đọc từ file (--dev-cert/--dev-key). Không dùng cho bản phát hành.
+dev-keys = ["smks-sign/dev-keys"]
+
+[dependencies]
+smks-core = { workspace = true }
+smks-crypto = { workspace = true }
+smks-merge = { path = "../smks-merge" }
+smks-pdf = { path = "../smks-pdf" }
+smks-sign = { path = "../smks-sign" }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+
+[lints]
+workspace = true

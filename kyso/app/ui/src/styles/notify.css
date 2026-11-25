@@ -1,0 +1,18 @@
+/* Thông báo Telegram: hộp đăng ký thiết bị và hộp cấu hình (không có trong prototype; dùng lại lớp sẵn có). */
+.popup.w620{width:620px}
+.tg{display:flex;flex-direction:column;gap:10px}
+.tg .nhom-p{margin:6px 0 0}
+.tg .luoi-tt{grid-template-columns:140px minmax(0,1fr)}
+.tg-ma{font-family:Consolas,'Courier New',monospace;font-size:12px;word-break:break-all}
+.tg-chon{white-space:normal}
+.tg-ds{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:13px;line-height:1.5}
+.tg .row{min-height:52px;gap:10px}
+.tg .row > .dan.tg-nhan{flex:0 0 76px}
+.tg-gt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.tg-gt .hint{overflow-wrap:anywhere}
+.tg .row > .dan.tg-cot{flex-direction:column;align-items:flex-start;gap:2px}
+.tg .ketnoi i{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
+.tg .ketnoi.loi{color:var(--danger)}
+.tg .sw:disabled{opacity:.45}
+.tg .nut.nguy{color:var(--danger);border-color:var(--danger-b)}
+.tg-il{display:inline !important;font-size:inherit !important}

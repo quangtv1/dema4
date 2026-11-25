@@ -1,0 +1,71 @@
+/* ---------- Màn Kiểm tra chữ ký số (prototype manKT L1311–1356, TD-57) ---------- */
+.kiem-tra .kt-man{display:contents}
+.kiem-tra .hang .o{flex:1;min-width:0}
+.kiem-tra .kt-thuhoi{margin-left:6px;white-space:nowrap}
+.kiem-tra .kt-tt{min-width:170px}
+.kiem-tra .bao.dai{max-width:none;align-items:center}
+.kiem-tra .kt-ds .dong.kt-dong{grid-template-columns:20px minmax(0,1fr);min-height:58px;align-items:flex-start;padding-top:9px;padding-bottom:7px}
+.kiem-tra .kt-dong .chip-tt{margin-top:1px}
+.kiem-tra .kt-ten{min-width:0;display:flex;flex-direction:column;gap:1px}
+.kiem-tra .kt-ten .phuchu{display:block}
+.kiem-tra .kt-kl{font-weight:600}
+.kiem-tra .kt-kl.ok{color:var(--ok)}
+.kiem-tra .kt-kl.dung{color:#9a6700}
+.kiem-tra .kt-kl.loi{color:var(--danger)}
+.kiem-tra .kt-xem{align-items:stretch;background:var(--bg)}
+.kiem-tra .kt-than{max-width:680px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:16px}
+.kiem-tra .bao.kt-kq{max-width:none;align-items:flex-start}
+.kiem-tra .kt-the{padding:16px 18px}
+.kiem-tra .kt-nguoi{font-weight:600}
+.kiem-tra .luoi-tt .phuchu{color:var(--tx3);font-size:12px;margin-left:6px}
+.kiem-tra .kt-dk{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.kiem-tra .kt-dk-dau{font-weight:600;font-size:13px;display:flex;align-items:baseline;gap:8px}
+.kiem-tra .kt-dk-dau .phuchu{font-weight:400;color:var(--tx3);font-size:12px}
+.kiem-tra .kt-dk-dong{display:flex;gap:10px;align-items:flex-start}
+.kiem-tra .kt-dk-dong .chip-tt{margin-top:1px}
+.kiem-tra .kt-dk-noi{display:flex;flex-direction:column;gap:1px;min-width:0;font-size:12.5px;line-height:1.5;color:var(--tx2)}
+.kiem-tra .kt-dk-noi b{color:var(--tx);font-weight:600;font-size:13px}
+.kiem-tra .kt-canh{max-width:none}
+.kiem-tra .kt-canh-dong{display:block}
+.kiem-tra .kt-nc{display:flex;flex-direction:column;gap:12px}
+.kiem-tra .kt-nc .luoi-tt{grid-template-columns:130px minmax(0,1fr)}
+.kiem-tra .kt-so{font-family:Consolas,monospace;font-size:12px;overflow-wrap:anywhere}
+.kiem-tra .kt-tdoi{font-size:12.5px;color:var(--tx2);padding:2px 0 2px 10px;border-left:2px solid var(--line)}
+.kiem-tra .kt-tdoi.loi{color:var(--danger);border-left-color:var(--danger)}
+.kiem-tra .kt-chuoi-dau{margin-bottom:4px}
+.kiem-tra .kt-chuoi{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12.5px}
+.kiem-tra .kt-trang{background:var(--bg)}
+
+/* Khung đánh dấu chữ ký đã có trên trang. */
+.giay .ky-dau{position:absolute;z-index:3;border:2px solid var(--ok);border-radius:2px;background:rgba(26,127,55,.06);cursor:pointer}
+.giay .ky-dau.warn{border-color:#d29b00;background:rgba(210,155,0,.07)}
+.giay .ky-dau.fail{border-color:var(--danger);background:rgba(200,40,30,.07)}
+.giay .ky-dau.noi{box-shadow:0 0 0 4px rgba(245,160,0,.45);border-color:#f5a000}
+.giay .ky-dau-so{position:absolute;top:-11px;left:-11px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--ok);color:#fff;font:700 11px/20px var(--font);text-align:center}
+.giay .ky-dau.warn .ky-dau-so{background:#b07f00}
+.giay .ky-dau.fail .ky-dau-so{background:var(--danger)}
+.giay .ky-dau.noi .ky-dau-so{background:#e08a00}
+
+/* ---------- Báo cáo in ra PDF ---------- */
+.kt-baocao{display:none}
+@media print{
+  @page{size:A4}
+  html,body,app-root,.man.kiem-tra{height:auto !important;overflow:visible !important;display:block !important;background:#fff !important}
+  body > *:not(app-root),app-root > *:not(app-kiem-tra),.kiem-tra .kt-man,.kiem-tra .tha-file{display:none !important}
+  .kiem-tra{padding:0 !important}
+  .kt-baocao{display:block;color:#000;font:11pt/1.45 var(--font);padding:0}
+  .kt-baocao h1{font-size:17pt;margin:0 0 10pt;color:#0a3d7a}
+  .kt-baocao h2{font-size:12.5pt;margin:14pt 0 4pt;break-after:avoid}
+  .kt-baocao table{width:100%;border-collapse:collapse;margin:4pt 0;break-inside:auto}
+  .kt-baocao tr{break-inside:avoid}
+  .kt-baocao th,.kt-baocao td{border:1px solid #c9d1db;padding:4pt 6pt;text-align:left;vertical-align:top}
+  .kt-baocao .bc-tt th{width:32%;background:#f3f6fa;font-weight:600}
+  .kt-baocao .bc-dk td:first-child{width:16%;font-weight:700;white-space:nowrap}
+  .kt-baocao .bc-ok{color:#1a7f37}
+  .kt-baocao .bc-warn{color:#9a6700}
+  .kt-baocao .bc-fail{color:#b42318}
+  .kt-baocao .bc-lydo{margin:0 0 4pt;color:#333}
+  .kt-baocao .bc-luuy{margin:3pt 0;color:#5c4300;font-size:10pt}
+  .kt-baocao .bc-ky{break-inside:auto}
+  .kt-baocao .bc-chan{margin-top:16pt;font-size:9.5pt;color:#555}
+}

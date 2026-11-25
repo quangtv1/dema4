@@ -1,0 +1,113 @@
+===== word.an.pdf
+che do doc: KHONG chat, vi file la hybrid-reference: Settings do not permit validation of signatures in hybrid-reference files.
+so chu ky: 1
+--- chu ky 1: field SaoMai_Signature_124
+  nguoi ky        : Common Name: Nguyễn Văn Thử Nghiệm, Organization: Sao Mai - THU NGHIEM, Country: VN
+  thuat toan      : rsassa_pkcs1v15 / sha256
+  signed attrs    : ['content_type', 'message_digest', 'signing_certificate_v2']
+  unsigned attrs  : ['signature_time_stamp_token']
+  /M tu khai      : 2026-11-19 11:02:36+07:00
+  gio TSA         : 2026-11-19 04:02:37+00:00
+  TSA             : Common Name: Máy chủ cấp dấu thời gian 02, Organization: Ban Cơ yếu Chính phủ, Country: VN
+  pham vi / thay doi: ENTIRE_FILE / NONE
+  bottom_line     : True
+  [DAT] noi dung nguyen ven (intact)
+  [DAT] chu ky dung (valid)
+  [DAT] nguoi ky tin cay (trusted)
+  [DAT] pham vi hop le
+  [DAT] SubFilter ETSI.CAdES.detached
+  [DAT] co signingCertificateV2
+  [DAT] KHONG co signing-time
+  [DAT] co dau thoi gian
+  [DAT] dau thoi gian dung (valid)
+  [DAT] TSA tin cay ve Root G2 (trusted)
+===== word.an.hien.pdf
+che do doc: KHONG chat, vi file la hybrid-reference: Settings do not permit validation of signatures in hybrid-reference files.
+so chu ky: 2
+--- chu ky 1: field SaoMai_Signature_124
+  nguoi ky        : Common Name: Nguyễn Văn Thử Nghiệm, Organization: Sao Mai - THU NGHIEM, Country: VN
+  thuat toan      : rsassa_pkcs1v15 / sha256
+  signed attrs    : ['content_type', 'message_digest', 'signing_certificate_v2']
+  unsigned attrs  : ['signature_time_stamp_token']
+  /M tu khai      : 2026-11-19 11:02:36+07:00
+  gio TSA         : 2026-11-19 04:02:37+00:00
+  TSA             : Common Name: Máy chủ cấp dấu thời gian 02, Organization: Ban Cơ yếu Chính phủ, Country: VN
+  pham vi / thay doi: ENTIRE_REVISION / FORM_FILLING
+  bottom_line     : True
+  [DAT] noi dung nguyen ven (intact)
+  [DAT] chu ky dung (valid)
+  [DAT] nguoi ky tin cay (trusted)
+  [DAT] pham vi hop le
+  [DAT] SubFilter ETSI.CAdES.detached
+  [DAT] co signingCertificateV2
+  [DAT] KHONG co signing-time
+  [DAT] co dau thoi gian
+  [DAT] dau thoi gian dung (valid)
+  [DAT] TSA tin cay ve Root G2 (trusted)
+--- chu ky 2: field SaoMai_Signature_126
+  nguoi ky        : Common Name: Nguyễn Văn Thử Nghiệm, Organization: Sao Mai - THU NGHIEM, Country: VN
+  thuat toan      : rsassa_pkcs1v15 / sha256
+  signed attrs    : ['content_type', 'message_digest', 'signing_certificate_v2']
+  unsigned attrs  : ['signature_time_stamp_token']
+  /M tu khai      : 2026-11-19 11:03:02+07:00
+  gio TSA         : 2026-11-19 04:03:03+00:00
+  TSA             : Common Name: Máy chủ cấp dấu thời gian 02, Organization: Ban Cơ yếu Chính phủ, Country: VN
+  pham vi / thay doi: ENTIRE_FILE / NONE
+  bottom_line     : True
+  [DAT] noi dung nguyen ven (intact)
+  [DAT] chu ky dung (valid)
+  [DAT] nguoi ky tin cay (trusted)
+  [DAT] pham vi hop le
+  [DAT] SubFilter ETSI.CAdES.detached
+  [DAT] co signingCertificateV2
+  [DAT] KHONG co signing-time
+  [DAT] co dau thoi gian
+  [DAT] dau thoi gian dung (valid)
+  [DAT] TSA tin cay ve Root G2 (trusted)
+===== stream.hien.pdf
+che do doc: chat (strict)
+so chu ky: 1
+--- chu ky 1: field SaoMai_Signature_37
+  nguoi ky        : Common Name: Nguyễn Văn Thử Nghiệm, Organization: Sao Mai - THU NGHIEM, Country: VN
+  thuat toan      : rsassa_pkcs1v15 / sha256
+  signed attrs    : ['content_type', 'message_digest', 'signing_certificate_v2']
+  unsigned attrs  : ['signature_time_stamp_token']
+  /M tu khai      : 2026-11-19 11:03:02+07:00
+  gio TSA         : 2026-11-19 04:03:03+00:00
+  TSA             : Common Name: Máy chủ cấp dấu thời gian 02, Organization: Ban Cơ yếu Chính phủ, Country: VN
+  pham vi / thay doi: ENTIRE_FILE / NONE
+  bottom_line     : True
+  [DAT] noi dung nguyen ven (intact)
+  [DAT] chu ky dung (valid)
+  [DAT] nguoi ky tin cay (trusted)
+  [DAT] pham vi hop le
+  [DAT] SubFilter ETSI.CAdES.detached
+  [DAT] co signingCertificateV2
+  [DAT] KHONG co signing-time
+  [DAT] co dau thoi gian
+  [DAT] dau thoi gian dung (valid)
+  [DAT] TSA tin cay ve Root G2 (trusted)
+===== table.anh.pdf
+che do doc: chat (strict)
+so chu ky: 1
+--- chu ky 1: field SaoMai_Signature_35
+  nguoi ky        : Common Name: Nguyễn Văn Thử Nghiệm, Organization: Sao Mai - THU NGHIEM, Country: VN
+  thuat toan      : rsassa_pkcs1v15 / sha256
+  signed attrs    : ['content_type', 'message_digest', 'signing_certificate_v2']
+  unsigned attrs  : ['signature_time_stamp_token']
+  /M tu khai      : 2026-11-19 11:03:02+07:00
+  gio TSA         : 2026-11-19 04:03:03+00:00
+  TSA             : Common Name: Máy chủ cấp dấu thời gian 02, Organization: Ban Cơ yếu Chính phủ, Country: VN
+  pham vi / thay doi: ENTIRE_FILE / NONE
+  bottom_line     : True
+  [DAT] noi dung nguyen ven (intact)
+  [DAT] chu ky dung (valid)
+  [DAT] nguoi ky tin cay (trusted)
+  [DAT] pham vi hop le
+  [DAT] SubFilter ETSI.CAdES.detached
+  [DAT] co signingCertificateV2
+  [DAT] KHONG co signing-time
+  [DAT] co dau thoi gian
+  [DAT] dau thoi gian dung (valid)
+  [DAT] TSA tin cay ve Root G2 (trusted)
+KET QUA CHUNG: DAT

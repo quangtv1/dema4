@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sign-image-preview"
+description = "Enables the sign_image_preview command without any pre-configured scope."
+commands.allow = ["sign_image_preview"]
+
+[[permission]]
+identifier = "deny-sign-image-preview"
+description = "Denies the sign_image_preview command without any pre-configured scope."
+commands.deny = ["sign_image_preview"]

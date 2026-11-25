@@ -1,0 +1,15 @@
+[package]
+name = "s3-font"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Spike đứng riêng, không thuộc workspace chính.
+[workspace]
+
+[dependencies]
+pdf-writer = "0.15"
+subsetter = "0.2"
+ttf-parser = "0.25"
+unicode-normalization = "0.1"
+miniz_oxide = "0.8"

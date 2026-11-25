@@ -1,0 +1,272 @@
+<!-- Màn Xem trước & vị trí chữ ký. Bố cục và nhãn theo prototype manTC() L1384–1413. -->
+@let files = t.files();
+@let cur = t.current();
+@let box = t.curBox();
+@let locked = t.locked();
+
+<!-- Hàng đầu: Quay lại · tiêu đề · Chế độ · Cỡ · Nâng cao -->
+<div class="hang">
+  <button class="nut nho" type="button" (click)="t.exit()"><svg icon="back" class="nho"></svg>Quay lại</button>
+  <span class="tieu">Xem trước &amp; vị trí chữ ký</span>
+  <span class="dan"></span>
+  <span class="nhanphu">Chế độ</span>
+  <select class="fld vt-che-do" [disabled]="locked || !files.length" (change)="onMode($event)">
+    <option value="all" [selected]="t.mode() === 'all'">Tất cả file</option>
+    <option value="per" [selected]="t.mode() === 'per'">Từng file</option>
+  </select>
+  <span [tip]="tipMode"></span>
+  <span class="ngan"></span>
+  <span class="nhanphu">Cỡ</span>
+  <input class="vt-thanh" type="range" min="50" max="200" step="10" [title]="sizeTitle()"
+         [value]="t.sizePct()" [disabled]="locked || !box || t.textOnly()" (input)="onSize($event)" />
+  <span class="vt-co">{{ t.sizePct() }}%</span>
+  <button class="nut nho nangcao" type="button" [class.mo]="t.advOpen()" [attr.aria-expanded]="t.advOpen()" (click)="t.advOpen.set(!t.advOpen())">
+    <svg icon="gear" class="nho"></svg>Nâng cao<svg icon="chevD" class="mui"></svg>
+  </button>
+</div>
+
+@if (t.advOpen()) {
+  <div class="nc-panel vt-nc">
+    <span class="nhanphu">Theo mẫu <span class="trai" [tip]="tipProfile"></span></span>
+    <select class="fld vt-mau" [disabled]="locked || !cur" (change)="onProfile($event)">
+      @for (p of t.profiles(); track p.id) {
+        <option [value]="p.id" [selected]="p.id === t.profile()?.id">{{ p.name }}{{ p.isDefault ? ' (mặc định)' : '' }}</option>
+      }
+    </select>
+    <span class="vt-cach"></span>
+    <span class="nhanphu">Vị trí theo mẫu</span>
+    <select class="fld vt-neo" [disabled]="locked || !cur" (change)="onAnchor($event)">
+      @for (a of anchors; track a) {
+        <option [value]="a" [selected]="a === t.anchorShown()">{{ cap(posLabel[a]) }}</option>
+      }
+    </select>
+    <span class="vt-cach"></span>
+    <span class="nhanphu">Hiển thị</span>
+    <select class="fld vt-kieu" [disabled]="locked" (change)="onDisplay($event)"
+      [title]="t.mode() === 'per' ? 'Từng file: kiểu hiển thị riêng cho file đang xem' : 'Kiểu hiển thị cho tất cả file'">
+      @for (m of modes; track m) {
+        <option [value]="m" [selected]="m === t.curDisplay()" [disabled]="modeDisabled(m)">{{ modeLabel[m] }}</option>
+      }
+    </select>
+      <!-- Ảnh so với chữ (TD-51): vị trí ảnh, phần ảnh chiếm, khoảng cách; áp cho mọi văn bản. Luôn hiện, kể cả khi
+           Hiển thị chỉ ảnh / chỉ thông tin / ẩn (chỉnh sẵn, dùng khi về "Ảnh + thông tin"). -->
+      <span class="vt-xuong"></span>
+      <span class="nhanphu">Vị trí ảnh <span class="trai" [tip]="tipSplit"></span></span>
+      <span class="seg-nhom vt-bocuc" role="group" aria-label="Vị trí ảnh">
+        @for (l of imageLayouts; track l.id) {
+          <button class="seg" type="button" [class.chon]="!t.freeBoxes() && l.id === t.imageLayout()" [title]="l.title" [disabled]="locked"
+                  (click)="t.setImageLayout(l.id)">{{ l.label }}</button>
+        }
+        <button class="seg" type="button" [class.chon]="!!t.freeBoxes()" [disabled]="locked"
+                title="Tự kéo thả ảnh và thông tin trong khung (ô sửa bên dưới)" (click)="t.startFree()">Tự do</button>
+      </span>
+      @if (t.boxMode() !== 'imageAndText') {
+        <span class="vt-cach"></span>
+        <span class="vt-goiy vt-chidung">Chỉ dùng khi Hiển thị là "Ảnh + thông tin"; chỉnh sẵn được.</span>
+      }
+      @if (t.freeBoxes(); as fb) {
+        <span class="vt-cach"></span>
+        <span class="vt-goiy">Kéo ô ảnh / ô thông tin để dời, kéo cạnh / góc để đổi cỡ; kéo cạnh / góc khung ngoài để đổi cỡ cả khối.</span>
+        <span class="vt-xuong"></span>
+        @let ed = editor();
+        <div class="vt-sua" [style.width.px]="ed.w" [style.height.px]="ed.h" [style.transform]="edShift()">
+          <div class="vt-o anh" [class.tren]="topPart() === 'image'" [class.mo]="t.boxMode() === 'text'" [style.left.%]="fb.image.x * 100" [style.top.%]="fb.image.y * 100"
+               [style.width.%]="fb.image.w * 100" [style.height.%]="fb.image.h * 100" title="Ảnh chữ ký: kéo để dời, kéo cạnh hoặc góc để đổi cỡ"
+               (pointerdown)="dragPart('image', $event)">
+            @if (t.ks.imageUrl(); as src) {
+              <img [src]="src" alt="" draggable="false" />
+            }
+            @for (d of handles; track d) {
+              <span [class]="'tay ' + d" [attr.data-d]="d"></span>
+            }
+          </div>
+          <div class="vt-o chu" [class.tren]="topPart() === 'text'" [class.mo]="t.boxMode() === 'image'" [style.left.%]="fb.text.x * 100" [style.top.%]="fb.text.y * 100"
+               [style.width.%]="fb.text.w * 100" [style.height.%]="fb.text.h * 100" title="Thông tin: kéo để dời, kéo cạnh hoặc góc để đổi cỡ"
+               (pointerdown)="dragPart('text', $event)">
+            <div class="vt-chu" [style.font-size.px]="editorFont()" [style.font-family]="t.ks.appearance().fontFamily"
+                 [style.color]="t.ks.appearance().textColor">
+              @for (l of editorLines(); track $index) {
+                <div>{{ l }}</div>
+              }
+            </div>
+            @for (d of handles; track d) {
+              <span [class]="'tay ' + d" [attr.data-d]="d"></span>
+            }
+          </div>
+          <!-- Góc khung ngoài: đổi cỡ cả khối chữ ký trên trang (ô ảnh / ô chữ giãn theo). -->
+          @if (!t.textOnly() && box) {
+            @for (d of handles; track d) {
+              <span [class]="'tay khoi ' + d" [attr.data-d]="d" title="Kéo để đổi cỡ cả khung chữ ký" (pointerdown)="dragBlock($event)"></span>
+            }
+          }
+        </div>
+      } @else {
+      <span class="vt-cach"></span>
+      <span class="nhanphu">Ảnh chiếm</span>
+      <input class="vt-thanh vt-anh" type="range" min="10" max="90" step="1" [value]="shareShown()" [disabled]="locked"
+             title="Phần khung dành cho ảnh" (input)="onSplit('imageShare', $event)" />
+      <span class="vt-so" [class.tu]="t.imageShare() === null">{{ t.imageShare() === null ? 'Tự động' : t.imageShare() + '%' }}</span>
+      <span class="vt-cach"></span>
+      <span class="nhanphu">Khoảng cách</span>
+      <input class="vt-thanh vt-khoang" type="range" min="0" max="30" step="1" [value]="gapShown()" [disabled]="locked"
+             title="Khoảng cách giữa ảnh và thông tin" (input)="onSplit('imageGap', $event)" />
+      <span class="vt-so" [class.tu]="t.imageGap() === null">{{ t.imageGap() === null ? 'Tự động' : t.imageGap() + '%' }}</span>
+      <button class="nut nho vt-tudong" type="button" [disabled]="locked || (t.imageShare() === null && t.imageGap() === null)"
+              title="Chia ảnh và chữ như mặc định" (click)="t.setImageSplit('imageShare', null); t.setImageSplit('imageGap', null)">
+        <svg icon="refresh" class="nho"></svg>Tự động
+      </button>
+      }
+  </div>
+}
+
+@if (locked && t.ks.running()) {
+  <div class="bao canh dai"><svg icon="warn"></svg><span>Đang ký số: chưa đổi được vị trí chữ ký tới khi lô ký xong.</span></div>
+}
+@if (t.layoutError(); as e) {
+  <div class="bao loi dai">
+    <svg icon="alert"></svg><span class="dan">Không tính được vị trí chữ ký: {{ e }}</span>
+    <button class="nutma" type="button" title="Đóng" (click)="t.layoutError.set(null)"><svg icon="x" class="nho"></svg></button>
+  </div>
+}
+
+<div class="khung">
+  <div class="than">
+    @if (!files.length) {
+      <div class="phai">
+        <div class="mo-dau">
+          <svg class="logo-cn" bigIcon="vitri"></svg>
+          <h2>Vị trí chữ ký</h2>
+          <p>Kéo thả, đổi cỡ khung chữ ký trên trang — một khung cho tất cả hoặc riêng từng file.</p>
+          <div class="buoc">
+            <div>
+              <span class="so">1</span><span class="t">Chọn văn bản</span>
+              Bấm <button class="lk" type="button" [disabled]="locked" (click)="t.ks.pick('file')">1 file</button> hoặc
+              <button class="lk" type="button" [disabled]="locked" (click)="t.ks.pick('folder')">Thư mục</button>.
+            </div>
+            <div><span class="so">2</span><span class="t">Đặt khung</span>Kéo khung để di chuyển, kéo cạnh hoặc góc để đổi cỡ.</div>
+            <div><span class="so">3</span><span class="t">Áp dụng</span>Về màn Ký số và ký như thường.</div>
+          </div>
+        </div>
+      </div>
+    } @else {
+      <!-- Lưới file -->
+      <div class="cottrai" [style.width.px]="t.leftW()">
+        <div class="ab-luoi">
+          @for (f of files; track f.path) {
+            @let m = minis()[f.path];
+            <button class="ab-file" type="button" [class.chon]="f.path === cur?.path" [title]="fileTitle(f)" (click)="t.select(f.path)">
+              <span class="mini" [style.width.px]="m.w" [style.height.px]="m.h" [class.loi]="!!m.error" [class.chuagan]="m.skip">
+                @for (v of vach; track $index) {
+                  <span class="vach" [style.top.%]="v.top" [style.right.px]="v.right"></span>
+                }
+                @for (b of m.boxes; track $index) {
+                  <span class="o-ky" [style.left.%]="b.xRatio * 100" [style.top.%]="b.yRatio * 100" [style.width.%]="b.widthRatio * 100" [style.height.%]="b.heightRatio * 100"></span>
+                }
+                @if (m.own) {
+                  <span class="tick"><svg icon="check"></svg></span>
+                }
+              </span>
+              <span class="ten">{{ f.name }}</span>
+            </button>
+          }
+        </div>
+      </div>
+      <div class="keo" title="Kéo để đổi độ rộng" [class.dang]="resizing()" (pointerdown)="startResize($event)"></div>
+
+      <!-- Trang xem trước -->
+      <div class="phai">
+        <div class="dieuhuong">
+          <button class="nutma" type="button" title="Văn bản trước (Ctrl+←)" [disabled]="t.currentIndex() <= 0" (click)="t.nav(-1)"><svg icon="chevL"></svg></button>
+          <span class="tt vt-ten"><b>{{ cur?.name }}</b></span>
+          <button class="nutma" type="button" title="Văn bản sau (Ctrl+→)" [disabled]="t.currentIndex() >= files.length - 1" (click)="t.nav(1)"><svg icon="chevR"></svg></button>
+          <span class="tong">{{ t.currentIndex() + 1 }} / {{ files.length }}</span>
+          <span class="dan"></span>
+          <span class="ngan"></span>
+          <button class="nutma" type="button" title="Thu nhỏ (Ctrl + lăn chuột)" [disabled]="t.zoom() <= 40" (click)="t.zoomBy(-10)"><svg icon="zoomOut"></svg></button>
+          <span class="zm">{{ t.zoom() }} %</span>
+          <button class="nutma" type="button" title="Phóng to (Ctrl + lăn chuột)" [disabled]="t.zoom() >= 160" (click)="t.zoomBy(10)"><svg icon="zoomIn"></svg></button>
+        </div>
+        @if (hint(); as h) {
+          <div class="bao canh dai ky-nhac"><svg icon="info"></svg><span>{{ h }}</span></div>
+        }
+        <div class="xem-hang">
+        @if (pv.pageCount() > 1) {
+          <app-page-thumbs [view]="pv" [marks]="t.boxPages()" [pageTools]="!locked" (pageMenu)="openPageMenu($event)" />
+        }
+        <div pdfView #pv="pdfView" [preview]="t.preview()" [zoom]="t.zoom()" [sigBoxes]="sigBoxes()" [boxTools]="!locked"
+             (sigBoxEdit)="t.setBox($event.index, $event.placement)" (sigBoxDelete)="deleteBox($event)" (boxMenu)="openBoxMenu($event)"
+             (wheel)="menu.set(null)" (zoomStep)="t.zoomBy($event)" [class.mo-di]="t.previewBusy() && !!t.preview()">
+          @if (t.curSkipped()) {
+            <div class="bao canh vt-chuagan"><svg icon="warn"></svg><span><b>Chưa gán chữ ký</b>Đã xoá hết khung: văn bản này được bỏ qua khi ký số. Chuột phải trên trang (hoặc ảnh thu nhỏ) › Thêm khung để gán lại.</span></div>
+          } @else if (t.curDisplay() === 'hidden') {
+            <div class="bao canh"><svg icon="warn"></svg><b>Chữ ký đang để ẩn — khung chỉ để tham khảo</b></div>
+          }
+          @if (t.previewError(); as e) {
+            <div class="bao loi"><svg icon="alert"></svg><span><b>Không mở được bản xem trước</b>{{ e }}</span></div>
+          } @else if (t.curError(); as e) {
+            <div class="bao loi"><svg icon="alert"></svg><span><b>Không tính được vị trí chữ ký</b>{{ e }}</span></div>
+          }
+          @if (t.previewBusy() && !t.preview()) {
+            <div class="trong-ds giua-ds"><svg icon="spin" class="quay"></svg><br />Đang mở văn bản…</div>
+          }
+        </div>
+        </div>
+        @if (menu(); as m) {
+          @let pages = pv.pageCount();
+          @let onPage = t.boxPages().has(m.page);
+          <div class="ky-menu vt-menu" role="menu" [style.left.px]="m.left" [style.top.px]="m.top" (contextmenu)="$event.preventDefault()">
+            <div class="km-dau">Chữ ký chính · trang {{ m.page }}</div>
+            @if (m.index !== null) {
+              <button class="km-muc" type="button" role="menuitem" (click)="menuDelete()">
+                <svg icon="trash"></svg><span class="dan">Xoá khung chữ ký</span><kbd>Delete</kbd>
+              </button>
+            } @else if (m.thumb && onPage) {
+              <button class="km-muc" type="button" role="menuitem" (click)="menuDelete()">
+                <svg icon="trash"></svg><span class="dan">Xoá khung chữ ký ở trang {{ m.page }}</span>
+              </button>
+            } @else {
+              <button class="km-muc" type="button" role="menuitem" (click)="menuAdd()">
+                <svg icon="plus"></svg><span class="dan">{{ m.thumb ? 'Thêm khung chữ ký vào trang ' + m.page : 'Thêm khung chữ ký ở đây' }}</span>
+              </button>
+            }
+            @if (t.curBoxes().length > 1) {
+              <button class="km-muc" type="button" role="menuitem" (click)="menuDeleteAll()">
+                <svg icon="trash"></svg><span class="dan">Xoá hết khung ({{ t.curBoxes().length }})</span>
+              </button>
+            }
+            @if (!t.curSkipped() && pages > 1 && t.boxPages().size < pages) {
+              <button class="km-muc" type="button" role="menuitem" (click)="menuCopyAll()">
+                <svg icon="copy"></svg><span class="dan">Thêm khung giống thế này vào mọi trang</span>
+              </button>
+            }
+            <div class="km-chu">{{ t.mode() === 'per' ? 'Từng file: chỉ văn bản này.' : 'Tất cả file: áp cho mọi văn bản (văn bản ít trang hơn: khung về trang cuối).' }} Mỗi lần ký, văn bản nhận một chữ ký, hiện ở mọi khung.</div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Chân màn -->
+<div class="chan">
+  <div class="dan">
+    <svg icon="frame"></svg>
+    @if (t.curSkipped()) {
+      <span class="vt-chuagan-chan"><b>{{ footText() }}</b></span>
+    } @else if (box) {
+      <span>
+        {{ footText() }} · X <b>{{ pct(box.xRatio) }}%</b> · Y <b>{{ pct(box.yRatio) }}%</b> · <b>{{ pct(box.widthRatio) }} × {{ pct(box.heightRatio) }}%</b>
+        @if (t.mode() === 'per') {
+          · đặt riêng <b>{{ t.ownCount() }}/{{ files.length }}</b> file
+        }
+      </span>
+    } @else {
+      <span>{{ files.length ? 'Đang tính vị trí chữ ký…' : 'Chọn văn bản để đặt vị trí chữ ký.' }}</span>
+    }
+  </div>
+  <button class="nut" type="button" title="Bỏ khung tự đặt của file đang xem (Từng file) hoặc khung dùng chung, về theo mẫu khổ giấy" [disabled]="locked || !t.curManual()" (click)="t.reset()">
+    <svg icon="refresh"></svg>Đặt lại
+  </button>
+  <button class="nut" type="button" (click)="t.exit()">Thoát</button>
+  <button class="nut chinh rong" type="button" [disabled]="locked" (click)="t.apply()"><svg icon="check"></svg>Áp dụng</button>
+</div>

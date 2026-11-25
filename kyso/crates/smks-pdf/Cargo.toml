@@ -1,0 +1,23 @@
+[package]
+name = "smks-pdf"
+description = "Sao Mai Ký số: đọc PDF, ghi nối bản, khối chữ ký, hình học trang, quét chữ ký. Không phụ thuộc Tauri."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]
+smks-core = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+lopdf = { version = "0.47", default-features = false }
+miniz_oxide = "0.8"
+pdf-writer = "0.15"
+subsetter = "0.2"
+ttf-parser = "0.25"
+unicode-normalization = "0.1"
+
+[lints]
+workspace = true

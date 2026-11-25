@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-merge-inspect-template"
+description = "Enables the merge_inspect_template command without any pre-configured scope."
+commands.allow = ["merge_inspect_template"]
+
+[[permission]]
+identifier = "deny-merge-inspect-template"
+description = "Denies the merge_inspect_template command without any pre-configured scope."
+commands.deny = ["merge_inspect_template"]

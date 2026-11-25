@@ -1,0 +1,740 @@
+<!-- Màn Ký số văn bản. Bố cục và nhãn theo prototype manKySo() L1006–1111; khung nguồn dùng chung kiểu với Tạo văn bản. -->
+@let files = s.files();
+@let loaded = s.loaded();
+@let job = s.job();
+@let running = s.running();
+@let vis = s.visible();
+@let cur = s.current();
+
+@if (s.sourceOpen()) {
+<div class="nguon ks">
+  <button class="nutma ng-thu" type="button" title="Thu gọn khung chọn file" aria-expanded="true" (click)="s.setSourceOpen(false)">
+    <svg icon="chevU"></svg>
+  </button>
+  <!-- Dòng 1: văn bản cần ký | Xóa file gốc -->
+  <span class="ng-nhan">Văn bản cần ký</span>
+  <div class="ng-file">
+    <span pathInput [value]="s.sourcePath()" placeholder="Chọn 1 file hoặc cả thư mục cần ký" [disabled]="s.locked()" (cleared)="s.clearSource()"></span>
+    <span class="seg-nhom">
+      <button class="seg" type="button" title="Chọn 1 văn bản" [class.chon]="loaded && s.sourceKind() === 'file'" [disabled]="!canPick() || s.listBusy()" (click)="s.pick('file')">
+        <svg icon="file"></svg>1 file
+      </button>
+      <button class="seg" type="button" title="Chọn cả thư mục" [class.chon]="loaded && s.sourceKind() === 'folder'" [disabled]="!canPick() || s.listBusy()" (click)="s.pick('folder')">
+        <svg icon="folder"></svg>Thư mục
+      </button>
+    </span>
+    @if (s.listBusy()) {
+      <svg icon="spin" class="quay"></svg>
+    }
+  </div>
+  <div class="ng-o ng-c34">
+    <label class="hop" [class.tat]="s.locked()"><input type="checkbox" [checked]="s.replaceOriginal()" [disabled]="s.locked()" (change)="onReplace($event)" />Xóa file gốc</label>
+    <span class="trai" [tip]="tipXoaGoc()"></span>
+  </div>
+
+  <!-- Dòng 2: ảnh chữ ký / con dấu | Hiển thị, Cấu hình vị trí -->
+  <span class="ng-nhan">Chữ ký / con dấu</span>
+  <div class="ng-file">
+    <span pathInput [value]="s.imagePath()" placeholder="Chọn ảnh chữ ký hoặc con dấu (.png, .jpg)" [disabled]="s.locked()" (cleared)="s.clearImage()"></span>
+    <button class="nut" type="button" [disabled]="!canPick()" [title]="noCoreTitle()" (click)="s.pickImage()"><svg icon="image"></svg>Chọn ảnh</button>
+  </div>
+  <label class="ng-o ng-c3">
+    <span class="nhanphu">Hiển thị</span>
+    <select class="fld kieu-ky" [disabled]="s.locked()" (change)="s.setMode(modeValue($event))">
+      @for (m of modes; track m) {
+        <option [value]="m" [selected]="m === s.curMode()" [disabled]="modeDisabled(m)">{{ modeLabel[m] }}</option>
+      }
+    </select>
+  </label>
+  <span class="ng-c4 ng-boc" [title]="tipCauHinh">
+    <button class="nut" type="button" [disabled]="s.locked()" (click)="ui.go('tucauhinh')"><svg icon="gear"></svg>Cấu hình vị trí</button>
+  </span>
+</div>
+} @else {
+  <div class="nguon-gon" role="button" tabindex="0" title="Mở khung chọn file" aria-expanded="false"
+       (click)="s.setSourceOpen(true)" (keydown.enter)="s.setSourceOpen(true)" (keydown.space)="s.setSourceOpen(true); $event.preventDefault()">
+    <span class="gon-muc" [class.trong]="!loaded">
+      <svg [icon]="s.sourceKind() === 'folder' ? 'folder' : 'file'" class="nho"></svg>{{ loaded ? baseName(s.sourcePath()) : 'Chưa chọn văn bản' }}
+    </span>
+    @if (loaded) {
+      <span class="gon-phu">{{ files.length }} văn bản</span>
+    }
+    <span class="gon-muc" [class.trong]="!s.hasImage()"><svg icon="image" class="nho"></svg>{{ s.hasImage() ? baseName(s.imagePath()) : 'Không có ảnh' }}</span>
+    <span class="gon-phu">{{ modeLabel[s.curMode()] }}</span>
+    <span class="dan"></span>
+    <span class="nutma" aria-hidden="true"><svg icon="chevD"></svg></span>
+  </div>
+}
+
+@if (!s.available) {
+  <div class="bao canh dai">
+    <svg icon="warn"></svg>
+    <span>
+      <b>Đang chạy trong trình duyệt, không có lõi ứng dụng</b>
+      Chọn văn bản, xem trước và ký số cần mở bằng ứng dụng Sao Mai Ký số.
+    </span>
+  </div>
+}
+@if (s.loadError(); as message) {
+  <div class="bao loi dai">
+    <svg icon="alert"></svg>
+    <span class="dan">{{ message }}</span>
+    <button class="nutma" type="button" title="Đóng" (click)="s.loadError.set(null)"><svg icon="x" class="nho"></svg></button>
+  </div>
+}
+
+<!-- Khung tab -->
+<div class="khung">
+  <div class="tabs">
+    <button class="tab" type="button" [class.chon]="s.view() === 'files'" (click)="s.view.set('files')">
+      <svg icon="list"></svg>Văn bản <span class="dem">({{ loaded ? vis.length : 0 }})</span>
+    </button>
+    <button class="tab" type="button" [class.chon]="s.view() === 'log'" (click)="s.view.set('log')">
+      <svg icon="terminal"></svg>Nhật ký
+    </button>
+    <div class="phai-tab">
+      @if (s.hasRun()) {
+        <span class="td-tt" [class.dang]="tdClass() === 'dang'" [class.xong]="tdClass() === 'xong'" [class.dung]="tdClass() === 'dung'">
+          @if (running) {
+            <svg icon="spin" class="quay"></svg>
+          } @else {
+            <svg [icon]="s.allDone() ? 'checkC' : 'pause'"></svg>
+          }
+          {{ job?.stopping ? 'Đang tạm dừng…' : tdText() }}
+        </span>
+        @if (s.view() === 'log') {
+          <span class="tdsep"></span>
+        }
+      } @else if (job?.error; as e) {
+        <span class="td-tt dung" [title]="e"><svg icon="alert"></svg>Không chạy được: {{ e }}</span>
+      }
+      @if (s.view() === 'log') {
+        <button class="lk tron" type="button" [disabled]="!s.log().length" (click)="s.clearLog()">Xóa</button>
+      }
+    </div>
+    @if (s.hasRun()) {
+      <div class="td-line" [class.xong]="tdClass() === 'xong'" [class.dung]="tdClass() === 'dung'" [style.width.%]="progressPct()"></div>
+    }
+  </div>
+
+  @if (s.view() === 'log') {
+    <div class="log">
+      @for (ln of s.log(); track ln.id) {
+        <div class="ln">
+          <span class="time">{{ ln.time }}</span>
+          <span class="tag" [class.t-info]="ln.tag === 'INFO'" [class.t-token]="ln.tag === 'TOKEN'" [class.t-ok]="ln.tag === 'OK'" [class.t-loi]="ln.tag === 'LỖI'" [class.t-xong]="ln.tag === 'XONG'">{{ ln.tag }}</span>
+          <span class="txt">{{ ln.text }}</span>
+        </div>
+      } @empty {
+        <div class="ln">
+          <span class="time">--:--:--</span><span class="tag t-info">INFO</span>
+          <span class="txt">{{ loaded ? 'Chưa có sự kiện. Bấm "Ký số" để bắt đầu.' : 'Chưa chọn văn bản. Bấm "1 file" hoặc "Thư mục" để bắt đầu.' }}</span>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="than">
+      @if (s.listOpen()) {
+        <div class="cottrai" [style.width.px]="s.leftW()">
+          @if (!loaded) {
+            <div class="ds">
+              <div class="trong-ds">
+                @if (s.listBusy()) {
+                  <svg icon="spin" class="quay"></svg><br />Đang đọc danh sách…
+                } @else {
+                  <svg icon="folderOpen"></svg><br />Chưa chọn văn bản
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="ds">
+              <div class="ds-dau cot-ks">
+                <span class="so-dau">#</span><span>Tên văn bản</span>
+                <span class="loc-th">
+                  <button class="loc-nut" type="button" title="Lọc theo trạng thái" [class.on]="s.filter() !== 'all'" (click)="toggleFilter()">
+                    @if (s.filter() !== 'all') {
+                      <svg icon="filter" class="nho"></svg>
+                    }
+                    <span>{{ filterLabel(s.filter()) }}</span><svg icon="chevD" class="nho"></svg>
+                  </button>
+                  @if (s.filterOpen()) {
+                    <div class="loc-menu">
+                      @for (ft of filters; track ft.id) {
+                        <button class="loc-item" type="button" [class.chon]="s.filter() === ft.id" (click)="s.setFilter(ft.id)">
+                          @if (s.filter() === ft.id) {
+                            <svg icon="check" class="nho"></svg>
+                          } @else {
+                            <span class="loc-sp"></span>
+                          }
+                          <span class="loc-ten">{{ ft.label }}</span><span class="loc-dem">{{ s.filterCounts()[ft.id] }}</span>
+                        </button>
+                      }
+                    </div>
+                  }
+                </span>
+              </div>
+              @for (it of vis; track it.file.path) {
+                @let st = rowStatus(it.file);
+                @let reason = rowReason(it.file);
+                <div
+                  class="dong cot-ks"
+                  [class.chon]="it.file.path === cur?.path"
+                  [class.dang]="st === 'dang'"
+                  [title]="rowTitle(it.file)"
+                  (click)="s.selectedPath.set(it.file.path)"
+                >
+                  <span class="so">{{ it.index + 1 }}</span>
+                  <span class="ten">
+                    <svg [icon]="it.file.unreadable ? 'warn' : 'file'" [class.loi-chu]="it.file.unreadable"></svg>
+                    <span class="ten-cot">
+                      <span>{{ it.file.name }}</span>
+                      @if (reason) {
+                        <span class="ly-do">{{ reason }}</span>
+                      } @else if (it.file.unreadable) {
+                        <span class="ly-do">Không đọc được file</span>
+                      } @else if (it.file.signatureCount > 0) {
+                        <span class="da-co">Đã có {{ it.file.signatureCount }} chữ ký</span>
+                      }
+                    </span>
+                  </span>
+                  @switch (st) {
+                    @case ('ok') {
+                      <span class="chip-tt ok"><svg icon="checkC"></svg>Đã ký</span>
+                    }
+                    @case ('loi') {
+                      <span class="chip-tt loi"><svg icon="alert"></svg>Lỗi</span>
+                    }
+                    @case ('dang') {
+                      <span class="chip-tt dang"><svg icon="spin" class="quay"></svg>Đang ký</span>
+                    }
+                    @case ('dung') {
+                      <span class="chip-tt dung"><svg icon="pause"></svg>Tạm dừng</span>
+                    }
+                    @case ('bo') {
+                      <span class="chip-tt bo"><svg icon="warn"></svg>Chưa gán chữ ký</span>
+                    }
+                    @default {
+                      <span class="chip-tt cho"><svg icon="clock"></svg>Chờ ký</span>
+                    }
+                  }
+                </div>
+              } @empty {
+                <div class="trong-ds">
+                  @if (s.filter() !== 'all') {
+                    Không có văn bản ở trạng thái “{{ filterLabel(s.filter()) }}”
+                  } @else {
+                    Không có văn bản khớp “{{ s.search() }}”
+                  }
+                </div>
+              }
+            </div>
+          }
+          <div class="daytrai">
+            <label class="tim">
+              <svg icon="search" class="nho"></svg>
+              <input type="search" placeholder="Tìm theo tên file" autocomplete="off" [value]="s.search()" [disabled]="!loaded" (input)="s.search.set(textValue($event))" />
+            </label>
+            @if (loaded) {
+              <span class="dem">{{ s.search().trim() || s.filter() !== 'all' ? vis.length + ' / ' + files.length : files.length + ' văn bản' }}</span>
+            }
+            <button class="nutma thu" type="button" title="Thu gọn danh sách" (click)="s.listOpen.set(false)"><svg icon="panelL"></svg></button>
+          </div>
+        </div>
+        <div class="keo" title="Kéo để đổi độ rộng cột" [class.dang]="resizing()" (pointerdown)="startResize($event)"></div>
+      } @else {
+        <div class="rail-ds">
+          @if (loaded) {
+            <div class="rail-dau" title="Số thứ tự">#</div>
+            <div class="rail-ds-list">
+              @for (it of vis; track it.file.path) {
+                @let st = rowStatus(it.file);
+                <button
+                  class="rail-stt"
+                  type="button"
+                  [class.chon]="it.file.path === cur?.path"
+                  [class.st-ok]="st === 'ok'"
+                  [class.st-loi]="st === 'loi'"
+                  [class.st-dang]="st === 'dang'"
+                  [class.st-dung]="st === 'dung'"
+                  [class.st-bo]="st === 'bo'"
+                  [title]="it.file.name + ' · ' + statusLabel[st]"
+                  (click)="s.selectedPath.set(it.file.path)"
+                >
+                  {{ it.index + 1 }}
+                </button>
+              }
+            </div>
+          } @else {
+            <div class="rail-trong"></div>
+          }
+          <button class="nutma" type="button" title="Mở danh sách văn bản" (click)="s.listOpen.set(true)"><svg icon="panelR"></svg></button>
+        </div>
+      }
+
+      <!-- Cột phải -->
+      <div class="phai">
+        @if (!loaded) {
+          <div class="mo-dau">
+            <svg class="logo-cn" bigIcon="ky"></svg>
+            <h2>Ký số văn bản <span [tip]="tipGioiThieu()"></span></h2>
+            <p>Ký 1 văn bản hoặc cả thư mục bằng chứng thư số trên USB Token.</p>
+            <div class="buoc">
+              <div>
+                <span class="so">1</span><span class="t">Chọn văn bản</span>
+                Bấm <button class="lk" type="button" [disabled]="!canPick()" (click)="s.pick('file')">1 file</button> hoặc
+                <button class="lk" type="button" [disabled]="!canPick()" (click)="s.pick('folder')">Thư mục</button>.
+              </div>
+              <div><span class="so">2</span><span class="t">Cắm USB Token</span>Chọn chứng thư số khi bấm Ký số.</div>
+              <div><span class="so">3</span><span class="t">Ký số</span>Nhập mã PIN ở hộp của token, xem kết quả từng file.</div>
+            </div>
+            <button class="logo-goc" type="button" title="Trang chủ" (click)="ui.go('home')"><img alt="Sao Mai" src="img/full.png" /></button>
+          </div>
+        } @else if (!vis.length) {
+          <div class="vungxem">
+            <div class="trong-ds giua-ds"><svg icon="search"></svg><br />Không có văn bản khớp “{{ s.search() }}”</div>
+          </div>
+        } @else if (cur) {
+          @let st = s.status(cur.path);
+          @let res = s.currentResult();
+          <div class="dieuhuong">
+            <button class="nutma" type="button" title="Văn bản trước (Ctrl+←)" [disabled]="s.selectedPos() <= 0" (click)="s.selectPos(s.selectedPos() - 1)">
+              <svg icon="chevL"></svg>
+            </button>
+            <input class="so" [value]="s.selectedPos() + 1" (change)="s.selectPos(numberValue($event) - 1)" />
+            <span class="tong">/ {{ vis.length }}</span>
+            <button class="nutma" type="button" title="Văn bản sau (Ctrl+→)" [disabled]="s.selectedPos() >= vis.length - 1" (click)="s.selectPos(s.selectedPos() + 1)">
+              <svg icon="chevR"></svg>
+            </button>
+            <span class="tt"><b>{{ cur.name }}</b></span>
+            <span class="trai" [tip]="fileTip()"></span>
+            <span class="dan"></span>
+            @switch (st) {
+              @case ('ok') {
+                <span class="chip-tt ok"><svg icon="checkC"></svg>Đã ký</span>
+              }
+              @case ('loi') {
+                <span class="chip-tt loi"><svg icon="alert"></svg>Lỗi</span>
+              }
+              @case ('dang') {
+                <span class="chip-tt dang"><svg icon="spin" class="quay"></svg>Đang ký</span>
+              }
+              @case ('dung') {
+                <span class="chip-tt dung"><svg icon="pause"></svg>Tạm dừng</span>
+              }
+              @default {
+                <span class="chip-tt cho"><svg icon="clock"></svg>Chờ ký</span>
+              }
+            }
+            <span class="ngan"></span>
+            <span class="seg-nhom luot-ky" role="radiogroup" aria-label="Lượt ký">
+              @for (k of kinds; track k) {
+                <button class="seg" type="button" role="radio" [attr.aria-checked]="s.kind() === k" [class.chon]="s.kind() === k" [disabled]="s.locked()" (click)="s.setKind(k)">
+                  {{ k === 'main' ? 'Chính' : 'Nháy' }}
+                </button>
+              }
+            </span>
+            <span class="trai" [tip]="tipLuot"></span>
+            <span class="ngan"></span>
+            <button class="nutma" type="button" title="Thu nhỏ (Ctrl + lăn chuột)" [disabled]="s.zoom() <= 40" (click)="s.zoomBy(-10)"><svg icon="zoomOut"></svg></button>
+            <span class="zm">{{ s.zoom() }} %</span>
+            <button class="nutma" type="button" title="Phóng to (Ctrl + lăn chuột)" [disabled]="s.zoom() >= 160" (click)="s.zoomBy(10)"><svg icon="zoomIn"></svg></button>
+            @if (s.currentManual() && s.curMode() !== 'hidden') {
+              <span class="ngan"></span>
+              <button
+                class="nutma ve-mau"
+                type="button"
+                [title]="s.currentOwn() ? 'Bỏ khung riêng của văn bản này, dùng khung chung của cả lô' : (s.kind() === 'main' ? 'Bỏ vị trí kéo tay, đặt chữ ký theo mẫu chữ ký theo khổ giấy' : 'Bỏ khung tự đặt, ký nháy ở mọi trang')"
+                [disabled]="s.locked()"
+                (click)="s.resetBoxes()"
+              >
+                <svg icon="refresh"></svg>
+              </button>
+            }
+          </div>
+          @if (boxHint(); as h) {
+            <div class="bao canh dai ky-nhac"><svg icon="info"></svg><span>{{ h }}</span></div>
+          }
+          <div class="xem-hang">
+          @if (pv.pageCount() > 1) {
+            <app-page-thumbs [view]="pv" [marks]="s.boxPages()" />
+          }
+          <div
+            pdfView
+            #pv="pdfView"
+            [boxTools]="!s.locked()"
+            [preview]="s.preview()"
+            [zoom]="s.zoom()"
+            [sigBoxes]="s.sigBoxes()"
+            (sigBoxEdit)="s.moveBox($event.index, $event.placement)"
+            (sigBoxDelete)="deleteBox($event)"
+            (boxMenu)="openBoxMenu($event)"
+            (zoomStep)="s.zoomBy($event)"
+            (scroll)="boxMenu.set(null)"
+            [class.mo-di]="s.previewBusy() && !!s.preview()"
+          >
+            @switch (st) {
+              @case ('ok') {
+                <span class="nhan-trang ok"><svg icon="checkC"></svg>Đã ký số</span>
+              }
+              @case ('loi') {
+                <span class="nhan-trang loi"><svg icon="alert"></svg>Lỗi</span>
+              }
+              @case ('dang') {
+                <span class="nhan-trang dang"><svg icon="spin" class="quay"></svg>Đang ký…</span>
+              }
+            }
+            @if (!s.available) {
+              <div class="bao canh"><svg icon="warn"></svg><span>Xem trước cần lõi ứng dụng (không có khi chạy trong trình duyệt).</span></div>
+            }
+            @if (st === 'bo') {
+              <div class="bao canh ks-chuagan"><svg icon="warn"></svg><span><b>Chưa gán chữ ký</b>Đã xoá hết khung chữ ký: văn bản này được bỏ qua khi ký số. Chuột phải trên trang › Thêm khung chữ ký ở đây để gán lại.</span></div>
+            } @else if (st === 'loi') {
+              <div class="bao loi"><svg icon="alert"></svg><span><b>Không ký được</b>{{ res?.reason ?? 'Không rõ lý do.' }}</span></div>
+            } @else if (st === 'dung') {
+              <div class="bao xanh"><svg icon="pause"></svg><span><b>Chưa ký: lượt ký đang tạm dừng</b>{{ res?.reason?.includes('rút USB token') ? 'Đã rút USB token khi đang ký. Cắm lại token rồi bấm "Ký tiếp".' : 'Bấm "Ký tiếp" để ký tiếp các văn bản còn lại.' }}</span></div>
+            } @else if (st === 'ok' && running) {
+              <div class="bao xanh"><svg icon="info"></svg><span>Đã ký. Bản đã ký xem được khi lượt ký xong; đang hiện file gốc.</span></div>
+            } @else if (cur.unreadable) {
+              <div class="bao canh"><svg icon="warn"></svg><span><b>Không đọc được file</b>File PDF có thể bị hỏng hoặc được bảo vệ.</span></div>
+            }
+            @if (st === 'ok' && !running && res?.verdict && res?.verdict !== 'validTrusted' && res?.verdict !== 'notApplicable') {
+              <div class="bao canh"><svg icon="warn"></svg><span><b>Kết quả kiểm tra sau khi ký</b>{{ verdictLabel(res?.verdict ?? null) }}</span></div>
+            }
+            @if (s.previewBusy()) {
+              <div class="xem-tt" [class.noi]="!!s.preview()"><svg icon="spin" class="quay"></svg>Đang mở văn bản…</div>
+            }
+            @if (s.previewError(); as e) {
+              <div class="bao loi"><svg icon="alert"></svg><span><b>Không mở được bản xem trước</b>{{ e }}</span></div>
+            }
+          </div>
+          </div>
+          @if (boxMenu(); as m) {
+            <div class="ky-menu" role="menu" [style.left.px]="m.left" [style.top.px]="m.top" (contextmenu)="$event.preventDefault()">
+              <div class="km-dau">{{ kindLabel[s.kind()] }} · trang {{ m.page }}</div>
+              @if (m.index !== null) {
+                <button class="km-muc" type="button" role="menuitem" (click)="menuDelete()">
+                  <svg icon="trash"></svg><span class="dan">Xoá khung chữ ký</span><kbd>Delete</kbd>
+                </button>
+                @if (pv.pageCount() > 1) {
+                  <button class="km-muc" type="button" role="menuitem" (click)="menuCopyAll(pv.pageCount())">
+                    <svg icon="copy"></svg><span class="dan">Thêm khung giống thế này vào mọi trang</span>
+                  </button>
+                }
+              } @else {
+                <button class="km-muc" type="button" role="menuitem" (click)="menuAdd()">
+                  <svg icon="plus"></svg><span class="dan">Thêm khung chữ ký ở đây</span>
+                </button>
+              }
+              @if (m.index !== null && s.curMode() === 'imageAndText') {
+                @let lay = s.appearance().imageLayout;
+                <div class="km-bocuc" role="group" aria-label="Vị trí ảnh">
+                  <span class="km-nhan">Vị trí ảnh</span>
+                  <span class="seg-nhom">
+                    @for (l of imageLayouts; track l.id) {
+                      <button class="seg" type="button" role="menuitemradio" [attr.aria-checked]="lay === l.id" [class.chon]="lay === l.id" [title]="l.title" (click)="menuLayout(l.id)">{{ l.label }}</button>
+                    }
+                  </span>
+                </div>
+              }
+              @if (s.currentManual()) {
+                <button class="km-muc" type="button" role="menuitem" (click)="menuReset()">
+                  <svg icon="refresh"></svg><span class="dan">{{ s.currentOwn() ? 'Bỏ khung riêng của văn bản này' : 'Về vị trí mặc định' }}</span>
+                </button>
+              }
+              <div class="km-chu">Mỗi lần ký, văn bản nhận một chữ ký, hiện ở mọi khung.</div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Chân màn -->
+<div class="chan">
+  <div class="dan">
+    @if (!s.available) {
+      <svg icon="info"></svg><span>Mở bằng ứng dụng Sao Mai Ký số để chọn văn bản và ký số.</span>
+    } @else if (!loaded) {
+      <svg icon="info"></svg><span>Chọn văn bản cần ký để bắt đầu.</span>
+    } @else if (running) {
+      <svg icon="clock"></svg>
+      <span>
+        Đã chạy <b>{{ fmtDur(s.elapsedMs()) }}</b>
+        @if (s.doneCount() > 0) {
+          · còn khoảng <b>{{ fmtDur(s.etaMs(files.length - s.doneCount())) }}</b>
+        } @else {
+          · đang ước lượng…
+        }
+      </span>
+      <span class="ngan"></span><span class="so-ok">Đã ký <b>{{ s.okCount() }}</b></span>
+      @if (s.errCount()) {
+        <span class="so-loi">Lỗi <b>{{ s.errCount() }}</b></span>
+      }
+    } @else if (s.remainCount() > 0 && s.hasRun()) {
+      <svg icon="clock"></svg>
+      <span>
+        Tạm dừng · đã chạy <b>{{ fmtDur(s.elapsedMs()) }}</b> · còn khoảng <b>{{ fmtDur(s.etaMs(s.remainCount())) }}</b> cho
+        {{ s.remainCount() }} văn bản
+      </span>
+      <span class="ngan"></span><span class="so-ok">Đã ký <b>{{ s.okCount() }}</b></span>
+      @if (s.errCount()) {
+        <span class="so-loi">Lỗi <b>{{ s.errCount() }}</b></span>
+      }
+      @if (s.pausedCount()) {
+        <span class="so-dung">Tạm dừng <b>{{ s.pausedCount() }}</b></span>
+      }
+    } @else if (s.remainCount() > 0) {
+      <svg icon="checkC"></svg><span>Sẵn sàng ký <b>{{ s.remainCount() }}</b> văn bản</span>
+      <span class="tren trai" [tip]="readyTip()"></span>
+    } @else {
+      <svg icon="checkC"></svg>
+      <span>Đã ký xong <b>{{ files.length }}</b> văn bản · tổng thời gian <b>{{ fmtDur(s.elapsedMs()) }}</b></span>
+      <span class="ngan"></span><span class="so-ok">Đã ký <b>{{ s.okCount() }}</b></span>
+      <span class="tren trai" [tip]="doneTip()"></span>
+    }
+  </div>
+  @if (!running && s.hasRun() && s.outputFolder()) {
+    <button class="nut" type="button" (click)="s.openOutputFolder()"><svg icon="folderOpen"></svg>Mở thư mục</button>
+  }
+  @if (running) {
+    <button class="nut rong" type="button" [disabled]="!job?.jobId || job?.stopping" (click)="s.primaryAction()">
+      <svg icon="pause"></svg>{{ job?.stopping ? 'Đang tạm dừng…' : 'Tạm dừng' }}
+    </button>
+  } @else {
+    <button class="nut chinh rong" type="button" [disabled]="!s.available || !loaded || s.tokenBusy() || s.listBusy()" (click)="s.primaryAction()">
+      <svg icon="pen"></svg>{{ runLabel() }}
+    </button>
+  }
+</div>
+
+@if (dragging()) {
+  <div class="tha-file">
+    <svg icon="download"></svg>
+    Thả văn bản vào đây
+    <span>File PDF hoặc thư mục chứa PDF</span>
+  </div>
+}
+
+@let dlg = ui.dialog();
+<!-- Hộp Xác nhận ký: chọn chứng thư (thay hộp nhập PIN của prototype; PIN do middleware của token hỏi) -->
+@if (dlg?.kind === 'ks-confirm') {
+  @let scan = s.certScan();
+  <app-popup title="Xác nhận ký" icon="pen" size="w560" (closed)="closeConfirm()">
+    <div class="than-p">
+      @if (s.certBusy()) {
+        <div class="xem-tt"><svg icon="spin" class="quay"></svg>Đang tìm chứng thư số…</div>
+      } @else if (s.certError(); as e) {
+        <div class="bao loi dai"><svg icon="alert"></svg><span><b>Không đọc được kho chứng thư</b>{{ e }}</span></div>
+      } @else if (scan && !s.signableCerts().length) {
+        <div class="bao loi dai">
+          <svg icon="alert"></svg>
+          <span><b>Không có chứng thư số nào dùng để ký được</b>Cắm USB Token rồi bấm Quét lại.@if (s.hiddenFound()) { {{ s.hiddenFound() }} chứng thư đã bị xoá khỏi danh sách: mở Cấu hình › USB Token để hiện lại.}</span>
+        </div>
+        @if (s.shownCerts().length) {
+          <div class="nhom-p">Chứng thư tìm thấy ({{ s.shownCerts().length }})</div>
+          <div class="trung-ds">
+            @for (c of s.shownCerts(); track c.thumbprint) {
+              <div class="trung-dong loi" [title]="certTitle(c)">
+                <svg icon="alert"></svg>
+                <span class="ten"><b>{{ c.commonName }}</b><span>{{ c.reason ?? 'Không dùng để ký được.' }}</span></span>
+              </div>
+            }
+          </div>
+        }
+      } @else if (scan) {
+        <div class="nhom-p">Chọn chứng thư số</div>
+        <div class="ct-ds" role="radiogroup" aria-label="Chứng thư số">
+          @for (c of s.shownCerts(); track c.thumbprint) {
+            <label class="ct-dong" [class.tat]="!c.canSign" [class.chon]="c.thumbprint === s.chosenCert()" [title]="certTitle(c)">
+              <input
+                type="radio"
+                name="ks-cert"
+                [checked]="c.thumbprint === s.chosenCert()"
+                [disabled]="!c.canSign || s.tokenBusy()"
+                (change)="s.chooseCert(c)"
+              />
+              <span class="ct-noi">
+                <span class="ct-ten">
+                  <b>{{ c.commonName }}</b>
+                  @if (c.source === 'usbToken') {
+                    <span class="ct-the"><svg icon="usb"></svg>USB Token</span>
+                  }
+                  @if (s.savedPins().has(c.thumbprint.toUpperCase())) {
+                    <span class="ct-the"><svg icon="key"></svg>Đã lưu PIN</span>
+                  }
+                </span>
+                <span class="ct-phu">
+                  {{ c.issuerCommonName }} · HSD {{ fmtDate(c.validTo) }}{{ c.keyProvider ? ' · ' + c.keyProvider : '' }}
+                </span>
+                @if (!c.canSign) {
+                  <span class="ct-lydo">{{ c.reason ?? 'Không dùng để ký được.' }}</span>
+                }
+              </span>
+            </label>
+          }
+        </div>
+        <div class="hint mo-ta">Sẽ ký <b>{{ s.pendingFiles().length }}</b> văn bản, lượt <b>{{ kindLabel[s.kind()] }}</b>; {{ saveNote() }}</div>
+        @if (s.chosenCert()) {
+          <div class="ct-pin">
+            @if (s.chosenHasPin()) {
+              <div class="ct-pin-luu">
+                <svg icon="key"></svg>
+                <span class="dan">Đã lưu mã PIN của chứng thư này trên máy; app tự nhập khi mở token.</span>
+                <button class="lk" type="button" [disabled]="s.tokenBusy()" (click)="s.forgetPin()">Xoá PIN đã lưu</button>
+              </div>
+            } @else {
+              <label class="ct-pin-o">
+                <span class="nhanphu">Mã PIN</span>
+                <input
+                  class="fld"
+                  type="password"
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="32"
+                  placeholder="Để trống thì nhập ở hộp của token"
+                  [value]="s.pinInput()"
+                  [disabled]="s.tokenBusy()"
+                  (input)="s.pinInput.set(textValue($event))"
+                  (keydown.enter)="s.confirm()"
+                />
+              </label>
+              <label class="hop ct-pin-luu-o" [class.tat]="!s.pinInput()">
+                <input type="checkbox" [checked]="s.savePin()" [disabled]="!s.pinInput() || s.tokenBusy()" (change)="s.savePin.set(isChecked($event))" />
+                Lưu PIN trên máy này để lần sau tự nhập
+              </label>
+              @if (s.savePin() && s.pinInput()) {
+                <div class="bao canh dai">
+                  <svg icon="warn"></svg>
+                  <span><b>PIN được mã hoá theo tài khoản Windows này</b>Ai dùng được tài khoản Windows này và có token cắm vào máy đều ký được mà không cần biết PIN. Xoá PIN đã lưu ở Cấu hình › USB Token.</span>
+                </div>
+              }
+            }
+          </div>
+        }
+      }
+      @if (scan?.diagnostics?.length && !s.certBusy()) {
+        <div class="nhom-p">Chẩn đoán</div>
+        <div class="trung-ds">
+          @for (d of scan?.diagnostics ?? []; track $index) {
+            <div class="trung-dong canh"><svg icon="info"></svg><span class="ten"><span>{{ d }}</span></span></div>
+          }
+        </div>
+      }
+      @if (s.tokenBusy()) {
+        <div class="bao xanh dai ct-bao"><svg icon="spin" class="quay"></svg><span><b>Đang mở token…</b>Middleware có thể hiện hộp nhập mã PIN.</span></div>
+      } @else if (s.tokenError(); as e) {
+        <div class="bao loi dai ct-bao"><svg icon="alert"></svg><span><b>Không mở được token</b>{{ e }}</span></div>
+      }
+    </div>
+    <button foot class="nut trai" type="button" [disabled]="s.certBusy() || s.tokenBusy()" (click)="s.scanCerts()"><svg icon="refresh"></svg>Quét lại</button>
+    <button foot class="nut" type="button" (click)="closeConfirm()">Hủy</button>
+    <button foot class="nut chinh rong" type="button" [disabled]="!s.chosenCert() || s.certBusy() || s.tokenBusy() || !s.signableCerts().length" (click)="s.confirm()">
+      @if (s.tokenBusy()) {
+        <svg icon="spin" class="quay"></svg>
+      } @else {
+        <svg icon="pen"></svg>
+      }
+      Ký số
+    </button>
+  </app-popup>
+}
+
+<!-- Hộp File đã ký / trùng tên (prototype mTrung L1455–1467) -->
+@if (dlg?.kind === 'ks-dup') {
+  @let dups = s.dups();
+  @let ow = s.output().overwrite;
+  <app-popup title="File đã ký / trùng tên" icon="alert" size="w560" (closed)="ui.close()">
+    <div class="than-p">
+      <div class="bao loi dai trung-bao">
+        <svg icon="alert"></svg>
+        <span><b>{{ dups.length }}</b> file đã ký trùng tên trong {{ dupWhere() }}. Bạn muốn xử lý thế nào?</span>
+      </div>
+      <div class="trung-ds">
+        @for (d of dups; track d.output) {
+          <div class="trung-dong" [title]="d.output">
+            <span class="ten"><b>{{ baseName(d.output) }}</b><span>{{ dirOf(d.output) }}</span></span>
+            <span class="co"><svg icon="alert" class="nho"></svg>đã tồn tại</span>
+          </div>
+        }
+      </div>
+      <div class="hint trung-hint"><b>Ghi đè</b>: thay file đã ký cũ bằng bản mới.<br /><b>Giữ cả hai</b>: tạo bản mới, thêm hậu tố (1), (2)… — không đụng file cũ.</div>
+    </div>
+    <button foot class="nut trai" type="button" (click)="ui.close()">Hủy</button>
+    <button foot class="nut" type="button" [class.chinh]="!ow" [class.rong]="!ow" (click)="s.chooseDup(false)"><svg icon="file"></svg>Giữ cả hai</button>
+    <button foot class="nut" type="button" [class.chinh]="ow" [class.rong]="ow" (click)="s.chooseDup(true)"><svg icon="check"></svg>Ghi đè</button>
+  </app-popup>
+}
+
+<!-- Xác nhận bật "Xóa file gốc" (ADR 0003) -->
+@if (dlg?.kind === 'ks-replace') {
+  <app-popup title="Xóa file gốc" icon="warn" size="w470" (closed)="ui.close()">
+    <div class="than-p">
+      <div class="bao canh dai"><svg icon="warn"></svg><span><b>File đã ký sẽ thay vào đúng chỗ file gốc.</b>File gốc được chuyển vào Thùng rác của Windows, khôi phục được.</span></div>
+      <ul class="hint thay-ds">
+        <li>Chỉ thay sau khi chữ ký trên file đã ký được kiểm lại hợp lệ.</li>
+        <li>File trên ổ mạng hoặc USB (không có Thùng rác): giữ nguyên file gốc, file đã ký lưu vào thư mục {{ s.output().fixedFolder ?? s.output().subfolder }} như thường.</li>
+        <li>Chỉ áp dụng trong lần mở ứng dụng này.</li>
+      </ul>
+    </div>
+    <button foot class="nut" type="button" (click)="ui.close()">Hủy</button>
+    <button foot class="nut chinh rong" type="button" (click)="s.confirmReplace()"><svg icon="check"></svg>Bật Xóa file gốc</button>
+  </app-popup>
+}
+
+<!-- Hộp kết quả sau khi ký -->
+@if (dlg?.kind === 'ks-done' && job; as j) {
+  @let sum = j.summary;
+  @let clean = !!sum && !sum.stopped && !sum.tokenRemoved && !sum.failed;
+  <app-popup title="Ký số" icon="pen" size="w470" (closed)="ui.close()">
+    <div class="than-p giua">
+      <div class="icon-lon" [class.ok]="clean" [class.canh]="!clean">
+        <svg [icon]="clean ? 'check' : 'warn'"></svg>
+      </div>
+      <div class="tieu-p">{{ doneTitle() }}</div>
+      @if (sum) {
+        <div class="so-lon">
+          <div><b>{{ sum.total }}</b><span>Tổng số</span></div>
+          <div class="so-ok"><b>{{ sum.success }}</b><span>Thành công</span></div>
+          <div class="so-loi"><b>{{ sum.failed }}</b><span>Lỗi</span></div>
+          @if (sum.paused) {
+            <div class="so-dung"><b>{{ sum.paused }}</b><span>Tạm dừng</span></div>
+          }
+        </div>
+        <div class="hint mo-ta">
+          @if (sum.tokenRemoved) {
+            <b>Đã rút USB token khi đang ký.</b><br />
+          }
+          @if (s.skipCount()) {
+            <span class="ks-bo-qua">Bỏ qua <b>{{ s.skipCount() }}</b> văn bản chưa gán chữ ký (đã xoá hết khung).</span><br />
+          }
+          @if (sum.clockNote && sum.success) {
+            <span class="ks-giomay"><b>Ký theo giờ máy tính</b> (không lấy được giờ máy chủ dấu thời gian Ban Cơ yếu): văn bản không có dấu thời gian.</span><br />
+          }
+          @if (sum.paused) {
+            Còn {{ sum.paused }} văn bản chưa ký: bấm <b>Ký tiếp</b> để ký tiếp.<br />
+          }
+          @if (s.outputFolder()) {
+            Lưu tại {{ s.outputFolder() }}
+          } @else if (!sum.success) {
+            Không có văn bản nào được ký.
+          }
+        </div>
+      }
+      @if (failedFiles().length) {
+        <div class="nhom-p">Văn bản lỗi ({{ failedFiles().length }})</div>
+        <div class="trung-ds">
+          @for (f of failedFiles(); track f.path) {
+            <div class="trung-dong loi">
+              <svg icon="alert"></svg>
+              <span class="ten"><b>{{ f.name }}</b><span>{{ f.reason }}</span></span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+    <button foot class="nut trai" type="button" (click)="showLog()"><svg icon="terminal"></svg>Nhật ký</button>
+    <button foot class="nut" type="button" [disabled]="!s.outputFolder()" (click)="s.openOutputFolder()"><svg icon="folderOpen"></svg>Mở thư mục</button>
+    <button foot class="nut chinh" type="button" (click)="ui.close()">Đóng</button>
+  </app-popup>
+}

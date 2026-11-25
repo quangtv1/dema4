@@ -1,0 +1,33 @@
+[package]
+name = "smks-sign"
+description = "Sao Mai Ký số: ký và xác minh PDF (ghép smks-pdf + smks-crypto), lô ký. Không phụ thuộc Tauri."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[features]
+dev-keys = ["smks-crypto/dev-keys"]
+
+[dependencies]
+smks-core = { workspace = true }
+smks-crypto = { workspace = true }
+smks-pdf = { path = "../smks-pdf" }
+serde = { workspace = true }
+cms = "0.3.0-rc.2"
+der = { version = "0.8", features = ["std", "oid"] }
+x509-cert = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_UI_Shell",
+] }
+
+[dev-dependencies]
+smks-crypto = { workspace = true, features = ["dev-keys"] }
+
+[lints]
+workspace = true

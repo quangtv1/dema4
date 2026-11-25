@@ -1,0 +1,67 @@
+/*
+ * Nền tảng, theo prototype (dòng 23–31), bỏ phần phông nền trình diễn quanh cửa sổ giả (.cuaso, .ghichu).
+ * Cửa sổ thật dùng thanh tiêu đề của Windows nên không có .tieude/.cap.
+ */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  font: 13px/1.4 var(--font);
+  color: var(--tx);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.an {
+  display: none !important;
+}
+
+svg.i {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+svg.i.nho {
+  width: 14px;
+  height: 14px;
+}
+
+/* Khung gốc thay cho .cuaso của prototype (L34): chiếm trọn cửa sổ, là mốc định vị của lớp phủ hộp thoại. */
+app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}

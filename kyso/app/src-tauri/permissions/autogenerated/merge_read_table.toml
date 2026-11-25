@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-merge-read-table"
+description = "Enables the merge_read_table command without any pre-configured scope."
+commands.allow = ["merge_read_table"]
+
+[[permission]]
+identifier = "deny-merge-read-table"
+description = "Denies the merge_read_table command without any pre-configured scope."
+commands.deny = ["merge_read_table"]

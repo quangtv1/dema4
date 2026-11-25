@@ -1,0 +1,36 @@
+[package]
+name = "smks-merge"
+description = "Sao Mai Ký số: mẫu DOCX, dữ liệu Excel/CSV, chuyển đổi qua Word. Không phụ thuộc Tauri."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]
+smks-core = { workspace = true }
+calamine = "0.38"
+csv = "1"
+encoding_rs = "0.8"
+regex = "1"
+serde = { workspace = true }
+sha2 = { workspace = true }
+unicode-normalization = "0.1"
+zip = { version = "9", default-features = false, features = ["deflate"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_System_Com",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Ole",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+] }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notify-test"
+description = "Enables the notify_test command without any pre-configured scope."
+commands.allow = ["notify_test"]
+
+[[permission]]
+identifier = "deny-notify-test"
+description = "Denies the notify_test command without any pre-configured scope."
+commands.deny = ["notify_test"]

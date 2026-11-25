@@ -1,0 +1,23 @@
+[package]
+name = "smks-gateway"
+description = "Sao Mai Ký số: Notification Gateway. Máy chủ nhỏ giữ Bot Token Telegram, xác thực từng thiết bị, soạn và chuyển thông báo."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]
+smks-notify = { path = "../smks-notify" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+# Máy chủ HTTP đồng bộ, không kéo runtime async. TLS do reverse proxy phía trước đảm nhận (xem tài liệu triển khai).
+tiny_http = "0.12"
+
+[build-dependencies]
+# Cùng crate mà tauri-build dùng để ứng dụng không cần VCRUNTIME140.dll.
+static_vcruntime = "3"
+
+[lints]
+workspace = true

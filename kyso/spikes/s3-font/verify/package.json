@@ -1,0 +1,8 @@
+{
+  "name": "s3-font-verify",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pdfjs-dist": "6.4.299"
+  }
+}

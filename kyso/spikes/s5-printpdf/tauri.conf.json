@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "s5-printpdf",
+  "identifier": "com.saomaiso.spike.s5",
+  "build": { "frontendDist": "./dist" },
+  "app": {
+    "windows": [{ "label": "main", "title": "s5", "width": 800, "height": 600, "visible": false }],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": false, "icon": ["icons/icon.ico"] }
+}

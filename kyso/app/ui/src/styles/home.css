@@ -1,0 +1,28 @@
+/* Trang chủ — prototype L323–348 và phần ghi đè L456–458 (đã gộp). */
+.man.trang-chu{padding:0 0 44px;background:#fff;align-items:center;justify-content:center;overflow-y:auto;gap:0}
+.tc-dau{display:flex;flex-direction:column;align-items:center;text-align:center;flex-shrink:0}
+.tc-dau p{margin:0;color:var(--tx2);font-size:13px;display:flex;align-items:center;gap:7px;justify-content:center}
+.tc-dau h1{margin:0 0 4px;font-size:22px;font-weight:600;letter-spacing:-.2px}
+.logo-dinh{display:block;width:78px;margin-bottom:10px}
+.logo-dong{position:relative;display:block;width:100%}
+.logo-dong > img{width:100%;height:auto;display:block}
+.logo-dong img.ld-sao{position:absolute;left:63%;top:.41%;width:15.33%;transform-origin:50% 50%}
+.logo-dong svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.tc-luoi{display:flex;gap:22px;justify-content:center;margin-top:30px;flex-shrink:0}
+.tc-the{position:relative;width:162px;height:146px;background:#fff;border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;cursor:default;transition:border-color .15s,box-shadow .15s,transform .15s;color:var(--tx);padding:0}
+.tc-the svg.la{width:52px;height:52px;fill:none;stroke:var(--ink);stroke-linejoin:round;stroke-linecap:round;transition:stroke .15s}
+.tc-the b{font-size:13.5px;font-weight:600}
+.tc-the:hover,.tc-the:focus-visible{border-color:var(--accent);box-shadow:0 8px 22px rgba(10,84,184,.14);transform:translateY(-2px);outline:none;z-index:20}
+.tc-the:hover svg.la,.tc-the:focus-visible svg.la{stroke:var(--accent)}
+.tc-the .tip{position:absolute;top:9px;right:9px}
+.tc-day{position:absolute;left:0;bottom:0;width:100%;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 24px;background:var(--panel);border-top:1px solid var(--line2);font-size:12px;color:var(--tx2)}
+.tc-day > span{display:flex;align-items:center}
+.tc-day > span > span{padding:0 12px;border-left:1px solid #d5d9df;line-height:12px}
+.tc-day > span > span:first-child{border-left:0;padding-left:0}
+.tc-day > span.phien-ban{gap:8px}
+.tc-day > span > .tip{padding:0;border:1.5px solid currentColor;line-height:1;margin-left:2px}
+.tc-day b{color:var(--tx);font-weight:400;margin-left:4px}
+.tc-day a{color:var(--tx);margin-left:4px}
+
+/* Màn chưa làm: chỉ ghi rõ "Chức năng đang phát triển". */
+.dang-phat-trien{flex:1;margin-bottom:12px;border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex}

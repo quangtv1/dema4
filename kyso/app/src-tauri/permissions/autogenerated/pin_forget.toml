@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pin-forget"
+description = "Enables the pin_forget command without any pre-configured scope."
+commands.allow = ["pin_forget"]
+
+[[permission]]
+identifier = "deny-pin-forget"
+description = "Denies the pin_forget command without any pre-configured scope."
+commands.deny = ["pin_forget"]

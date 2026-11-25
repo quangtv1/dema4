@@ -1,0 +1,45 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "app/src-tauri"]
+exclude = ["spikes"]
+
+[workspace.package]
+version = "1.5.0-dev"
+edition = "2024"
+rust-version = "1.100"
+publish = false
+authors = ["Sao Mai Digital Solutions"]
+
+[workspace.dependencies]
+smks-core = { path = "crates/smks-core" }
+smks-crypto = { path = "crates/smks-crypto" }
+
+anyhow = "1"
+# Không bật "color": tính năng này kéo windows-sys, và CLI kiểm thử không cần màu.
+clap = { version = "4", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "suggestions"] }
+base64ct = { version = "1", features = ["alloc"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+thiserror = "2"
+x509-cert = { version = "0.3", default-features = false, features = ["std"] }
+
+[workspace.lints.rust]
+# unsafe chỉ được phép trong module `ffi` của từng crate (mở bằng #[allow(unsafe_code)] tại đó).
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+# Không unwrap/expect trong luồng xử lý sản phẩm; test được miễn qua clippy.toml.
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

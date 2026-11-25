@@ -1,0 +1,46 @@
+[package]
+name = "smks-crypto"
+description = "Sao Mai Ký số: kho chứng thư, khoá ký CNG/CAPI, CMS/CAdES, TSA, chuỗi CA, xác minh. Không phụ thuộc Tauri."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[features]
+# Khoá phần mềm đọc từ file PKCS#8, chỉ để thử và chạy CI. KHÔNG bật trong bản phát hành (kế hoạch 6.2).
+dev-keys = ["x509-cert/builder"]
+
+[dependencies]
+smks-core = { workspace = true }
+base64ct = { workspace = true }
+sha2 = { workspace = true }
+serde = { workspace = true }
+x509-cert = { workspace = true }
+cms = "0.3.0-rc.2"
+der = { version = "0.8", features = ["std", "oid"] }
+ecdsa = { version = "0.17", features = ["der", "digest"] }
+getrandom = "0.3"
+p256 = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8", "std"] }
+p384 = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8", "std"] }
+rsa = { version = "0.10", default-features = false, features = ["std", "encoding", "pkcs1v15"] }
+sha1 = "0.11"
+spki = "0.8"
+# HTTP thường tới TSA (token có chữ ký và được kiểm tra), không cần TLS.
+ureq = { version = "3", default-features = false }
+x509-tsp = "0.2.0-rc.0"
+# Hỏi / đọc trạng thái chứng thư qua OCSP để nhúng vào file khi ký dài hạn (PAdES B-LT, TD-58).
+x509-ocsp = "0.3.0-rc.1"
+zeroize = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+] }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+x509-cert = { workspace = true, features = ["builder"] }

@@ -1,0 +1,16 @@
+[package]
+name = "s5-printpdf"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Spike đứng riêng, không thuộc workspace chính.
+[workspace]
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+tauri = "2"
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_Foundation"] }

@@ -1,0 +1,1900 @@
+{
+  "reader": "ClosedXML 0.105.1",
+  "culture": "en-US",
+  "files": [
+    {
+      "file": "1_giay_moi_hop.xlsx",
+      "sheet": "DuLieu",
+      "headers": [
+        {
+          "columnNumber": 1,
+          "name": "Số văn bản"
+        },
+        {
+          "columnNumber": 2,
+          "name": "Ngày ký"
+        },
+        {
+          "columnNumber": 3,
+          "name": "Danh xưng"
+        },
+        {
+          "columnNumber": 4,
+          "name": "Họ tên"
+        },
+        {
+          "columnNumber": 5,
+          "name": "Chức vụ"
+        },
+        {
+          "columnNumber": 6,
+          "name": "Đơn vị"
+        },
+        {
+          "columnNumber": 7,
+          "name": "Tên cuộc họp"
+        },
+        {
+          "columnNumber": 8,
+          "name": "Nội dung"
+        },
+        {
+          "columnNumber": 9,
+          "name": "Thời gian"
+        },
+        {
+          "columnNumber": 10,
+          "name": "Địa điểm"
+        },
+        {
+          "columnNumber": 11,
+          "name": "Thành phần"
+        }
+      ],
+      "rows": [
+        {
+          "rowNumber": 2,
+          "values": {
+            "1": "125/GM-ABC",
+            "2": "20 tháng 11 năm 2026",
+            "3": "Ông",
+            "4": "Nguyễn Văn Hùng",
+            "5": "Phó Giám đốc",
+            "6": "Ban Giám đốc",
+            "7": "Hội nghị sơ kết công tác 9 tháng đầu năm 2026",
+            "8": "Đánh giá kết quả thực hiện kế hoạch 9 tháng, triển khai nhiệm vụ trọng tâm quý IV/2026.",
+            "9": "08 giờ 00 phút, thứ Năm, ngày 26/11/2026",
+            "10": "Phòng họp tầng 5, trụ sở Công ty, số 12 Trần Duy Hưng, Cầu Giấy, Hà Nội",
+            "11": "Ban Giám đốc, Trưởng các phòng ban"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 3,
+          "values": {
+            "1": "125/GM-ABC",
+            "2": "20 tháng 11 năm 2026",
+            "3": "Bà",
+            "4": "Lê Thị Thu Hà",
+            "5": "Trưởng phòng",
+            "6": "Phòng Tài chính - Kế toán",
+            "7": "Hội nghị sơ kết công tác 9 tháng đầu năm 2026",
+            "8": "Đánh giá kết quả thực hiện kế hoạch 9 tháng, triển khai nhiệm vụ trọng tâm quý IV/2026.",
+            "9": "08 giờ 00 phút, thứ Năm, ngày 26/11/2026",
+            "10": "Phòng họp tầng 5, trụ sở Công ty, số 12 Trần Duy Hưng, Cầu Giấy, Hà Nội",
+            "11": "Ban Giám đốc, Trưởng các phòng ban"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 4,
+          "values": {
+            "1": "125/GM-ABC",
+            "2": "20 tháng 11 năm 2026",
+            "3": "Ông",
+            "4": "Phạm Quốc Tuấn",
+            "5": "Trưởng phòng",
+            "6": "Phòng Kinh doanh",
+            "7": "Hội nghị sơ kết công tác 9 tháng đầu năm 2026",
+            "8": "Đánh giá kết quả thực hiện kế hoạch 9 tháng, triển khai nhiệm vụ trọng tâm quý IV/2026.",
+            "9": "08 giờ 00 phút, thứ Năm, ngày 26/11/2026",
+            "10": "Phòng họp tầng 5, trụ sở Công ty, số 12 Trần Duy Hưng, Cầu Giấy, Hà Nội",
+            "11": "Ban Giám đốc, Trưởng các phòng ban"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 5,
+          "values": {
+            "1": "125/GM-ABC",
+            "2": "20 tháng 11 năm 2026",
+            "3": "Bà",
+            "4": "Đỗ Ngọc Ánh",
+            "5": "Trưởng phòng",
+            "6": "Phòng Hành chính - Nhân sự",
+            "7": "Hội nghị sơ kết công tác 9 tháng đầu năm 2026",
+            "8": "Đánh giá kết quả thực hiện kế hoạch 9 tháng, triển khai nhiệm vụ trọng tâm quý IV/2026.",
+            "9": "08 giờ 00 phút, thứ Năm, ngày 26/11/2026",
+            "10": "Phòng họp tầng 5, trụ sở Công ty, số 12 Trần Duy Hưng, Cầu Giấy, Hà Nội",
+            "11": "Ban Giám đốc, Trưởng các phòng ban"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 6,
+          "values": {
+            "1": "126/GM-ABC",
+            "2": "20 tháng 11 năm 2026",
+            "3": "Bà",
+            "4": "Vũ Thị Mai",
+            "5": "Văn thư",
+            "6": "Văn phòng Công ty",
+            "7": "Triển khai hệ thống ký số văn bản điện tử",
+            "8": "Hướng dẫn quy trình tạo văn bản hàng loạt và ký số bằng USB token Ban Cơ yếu Chính phủ.",
+            "9": "14 giờ 00 phút, thứ Sáu, ngày 27/11/2026",
+            "10": "Hội trường tầng 2, trụ sở Công ty",
+            "11": "Văn thư, cán bộ phụ trách hành chính các đơn vị"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 7,
+          "values": {
+            "1": "126/GM-ABC",
+            "2": "20 tháng 11 năm 2026",
+            "3": "Ông",
+            "4": "Hoàng Đức Minh",
+            "5": "Chuyên viên",
+            "6": "Chi nhánh Đà Nẵng",
+            "7": "Triển khai hệ thống ký số văn bản điện tử",
+            "8": "Hướng dẫn quy trình tạo văn bản hàng loạt và ký số bằng USB token Ban Cơ yếu Chính phủ.",
+            "9": "14 giờ 00 phút, thứ Sáu, ngày 27/11/2026",
+            "10": "Hội trường tầng 2, trụ sở Công ty",
+            "11": "Văn thư, cán bộ phụ trách hành chính các đơn vị"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "file": "2_quyet_dinh_khen_thuong.xlsx",
+      "sheet": "DuLieu",
+      "headers": [
+        {
+          "columnNumber": 1,
+          "name": "Số quyết định"
+        },
+        {
+          "columnNumber": 2,
+          "name": "Ngày ký"
+        },
+        {
+          "columnNumber": 3,
+          "name": "Danh xưng"
+        },
+        {
+          "columnNumber": 4,
+          "name": "Họ tên"
+        },
+        {
+          "columnNumber": 5,
+          "name": "Ngày sinh"
+        },
+        {
+          "columnNumber": 6,
+          "name": "Chức vụ"
+        },
+        {
+          "columnNumber": 7,
+          "name": "Phòng ban"
+        },
+        {
+          "columnNumber": 8,
+          "name": "Thành tích"
+        },
+        {
+          "columnNumber": 9,
+          "name": "Mức thưởng"
+        },
+        {
+          "columnNumber": 10,
+          "name": "Mức thưởng bằng chữ"
+        },
+        {
+          "columnNumber": 11,
+          "name": "Ghi chú"
+        }
+      ],
+      "rows": [
+        {
+          "rowNumber": 2,
+          "values": {
+            "1": "301/QĐ-ABC",
+            "2": "15 tháng 12 năm 2026",
+            "3": "ông",
+            "4": "Nguyễn Văn An",
+            "5": "12/03/1988",
+            "6": "Kỹ sư phần mềm",
+            "7": "Phòng Công nghệ thông tin",
+            "8": "hoàn thành xuất sắc dự án số hoá hồ sơ, đưa hệ thống ký số vào vận hành trước tiến độ 2 tháng",
+            "9": "10.000.000",
+            "10": "Mười triệu đồng",
+            "11": ""
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Blank",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 3,
+          "values": {
+            "1": "302/QĐ-ABC",
+            "2": "15 tháng 12 năm 2026",
+            "3": "bà",
+            "4": "Trần Thị Bích Ngọc",
+            "5": "25/07/1991",
+            "6": "Kế toán viên",
+            "7": "Phòng Tài chính - Kế toán",
+            "8": "hoàn thành quyết toán thuế năm 2025 đúng hạn, không phát sinh sai sót",
+            "9": "5.000.000",
+            "10": "Năm triệu đồng",
+            "11": ""
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Blank",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 4,
+          "values": {
+            "1": "303/QĐ-ABC",
+            "2": "15 tháng 12 năm 2026",
+            "3": "ông",
+            "4": "Nguyễn Văn An",
+            "5": "02/11/1995",
+            "6": "Nhân viên kinh doanh",
+            "7": "Chi nhánh Hồ Chí Minh",
+            "8": "vượt 135% chỉ tiêu doanh số năm 2026",
+            "9": "8.000.000",
+            "10": "Tám triệu đồng",
+            "11": "Trùng tên với dòng 2 – để thử quy tắc đặt tên file"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 5,
+          "values": {
+            "1": "304/QĐ-ABC",
+            "2": "15 tháng 12 năm 2026",
+            "3": "bà",
+            "4": "Lý Thanh Hương",
+            "5": "30/01/1985",
+            "6": "Trưởng nhóm",
+            "7": "Phòng Chăm sóc khách hàng",
+            "8": "duy trì tỷ lệ hài lòng của khách hàng trên 98% trong 12 tháng liên tục",
+            "9": "6.000.000",
+            "10": "Sáu triệu đồng",
+            "11": ""
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Blank",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 6,
+          "values": {
+            "1": "305/QĐ-ABC",
+            "2": "15 tháng 12 năm 2026",
+            "3": "ông",
+            "4": "Bùi Thế Khang",
+            "5": "09/09/1990",
+            "6": "Chuyên viên",
+            "7": "Phòng Hành chính - Nhân sự",
+            "8": "xây dựng và triển khai Quy chế thi đua, khen thưởng mới của Công ty",
+            "9": "5.000.000",
+            "10": "Năm triệu đồng",
+            "11": ""
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "5": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Blank",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "file": "3_hop_dong_lao_dong.xlsx",
+      "sheet": "DuLieu",
+      "headers": [
+        {
+          "columnNumber": 1,
+          "name": "Số hợp đồng"
+        },
+        {
+          "columnNumber": 2,
+          "name": "Ngày ký"
+        },
+        {
+          "columnNumber": 3,
+          "name": "Họ tên"
+        },
+        {
+          "columnNumber": 4,
+          "name": "Ngày sinh"
+        },
+        {
+          "columnNumber": 5,
+          "name": "Giới tính"
+        },
+        {
+          "columnNumber": 6,
+          "name": "Số CCCD"
+        },
+        {
+          "columnNumber": 7,
+          "name": "Ngày cấp"
+        },
+        {
+          "columnNumber": 8,
+          "name": "Nơi cấp"
+        },
+        {
+          "columnNumber": 9,
+          "name": "Địa chỉ"
+        },
+        {
+          "columnNumber": 10,
+          "name": "Số điện thoại"
+        },
+        {
+          "columnNumber": 11,
+          "name": "Chức danh"
+        },
+        {
+          "columnNumber": 12,
+          "name": "Phòng ban"
+        },
+        {
+          "columnNumber": 13,
+          "name": "Địa điểm làm việc"
+        },
+        {
+          "columnNumber": 14,
+          "name": "Thời hạn"
+        },
+        {
+          "columnNumber": 15,
+          "name": "Ngày bắt đầu"
+        },
+        {
+          "columnNumber": 16,
+          "name": "Ngày kết thúc"
+        },
+        {
+          "columnNumber": 17,
+          "name": "Lương cơ bản"
+        },
+        {
+          "columnNumber": 18,
+          "name": "Phụ cấp"
+        }
+      ],
+      "rows": [
+        {
+          "rowNumber": 2,
+          "values": {
+            "1": "HĐ-2026-0101",
+            "2": "01 tháng 12 năm 2026",
+            "3": "Nguyễn Thị Lan Anh",
+            "4": "18/04/1998",
+            "5": "Nữ",
+            "6": "001198012345",
+            "7": "10/06/2021",
+            "8": "Cục Cảnh sát QLHC về TTXH",
+            "9": "Số 45 ngõ 102 Trường Chinh, Đống Đa, Hà Nội",
+            "10": "0912345678",
+            "11": "Chuyên viên kế toán",
+            "12": "Phòng Tài chính - Kế toán",
+            "13": "Trụ sở Công ty tại Hà Nội",
+            "14": "24 tháng",
+            "15": "01/12/2026",
+            "16": "30/11/2028",
+            "17": "15.000.000",
+            "18": "1.500.000"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "12": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "13": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "14": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "15": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "16": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "17": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "18": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 3,
+          "values": {
+            "1": "HĐ-2026-0102",
+            "2": "01 tháng 12 năm 2026",
+            "3": "Trần Đức Thắng",
+            "4": "05/10/1996",
+            "5": "Nam",
+            "6": "036096004567",
+            "7": "22/03/2022",
+            "8": "Cục Cảnh sát QLHC về TTXH",
+            "9": "Thôn Đông, xã Yên Thường, Gia Lâm, Hà Nội",
+            "10": "0987654321",
+            "11": "Lập trình viên",
+            "12": "Phòng Công nghệ thông tin",
+            "13": "Trụ sở Công ty tại Hà Nội",
+            "14": "36 tháng",
+            "15": "01/12/2026",
+            "16": "30/11/2029",
+            "17": "22.000.000",
+            "18": "2.000.000"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "12": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "13": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "14": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "15": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "16": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "17": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "18": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 4,
+          "values": {
+            "1": "HĐ-2026-0103",
+            "2": "01 tháng 12 năm 2026",
+            "3": "Phan Minh Châu",
+            "4": "14/02/2000",
+            "5": "Nữ",
+            "6": "048300007890",
+            "7": "09/01/2023",
+            "8": "Cục Cảnh sát QLHC về TTXH",
+            "9": "Số 8 Lê Duẩn, Hải Châu, Đà Nẵng",
+            "10": "0905111222",
+            "11": "Nhân viên kinh doanh",
+            "12": "Chi nhánh Đà Nẵng",
+            "13": "Chi nhánh Công ty tại Đà Nẵng",
+            "14": "12 tháng",
+            "15": "01/12/2026",
+            "16": "30/11/2027",
+            "17": "12.000.000",
+            "18": "3.000.000"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "12": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "13": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "14": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "15": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "16": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "17": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "18": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 5,
+          "values": {
+            "1": "HĐ-2026-0104",
+            "2": "01 tháng 12 năm 2026",
+            "3": "Lâm Quang Vinh",
+            "4": "27/08/1993",
+            "5": "Nam",
+            "6": "079093003456",
+            "7": "15/11/2021",
+            "8": "Cục Cảnh sát QLHC về TTXH",
+            "9": "Số 210 Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh",
+            "10": "0938777666",
+            "11": "Trưởng nhóm kinh doanh",
+            "12": "Chi nhánh Hồ Chí Minh",
+            "13": "Chi nhánh Công ty tại TP. Hồ Chí Minh",
+            "14": "36 tháng",
+            "15": "01/12/2026",
+            "16": "30/11/2029",
+            "17": "25.000.000",
+            "18": "4.000.000"
+          },
+          "meta": {
+            "1": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "2": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "3": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "4": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "5": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "6": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "7": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "8": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "9": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "10": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "12": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "13": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "14": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "15": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "16": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "17": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "18": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "file": "tricky.xlsx",
+      "sheet": "DuLieu",
+      "headers": [
+        {
+          "columnNumber": 2,
+          "name": "so_text"
+        },
+        {
+          "columnNumber": 3,
+          "name": "so_0000"
+        },
+        {
+          "columnNumber": 4,
+          "name": "tien_nhom"
+        },
+        {
+          "columnNumber": 5,
+          "name": "tien_thap_phan"
+        },
+        {
+          "columnNumber": 6,
+          "name": "phan_tram"
+        },
+        {
+          "columnNumber": 7,
+          "name": "ngay_ddmmyyyy"
+        },
+        {
+          "columnNumber": 8,
+          "name": "ngay_mac_dinh"
+        },
+        {
+          "columnNumber": 9,
+          "name": "ngay_gio"
+        },
+        {
+          "columnNumber": 10,
+          "name": "so_general"
+        },
+        {
+          "columnNumber": 11,
+          "name": "so_thuc"
+        },
+        {
+          "columnNumber": 12,
+          "name": "cong_thuc"
+        },
+        {
+          "columnNumber": 13,
+          "name": "khoang_trang"
+        },
+        {
+          "columnNumber": 14,
+          "name": "logic"
+        },
+        {
+          "columnNumber": 15,
+          "name": "gio"
+        },
+        {
+          "columnNumber": 16,
+          "name": "tien_don_vi"
+        },
+        {
+          "columnNumber": 17,
+          "name": "am_ngoac"
+        },
+        {
+          "columnNumber": 18,
+          "name": "ngay_text"
+        },
+        {
+          "columnNumber": 19,
+          "name": "so_lon"
+        },
+        {
+          "columnNumber": 21,
+          "name": "o_gop"
+        }
+      ],
+      "rows": [
+        {
+          "rowNumber": 3,
+          "values": {
+            "2": "0001",
+            "3": "0001",
+            "4": "1,234,567",
+            "5": "1,234,567.50",
+            "6": "12.50%",
+            "7": "05/03/2026",
+            "8": "05/03/2026",
+            "9": "05/03/2026",
+            "10": "15000000",
+            "11": "0.1",
+            "12": "30000000",
+            "13": "abc",
+            "14": "TRUE",
+            "15": "14:30",
+            "16": "2,500,000 VND",
+            "17": "(1,500)",
+            "18": "05/03/2026",
+            "19": "123456789012",
+            "21": "gop"
+          },
+          "meta": {
+            "2": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "3": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "0000"
+            },
+            "4": {
+              "type": "Number",
+              "numFmtId": 3,
+              "format": ""
+            },
+            "5": {
+              "type": "Number",
+              "numFmtId": 4,
+              "format": ""
+            },
+            "6": {
+              "type": "Number",
+              "numFmtId": 10,
+              "format": ""
+            },
+            "7": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "8": {
+              "type": "DateTime",
+              "numFmtId": 14,
+              "format": ""
+            },
+            "9": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy\\ hh:mm"
+            },
+            "10": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "12": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "13": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "14": {
+              "type": "Boolean",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "15": {
+              "type": "TimeSpan",
+              "numFmtId": -1,
+              "format": "hh:mm"
+            },
+            "16": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "#,##0\\ \"VND\""
+            },
+            "17": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "#,##0;\\(#,##0\\)"
+            },
+            "18": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "19": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "21": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 4,
+          "values": {
+            "2": "0012",
+            "3": "0012",
+            "4": "999",
+            "5": "0.50",
+            "6": "100.00%",
+            "7": "31/12/1999",
+            "8": "31/12/1999",
+            "9": "31/12/1999",
+            "10": "3.5",
+            "11": "1234.5678",
+            "12": "7",
+            "13": "x y",
+            "14": "FALSE",
+            "15": "06:00",
+            "16": "0 VND",
+            "17": "1,500",
+            "18": "31/12/1999",
+            "19": "1.23456789012346E+16",
+            "21": ""
+          },
+          "meta": {
+            "2": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "3": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "0000"
+            },
+            "4": {
+              "type": "Number",
+              "numFmtId": 3,
+              "format": ""
+            },
+            "5": {
+              "type": "Number",
+              "numFmtId": 4,
+              "format": ""
+            },
+            "6": {
+              "type": "Number",
+              "numFmtId": 10,
+              "format": ""
+            },
+            "7": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "8": {
+              "type": "DateTime",
+              "numFmtId": 14,
+              "format": ""
+            },
+            "9": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy\\ hh:mm"
+            },
+            "10": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "12": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "13": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "14": {
+              "type": "Boolean",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "15": {
+              "type": "TimeSpan",
+              "numFmtId": -1,
+              "format": "hh:mm"
+            },
+            "16": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "#,##0\\ \"VND\""
+            },
+            "17": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "#,##0;\\(#,##0\\)"
+            },
+            "18": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "19": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "21": {
+              "type": "Blank",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        },
+        {
+          "rowNumber": 6,
+          "values": {
+            "2": "0123",
+            "3": "0123",
+            "4": "15,000,000",
+            "5": "1,000.00",
+            "6": "3.33%",
+            "7": "18/11/2026",
+            "8": "18/11/2026",
+            "9": "18/11/2026",
+            "10": "-7",
+            "11": "1E-07",
+            "12": "-14",
+            "13": "z",
+            "14": "TRUE",
+            "15": "23:58",
+            "16": "1 VND",
+            "17": "0",
+            "18": "18/11/2026",
+            "19": "1.234E-06",
+            "21": "le"
+          },
+          "meta": {
+            "2": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "3": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "0000"
+            },
+            "4": {
+              "type": "Number",
+              "numFmtId": 3,
+              "format": ""
+            },
+            "5": {
+              "type": "Number",
+              "numFmtId": 4,
+              "format": ""
+            },
+            "6": {
+              "type": "Number",
+              "numFmtId": 10,
+              "format": ""
+            },
+            "7": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy"
+            },
+            "8": {
+              "type": "DateTime",
+              "numFmtId": 14,
+              "format": ""
+            },
+            "9": {
+              "type": "DateTime",
+              "numFmtId": -1,
+              "format": "dd/mm/yyyy\\ hh:mm"
+            },
+            "10": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "11": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "12": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "13": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "14": {
+              "type": "Boolean",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "15": {
+              "type": "TimeSpan",
+              "numFmtId": -1,
+              "format": "hh:mm"
+            },
+            "16": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "#,##0\\ \"VND\""
+            },
+            "17": {
+              "type": "Number",
+              "numFmtId": -1,
+              "format": "#,##0;\\(#,##0\\)"
+            },
+            "18": {
+              "type": "Text",
+              "numFmtId": 49,
+              "format": ""
+            },
+            "19": {
+              "type": "Number",
+              "numFmtId": 0,
+              "format": ""
+            },
+            "21": {
+              "type": "Text",
+              "numFmtId": 0,
+              "format": ""
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

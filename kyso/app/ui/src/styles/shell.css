@@ -1,0 +1,129 @@
+/* Thanh menu — prototype L45–62. Bỏ chỉ báo USB Token bên phải (chưa có chức năng token, không hiện dữ liệu giả). */
+.menubar {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 40;
+}
+.mb-o {
+  position: relative;
+  display: flex;
+}
+.mb {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: default;
+}
+.mb svg.i {
+  width: 15px;
+  height: 15px;
+  color: #4a5462;
+}
+.mb:hover {
+  background: var(--hover);
+}
+.mb.mo {
+  background: var(--sel);
+  color: var(--accent-a);
+}
+.mb.mo svg.i {
+  color: var(--accent);
+}
+.mb .mui {
+  width: 12px;
+  height: 12px;
+  margin-left: -2px;
+  color: var(--tx3);
+}
+.mb-phai {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tx2);
+  padding-right: 6px;
+}
+.menu {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  min-width: 262px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 9px;
+  box-shadow: 0 14px 32px rgba(16, 32, 64, 0.18);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  z-index: 50;
+}
+.mi {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: default;
+  white-space: nowrap;
+}
+.mi:hover {
+  background: var(--hover);
+}
+.mi.dang {
+  background: var(--sel);
+}
+.mi svg.i {
+  color: var(--ink);
+}
+.mi.dang svg.i {
+  color: var(--accent);
+}
+.mi .nhan {
+  flex: 1;
+}
+.mi .phim {
+  font-size: 11.5px;
+  color: var(--tx3);
+  margin-left: 22px;
+}
+.mi .dau {
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: 10px;
+  width: 12px;
+  text-align: center;
+}
+.mi-sep {
+  height: 1px;
+  background: var(--line2);
+  margin: 4px 2px;
+}
+.ketnoi {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ok);
+  white-space: nowrap;
+}
+.ketnoi.tat {
+  color: var(--tx3);
+}

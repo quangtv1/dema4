@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-token-check"
+description = "Enables the token_check command without any pre-configured scope."
+commands.allow = ["token_check"]
+
+[[permission]]
+identifier = "deny-token-check"
+description = "Denies the token_check command without any pre-configured scope."
+commands.deny = ["token_check"]

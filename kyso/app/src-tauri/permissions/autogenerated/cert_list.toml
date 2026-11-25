@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cert-list"
+description = "Enables the cert_list command without any pre-configured scope."
+commands.allow = ["cert_list"]
+
+[[permission]]
+identifier = "deny-cert-list"
+description = "Denies the cert_list command without any pre-configured scope."
+commands.deny = ["cert_list"]
