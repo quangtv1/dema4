@@ -1,5 +1,6 @@
 //! "Làm tiếp gần đây" của Trang chủ: tối đa 5 thư mục / file vừa làm (chức năng + tình trạng lúc rời màn),
-//! lưu ở `<gốc dữ liệu>/gan_day.json` — mỗi máy riêng, không vào gói Xuất phiên. File hỏng → danh sách rỗng.
+//! lưu ở `<gốc dữ liệu>/gan_day.json` — mỗi máy riêng, không vào gói Xuất phiên. File hỏng → danh sách rỗng; mục
+//! hỏng bỏ qua; mục của chức năng bản này không biết (bản mới hơn ghi) không hiện nhưng giữ nguyên khi ghi lại.
 
 use std::path::{Path, PathBuf};
 
@@ -86,15 +87,32 @@ pub fn file_mac_dinh() -> PathBuf {
     crate::tach_vb::du_lieu_an::goc_du_lieu().join(TEN_FILE)
 }
 
-/// Đọc danh sách (mới nhất trước); thiếu / hỏng → rỗng.
+fn doc_tho(p: &Path) -> Vec<serde_json::Value> {
+    std::fs::read(p).ok().and_then(|b| serde_json::from_slice::<Vec<serde_json::Value>>(&b).ok()).unwrap_or_default()
+}
+
+/// Đọc danh sách (mới nhất trước) từng mục: thiếu / hỏng → rỗng; mục hỏng hoặc chức năng lạ → bỏ qua.
 pub fn doc(p: &Path) -> Vec<MucGanDay> {
-    let mut ds: Vec<MucGanDay> = std::fs::read(p).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    let mut ds: Vec<MucGanDay> = doc_tho(p).into_iter().filter_map(|v| serde_json::from_value(v).ok()).collect();
     ds.truncate(TOI_DA);
     ds
 }
 
-pub fn ghi(p: &Path, ds: &[MucGanDay]) -> std::io::Result<()> {
-    let json = serde_json::to_vec_pretty(ds).map_err(std::io::Error::other)?;
+/// Mục của chức năng bản này không biết (có `cn` là chuỗi lạ) — giữ nguyên để ghi lại.
+pub fn doc_la(p: &Path) -> Vec<serde_json::Value> {
+    let mut la: Vec<serde_json::Value> = doc_tho(p)
+        .into_iter()
+        .filter(|v| v["cn"].as_str().is_some_and(|c| serde_json::from_value::<ChucNang>(serde_json::Value::String(c.into())).is_err()))
+        .collect();
+    la.truncate(TOI_DA);
+    la
+}
+
+/// Ghi danh sách + các mục lạ (giữ nguyên, sau các mục bản này biết).
+pub fn ghi_kem(p: &Path, ds: &[MucGanDay], la: &[serde_json::Value]) -> std::io::Result<()> {
+    let mut v: Vec<serde_json::Value> = ds.iter().filter_map(|m| serde_json::to_value(m).ok()).collect();
+    v.extend(la.iter().cloned());
+    let json = serde_json::to_vec_pretty(&v).map_err(std::io::Error::other)?;
     crate::ghi_file::ghi_an_toan(p, json)
 }
 
@@ -141,6 +159,8 @@ pub struct DanhSach {
     /// `None` (test) = chỉ giữ trong bộ nhớ, không đọc / ghi file.
     file: Option<PathBuf>,
     pub ds: Vec<MucGanDay>,
+    /// Mục của chức năng bản này không biết — không hiện, giữ nguyên khi ghi.
+    la: Vec<serde_json::Value>,
     pub mat: Vec<bool>,
     phien: u64,
     phien_mat: u64,
@@ -153,7 +173,7 @@ impl DanhSach {
             return Self::default();
         }
         let f = file_mac_dinh();
-        DanhSach { ds: doc(&f), file: Some(f), phien: 1, ..Default::default() }
+        DanhSach { ds: doc(&f), la: doc_la(&f), file: Some(f), phien: 1, ..Default::default() }
     }
 
     fn doi(&mut self) {
@@ -161,7 +181,7 @@ impl DanhSach {
         // Thứ tự dòng đổi → cờ cũ không còn đúng dòng: coi như chưa biết (vẽ bình thường) tới khi kiểm xong
         self.mat.clear();
         if let Some(f) = &self.file {
-            let _ = ghi(f, &self.ds);
+            let _ = ghi_kem(f, &self.ds, &self.la);
         }
     }
 
@@ -267,7 +287,7 @@ mod tests {
         let mut m = muc(ChucNang::BocTach, "/x/HS");
         m.loai = Some("Văn bản".into());
         let ds = vec![m, muc(ChucNang::Dem, "/y")];
-        ghi(&p, &ds).unwrap();
+        ghi_kem(&p, &ds, &[]).unwrap();
         assert_eq!(doc(&p), ds);
         std::fs::write(&p, "{hỏng").unwrap();
         assert!(doc(&p).is_empty(), "file hỏng → rỗng");
@@ -315,5 +335,27 @@ mod tests {
         assert_eq!(thoi_gian_tuong_doi(t, t + 3 * 86_400_000), "3 ngày trước");
         assert!(thoi_gian_tuong_doi(t, t + 30 * 86_400_000).contains('/'));
         assert_eq!((so(7).as_str(), so(1204).as_str(), so(1234567).as_str()), ("7", "1.204", "1.234.567"));
+    }
+
+    #[test]
+    fn muc_chuc_nang_la_cua_ban_moi_bi_bo_qua_khi_doc_va_giu_nguyen_khi_ghi() {
+        let d = std::env::temp_dir().join(format!("dema4_gan_day_la_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let f = d.join(TEN_FILE);
+        let la = serde_json::json!({ "cn": "XoaGhim", "duong_dan": "/x/ho_so", "tinh": { "chu": "3/10" }, "luc": 5, "them": true });
+        let cu = serde_json::json!([la, { "cn": "Tach", "duong_dan": "/x/tach", "tinh": { "chu": "ok" }, "luc": 4 }, "hỏng"]);
+        std::fs::write(&f, cu.to_string()).unwrap();
+        let mut ds = DanhSach { ds: doc(&f), la: doc_la(&f), file: Some(f.clone()), phien: 1, ..Default::default() };
+        assert_eq!(ds.ds.iter().map(|m| m.duong_dan.as_str()).collect::<Vec<_>>(), ["/x/tach"], "mục lạ / hỏng không làm rỗng cả danh sách");
+        ds.them(muc(ChucNang::Dem, "/x/dem"));
+        let v: serde_json::Value = serde_json::from_slice(&std::fs::read(&f).unwrap()).unwrap();
+        let v = v.as_array().unwrap();
+        assert_eq!(v.len(), 3);
+        assert!(v.contains(&la), "mục của bản mới giữ nguyên khi bản này ghi lại");
+        ds.xoa_het();
+        let v: serde_json::Value = serde_json::from_slice(&std::fs::read(&f).unwrap()).unwrap();
+        assert_eq!(v, serde_json::json!([la]), "Xoá hết chỉ xoá mục bản này hiện ra");
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

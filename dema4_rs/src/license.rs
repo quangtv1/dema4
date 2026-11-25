@@ -153,11 +153,12 @@ pub fn ngau_nhien_hex() -> String {
 ///
 /// Còn hở (chấp nhận, phía máy khách không bịt kín được khi vẫn cho chạy offline): giữ câu trả lời ký, chỉ xoá các
 /// lần chạy chờ xác nhận trong lúc chặn mạng → thêm `TOI_DA_OFFLINE` lượt mỗi lần xoá.
-pub fn quyet_dinh(co_tram: bool, da_ky: Option<&TrangThaiMay>, cho_ghi: &[LanChay], cn: ChucNang) -> QuyetDinh {
+///
+/// `chua_xac_nhan` tính cả lần chạy của chức năng bản này không biết (`SoLuot::so_cho_la`).
+pub fn quyet_dinh_so(co_tram: bool, da_ky: Option<&TrangThaiMay>, chua_xac_nhan: u32, cn: ChucNang) -> QuyetDinh {
     if co_tram && da_ky.is_none() {
         return QuyetDinh::CanMangLanDau(cn);
     }
-    let chua_xac_nhan = cho_ghi.len() as u32;
     if let Some(m) = da_ky {
         if m.trang_thai == TrangThai::Khoa || m.da_dung + chua_xac_nhan >= m.han {
             return QuyetDinh::HetLuot(cn);
@@ -167,6 +168,12 @@ pub fn quyet_dinh(co_tram: bool, da_ky: Option<&TrangThaiMay>, cho_ghi: &[LanCha
         return QuyetDinh::HetLuotOffline(cn);
     }
     QuyetDinh::Cho
+}
+
+/// `quyet_dinh_so` theo danh sách lần chạy chờ xác nhận.
+#[cfg(test)]
+pub fn quyet_dinh(co_tram: bool, da_ky: Option<&TrangThaiMay>, cho_ghi: &[LanChay], cn: ChucNang) -> QuyetDinh {
+    quyet_dinh_so(co_tram, da_ky, cho_ghi.len() as u32, cn)
 }
 
 const TEN_FILE: &str = "license_so_luot.json";
@@ -181,11 +188,17 @@ pub struct SoLuot {
 #[derive(Default)]
 struct NoiDung {
     lan: Vec<LanChay>,
+    /// Lần chạy của chức năng bản này không biết (bản mới hơn ghi): giữ nguyên JSON khi ghi lại sổ, tính vào giới
+    /// hạn offline, không gửi trạm (bản mới gửi).
+    la: Vec<serde_json::Value>,
     tra_loi: Option<TraLoiKy>,
 }
 
 impl NoiDung {
     fn tu_json(v: &serde_json::Value) -> Self {
+        let la = v["lan"].as_array().map_or_else(Vec::new, |ds| {
+            ds.iter().filter(|l| l["ma"].is_string() && l["cn"].as_str().is_some_and(|c| ChucNang::tu_ma(c).is_none())).cloned().collect()
+        });
         let lan = v["lan"].as_array().map(|ds| {
             ds.iter()
                 .filter_map(|l| {
@@ -199,13 +212,14 @@ impl NoiDung {
                 .collect()
         });
         let tra_loi = v["tra_loi"]["du_lieu"].as_str().zip(v["tra_loi"]["chu_ky"].as_str()).map(|(d, c)| TraLoiKy { du_lieu: d.into(), chu_ky: c.into() });
-        Self { lan: lan.unwrap_or_default(), tra_loi }
+        Self { lan: lan.unwrap_or_default(), la, tra_loi }
     }
     fn json(&self) -> serde_json::Value {
         let lan: Vec<serde_json::Value> = self
             .lan
             .iter()
             .map(|l| serde_json::json!({ "ma": l.ma, "cn": l.cn.ma(), "luc": l.luc, "trang_thai": if l.trang_thai == TrangThaiLan::DaChay { "da_chay" } else { "dat_cho" } }))
+            .chain(self.la.iter().cloned())
             .collect();
         serde_json::json!({ "lan": lan, "tra_loi": self.tra_loi.as_ref().map(|t| serde_json::json!({ "du_lieu": t.du_lieu, "chu_ky": t.chu_ky })) })
     }
@@ -234,6 +248,11 @@ impl SoLuot {
                     Some(x) if l.trang_thai == TrangThaiLan::DaChay => x.trang_thai = TrangThaiLan::DaChay,
                     Some(_) => {}
                     None => kq.lan.push(l),
+                }
+            }
+            for l in n.la {
+                if !kq.la.iter().any(|x| x["ma"] == l["ma"]) {
+                    kq.la.push(l);
                 }
             }
             if kq.tra_loi.is_none() {
@@ -310,6 +329,11 @@ impl SoLuot {
     /// Lần chạy trạm chưa xác nhận (đặt chỗ đang chạy hoặc sót lại cũng tính).
     pub fn cho_ghi(&self) -> Vec<LanChay> {
         self.doc().lan
+    }
+
+    /// Số lần chạy chưa xác nhận của chức năng bản này không biết (tính vào giới hạn offline).
+    pub fn so_cho_la(&self) -> u32 {
+        self.doc().la.len() as u32
     }
 
     pub fn luu_tra_loi(&self, tl: &TraLoiKy) {
@@ -477,7 +501,9 @@ impl KiemTra {
 
     /// Quyết định tức thì trên câu trả lời ký gần nhất + sổ lượt (không gọi mạng).
     pub fn quyet_dinh(&self, cn: ChucNang) -> QuyetDinh {
-        quyet_dinh(self.chung.kho.is_some(), self.chung.da_ky.lock().unwrap().as_ref(), &self.chung.so.cho_ghi(), cn)
+        let c = &self.chung;
+        let chua_xac_nhan = c.so.cho_ghi().len() as u32 + c.so.so_cho_la();
+        quyet_dinh_so(c.kho.is_some(), c.da_ky.lock().unwrap().as_ref(), chua_xac_nhan, cn)
     }
 
     /// Được chạy → ghi đặt chỗ lên đĩa **trước khi** chạy; hết lượt → lý do để hiện popup.
@@ -920,5 +946,32 @@ mod tests {
             assert_eq!(kt.bat_dau(ChucNang::Dem).unwrap_err(), QuyetDinh::HetLuotOffline(ChucNang::Dem));
             assert!(!kt.thong_ke("thong_ke_dem", |_| serde_json::json!({})));
         }
+    }
+
+    #[test]
+    fn lan_chay_chuc_nang_la_cua_ban_moi_duoc_giu_va_tinh_vao_gioi_han_offline() {
+        let (so, d) = so_luot("cn_la");
+        let la = serde_json::json!({ "lan": [{ "ma": "m1", "cn": "xoa_ghim", "luc": "2026-11-25 10:00:00", "trang_thai": "da_chay", "them": 1 }], "tra_loi": null });
+        for n in ["a", "b"] {
+            std::fs::create_dir_all(d.join(n)).unwrap();
+            std::fs::write(d.join(n).join(TEN_FILE), la.to_string()).unwrap();
+        }
+        // Bản này không biết "xoa_ghim": không gửi trạm, nhưng không được bỏ khi ghi lại sổ
+        assert!(so.cho_ghi().is_empty());
+        assert_eq!(so.so_cho_la(), 1);
+        let l = so.dat_cho(ChucNang::Tach);
+        so.xong(&l.ma, true);
+        so.da_xac_nhan(&[l.ma.clone()]);
+        for n in ["a", "b"] {
+            let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(d.join(n).join(TEN_FILE)).unwrap()).unwrap();
+            assert_eq!(v["lan"].as_array().unwrap().len(), 1, "{n}: mục lạ còn sau đọc – sửa – ghi");
+            assert_eq!(v["lan"][0], la["lan"][0], "{n}: giữ nguyên từng trường");
+        }
+        // Tính vào giới hạn offline: 1 lạ + 1 đang chờ = đủ 2 → chặn
+        assert_eq!(quyet_dinh_so(false, None, so.cho_ghi().len() as u32 + so.so_cho_la(), ChucNang::Dem), QuyetDinh::Cho);
+        let l2 = so.dat_cho(ChucNang::Dem);
+        so.xong(&l2.ma, true);
+        assert_eq!(quyet_dinh_so(false, None, so.cho_ghi().len() as u32 + so.so_cho_la(), ChucNang::Dem), QuyetDinh::HetLuotOffline(ChucNang::Dem));
+        let _ = std::fs::remove_dir_all(&d);
     }
 }
