@@ -207,7 +207,7 @@ impl HopCauHinh {
                 let nut = egui::Button::new(RichText::new("Xoá cache").size(12.0)).min_size(egui::vec2(0.0, 22.0));
                 bam_xoa = ui
                     .add_enabled(co_cache, nut)
-                    .on_hover_text("Xoá kết quả phân tích đã lưu (cache, cạnh file ứng dụng) của thư mục đang mở. Nhãn đã gán không mất; lần Phân tích sau sẽ phân tích lại mọi trang.")
+                    .on_hover_text("Xoá kết quả phân tích đã lưu (cache, trong thư mục dữ liệu của ứng dụng) của thư mục đang mở. Nhãn đã gán không mất; lần Phân tích sau sẽ phân tích lại mọi trang.")
                     .on_disabled_hover_text("Thư mục đang mở chưa có cache phân tích")
                     .clicked();
             });
@@ -391,7 +391,7 @@ impl HopCauHinh {
                 ui,
                 |ui| {
                     ui.label("Lưu nhãn");
-                    thong_tin(ui, "Ghi index_and_blank.txt (thư mục ẩn .sm-dema4 cạnh file ứng dụng) sau mỗi thay đổi, hoặc khi bấm Lưu nhãn / Ctrl+S.");
+                    thong_tin(ui, "Ghi index_and_blank.txt (thư mục dữ liệu của ứng dụng) sau mỗi thay đổi, hoặc khi bấm Lưu nhãn / Ctrl+S.");
                 },
                 |ui| {
                     ui.spacing_mut().item_spacing.x = 18.0;
@@ -424,7 +424,7 @@ impl HopCauHinh {
                 },
             );
             if focus_ra || m.thu_muc_ra.trim().is_empty() {
-                goi_y_duoi(ui, &format!("Trống: .sm-dema4{s}muc_luc{s}<tên file biên mục> cạnh file ứng dụng (thư mục ẩn — mở bằng nút Mở thư mục sau khi sinh)", s = std::path::MAIN_SEPARATOR), CHU_PHU);
+                goi_y_duoi(ui, &format!("Trống: muc_luc{s}<tên file biên mục> trong thư mục dữ liệu của ứng dụng (mở bằng nút Mở thư mục sau khi sinh)", s = std::path::MAIN_SEPARATOR), CHU_PHU);
             }
             dong!(
                 ui,

@@ -98,7 +98,7 @@ fn ma_may_tu(ma_hdh: &str) -> String {
 }
 
 /// Mã máy của máy đang chạy: chỉ từ ID hệ điều hành (không đổi khi đổi tên máy / card mạng / VPN);
-/// không đọc được → ID ngẫu nhiên tạo 1 lần, lưu cạnh dữ liệu ẩn của app.
+/// không đọc được → ID ngẫu nhiên tạo 1 lần, lưu trong thư mục dữ liệu của app.
 pub fn ma_may() -> String {
     static MA: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     MA.get_or_init(|| ma_may_tu(&id_goc_may())).clone()
@@ -207,7 +207,7 @@ impl SoLuot {
         Self { noi }
     }
 
-    /// 2 nơi có thư mục cha khác nhau: dữ liệu ẩn cạnh file chạy + thư mục người dùng.
+    /// Nơi lưu sổ lượt: gốc dữ liệu + thư mục người dùng (bình thường trùng nhau nên chỉ còn 1 nơi; gốc rơi về thư mục tạm thì 2).
     pub fn mac_dinh() -> Self {
         let mut noi = vec![crate::tach_vb::du_lieu_an::goc_du_lieu().to_path_buf()];
         if let Some(d) = crate::cau_hinh::thu_muc_nguoi_dung() {

@@ -16,6 +16,7 @@ pub mod thuoc_kho;
 pub mod van_ban;
 pub mod xem_trang;
 
+use crate::ghi_file::ghi_an_toan;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
@@ -371,16 +372,6 @@ pub fn ten_hien_ho_so(duong_dan: &[String]) -> Vec<String> {
 /// Gắn lại đuôi gốc của file (`.pdf` / `.PDF` …) vào tên hiển thị — dùng cho cột tên hồ sơ.
 pub fn kem_duoi(ten: &[String], duong_dan: &[String]) -> Vec<String> {
     ten.iter().zip(duong_dan).map(|(t, p)| format!("{t}{}", p.rfind('.').filter(|&i| !p[i..].contains('/')).map_or("", |i| &p[i..]))).collect()
-}
-
-/// Ghi qua file tạm rồi đổi tên: tắt app giữa chừng không làm hỏng file nhãn.
-fn ghi_an_toan(p: &Path, noi_dung: &str) -> std::io::Result<()> {
-    if let Some(cha) = p.parent() {
-        std::fs::create_dir_all(cha)?;
-    }
-    let tam = p.with_extension("tmp");
-    std::fs::write(&tam, noi_dung)?;
-    std::fs::rename(&tam, p)
 }
 
 impl ManTach {

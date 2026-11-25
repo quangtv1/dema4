@@ -1,4 +1,4 @@
-//! Khoá API / bí mật của Bóc tách lưu trong cache `.sm-dema4/boc_tach/khoa.bin`, mã hoá AES-256-GCM.
+//! Khoá API / bí mật của Bóc tách lưu trong `<thư mục dữ liệu app>/boc_tach/khoa.bin`, mã hoá AES-256-GCM.
 //! Khoá giải mã = SHA-256(bí mật lúc build ‖ ID gốc của máy — không phải mã máy `SM-…` công khai): bí mật lấy từ biến `DEMA4_KHOA_CACHE` khi build (secret CI,
 //! không có trong repo); gắn mã máy nên chép file sang máy khác không giải mã được. Build thiếu biến → không ghi
 //! khoá ra đĩa (chỉ giữ trong phiên). Giới hạn: bí mật nằm trong file chạy — chống đọc trộm file cache, không

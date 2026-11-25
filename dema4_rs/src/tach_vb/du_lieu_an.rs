@@ -1,5 +1,6 @@
-//! Dữ liệu ẩn của từng thư mục đầu vào (nhãn, góc xoay, log tách, cache phân tích), đặt cạnh file chạy:
-//! `<thư mục app>/.sm-dema4/<tên thư mục>-<băm đường dẫn>/`. Mỗi thư mục đầu vào 1 thư mục con riêng nên
+//! Dữ liệu làm dở của từng thư mục đầu vào (nhãn, góc xoay, log tách, cache phân tích, kết quả bóc tách), trong thư mục
+//! người dùng của app (không phụ thuộc chỗ đặt file chạy): `<gốc>/viec/<tên thư mục>-<băm đường dẫn>/`, gốc =
+//! `%LOCALAPPDATA%\sm-dema4` / `~/Library/Application Support/sm-dema4`. Mỗi thư mục đầu vào 1 thư mục con riêng nên
 //! phân tích nhiều thư mục (kể cả thư mục cha / con của nhau, hay trùng tên ở chỗ khác) không ảnh hưởng nhau,
 //! và thư mục đầu vào không bị ghi gì thêm. Bản cũ (`<thư mục đầu vào>/.sm-dema4/`) được chuyển sang khi mở.
 
@@ -10,7 +11,7 @@ const TEN_AN: &str = ".sm-dema4";
 /// File ghi đường dẫn đầy đủ của thư mục đầu vào (để người xem biết thư mục con nào của thư mục nào).
 const FILE_GOC: &str = "thu_muc_goc.txt";
 
-/// Thư mục dữ liệu ẩn của thư mục đầu vào `goc`.
+/// Thư mục dữ liệu làm dở của thư mục đầu vào `goc` (`<gốc>/viec/<tên>-<băm>`).
 pub fn thu_muc_an(goc: &Path) -> PathBuf {
     let duong_dan = chuan_hoa(goc);
     let ten: String = Path::new(&duong_dan)
@@ -19,7 +20,7 @@ pub fn thu_muc_an(goc: &Path) -> PathBuf {
         .unwrap_or_default();
     // Windows không phân biệt hoa thường trong đường dẫn: băm theo chữ thường, tên hiển thị giữ nguyên
     let khoa = if cfg!(windows) { duong_dan.to_lowercase() } else { duong_dan };
-    goc_du_lieu().join(format!("{}-{:016x}", ten.trim(), bam(&khoa)))
+    goc_du_lieu().join("viec").join(format!("{}-{:016x}", ten.trim(), bam(&khoa)))
 }
 
 /// Chuyển dữ liệu cũ trong `<goc>/.sm-dema4/` sang chỗ mới (1 lần) rồi xoá bản cũ; ghi `thu_muc_goc.txt`.
@@ -52,19 +53,28 @@ fn bam(s: &str) -> u64 {
     s.bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| (h ^ b as u64).wrapping_mul(0x0100_0000_01b3))
 }
 
-/// `<thư mục app>/.sm-dema4` (ẩn); không ghi được → thư mục người dùng, rồi thư mục tạm.
+/// Gốc dữ liệu của app = thư mục người dùng (`cau_hinh::thu_muc_nguoi_dung`); không ghi được → thư mục tạm
+/// (`goc_la_tam()` = true để giao diện báo người dùng: dữ liệu có thể mất khi dọn máy).
 pub(crate) fn goc_du_lieu() -> &'static Path {
-    static GOC: OnceLock<PathBuf> = OnceLock::new();
-    GOC.get_or_init(|| {
-        let cho = [
-            std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join(TEN_AN))),
-            crate::cau_hinh::thu_muc_nguoi_dung().map(|d| d.join(TEN_AN)),
-            Some(std::env::temp_dir().join(TEN_AN)),
-        ];
-        let p = cho.into_iter().flatten().find(|p| ghi_duoc(p)).unwrap_or_else(|| std::env::temp_dir().join(TEN_AN));
-        an_thu_muc(&p);
-        p
-    })
+    &goc().0
+}
+
+/// Gốc đang là thư mục tạm dự phòng (thư mục người dùng không ghi được).
+pub(crate) fn goc_la_tam() -> bool {
+    goc().1
+}
+
+fn goc() -> &'static (PathBuf, bool) {
+    static GOC: OnceLock<(PathBuf, bool)> = OnceLock::new();
+    GOC.get_or_init(|| chon_goc(crate::cau_hinh::thu_muc_nguoi_dung(), &std::env::temp_dir()))
+}
+
+/// Chọn gốc: thư mục người dùng nếu ghi được, không thì `<tam>/sm-dema4` (cờ dự phòng = true).
+fn chon_goc(nguoi_dung: Option<PathBuf>, tam: &Path) -> (PathBuf, bool) {
+    match nguoi_dung.filter(|p| ghi_duoc(p)) {
+        Some(p) => (p, false),
+        None => (tam.join("sm-dema4"), true),
+    }
 }
 
 fn ghi_duoc(p: &Path) -> bool {
@@ -72,23 +82,6 @@ fn ghi_duoc(p: &Path) -> bool {
     let ok = std::fs::create_dir_all(p).is_ok() && std::fs::write(&thu, b"").is_ok();
     let _ = std::fs::remove_file(&thu);
     ok
-}
-
-/// macOS / Linux: tên bắt đầu bằng `.` đã ẩn. Windows: bật thuộc tính Hidden.
-fn an_thu_muc(_p: &Path) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::ffi::OsStrExt;
-        use windows_sys::Win32::Storage::FileSystem::{GetFileAttributesW, SetFileAttributesW, FILE_ATTRIBUTE_HIDDEN, INVALID_FILE_ATTRIBUTES};
-        let rong: Vec<u16> = _p.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-        // SAFETY: `rong` là chuỗi UTF-16 kết thúc bằng 0, sống tới hết lời gọi
-        unsafe {
-            let tt = GetFileAttributesW(rong.as_ptr());
-            if tt != INVALID_FILE_ATTRIBUTES && tt & FILE_ATTRIBUTE_HIDDEN == 0 {
-                SetFileAttributesW(rong.as_ptr(), tt | FILE_ATTRIBUTE_HIDDEN);
-            }
-        }
-    }
 }
 
 fn chep_thu_muc(tu: &Path, den: &Path) -> std::io::Result<()> {
@@ -121,6 +114,42 @@ mod tests {
         assert_eq!(da, thu_muc_an(&goc.join("x/./HS/")), "cùng thư mục gõ khác kiểu → cùng chỗ");
         assert!(da.file_name().unwrap().to_string_lossy().starts_with("HS-"));
         let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    #[test]
+    fn goc_du_lieu_o_thu_muc_nguoi_dung_khong_canh_exe_test_khong_cham_thu_muc_that() {
+        let goc = goc_du_lieu();
+        assert_eq!(Some(goc.to_path_buf()), crate::cau_hinh::thu_muc_nguoi_dung(), "gốc = thư mục người dùng của app");
+        assert!(goc.starts_with(std::env::temp_dir()), "test chỉ ghi trong thư mục tạm: {}", goc.display());
+        let exe = std::env::current_exe().unwrap();
+        assert!(!goc.starts_with(exe.parent().unwrap()), "không còn ghi cạnh file chạy");
+        assert!(thu_muc_an(Path::new("/x/HS")).starts_with(goc.join("viec")), "dữ liệu làm dở nằm dưới viec/");
+        assert!(!goc_la_tam(), "gốc ghi được → không phải nhánh dự phòng");
+    }
+
+    #[test]
+    fn thu_muc_nguoi_dung_khong_ghi_duoc_thi_dung_thu_muc_tam_va_bao() {
+        let d = std::env::temp_dir().join(format!("dema4_chon_goc_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        // "Thư mục người dùng" là 1 file thường → không tạo / ghi được bên trong
+        std::fs::write(d.join("khong_ghi_duoc"), "").unwrap();
+        assert_eq!(chon_goc(Some(d.join("khong_ghi_duoc/sm-dema4")), &d), (d.join("sm-dema4"), true));
+        assert_eq!(chon_goc(None, &d), (d.join("sm-dema4"), true), "không biết thư mục người dùng (thiếu biến môi trường)");
+        assert_eq!(chon_goc(Some(d.join("nd/sm-dema4")), &d), (d.join("nd/sm-dema4"), false));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn du_lieu_cu_canh_file_chay_khong_doc_khong_xoa() {
+        let exe_dir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
+        let cu = exe_dir.join(TEN_AN).join(format!("HS-{}", std::process::id()));
+        std::fs::create_dir_all(&cu).unwrap();
+        std::fs::write(cu.join("index_and_blank.txt"), "a.pdf;2;index\n").unwrap();
+        let moi = thu_muc_an(Path::new("/x/HS"));
+        assert!(!moi.starts_with(&exe_dir), "cài mới: không dùng `.sm-dema4` cạnh file chạy");
+        assert!(cu.join("index_and_blank.txt").exists(), "dữ liệu cũ cạnh file chạy để nguyên");
+        let _ = std::fs::remove_dir_all(&cu);
     }
 
     #[test]

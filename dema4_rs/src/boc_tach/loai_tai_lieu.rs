@@ -1,5 +1,5 @@
 //! Loại tài liệu: bộ trường cần trích, mô tả gửi mô hình đọc, chuẩn hoá, trang đọc. 3 loại có sẵn; người dùng
-//! sửa / thêm / xoá, lưu JSON trong `.sm-dema4/boc_tach/loai_tai_lieu.json` cạnh file chạy.
+//! sửa / thêm / xoá, lưu JSON trong `<thư mục dữ liệu app>/boc_tach/loai_tai_lieu.json`.
 
 use std::path::{Path, PathBuf};
 

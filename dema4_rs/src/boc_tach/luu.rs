@@ -1,4 +1,4 @@
-//! Kết quả bóc từng file ghi nối tiếp `boc_tach.jsonl` trong thư mục dữ liệu ẩn của thư mục nguồn (cạnh file chạy):
+//! Kết quả bóc từng file ghi nối tiếp `boc_tach.jsonl` trong thư mục dữ liệu làm dở của thư mục nguồn (`du_lieu_an::thu_muc_an`):
 //! nguồn sự thật để mở lại thấy kết quả đã đọc (kể cả khi tắt app giữa chừng) và dựng lại Excel. Mỗi dòng 1 bản ghi,
 //! cùng file thì bản ghi sau thắng (đọc lại, sửa tay).
 

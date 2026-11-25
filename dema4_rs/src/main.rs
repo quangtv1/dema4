@@ -7,13 +7,14 @@
 //! - Thêm `--dpi` để kiểm tra DPI ảnh scan, `--kyso` để kiểm tra chữ ký số (mặc định tắt).
 //! - `dema4_rs <thư mục> --khong-ghi`: chỉ đếm và in kết quả (không ghi file, không gửi thống kê), dùng để đo tốc độ.
 //! - `dema4_rs --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]`: tách văn bản theo nhãn,
-//!   ghi `<cha>/<tên>_vanban/…` và `ketqua_tach.txt` trong thư mục dữ liệu ẩn của thư mục pdf (cạnh file chạy); chưa có nhãn thì phân tích tự động trước.
+//!   ghi `<cha>/<tên>_vanban/…` và `ketqua_tach.txt` trong thư mục dữ liệu làm dở của thư mục pdf (thư mục người dùng của app); chưa có nhãn thì phân tích tự động trước.
 
 #[allow(dead_code)] // nối dần vào màn Bóc tách
 mod boc_tach;
 #[allow(dead_code)] // nối dần vào màn Đếm / Tách
 mod cau_hinh;
 mod dem_pdf;
+mod ghi_file;
 mod gioi_thieu;
 mod license;
 mod logo_chuc_nang;

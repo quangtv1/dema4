@@ -188,7 +188,7 @@ const HD_DEM: &[Khoi] = &[
         ("Hệ số quy A4", "A0–A7, mặc định 16 · 8 · 4 · 2 · 1 · 0,5 · 0,25 · 0,125."),
         ("Lớn hơn A0", "Cạnh dài > 1399 mm: ~theo diện tích ÷ A4~ (vd 1500×900 mm ≈ 21,64) hoặc ~hệ số cố định~ ≥ hệ số A0."),
         ("Ranh giới khổ", "Kéo vạch trên thước (mặc định ở giữa 2 khổ, vd A3|A4 = 358,5 mm). Gõ *Thử cạnh dài* để xem trang thuộc khổ nào."),
-        ("Lưu · Mặc định", "Áp cho lần Đếm sau (file ẩn `.dema4_saomai.cfg` cạnh file chạy). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
+        ("Lưu · Mặc định", "Áp cho lần Đếm sau (file `.dema4_saomai.cfg` trong thư mục dữ liệu của ứng dụng). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
     ]),
 ];
 
@@ -226,7 +226,7 @@ const HD_TACH: &[Khoi] = &[
         ("Hoàn tác", "[Ctrl+Z] hoàn tác · [Ctrl+Y] làm lại — riêng từng nhóm lọc"),
         ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc nút − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước/sau · [F1] hướng dẫn"),
     ]),
-    Khoi::Ghi("Nhãn, góc xoay, log và cache lưu trong thư mục ẩn `.sm-dema4` cạnh file ứng dụng (mỗi thư mục đầu vào 1 thư mục con riêng); thư mục đầu vào và file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
+    Khoi::Ghi("Nhãn, góc xoay, log và cache lưu trong thư mục dữ liệu của ứng dụng (Windows `%LOCALAPPDATA%\\sm-dema4`, macOS `~/Library/Application Support/sm-dema4`), mỗi thư mục đầu vào 1 thư mục con riêng dưới `viec/` — dời file chạy đi chỗ khác không mất (từ bản 2.3; dữ liệu bản cũ để cạnh file chạy không được mang sang: nên tách / xuất xong phần đang làm trước khi nâng cấp); thư mục đầu vào và file PDF gốc không bị sửa. *Phân tích lại* = làm lại từ đầu."),
 ];
 
 const HD_MUC_LUC: &[Khoi] = &[
@@ -245,7 +245,7 @@ const HD_MUC_LUC: &[Khoi] = &[
         ("Tự động", "`{trang_so}` `{tong_so_trang}`: Word tự tính khi in, không cần ghép."),
         ("Chưa ghép", "Giữ nguyên `{bien}` trong file kết quả. Rê chuột lên dòng biến để thấy vị trí trên trang mẫu."),
     ]),
-    Khoi::Ghi("File kết quả mặc định nằm trong thư mục ẩn `.sm-dema4/muc_luc/<tên file biên mục>` cạnh file ứng dụng — mở bằng *Mở thư mục* trong popup kết quả, hoặc đặt thư mục khác ở *Cấu hình › Sinh mục lục*. Trang xem trước là bản mô phỏng (chữ + bảng); xuất PDF có ở bản sau."),
+    Khoi::Ghi("File kết quả mặc định nằm trong `muc_luc/<tên file biên mục>` của thư mục dữ liệu ứng dụng — mở bằng *Mở thư mục* trong popup kết quả, hoặc đặt thư mục khác ở *Cấu hình › Sinh mục lục*. Trang xem trước là bản mô phỏng (chữ + bảng); xuất PDF có ở bản sau."),
 ];
 
 const HD_BOC_TACH: &[Khoi] = &[

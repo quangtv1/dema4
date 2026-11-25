@@ -16,7 +16,7 @@ use crate::gui_tach::khung_hop;
 use crate::muc_luc::sinh;
 
 impl ManMucLuc {
-    /// Thư mục ra: Cấu hình (gõ đường dẫn) hoặc mặc định `.sm-dema4/muc_luc/<tên file dữ liệu>` cạnh file chạy.
+    /// Thư mục ra: Cấu hình (gõ đường dẫn) hoặc mặc định `<thư mục dữ liệu app>/muc_luc/<tên file dữ liệu>`.
     pub fn thu_muc_ra(&self, cfg: &CauHinhMucLuc) -> PathBuf {
         let rieng = cfg.thu_muc_ra.trim();
         if rieng.is_empty() {

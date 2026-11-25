@@ -120,6 +120,8 @@ struct UngDungChinh {
     hoi_dong: bool,
     /// Đóng app khi đang phân tích / tách: hỏi Thoát luôn / Huỷ (thoát giữa chừng mất kết quả đang ghi dở).
     hoi_dong_chay: bool,
+    /// Thư mục người dùng không ghi được → dữ liệu đang lưu ở thư mục tạm: báo 1 lần lúc mở app.
+    bao_goc_tam: bool,
     cho_dong: bool,
 }
 
@@ -134,7 +136,7 @@ impl Default for UngDungChinh {
         let mut boc_tach = crate::gui_boc_tach::ManBocTach::default();
         boc_tach.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), cho_dong: false }
     }
 }
 
@@ -212,6 +214,29 @@ impl UngDungChinh {
                 self.cho_dong = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
+        }
+    }
+
+    /// Báo dữ liệu đang lưu ở thư mục tạm (thư mục người dùng không ghi được, vd máy bị chặn quyền ghi).
+    fn hop_goc_tam(&mut self, ctx: &egui::Context) {
+        if !self.bao_goc_tam {
+            return;
+        }
+        use crate::gui_tach::khung_hop as kh;
+        let mut dong = false;
+        let goc = crate::tach_vb::du_lieu_an::goc_du_lieu().display().to_string();
+        let ph = kh::hop(ctx, "bao_goc_tam", 420.0, "Không ghi được thư mục dữ liệu", |ui| {
+            kh::than_chu(ui, &format!("Không ghi được thư mục dữ liệu của ứng dụng trên máy này. Nhãn, cache, kết quả bóc tách và cấu hình đang lưu tạm ở {goc} — có thể mất khi dọn máy. Liên hệ quản trị máy để cấp quyền ghi thư mục người dùng."));
+            kh::chan(ui, |ui| {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(kh::nut_chan("Đã hiểu")).clicked() {
+                        dong = true;
+                    }
+                });
+            });
+        });
+        if dong || ph.should_close() {
+            self.bao_goc_tam = false;
         }
     }
 
@@ -364,6 +389,7 @@ impl eframe::App for UngDungChinh {
             }
         }
         self.hop_hoi_dong(&ctx);
+        self.hop_goc_tam(&ctx);
         self.hop_hoi_dong_chay(&ctx);
         if self.tro_giup.is_none() && self.hop_cau_hinh.is_none() && ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(self.tab_huong_dan()));

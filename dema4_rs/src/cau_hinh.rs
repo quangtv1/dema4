@@ -1,8 +1,8 @@
 //! Cấu hình người dùng `.dema4_saomai.cfg` (file ẩn; dạng `khoá=giá trị`, mỗi dòng 1 khoá): hệ số quy A4, ranh giới khổ,
 //! tuỳ chọn Tách PDF và trạng thái giao diện.
 //!
-//! Đặt cạnh file chạy; thư mục đó không ghi được → thư mục người dùng (`%APPDATA%\sm-dema4\`,
-//! macOS `~/Library/Application Support/sm-dema4/`). Khoá thiếu / sai → giá trị mặc định, không báo lỗi.
+//! Đặt trong thư mục người dùng của app (`%LOCALAPPDATA%\sm-dema4\`, macOS `~/Library/Application Support/sm-dema4/`),
+//! không phụ thuộc chỗ đặt file chạy. Khoá thiếu / sai → giá trị mặc định, không báo lỗi.
 
 use crate::boc_tach::mo_hinh::NhaCungCap;
 use crate::dem_pdf::HE_SO_MAC_DINH;
@@ -11,8 +11,6 @@ use std::path::{Path, PathBuf};
 
 /// Cùng tên ứng dụng, ẩn: dấu chấm đầu (macOS / Linux) + thuộc tính Hidden khi ghi (Windows).
 pub const TEN_FILE: &str = ".dema4_saomai.cfg";
-/// Tên cũ (≤ v1.0.0 bản đầu): vẫn đọc nếu chưa có file mới; lần ghi sau chuyển sang tên mới và xoá file cũ.
-const TEN_FILE_CU: &str = "sm-dema4.cfg";
 /// Ranh giới khổ mặc định (mm, cạnh dài): điểm giữa 2 khổ liền kề A0|A1 … A6|A7.
 pub const RANH_GIOI_MAC_DINH: [f64; 7] = [1015.0, 717.5, 507.0, 358.5, 253.5, 179.0, 126.5];
 /// Cạnh dài chuẩn (mm) A0 … A7.
@@ -91,7 +89,7 @@ pub struct CauHinh {
 /// Cấu hình + lựa chọn gần nhất của màn Sinh mục lục (khoá `ml_*` trong file).
 #[derive(Debug, Clone, PartialEq)]
 pub struct CauHinhMucLuc {
-    /// Thư mục ra; trống = `.sm-dema4/muc_luc/<tên file dữ liệu>` cạnh file chạy.
+    /// Thư mục ra; trống = `<thư mục dữ liệu app>/muc_luc/<tên file dữ liệu>` (xem `tach_vb::du_lieu_an::goc_du_lieu`).
     pub thu_muc_ra: String,
     pub mau_ten: String,
     /// File đã có: ghi đè (`true`) hay bỏ qua.
@@ -541,30 +539,43 @@ impl CauHinh {
     }
 }
 
-/// Thư mục đặt file theo thứ tự ưu tiên: cạnh file chạy, rồi thư mục người dùng.
-fn thu_muc_dat_file() -> Vec<PathBuf> {
-    std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)).into_iter().chain(thu_muc_nguoi_dung()).collect()
+/// File cấu hình: chỉ 1 chỗ, cùng gốc với dữ liệu app (thư mục người dùng; không ghi được thì thư mục tạm dự phòng),
+/// không phụ thuộc chỗ đặt file chạy. Bản trước 2.3 đặt cạnh file chạy — không đọc nữa (cài mới bắt đầu bằng mặc định).
+fn file_cau_hinh() -> Option<PathBuf> {
+    Some(crate::tach_vb::du_lieu_an::goc_du_lieu().join(TEN_FILE))
 }
 
-/// Chỗ đặt file (tên mới) theo thứ tự ưu tiên.
-pub fn cho_dat_file() -> Vec<PathBuf> {
-    thu_muc_dat_file().into_iter().map(|d| d.join(TEN_FILE)).collect()
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeDieuHanh {
+    Windows,
+    MacOs,
+    Linux,
 }
 
-/// Chỗ đọc: tên mới trước, rồi tên cũ.
-fn cho_doc(thu_muc: &[PathBuf]) -> Vec<PathBuf> {
-    thu_muc.iter().map(|d| d.join(TEN_FILE)).chain(thu_muc.iter().map(|d| d.join(TEN_FILE_CU))).collect()
-}
-
-pub(crate) fn thu_muc_nguoi_dung() -> Option<PathBuf> {
-    let goc = if cfg!(windows) {
-        PathBuf::from(std::env::var_os("APPDATA")?)
-    } else if cfg!(target_os = "macos") {
-        PathBuf::from(std::env::var_os("HOME")?).join("Library/Application Support")
-    } else {
-        std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|| Some(PathBuf::from(std::env::var_os("HOME")?).join(".config")))?
+/// Thư mục dữ liệu + cấu hình của app trên máy này. Windows dùng `%LOCALAPPDATA%` (không phải `%APPDATA%` = Roaming:
+/// khoá API mã hoá theo máy sẽ hỏng khi profile đi theo người sang máy khác, cache làm phình profile).
+fn thu_muc_nguoi_dung_tu(he: HeDieuHanh, bien: impl Fn(&str) -> Option<std::ffi::OsString>) -> Option<PathBuf> {
+    let goc = match he {
+        HeDieuHanh::Windows => PathBuf::from(bien("LOCALAPPDATA")?),
+        HeDieuHanh::MacOs => PathBuf::from(bien("HOME")?).join("Library/Application Support"),
+        HeDieuHanh::Linux => bien("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|| Some(PathBuf::from(bien("HOME")?).join(".config")))?,
     };
     Some(goc.join("sm-dema4"))
+}
+
+/// Test: thư mục tạm riêng của tiến trình test — không bao giờ chạm dữ liệu / cấu hình / license thật của máy dev.
+pub(crate) fn thu_muc_nguoi_dung() -> Option<PathBuf> {
+    if cfg!(test) {
+        return Some(std::env::temp_dir().join(format!("dema4_test_{}", std::process::id())).join("sm-dema4"));
+    }
+    let he = if cfg!(windows) {
+        HeDieuHanh::Windows
+    } else if cfg!(target_os = "macos") {
+        HeDieuHanh::MacOs
+    } else {
+        HeDieuHanh::Linux
+    };
+    thu_muc_nguoi_dung_tu(he, |k| std::env::var_os(k))
 }
 
 /// Đọc file đầu tiên có trong danh sách; không có file nào → mặc định.
@@ -573,7 +584,7 @@ pub fn doc_tu(cho: &[PathBuf]) -> CauHinh {
 }
 
 pub fn doc() -> CauHinh {
-    doc_tu(&cho_doc(&thu_muc_dat_file()))
+    doc_tu(&file_cau_hinh().into_iter().collect::<Vec<_>>())
 }
 
 fn ghi_file(p: &Path, noi_dung: &str) -> std::io::Result<()> {
@@ -627,16 +638,7 @@ pub fn ghi_vao(c: &CauHinh, cho: &[PathBuf]) -> std::io::Result<PathBuf> {
 }
 
 pub fn ghi(c: &CauHinh) -> std::io::Result<PathBuf> {
-    ghi_trong(c, &thu_muc_dat_file())
-}
-
-/// Ghi tên mới; ghi được thì xoá file tên cũ ở mọi chỗ (lần đọc sau không lấy nhầm bản cũ).
-fn ghi_trong(c: &CauHinh, thu_muc: &[PathBuf]) -> std::io::Result<PathBuf> {
-    let p = ghi_vao(c, &thu_muc.iter().map(|d| d.join(TEN_FILE)).collect::<Vec<_>>())?;
-    for d in thu_muc {
-        let _ = std::fs::remove_file(d.join(TEN_FILE_CU));
-    }
-    Ok(p)
+    ghi_vao(c, &file_cau_hinh().into_iter().collect::<Vec<_>>())
 }
 
 #[cfg(test)]
@@ -786,22 +788,26 @@ mod tests {
     }
 
     #[test]
-    fn file_an_ten_ung_dung_va_chuyen_tu_ten_cu() {
+    fn cau_hinh_chi_o_thu_muc_nguoi_dung_khong_doc_canh_exe() {
         assert!(TEN_FILE.starts_with('.') && TEN_FILE.contains("dema4_saomai"), "ẩn trên macOS / Linux, cùng tên ứng dụng");
-        let d = tam("ten_moi");
-        let (exe, nd) = (d.join("canh_exe"), d.join("nguoi_dung"));
-        std::fs::create_dir_all(&exe).unwrap();
-        let cu = CauHinh { rong_cot_trai: 321.0, ..Default::default() };
-        std::fs::write(exe.join(TEN_FILE_CU), cu.noi_dung()).unwrap();
-        let thu_muc = vec![exe.clone(), nd];
-        assert_eq!(doc_tu(&cho_doc(&thu_muc)), cu, "chưa có file mới → đọc file tên cũ");
-        let moi = CauHinh { rong_cot_trai: 222.0, ..cu.clone() };
-        assert_eq!(ghi_trong(&moi, &thu_muc).unwrap(), exe.join(TEN_FILE));
-        assert!(!exe.join(TEN_FILE_CU).exists(), "ghi xong xoá file tên cũ");
-        assert_eq!(doc_tu(&cho_doc(&thu_muc)), moi);
-        ghi_trong(&cu, &thu_muc).unwrap(); // ghi đè file đã có (Windows: file đang ẩn)
-        assert_eq!(doc_tu(&cho_doc(&thu_muc)), cu);
-        let _ = std::fs::remove_dir_all(&d);
+        let f = file_cau_hinh().unwrap();
+        assert_eq!(f, crate::tach_vb::du_lieu_an::goc_du_lieu().join(TEN_FILE), "cùng gốc với dữ liệu (cả khi rơi về thư mục tạm)");
+        let exe = std::env::current_exe().unwrap();
+        assert!(!f.starts_with(exe.parent().unwrap()), "không đặt cạnh file chạy");
+        // doc() / ghi() chỉ dùng đúng file này (không còn danh sách chỗ cạnh exe / tên cũ) — đọc ghi thử ở test ghi_vao_cho_dau_tien_ghi_duoc_va_doc_lai
+    }
+
+    #[test]
+    fn thu_muc_nguoi_dung_windows_la_localappdata_khong_phai_roaming() {
+        let bien = |k: &str| match k {
+            "LOCALAPPDATA" => Some(std::ffi::OsString::from("C:/Users/u/AppData/Local")),
+            "APPDATA" => Some("C:/Users/u/AppData/Roaming".into()),
+            "HOME" => Some("/Users/u".into()),
+            _ => None,
+        };
+        assert_eq!(thu_muc_nguoi_dung_tu(HeDieuHanh::Windows, bien), Some(PathBuf::from("C:/Users/u/AppData/Local/sm-dema4")));
+        assert_eq!(thu_muc_nguoi_dung_tu(HeDieuHanh::MacOs, bien), Some(PathBuf::from("/Users/u/Library/Application Support/sm-dema4")));
+        assert_eq!(thu_muc_nguoi_dung_tu(HeDieuHanh::Linux, bien), Some(PathBuf::from("/Users/u/.config/sm-dema4")));
     }
 
     #[test]
