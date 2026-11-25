@@ -331,7 +331,7 @@ fn tom_tat(bc: &BaoCaoGop) -> String {
         s += &format!("\nBỏ qua loại tài liệu không hợp lệ: {}", bc.loai_loi.join(", "));
     }
     if !bc.bo_qua.is_empty() {
-        s += &format!("\nBỏ qua {} mục không có PDF tương ứng (hoặc PDF khác bản) trong thư mục này", bc.bo_qua.len());
+        s += &format!("\nBỏ qua {} mục không có PDF tương ứng trong thư mục này, hoặc PDF khác bản (nội dung file không giống máy gửi)", bc.bo_qua.len());
     }
     s
 }

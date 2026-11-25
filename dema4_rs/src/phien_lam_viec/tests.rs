@@ -289,6 +289,30 @@ fn file_nhan_may_nay_loi_thi_dung_khong_ghi_de() {
 }
 
 #[test]
+fn pdf_trung_ten_trung_kich_thuoc_khac_noi_dung_bi_bo_qua() {
+    let (d, f_loai) = tam("ma");
+    let (a, b) = (thu_muc(&d, "A"), thu_muc(&d, "B"));
+    ghi_an_toan(&thu_muc_an(&b).join(F_NHAN), "a.pdf;2;index\nb.pdf;2;index\n").unwrap();
+    ghi_moc(&b, &[("a.pdf", 100, 1), ("b.pdf", 100, 2)]);
+    let goi = d.join("B.zip");
+    xuat_voi(&b, &goi, &f_loai).unwrap();
+    // Máy nhận: b.pdf cùng tên, cùng kích thước nhưng khác 1 byte nội dung (bản scan khác)
+    let mut noi_dung = std::fs::read(a.join("b.pdf")).unwrap();
+    let n = noi_dung.len();
+    noi_dung[n - 2] ^= 0x20;
+    std::fs::write(a.join("b.pdf"), &noi_dung).unwrap();
+    assert_eq!(xem_truoc_voi(&a, &goi, &f_loai).unwrap().so_pdf_khop, 2, "a.pdf, c.pdf giống hệt; b.pdf khác bản");
+    let bc = nhap_voi(&a, &goi, &f_loai).unwrap();
+    let nh = doc_nhan(&a);
+    assert!(nh.contains_key("a.pdf") && !nh.contains_key("b.pdf"), "{nh:?}");
+    assert!(bc.bo_qua.contains(&"b.pdf".to_string()), "{bc:?}");
+    for g in [&a, &b] {
+        let _ = std::fs::remove_dir_all(thu_muc_an(g));
+    }
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
 fn trang_ngoai_so_trang_that_bi_bo_pdf_khac_kich_thuoc_bi_bo_qua() {
     let (d, f_loai) = tam("trang");
     let (a, b) = (thu_muc(&d, "A"), thu_muc(&d, "B"));

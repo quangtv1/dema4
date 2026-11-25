@@ -9,7 +9,7 @@
 
 mod gop;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -56,6 +56,10 @@ struct Manifest {
 struct PdfGoi {
     khoa: String,
     kich_thuoc: u64,
+    /// Mã kiểm tra nội dung PDF (64 KB đầu + 64 KB cuối + kích thước, như cache phân tích): máy nhận chỉ nhận dữ liệu
+    /// cho PDF cùng mã — trùng tên + trùng kích thước mà khác bản scan vẫn bị bỏ qua. Gói từ v2.3.0 không có → chỉ so kích thước.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ma: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -163,6 +167,20 @@ fn pdf_tren_may(goc: &Path) -> BTreeMap<String, (PathBuf, u64)> {
     ds
 }
 
+/// Khoá (chuẩn) các PDF của gói có bản **giống hệt** trên máy này: cùng đường dẫn tương đối, cùng kích thước và — khi gói
+/// có mã kiểm tra — cùng mã nội dung. PDF khác bản thì nhãn / trang / kết quả không còn đúng → nơi gọi bỏ qua.
+fn pdf_khop(goi: &[PdfGoi], may: &BTreeMap<String, (PathBuf, u64)>) -> HashSet<String> {
+    use rayon::prelude::*;
+    goi.par_iter()
+        .filter_map(|p| {
+            let k = nhan::chuan_duong_dan(&p.khoa);
+            let (duong, n) = may.get(&k)?;
+            let cung_ma = p.ma.is_none_or(|ma| cache_trang::van_tay_file(duong, *n).ok() == Some(ma));
+            (*n == p.kich_thuoc && cung_ma).then_some(k)
+        })
+        .collect()
+}
+
 /// Đọc file của máy này: không có → rỗng; byte hỏng chỉ mất ký tự đó; lỗi đọc khác → `Err` (không coi là rỗng rồi ghi đè).
 fn doc_file_may(f: &Path) -> Result<String, String> {
     match std::fs::read(f) {
@@ -207,7 +225,11 @@ fn xuat_voi(goc: &Path, file_zip: &Path, file_loai: &Path) -> Result<TomTatXuat,
         phien_ban_app: env!("CARGO_PKG_VERSION").into(),
         ten_thu_muc: ten_thu_muc(goc),
         tao_luc: moc_sua::bay_gio_ms(),
-        pdf: pdf_tren_may(goc).into_iter().map(|(khoa, (_, kich_thuoc))| PdfGoi { khoa, kich_thuoc }).collect(),
+        pdf: {
+            use rayon::prelude::*;
+            let ds: Vec<_> = pdf_tren_may(goc).into_iter().collect();
+            ds.into_par_iter().map(|(khoa, (p, kich_thuoc))| PdfGoi { ma: cache_trang::van_tay_file(&p, kich_thuoc).ok(), khoa, kich_thuoc }).collect()
+        },
         loai_tai_lieu: loai_tai_lieu::doc(file_loai).into_iter().filter(|l| ten_loai.contains(l.ten.as_str())).collect(),
     };
     let so_ho_so = moc_sua::doc(&an.join(moc_sua::TEN_FILE)).values().filter(|m| m.chu_ky != moc_sua::CHU_KY_RONG).count();
@@ -322,7 +344,7 @@ pub fn xem_truoc(goc: &Path, file_zip: &Path) -> Result<XemTruoc, String> {
 fn xem_truoc_voi(goc: &Path, file_zip: &Path, file_loai: &Path) -> Result<XemTruoc, String> {
     let mut goi = Goi::mo(file_zip)?;
     let may = pdf_tren_may(goc);
-    let so_pdf_khop = goi.manifest.pdf.iter().filter(|p| may.get(&nhan::chuan_duong_dan(&p.khoa)).map(|(_, n)| *n) == Some(p.kich_thuoc)).count();
+    let so_pdf_khop = pdf_khop(&goi.manifest.pdf, &may).len();
     let so_ho_so = moc_sua::doc_chuoi(&goi.doc_chu(moc_sua::TEN_FILE)?).values().filter(|m| m.chu_ky != moc_sua::CHU_KY_RONG).count();
     let co_san: BTreeSet<String> = loai_tai_lieu::doc(file_loai).into_iter().map(|l| l.ten).collect();
     let loai_moi = goi
@@ -357,13 +379,11 @@ fn nhap_voi(goc: &Path, file_zip: &Path, file_loai: &Path) -> Result<BaoCaoGop, 
     let may_pdf = pdf_tren_may(goc);
     let bay_gio = moc_sua::bay_gio_ms();
     let mut bc = BaoCaoGop::default();
-    // Khoá từ gói → khoá chuẩn nếu trùng 1 PDF trên máy này **cùng kích thước** với PDF của máy xuất (khác bản PDF thì
-    // nhãn / trang / kết quả không còn đúng → bỏ qua)
-    let kich_thuoc_goi: HashMap<String, u64> = goi.manifest.pdf.iter().map(|p| (nhan::chuan_duong_dan(&p.khoa), p.kich_thuoc)).collect();
+    // Khoá từ gói → khoá chuẩn nếu trùng 1 PDF **giống hệt** trên máy này (xem `pdf_khop`)
+    let khop = pdf_khop(&goi.manifest.pdf, &may_pdf);
     let kiem_khoa = |k: &str| -> Option<String> {
         let c = nhan::chuan_duong_dan(k);
-        let cung_ban = may_pdf.get(&c).is_some_and(|(_, n)| kich_thuoc_goi.get(&c) == Some(n));
-        (khoa_hop_le(&c) && cung_ban).then_some(c)
+        (khoa_hop_le(&c) && khop.contains(&c)).then_some(c)
     };
     let mut bo_qua: BTreeSet<String> = BTreeSet::new();
 
