@@ -54,9 +54,11 @@ impl MucGanDay {
         MucGanDay { cn, duong_dan: duong_dan.into(), loai: None, mau: None, sheet: None, dong_tieu_de: None, tinh, luc: bay_gio_ms() }
     }
 
-    /// Cùng chức năng + cùng thư mục / file → cùng 1 dòng.
-    fn trung(&self, khac: &MucGanDay) -> bool {
-        self.cn == khac.cn && Path::new(&self.duong_dan) == Path::new(&khac.duong_dan)
+    /// Cùng chức năng + cùng thư mục / file → cùng 1 dòng. So theo khoá thư mục dữ liệu (chuẩn hoá đường dẫn, NFC,
+    /// hoa/thường trên Windows) — `D:\HS` và `d:\hs\` là 1 dòng.
+    pub fn trung(&self, khac: &MucGanDay) -> bool {
+        use crate::tach_vb::du_lieu_an::thu_muc_an;
+        self.cn == khac.cn && thu_muc_an(Path::new(self.duong_dan.trim())) == thu_muc_an(Path::new(khac.duong_dan.trim()))
     }
 
     /// (thư mục cha, tên cuối) — tách theo cả `/` và `\` (đường dẫn Windows / ổ mạng như nhau trên mọi máy).
@@ -156,6 +158,8 @@ impl DanhSach {
 
     fn doi(&mut self) {
         self.phien += 1;
+        // Thứ tự dòng đổi → cờ cũ không còn đúng dòng: coi như chưa biết (vẽ bình thường) tới khi kiểm xong
+        self.mat.clear();
         if let Some(f) = &self.file {
             let _ = ghi(f, &self.ds);
         }
@@ -185,6 +189,16 @@ impl DanhSach {
             them(&mut self.ds, MucGanDay { duong_dan: p.display().to_string(), luc: bay_gio_ms(), ..m });
             self.doi();
         }
+    }
+
+    /// Kiểm lại thư mục còn không (vào Trang chủ: ổ mạng / Drive có thể vừa gắn lại).
+    pub fn kiem_lai(&mut self) {
+        self.phien += 1;
+    }
+
+    /// Dòng cùng chức năng + đường dẫn với `muc` (vị trí có thể đã đổi trong lúc hộp chọn đang mở).
+    pub fn tim(&self, muc: &MucGanDay) -> Option<usize> {
+        self.ds.iter().position(|m| m.trung(muc))
     }
 
     pub fn mat(&self, i: usize) -> bool {
@@ -235,6 +249,10 @@ mod tests {
         }
         assert_eq!(ds.iter().map(|m| m.duong_dan.as_str()).collect::<Vec<_>>(), ["/a/5", "/a/4", "/a/3", "/a/2", "/a/1"]);
         them(&mut ds, muc(ChucNang::Tach, "/a/3/"));
+        if cfg!(windows) {
+            them(&mut ds, muc(ChucNang::Tach, "/A/3"));
+            assert_eq!(ds.len(), 5, "Windows: khác hoa/thường vẫn 1 dòng");
+        }
         assert_eq!((ds.len(), ds[0].duong_dan.as_str(), ds[1].duong_dan.as_str()), (5, "/a/3/", "/a/5"), "cùng thư mục → 1 dòng, lên đầu");
         them(&mut ds, muc(ChucNang::BocTach, "/a/5"));
         assert_eq!((ds[0].cn, ds[1].duong_dan.as_str(), ds.len()), (ChucNang::BocTach, "/a/3/", 5), "khác chức năng → dòng riêng");
@@ -275,7 +293,7 @@ mod tests {
         assert_eq!(ds.mat, [true, false], "dòng đầu (Đếm) không còn thư mục");
         ds.doi_duong_dan(0, &d);
         assert_eq!((ds.ds[0].cn, ds.ds[0].duong_dan.as_str()), (ChucNang::Dem, d.to_str().unwrap()));
-        assert!(!ds.mat(0) || ds.phien_mat != ds.phien, "đổi → kiểm lại");
+        assert!(!ds.mat(0) && ds.mat.is_empty(), "đổi thứ tự → bỏ cờ cũ (không làm mờ / Chọn lại nhầm dòng) tới khi kiểm lại");
         ds.xoa(1);
         assert_eq!(doc(&f).len(), 1);
         ds.xoa_het();

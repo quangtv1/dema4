@@ -129,7 +129,7 @@ struct UngDungChinh {
     /// Làm tiếp gần đây (Trang chủ, menu Chức năng › Gần đây).
     gan_day: crate::gan_day::DanhSach,
     /// "Chọn lại…" dòng gần đây đang mở hộp chọn: (dòng, kết quả).
-    chon_lai: Option<(usize, std::sync::mpsc::Receiver<Option<PathBuf>>)>,
+    chon_lai: Option<(crate::gan_day::MucGanDay, std::sync::mpsc::Receiver<Option<PathBuf>>)>,
     cho_dong: bool,
 }
 
@@ -353,6 +353,9 @@ impl UngDungChinh {
     fn chuyen_man(&mut self, man: Man) {
         if man != self.man {
             self.ghi_gan_day();
+            if man == Man::TrangChu {
+                self.gan_day.kiem_lai();
+            }
         }
         if man == Man::MucLuc && self.man != Man::MucLuc {
             self.muc_luc.dat_lai();
@@ -382,19 +385,34 @@ impl UngDungChinh {
     fn mo_gan_day(&mut self, i: usize, ctx: &egui::Context) {
         use crate::gan_day::ChucNang;
         let Some(mut m) = self.gan_day.ds.get(i).cloned().filter(|_| !self.gan_day.mat(i)) else { return };
-        self.chuyen_man(match m.cn {
+        let man = match m.cn {
             ChucNang::Dem => Man::Dem,
             ChucNang::Tach => Man::Tach,
             ChucNang::MucLuc => Man::MucLuc,
             ChucNang::BocTach => Man::BocTach,
-        });
+        };
+        if self.man == man {
+            // Mở từ menu Gần đây ngay trong màn đó: ghi dòng của việc đang làm rồi đặt lại màn như khi chuyển màn
+            self.ghi_gan_day();
+            match man {
+                Man::MucLuc => self.muc_luc.dat_lai(),
+                Man::BocTach => self.boc_tach.dat_lai(),
+                _ => {}
+            }
+        } else {
+            self.chuyen_man(man);
+        }
         match m.cn {
             ChucNang::Dem => {
                 if self.dem.thu_muc.trim() != m.duong_dan.trim() {
                     self.dem.chon_thu_muc(m.duong_dan.clone(), ctx);
                 }
             }
-            ChucNang::Tach => self.tach.mo_tu_gan_day(&m.duong_dan),
+            ChucNang::Tach => {
+                if !self.tach.mo_tu_gan_day(&m.duong_dan) {
+                    return; // nhãn thư mục đang mở chưa lưu được — giữ nguyên, lỗi hiện ở dòng trạng thái màn Tách
+                }
+            }
             ChucNang::BocTach => self.boc_tach.mo_tu_gan_day(&m.duong_dan, m.loai.as_deref(), ctx),
             ChucNang::MucLuc => self.muc_luc.mo_tu_gan_day(&m.duong_dan, m.sheet.clone(), m.dong_tieu_de, m.mau.as_deref(), ctx),
         }
@@ -426,7 +444,7 @@ impl UngDungChinh {
                         } else {
                             crate::gui_tach::chon_thu_muc_nen("", ctx)
                         };
-                        self.chon_lai = Some((i, nhan));
+                        self.chon_lai = Some((m.clone(), nhan));
                     }
                 }
             }
@@ -435,12 +453,12 @@ impl UngDungChinh {
 
     /// Nhận kết quả hộp "Chọn lại…" (cập nhật đường dẫn của dòng) + kiểm thư mục còn không.
     fn nhan_gan_day(&mut self, ctx: &egui::Context) {
-        if let Some((i, n)) = &self.chon_lai {
+        if let Some((m, n)) = &self.chon_lai {
             match n.try_recv() {
                 Ok(p) => {
-                    let i = *i;
+                    let i = self.gan_day.tim(m);
                     self.chon_lai = None;
-                    if let Some(p) = p {
+                    if let (Some(i), Some(p)) = (i, p) {
                         self.gan_day.doi_duong_dan(i, &p);
                     }
                 }

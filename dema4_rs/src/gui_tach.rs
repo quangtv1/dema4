@@ -775,16 +775,21 @@ impl ManTach {
     }
 
     /// Mở thư mục từ Làm tiếp gần đây: đang mở đúng thư mục → giữ nguyên; thư mục khác đang mở → ghi xuống đĩa trước,
-    /// rồi mở thư mục mới (nhãn + cache đã lưu) ở lần vẽ tới.
-    pub fn mo_tu_gan_day(&mut self, thu_muc: &str) {
+    /// rồi mở thư mục mới (nhãn + cache đã lưu) ở lần vẽ tới. Nhãn chưa lưu ghi lỗi → giữ thư mục cũ (lỗi ở dòng
+    /// trạng thái), trả `false`.
+    pub fn mo_tu_gan_day(&mut self, thu_muc: &str) -> bool {
         if self.co_phien() && self.cung_du_lieu(Path::new(thu_muc)) {
-            return;
+            return true;
         }
         if self.co_phien() {
             self.ghi_het_xuong_dia();
+            if self.chua_luu() {
+                return false;
+            }
         }
         self.thu_muc = thu_muc.to_string();
         self.cho_mo_lai = true;
+        true
     }
 
     /// Đang mở thư mục (đã Phân tích) — sau Nhập phiên cần mở lại từ đĩa.
@@ -2871,6 +2876,39 @@ mod tests {
         let b = man.bang.as_ref().expect("mở lại từ đĩa → có bảng (nút Tách dùng được)");
         assert_eq!((b.trang[2].nhan(), b.trang[1].nhan()), (Nhan::Index, Nhan::NoiDung), "thấy nhãn vừa nhập");
         let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Mở thư mục khác từ Làm tiếp gần đây khi nhãn đang sửa không ghi được → giữ thư mục cũ + nhãn trong bộ nhớ.
+    #[cfg(unix)]
+    #[test]
+    fn mo_tu_gan_day_ghi_nhan_loi_thi_giu_thu_muc_cu() {
+        use std::os::unix::fs::PermissionsExt;
+        let goc = std::env::temp_dir().join(format!("dema4_gd_loi_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        std::fs::create_dir_all(&goc).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 2);
+        let an = thu_muc_an(&goc);
+        let _ = std::fs::remove_dir_all(&an);
+        let cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
+        let ch = cfg.cau_hinh_phan_tich();
+        let mut man = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };
+        man.bam_phan_tich(&ch);
+        let t = Instant::now();
+        while man.dang_chay() {
+            assert!(t.elapsed() < Duration::from_secs(30));
+            std::thread::sleep(Duration::from_millis(20));
+            man.nhan_su_kien(&ch, None);
+        }
+        man.bang.as_mut().unwrap().trang[1].sua.tay = Some(Nhan::Index);
+        man.bang.as_mut().unwrap().chua_luu = true;
+        std::fs::set_permissions(&an, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let mo = man.mo_tu_gan_day("/thu_muc/khac");
+        std::fs::set_permissions(&an, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(!mo, "ghi nhãn lỗi → không mở thư mục khác");
+        assert!(Path::new(&man.thu_muc) == goc && man.chua_luu() && !man.cho_mo_lai, "giữ thư mục + nhãn chưa lưu");
+        assert!(man.mo_tu_gan_day("/thu_muc/khac") && man.cho_mo_lai, "ghi được → mở");
+        let _ = std::fs::remove_dir_all(&an);
         let _ = std::fs::remove_dir_all(&goc);
     }
 
