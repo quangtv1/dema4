@@ -193,8 +193,11 @@ impl UngDungChinh {
         }
     }
 
-    /// Thư mục đang mở ở màn hiện tại dùng được cho Xuất / Nhập phiên (chỉ Tách và Bóc tách).
+    /// Thư mục đang mở ở màn hiện tại dùng được cho Xuất / Nhập phiên (Tách, Bóc tách, Xóa ghim).
     fn thu_muc_phien(&self) -> Option<PathBuf> {
+        if self.man == Man::XoaGhim {
+            return self.xoa_ghim.thu_muc.clone().filter(|p| p.is_dir());
+        }
         let tm = match self.man {
             Man::Tach => &self.tach.thu_muc,
             Man::BocTach => &self.boc_tach.thu_muc,
@@ -219,6 +222,10 @@ impl UngDungChinh {
     /// nhập xong thì nạp lại Tách / Bóc tách từ đĩa.
     fn hop_phien(&mut self, ctx: &egui::Context) {
         use crate::gui_phien::HanhDong;
+        if self.hop_phien.dang_mo() {
+            // Vùng Xóa ghim vừa sửa (đang chờ ghi trễ) phải có trong kho trước khi đóng gói / nhập
+            self.xoa_ghim.ghi_ngay();
+        }
         match self.hop_phien.ve(ctx) {
             Some(HanhDong::XacNhanNhap { goc, zip }) => {
                 if !self.ghi_xuong_dia_neu_dang_mo(&goc) {
@@ -240,6 +247,10 @@ impl UngDungChinh {
                 let an = crate::tach_vb::du_lieu_an::thu_muc_an;
                 if !self.boc_tach.thu_muc.trim().is_empty() && an(Path::new(self.boc_tach.thu_muc.trim())) == an(&goc) {
                     self.boc_tach.nap_ket_qua();
+                }
+                // Màn Xóa ghim đang mở đúng thư mục vừa nhập → nạp lại vùng chung / riêng từ kho
+                if let Some(tm) = self.xoa_ghim.thu_muc.clone().filter(|tm| crate::tach_vb::tach::nam_trong(tm, &goc) && crate::tach_vb::tach::nam_trong(&goc, tm)) {
+                    self.xoa_ghim.mo_thu_muc(tm);
                 }
             }
             None => {}
@@ -555,10 +566,10 @@ impl UngDungChinh {
                         if let Some(c) = chon_gd {
                             self.chon_trang_chu(c, &ui.ctx().clone());
                         }
-                        // Mang phần đang làm dở của thư mục đang mở (Tách / Bóc tách) sang máy khác
+                        // Mang phần đang làm dở của thư mục đang mở (Tách / Bóc tách / Xóa ghim) sang máy khác
                         ui.separator();
                         let goc = self.thu_muc_phien();
-                        let ly_do = "Mở thư mục ở màn Tách văn bản hoặc Bóc tách dữ liệu trước";
+                        let ly_do = "Mở thư mục ở màn Tách văn bản, Bóc tách dữ liệu hoặc Xóa ghim trước";
                         ui.add_enabled_ui(goc.is_some(), |ui| {
                             if muc_menu_day(ui, BieuTuong::TaiLieu, "Xuất phiên làm việc…", false, None, 190.0).on_disabled_hover_text(ly_do).clicked() {
                                 if let Some(g) = goc.clone() {
@@ -1952,7 +1963,7 @@ mod tests {
     use crate::boc_tach::mo_hinh::NhaCungCap;
 
     #[test]
-    fn xuat_nhap_phien_chi_o_tach_va_boc_tach_khi_da_mo_thu_muc() {
+    fn xuat_nhap_phien_chi_o_tach_boc_tach_xoa_ghim_khi_da_mo_thu_muc() {
         let d = std::env::temp_dir().join(format!("dema4_menu_phien_{}", std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
         let mut app = UngDungChinh::default();
@@ -1963,6 +1974,10 @@ mod tests {
         app.man = Man::BocTach;
         assert!(app.thu_muc_phien().is_none(), "chưa chọn thư mục");
         app.boc_tach.thu_muc = d.display().to_string();
+        assert_eq!(app.thu_muc_phien(), Some(d.clone()));
+        app.man = Man::XoaGhim;
+        assert!(app.thu_muc_phien().is_none(), "Xóa ghim chưa mở thư mục");
+        app.xoa_ghim.thu_muc = Some(d.clone());
         assert_eq!(app.thu_muc_phien(), Some(d.clone()));
         app.man = Man::Tach;
         app.tach.thu_muc = d.join("khong_co").display().to_string();
@@ -2584,6 +2599,8 @@ mod tests {
         h.state_mut().boc_tach.tt[2] = TrangThai::Cho;
         h.run_steps(2);
         h.get_by_label("Chạy lại tất cả"); // nút phụ có mặt
+        // Lượt của lần 1 ghi lên trạm ở luồng nền: chờ xong rồi mới chụp số lượt (không thì lần sau thấy +2)
+        let _ = kt.moc().recv_timeout(Duration::from_secs(5));
         let (truoc, luot) = (dem_dong(), kt.luot().unwrap().0);
         h.get_by_label("Tiếp tục (1)").click();
         cho_boc_tach(&mut h, |s| !s.boc_tach.dang_chay() && matches!(s.boc_tach.tt[2], TrangThai::Xong(_)));
@@ -3027,7 +3044,7 @@ mod tests {
         let ds = vec![
             muc(ChucNang::Tach, r"D:\SoHoa\Phong_Noi_vu\HS_2024", "42/120 hồ sơ đã duyệt · 3 nghi trắng, 1 xoay", 42, 120, false, 3),
             bt,
-            muc(ChucNang::Tach, r"\\NAS\SoHoa\Phong_Tai_chinh\HS_2022", "Đã tách 118 hồ sơ → 1.204 văn bản", 118, 118, false, 60 * 5),
+            muc(ChucNang::XoaGhim, r"D:\SoHoa\Phong_Noi_vu\HS_2025", "Đã xoá ghim 86/86 file", 86, 86, false, 40),
             ml,
             muc(ChucNang::Dem, r"E:\USB\Ho_so_ban_giao", "1.234 trang A4 · 87 file", 0, 0, false, 60 * 24 * 3),
         ];

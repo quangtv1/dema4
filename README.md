@@ -6,6 +6,7 @@
 - **Tách văn bản** — tách hồ sơ PDF scan thành từng văn bản theo tờ index (mã vạch), bỏ trang trắng, gợi ý trang xoay.
 - **Sinh mục lục hồ sơ** — từ file biên mục Excel/CSV và mẫu DOCX, sinh mục lục cho từng hồ sơ.
 - **Bóc tách dữ liệu** — đọc văn bản PDF bằng mô hình AI (máy chủ nội bộ hoặc Gemini / Claude / GPT / OpenRouter) lấy số ký hiệu, ngày, trích yếu, tác giả, người ký…; ghi Excel và Google Sheet.
+- **Xóa ghim** — xoá vết ghim / kẹp / lỗ bấm / bóng mép trên PDF scan theo vùng góc, cạnh hoặc vẽ tay; giữ nét chữ, xem trước đúng như file xuất.
 - **Chuẩn hoá tên**, **Ký văn bản**, **Đóng gói AIP** — đang phát triển.
 
 Một file chạy duy nhất, không cần cài đặt. Tải ở [Releases](https://github.com/quangtv1/dema4/releases): `dema4_saomai.exe` (Windows x64) · `dema4_saomai` (macOS Apple Silicon). Trong app: **Trợ giúp › Kiểm tra cập nhật**.
@@ -15,6 +16,8 @@ Lần đầu mở (file chưa ký số với Apple / Microsoft):
 - **macOS**: **System Settings › Privacy & Security › Open Anyway**, hoặc `xattr -d com.apple.quarantine ~/Downloads/dema4_saomai && chmod +x ~/Downloads/dema4_saomai`.
 - **Windows** (SmartScreen): **More info › Run anyway**.
 - **Windows, mở không lên cửa sổ** (máy card Intel driver cũ): từ v2.2.2 app không còn dò Vulkan nên không còn crash ở `igvk64.dll`. Vẫn không lên → cập nhật driver card đồ hoạ, hoặc thử chạy trong PowerShell: `$env:WGPU_BACKEND="gl"; .\dema4_saomai.exe`.
+
+**Nâng cấp lên v2.5.0**: thêm chức năng **Xóa ghim** (ô trên Trang chủ, menu Chức năng). Lượt chạy Xóa ghim tính chung hạn mức với các chức năng khác. Phần Xóa ghim lưu ở file kho riêng `kho_xoa_ghim.bin`; dùng song song / quay về bản 2.4.1 không mất dữ liệu của bản này (bản 2.4.0 trở về trước gặp dòng Xóa ghim thì xoá trắng cả danh sách Làm tiếp gần đây và bỏ lượt Xóa ghim chưa gửi trạm — máy nào cần giữ bản cũ thì cập nhật lên 2.4.1 trở lên).
 
 **Nâng cấp lên v2.4.0**: phần đã làm ở Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) chuyển vào **1 kho theo nội dung từng PDF** — đổi tên / di chuyển thư mục, mở thư mục cha hay con, chép sang ổ khác vẫn thấy lại, tới từng file. Dữ liệu bản 2.3 tự chuyển vào kho lần đầu mở thư mục (file cũ giữ nguyên). Cùng 1 PDF ở nhiều chỗ dùng chung nhãn. Chỉ mở được 1 cửa sổ app.
 
@@ -26,7 +29,7 @@ Lần đầu mở (file chưa ký số với Apple / Microsoft):
 
 Mở app vào Trang chủ: bấm ô chức năng để bắt đầu (rê chuột xem tóm tắt). Về Trang chủ: menu **Chức năng › Trang chủ** hoặc bấm logo Sao Mai góc dưới phải màn giới thiệu.
 
-**Làm tiếp gần đây**: 5 thư mục / file vừa làm (Đếm, Tách, Mục lục, Bóc tách) kèm tình trạng lúc rời màn — bấm 1 dòng là mở lại đúng chức năng, đúng thư mục (Bóc tách: cả loại tài liệu; Mục lục: cả sheet, dòng tiêu đề, mẫu). Thư mục đã đổi chỗ → **Chọn lại…**; × bỏ 1 dòng, **Xoá lịch sử** bỏ hết. Cùng danh sách ở **Chức năng › Gần đây**.
+**Làm tiếp gần đây**: 5 thư mục / file vừa làm (Đếm, Tách, Mục lục, Bóc tách, Xóa ghim) kèm tình trạng lúc rời màn — bấm 1 dòng là mở lại đúng chức năng, đúng thư mục (Bóc tách: cả loại tài liệu; Mục lục: cả sheet, dòng tiêu đề, mẫu). Thư mục đã đổi chỗ → **Chọn lại…**; × bỏ 1 dòng, **Xoá lịch sử** bỏ hết. Cùng danh sách ở **Chức năng › Gần đây**.
 
 ![Trang chủ](docs/anh/trang-chu.png)
 
@@ -78,6 +81,18 @@ Mỗi trang cần đọc được gửi tới mô hình đọc đã chọn: máy
 
 ![Bóc tách: tab Kết quả bóc](docs/anh/boc-tach-ket-qua.png)
 
+## Xóa ghim
+
+Chọn (hoặc kéo thả) thư mục PDF scan → bật vùng **Có sẵn** (4 góc, 4 cạnh) hoặc **Vẽ vùng** (`V`) trên ảnh Gốc → xem **Gốc | Kết quả** → **Xóa ghim (n file)**.
+
+- **Vùng**: góc / cạnh có sẵn (kích thước theo điểm ảnh @120 dpi, tự co giãn theo DPI) hoặc vẽ tay. Loại: **Xoá**, **Bảo vệ** (không xoá gì trong vùng — chữ, số trang, dấu sát ghim), **Xoá vô đối** (xoá cả trong vùng bảo vệ). Phạm vi: **chung thư mục**, **riêng file**, **riêng trang**; áp mọi trang / lẻ / chẵn. Chọn vùng (`C`) để chỉnh kích thước, **ngưỡng** (nhỏ = xoá nhiều hơn), kéo thân / cạnh để di chuyển / đổi cỡ; `Delete` xoá, `Ctrl+Z` hoàn tác.
+- **Xem trước = file xuất**: ảnh Kết quả vẽ ở đúng DPI sẽ xuất bằng đúng bước xoá (chỉ khác ở nén JPEG). `[` `]` đổi file, `PageUp` / `PageDown` đổi trang, `Ctrl` + cuộn hoặc `+ - =` phóng (Gốc và Kết quả cuộn / phóng cùng nhau).
+- **Tuỳ chọn**: Bảo vệ nét đen (bật), Bảo vệ dấu đỏ / chữ ký xanh, Tô nền trắng, DPI xuất (Gốc = theo ảnh scan / 300 / 250 / 200 / 100 / 72), nén JPEG, Nén đen trắng.
+- **Kết quả**: `<tên nguồn>_xoaghim/` cạnh thư mục nguồn, giữ thư mục con và **tên file gốc**; file gốc không bị sửa; trang không có vùng chép nguyên. Chấm cạnh từng file: xanh = đã xoá, cam = đã đổi vùng / tuỳ chọn, đỏ = file kết quả mất, xám = chưa xoá; **Xóa ghim (n file)** chỉ chạy các file cần chạy, ▾ › **Chạy lại cả thư mục**. Chạy lại ghi đè kết quả cũ; không ghi đè kết quả của PDF khác trùng tên. Hộp kết quả: **Mở thư mục**, **Mở ở Tách**.
+- Vùng lưu tự động: chung theo thư mục (đổi tên thư mục → chọn lại), riêng theo nội dung từng PDF (đổi tên / di chuyển file vẫn còn); mang sang máy khác bằng **Xuất / Nhập phiên làm việc**. Nên **Xóa ghim trước** rồi mới gắn nhãn ở Tách (file kết quả là file mới). Xóa ghim chỉ tô lại vùng có vết — không phải công cụ che thông tin.
+
+![Xóa ghim](docs/anh/xoa-ghim.png)
+
 ## Cấu hình
 
 Menu **Cấu hình** (4 tab Đếm trang A4 / Tách PDF / Sinh mục lục / Bóc tách), lưu ở file `.dema4_saomai.cfg` trong thư mục dữ liệu.
@@ -97,9 +112,9 @@ Mọi dữ liệu làm việc (cấu hình, khoá API mã hoá, license, nhãn /
 - Windows: `%LOCALAPPDATA%\sm-dema4`
 - macOS: `~/Library/Application Support/sm-dema4`
 
-Phần Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) nằm trong **1 file kho** `kho_tach.bin`, khoá theo **nội dung từng PDF** (64 KB đầu + 64 KB cuối + kích thước) chứ không theo đường dẫn: đổi tên / di chuyển thư mục, mở thư mục cha hay con, chép sang ổ khác vẫn thấy lại phần đã làm của từng file, không phân tích lại. Cùng 1 PDF ở nhiều chỗ dùng chung nhãn. Trước khi **Tách**, app đọc lại nội dung từng file: file đã bị thay bản khác (cùng tên) không bị tách theo nhãn cũ. Kết quả Bóc tách vẫn ở `viec/<thư mục>/boc_tach.jsonl`, mỗi kết quả kèm id nội dung nên cũng tìm lại được khi đổi tên / di chuyển. Kho ghi nối từng thay đổi nhỏ (sửa 1 nhãn ghi vài chục byte), tắt máy giữa chừng không hỏng; **Cấu hình › Dọn dữ liệu cũ** bỏ phần đã làm của PDF không mở lại quá 12 tháng. Chỉ mở được 1 cửa sổ app (1 nơi ghi kho).
+Phần Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) nằm trong **1 file kho** `kho_tach.bin`, khoá theo **nội dung từng PDF** (64 KB đầu + 64 KB cuối + kích thước) chứ không theo đường dẫn: đổi tên / di chuyển thư mục, mở thư mục cha hay con, chép sang ổ khác vẫn thấy lại phần đã làm của từng file, không phân tích lại. Cùng 1 PDF ở nhiều chỗ dùng chung nhãn. Trước khi **Tách**, app đọc lại nội dung từng file: file đã bị thay bản khác (cùng tên) không bị tách theo nhãn cũ. Vùng + nhật ký Xóa ghim ở file kho riêng `kho_xoa_ghim.bin` (cùng cách ghi). Kết quả Bóc tách vẫn ở `viec/<thư mục>/boc_tach.jsonl`, mỗi kết quả kèm id nội dung nên cũng tìm lại được khi đổi tên / di chuyển. Kho ghi nối từng thay đổi nhỏ (sửa 1 nhãn ghi vài chục byte), tắt máy giữa chừng không hỏng; **Cấu hình › Dọn dữ liệu cũ** bỏ phần đã làm của PDF không mở lại quá 12 tháng. Chỉ mở được 1 cửa sổ app (1 nơi ghi kho).
 
-**Làm tiếp trên máy khác** (màn Tách hoặc Bóc tách, đã mở thư mục): **Chức năng › Xuất phiên làm việc…** đóng gói nhãn, góc xoay, cache phân tích và kết quả bóc tách của thư mục đó thành `<tên>.sm-dema4.zip` (mặc định vào thư mục Tải về; không có khoá API, license, cấu hình). Ở máy kia mở thư mục chứa các PDF đó — **cấp nào, tên gì cũng được**: khớp theo nội dung file — rồi **Chức năng › Nhập phiên làm việc…**: hộp xác nhận cho biết % PDF khớp, loại tài liệu mới; mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói), kết quả bóc tách đọc được không bị bản lỗi đè; báo cáo liệt kê hồ sơ hai máy cùng sửa. Nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, và để đồng hồ máy đúng giờ.
+**Làm tiếp trên máy khác** (màn Tách, Bóc tách hoặc Xóa ghim, đã mở thư mục): **Chức năng › Xuất phiên làm việc…** đóng gói nhãn, góc xoay, cache phân tích, kết quả bóc tách và vùng Xóa ghim của thư mục đó thành `<tên>.sm-dema4.zip` (mặc định vào thư mục Tải về; không có khoá API, license, cấu hình). Ở máy kia mở thư mục chứa các PDF đó — **cấp nào, tên gì cũng được**: khớp theo nội dung file — rồi **Chức năng › Nhập phiên làm việc…**: hộp xác nhận cho biết % PDF khớp, loại tài liệu mới; mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói), kết quả bóc tách đọc được không bị bản lỗi đè; báo cáo liệt kê hồ sơ hai máy cùng sửa. Nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, và để đồng hồ máy đúng giờ.
 
 ## Dòng lệnh
 

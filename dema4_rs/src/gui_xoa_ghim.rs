@@ -800,38 +800,41 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
-    /// Chụp màn Xóa ghim với 1 thư mục mẫu để xem bằng mắt:
-    /// `DEMA4_MAU_XG=<thư mục> DEMA4_ANH_XG=<file.png> cargo test chup_man_xoa_ghim -- --ignored`.
+    /// Chụp ảnh tài liệu màn Xóa ghim (thư mục PDF mẫu trung tính, không dữ liệu thật):
+    /// `DEMA4_MAU_XG=<thư mục> DEMA4_ANH=<thư mục ảnh> cargo test --release chup_man_xoa_ghim -- --ignored`
+    /// → `xoa-ghim.png` (màn chính, đang chọn vùng cạnh trái) + `xoa-ghim-xong.png` (hộp kết quả sau khi chạy).
     #[test]
-    #[ignore]
+    #[ignore = "cần GPU và thư mục mẫu"]
     fn chup_man_xoa_ghim() {
-        let (Some(mau), Some(f)) = (std::env::var_os("DEMA4_MAU_XG"), std::env::var_os("DEMA4_ANH_XG")) else { return };
+        let (Some(mau), Some(anh)) = (std::env::var_os("DEMA4_MAU_XG"), std::env::var_os("DEMA4_ANH")) else { return };
+        let anh = PathBuf::from(anh);
         let mut man = ManXoaGhim::default();
+        man.license = crate::license::KiemTra::gia(std::sync::Arc::new(crate::tram::KhoGia::moi(10)));
         man.mo_thu_muc(PathBuf::from(mau));
-        man.bo.them_ve((0.6, 0.05, 0.3, 0.06), LoaiVung::BaoVe, PhamVi::File, ApTrang::TatCa, 0);
-        man.phong = 1.5;
-        if std::env::var_os("DEMA4_CHAY_XG").is_some() {
-            man.license = crate::license::KiemTra::gia(std::sync::Arc::new(crate::tram::KhoGia::moi(10)));
-            for _ in 0..200 {
-                man.nhan_trang_thai();
-                if !man.tinh_trang.is_empty() {
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(20));
-            }
-            man.bam_chay(false);
+        if !man.bo.tm.vung.iter().any(|z| z.vi_tri == ViTri::CanhTrai) {
+            man.bo.bat_tat(ViTri::CanhTrai);
         }
+        man.bo.chon = man.bo.tm.vung.iter().position(|z| z.vi_tri == ViTri::CanhTrai).map(|i| (false, i));
+        man.bo.them_ve((0.62, 0.035, 0.3, 0.05), LoaiVung::BaoVe, PhamVi::File, ApTrang::TatCa, 0);
+        let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+        let m2 = man.clone();
         let mut da_cai = false;
-        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui(move |ui| {
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 760.0)).with_pixels_per_point(1.5).build_ui(move |ui| {
             if !std::mem::replace(&mut da_cai, true) {
                 crate::gui::cai_giao_dien(ui.ctx());
             }
-            man.ve(ui);
+            m2.borrow_mut().ve(ui);
         });
-        for _ in 0..100 {
-            h.run_steps(1);
-            std::thread::sleep(Duration::from_millis(50));
-        }
-        h.render().unwrap().save(f).unwrap();
+        let cho = |h: &mut egui_kittest::Harness, n: usize| {
+            for _ in 0..n {
+                h.run_steps(1);
+                std::thread::sleep(Duration::from_millis(40));
+            }
+        };
+        cho(&mut h, 80);
+        h.render().unwrap().save(anh.join("xoa-ghim.png")).unwrap();
+        man.borrow_mut().bam_chay(true);
+        cho(&mut h, 80);
+        h.render().unwrap().save(anh.join("xoa-ghim-xong.png")).unwrap();
     }
 }
