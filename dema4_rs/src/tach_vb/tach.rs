@@ -232,13 +232,33 @@ pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung
     Ok(kq)
 }
 
+/// Đường dẫn tuyệt đối chuẩn của `p`: chuẩn hoá phần đầu có thật trên đĩa rồi nối phần còn lại. Windows (NTFS không
+/// quy đổi NFC/NFD): đường dẫn dựng từ khoá NFC tới thư mục tên NFD "không tồn tại" — vẫn phải cùng dạng (`\\?\C:\…`)
+/// với đường dẫn thật để so sau khi NFC.
+fn chuan_hoa_mot_phan(p: &Path) -> PathBuf {
+    let mut con = Vec::new();
+    let mut dau = p;
+    loop {
+        if let Ok(c) = std::fs::canonicalize(dau) {
+            return con.iter().rev().fold(c, |d, t| d.join(t));
+        }
+        match (dau.parent(), dau.file_name()) {
+            (Some(cha), Some(ten)) => {
+                con.push(ten.to_os_string());
+                dau = cha;
+            }
+            _ => return p.to_path_buf(),
+        }
+    }
+}
+
 /// Ghép hồ sơ tìm thấy trong `thu_muc` với nhãn + góc xoay đọc từ file.
 /// `goc_nhan` = thư mục gốc để hiểu đường dẫn tương đối trong file nhãn; file xoay luôn tương đối với `thu_muc`.
 /// Trả hồ sơ + cảnh báo (dòng nhãn trỏ tới file không có trong thư mục).
 pub fn ghep_ho_so(pdf: &[PathBuf], nhan: super::nhan::BangNhan, goc_nhan: &Path, xoay: super::nhan::BangXoay, thu_muc: &Path) -> (Vec<HoSoTach>, Vec<String>) {
     use super::nhan::duong_dan_that;
     // Khớp theo đường dẫn tuyệt đối dạng NFC: khoá trong file nhãn đã NFC, tên trên đĩa (Drive trên Mac) có thể NFD
-    let chuan = |p: &Path| super::nhan::nfc(&std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf()).to_string_lossy());
+    let chuan = |p: &Path| super::nhan::nfc(&chuan_hoa_mot_phan(p).to_string_lossy());
     let mut theo_file: std::collections::HashMap<String, HoSoTach> = pdf.iter().map(|p| (chuan(p), HoSoTach { pdf: p.clone(), nhan: BTreeMap::new(), xoay: BTreeMap::new() })).collect();
     let mut canh_bao = Vec::new();
     for (p, n) in nhan {
