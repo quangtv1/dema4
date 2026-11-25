@@ -153,6 +153,19 @@ pub fn thong_ke_lo(phien: &PhienPhanTich, b: &BangTrang, cfg: &CauHinh) -> Optio
     Some(thong_ke_nguong::thong_ke(&trang, &xoay))
 }
 
+/// Vì sao nút Tách đang khoá (`None` = bấm được). Lỗi thư mục ra viết hoa chữ đầu để hiện thành câu.
+fn ly_do_khoa_tach(da_phan_tich: bool, dang_phan_tich: bool, ra: &Result<PathBuf, String>) -> Option<String> {
+    if !da_phan_tich {
+        return Some("Phân tích thư mục trước".into());
+    }
+    if dang_phan_tich {
+        return Some("Đang phân tích — chờ xong mới tách được".into());
+    }
+    let e = ra.as_ref().err()?;
+    let mut c = e.chars();
+    Some(c.next().map(|d| d.to_uppercase().chain(c).collect()).unwrap_or_default())
+}
+
 impl ManTach {
     /// Tổng cho dòng Thông tin (tính lại khi nhãn hoặc quy tắc quy A4 đổi).
     pub(super) fn tong_thong_tin(&mut self, quy_tac: &QuyTac) -> Option<TongVanBan> {
@@ -206,10 +219,15 @@ impl ManTach {
                 if nghi_trang + nghi_xoay > 0 {
                     goi_y += &format!(" · Phải duyệt hết Nghi trắng ({nghi_trang}) và Nghi xoay ({nghi_xoay}) trước khi tách");
                 }
-                let bat = self.da_phan_tich() && self.chay.is_none() && ra.is_ok();
+                let khoa = ly_do_khoa_tach(self.da_phan_tich(), self.chay.is_some(), &ra);
+                let bat = khoa.is_none();
                 let nut = nut_mau("Tách", if bat { XANH_LA } else { Color32::from_rgb(0xB8, 0xB8, 0xB8) }).min_size(egui::vec2(110.0, 28.0));
-                if ui.add_enabled(bat, nut).on_hover_text(&goi_y).on_disabled_hover_text(if self.da_phan_tich() { goi_y.as_str() } else { "Phân tích thư mục trước" }).clicked() {
+                if ui.add_enabled(bat, nut).on_hover_text(&goi_y).on_disabled_hover_text(khoa.as_deref().unwrap_or_default()).clicked() {
                     self.bam_tach(cfg);
+                }
+                // Lý do khoá hiện thẳng cạnh nút — người dùng không phải rê chuột mới biết vì sao không tách được
+                if let Some(ly_do) = &khoa {
+                    ui.add(egui::Label::new(egui::RichText::new(ly_do).color(DO)).truncate()).on_hover_text(ly_do);
                 }
             });
         });
@@ -507,6 +525,16 @@ impl ManTach {
 mod tests {
     use super::*;
     use crate::gui_tach::bang_trang::Nhom;
+
+    #[test]
+    fn ly_do_khoa_tach_theo_thu_tu() {
+        let ok = Ok(PathBuf::from("ra"));
+        let loi = Err("thư mục nguồn không có tên".to_string());
+        assert_eq!(ly_do_khoa_tach(false, false, &ok).as_deref(), Some("Phân tích thư mục trước"));
+        assert!(ly_do_khoa_tach(true, true, &ok).unwrap().starts_with("Đang phân tích"));
+        assert_eq!(ly_do_khoa_tach(true, false, &loi).as_deref(), Some("Thư mục nguồn không có tên"));
+        assert_eq!(ly_do_khoa_tach(true, false, &ok), None);
+    }
 
     fn cho_xong(man: &mut ManTach, ch: &crate::tach_vb::phan_tich::CauHinhPhanTich) {
         let bat_dau = Instant::now();
