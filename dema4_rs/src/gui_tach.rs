@@ -152,7 +152,7 @@ pub struct ManTach {
     vi_tri_loc: std::collections::HashMap<Loc, u32>,
     /// Nhãn đang chọn để duyệt Nghi trắng: (trang tiêu điểm, nhãn). I / C / S / B chọn, Enter áp.
     chon_nghi: Option<(u32, Nhan)>,
-    trang_thai: String,
+    pub(crate) trang_thai: String,
     so_cot: usize,
     /// Số hàng lưới thấy được (PageUp / PageDown dời đúng 1 vùng nhìn).
     so_hang_nhin: usize,
@@ -215,6 +215,10 @@ pub struct ManTach {
     /// Đang gõ ô thư mục (chưa quét cho tới khi gõ xong) / hộp chọn thư mục chạy luồng riêng (Windows).
     dang_go_tm: bool,
     chon_tm: Option<Receiver<Option<PathBuf>>>,
+    /// Mở lại thư mục từ đĩa ở lần vẽ tới (sau Nhập phiên).
+    cho_mo_lai: bool,
+    /// Hộp Xuất / Nhập phiên đang mở: tắt phím tắt (modal chỉ chặn chuột).
+    pub khoa_phim: bool,
 }
 
 /// Danh sách hồ sơ xem trước: thư mục đã quét, kết quả đang chờ, tên hiển thị + số trang (nếu có cache).
@@ -300,6 +304,8 @@ impl Default for ManTach {
             cuon_giua: false,
             dang_go_tm: false,
             chon_tm: None,
+            cho_mo_lai: false,
+            khoa_phim: false,
         }
     }
 }
@@ -733,9 +739,22 @@ impl ManTach {
         self.khong_ghi_cache = true;
     }
 
-    /// Sau Nhập phiên: mở lại thư mục từ đĩa (nhãn, cache, mốc vừa gộp), không bước lưu.
-    pub fn mo_lai_tu_dia(&mut self, ch: &CauHinhPhanTich) {
-        self.bat_dau(ch, false);
+    /// Thư mục dữ liệu màn Tách đang ghi vào (phiên đang mở, chưa có phiên thì ô thư mục) có trùng thư mục dữ liệu
+    /// của `goc` không — so cùng khoá với nơi ghi (chuẩn hoá đường dẫn, NFC, hoa/thường trên Windows), không so chữ thô.
+    pub fn cung_du_lieu(&self, goc: &Path) -> bool {
+        let dang = self.phien.as_ref().map_or_else(|| PathBuf::from(self.thu_muc.trim()), |p| p.goc.clone());
+        !dang.as_os_str().is_empty() && thu_muc_an(&dang) == thu_muc_an(goc)
+    }
+
+    /// Đang mở thư mục (đã Phân tích) — sau Nhập phiên cần mở lại từ đĩa.
+    pub fn co_phien(&self) -> bool {
+        self.phien.is_some()
+    }
+
+    /// Sau Nhập phiên: mở lại thư mục từ đĩa (nhãn, cache, mốc vừa gộp), không bước lưu — chạy khi màn Tách được vẽ
+    /// (sự kiện Phân tích chỉ nhận trong `ve`; mở lúc đang ở màn khác thì kẹt "đang phân tích").
+    pub fn mo_lai_tu_dia(&mut self) {
+        self.cho_mo_lai = true;
     }
 
     /// Ghi mốc sửa từng hồ sơ (gộp phiên giữa 2 máy: bản sửa sau cùng thắng) theo đúng nội dung **đã ghi xuống đĩa**.
@@ -1040,7 +1059,7 @@ impl ManTach {
 
     /// Phím tắt tab Hồ sơ (khi không gõ chữ).
     fn phim_tat(&mut self, ctx: &egui::Context) -> Vec<Viec> {
-        if ctx.egui_wants_keyboard_input() || self.bang.is_none() || self.tab != Tab::HoSo || self.phong_to.is_some() {
+        if self.khoa_phim || ctx.egui_wants_keyboard_input() || self.bang.is_none() || self.tab != Tab::HoSo || self.phong_to.is_some() {
             return Vec::new();
         }
         let mut viec = Vec::new();
@@ -1144,6 +1163,10 @@ impl ManTach {
     // ---- Vẽ ----
 
     pub fn ve(&mut self, ui: &mut egui::Ui, cfg: &mut CauHinh) {
+        if self.cho_mo_lai && self.chay.is_none() && self.tach.is_none() {
+            self.cho_mo_lai = false;
+            self.bat_dau(&cfg.cau_hinh_phan_tich(), false);
+        }
         let ctx = ui.ctx().clone();
         let ch = cfg.cau_hinh_phan_tich();
         self.nhan_su_kien(&ch, Some(&ctx));
@@ -2799,11 +2822,28 @@ mod tests {
         man.ghi_cache();
         man.luu_nhan();
         assert_eq!(std::fs::read_to_string(thu_muc_an(&goc).join("index_and_blank.txt")).unwrap(), "a.pdf;3;index\n");
-        man.mo_lai_tu_dia(&ch);
+        man.mo_lai_tu_dia();
+        assert!(!man.dang_chay(), "chưa vẽ màn Tách → chưa mở (không kẹt đang phân tích khi ở màn khác)");
+        man.cho_mo_lai = false;
+        man.bat_dau(&ch, false);
         cho(&mut man);
         let b = man.bang.as_ref().expect("mở lại từ đĩa → có bảng (nút Tách dùng được)");
         assert_eq!((b.trang[2].nhan(), b.trang[1].nhan()), (Nhan::Index, Nhan::NoiDung), "thấy nhãn vừa nhập");
         let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Xuất / Nhập so thư mục theo khoá dữ liệu (NFC, dấu `/` cuối, phiên đang mở) — không so chữ thô.
+    #[test]
+    fn cung_du_lieu_theo_khoa_thu_muc_an() {
+        use unicode_normalization::UnicodeNormalization;
+        let goc = std::env::temp_dir().join(format!("dema4_cung_dl_{}_Hồ sơ", std::process::id()));
+        std::fs::create_dir_all(&goc).unwrap();
+        let nfd: String = goc.display().to_string().nfd().collect();
+        let man = ManTach { thu_muc: format!("{nfd}/"), ..Default::default() };
+        assert!(man.cung_du_lieu(&goc), "NFD + `/` cuối vẫn cùng thư mục dữ liệu");
+        assert!(!man.cung_du_lieu(&goc.with_file_name("khac")));
+        assert!(!ManTach::default().cung_du_lieu(&goc), "chưa chọn thư mục");
         let _ = std::fs::remove_dir_all(&goc);
     }
 

@@ -124,6 +124,8 @@ struct UngDungChinh {
     bao_goc_tam: bool,
     /// Xuất / Nhập phiên làm việc (menu Chức năng).
     hop_phien: crate::gui_phien::HopPhien,
+    /// Lúc nhập, màn Tách đang mở đúng thư mục → nhập xong mở lại từ đĩa.
+    mo_lai_tach_sau_nhap: bool,
     cho_dong: bool,
 }
 
@@ -138,7 +140,7 @@ impl Default for UngDungChinh {
         let mut boc_tach = crate::gui_boc_tach::ManBocTach::default();
         boc_tach.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, cho_dong: false }
     }
 }
 
@@ -190,11 +192,14 @@ impl UngDungChinh {
         Some(PathBuf::from(tm.trim())).filter(|p| !tm.trim().is_empty() && p.is_dir())
     }
 
-    /// Màn Tách đang mở đúng thư mục `goc` → ghi nhãn chưa lưu, cờ duyệt, mốc xuống đĩa (Bóc tách ghi từng bản ghi ngay).
-    fn ghi_xuong_dia_neu_dang_mo(&mut self, goc: &Path) {
-        if Path::new(self.tach.thu_muc.trim()) == goc {
+    /// Màn Tách đang ghi vào thư mục dữ liệu của `goc` → ghi nhãn chưa lưu, cờ duyệt, mốc xuống đĩa
+    /// (Bóc tách ghi từng bản ghi ngay). Trả `false` khi còn nhãn chưa lưu được (lỗi ghi).
+    fn ghi_xuong_dia_neu_dang_mo(&mut self, goc: &Path) -> bool {
+        if self.tach.cung_du_lieu(goc) {
             self.tach.ghi_het_xuong_dia();
+            return !self.tach.chua_luu();
         }
+        true
     }
 
     /// Hộp Xuất / Nhập phiên và việc sau đó: trước khi nhập thì ghi xuống đĩa + bỏ phiên Tách đang mở (không lưu lại);
@@ -203,18 +208,23 @@ impl UngDungChinh {
         use crate::gui_phien::HanhDong;
         match self.hop_phien.ve(ctx) {
             Some(HanhDong::XacNhanNhap { goc, zip }) => {
-                self.ghi_xuong_dia_neu_dang_mo(&goc);
-                if Path::new(self.tach.thu_muc.trim()) == goc {
+                if !self.ghi_xuong_dia_neu_dang_mo(&goc) {
+                    self.hop_phien.bao_loi(format!("Không lưu được nhãn đang sửa của thư mục này ({}) — chưa nhập gì. Sửa lỗi ghi rồi nhập lại.", self.tach.trang_thai));
+                    return;
+                }
+                self.mo_lai_tach_sau_nhap = self.tach.cung_du_lieu(&goc) && self.tach.co_phien();
+                if self.tach.cung_du_lieu(&goc) {
                     self.tach.bo_phien_khong_luu();
                 }
                 self.hop_phien.nhap(goc, zip, ctx);
             }
             Some(HanhDong::DaNhap { goc }) => {
-                if Path::new(self.tach.thu_muc.trim()) == goc {
-                    self.tach.mo_lai_tu_dia(&self.cfg.cau_hinh_phan_tich());
+                if std::mem::take(&mut self.mo_lai_tach_sau_nhap) {
+                    self.tach.mo_lai_tu_dia();
                 }
                 self.boc_tach.ds_loai = crate::boc_tach::loai_tai_lieu::doc(&crate::boc_tach::loai_tai_lieu::file_mac_dinh());
-                if Path::new(self.boc_tach.thu_muc.trim()) == goc {
+                let an = crate::tach_vb::du_lieu_an::thu_muc_an;
+                if !self.boc_tach.thu_muc.trim().is_empty() && an(Path::new(self.boc_tach.thu_muc.trim())) == an(&goc) {
                     self.boc_tach.nap_ket_qua();
                 }
             }
@@ -243,7 +253,8 @@ impl UngDungChinh {
         use crate::gui_tach::khung_hop as kh;
         let viec = self.viec_dang_chay().mo_ta().unwrap_or_else(|| "xử lý".into());
         kh::hop(ctx, "hoi_dong_chay", 360.0, "Đang xử lý", |ui| {
-            kh::than_chu(ui, &format!("Đang {viec}. Thoát ngay thì phần đang làm dở sẽ mất; nên bấm *Dừng*, đợi xong rồi mới thoát."));
+            let khuyen = if self.hop_phien.dang_chay() { "nên đợi xong rồi mới thoát" } else { "nên bấm *Dừng*, đợi xong rồi mới thoát" };
+            kh::than_chu(ui, &format!("Đang {viec}. Thoát ngay thì phần đang làm dở sẽ mất; {khuyen}."));
             kh::chan(ui, |ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui.add(kh::nut_chan_mau("Thoát luôn", DO)).clicked() {
@@ -385,8 +396,11 @@ impl UngDungChinh {
                         ui.add_enabled_ui(goc.is_some(), |ui| {
                             if muc_menu_day(ui, BieuTuong::TaiLieu, "Xuất phiên làm việc…", false, None, 190.0).on_disabled_hover_text(ly_do).clicked() {
                                 if let Some(g) = goc.clone() {
-                                    self.ghi_xuong_dia_neu_dang_mo(&g);
-                                    self.hop_phien.xuat(g, ui.ctx());
+                                    if self.ghi_xuong_dia_neu_dang_mo(&g) {
+                                        self.hop_phien.xuat(g, ui.ctx());
+                                    } else {
+                                        self.hop_phien.bao_loi(format!("Không lưu được nhãn đang sửa ({}) — chưa xuất. Sửa lỗi ghi rồi xuất lại.", self.tach.trang_thai));
+                                    }
                                 }
                                 ui.close();
                             }
@@ -464,6 +478,7 @@ impl eframe::App for UngDungChinh {
         if self.tro_giup.is_none() && self.hop_cau_hinh.is_none() && ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(self.tab_huong_dan()));
         }
+        self.tach.khoa_phim = self.hop_phien.dang_mo();
         self.thanh_menu(ui);
         match self.man {
             Man::TrangChu => {
