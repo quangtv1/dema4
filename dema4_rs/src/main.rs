@@ -50,7 +50,10 @@ fn main() {
             }
             let kt = license::KiemTra::mac_dinh();
             kt.mo_app();
-            let ma = if thu_muc == "--tach" {
+            let ma = if thu_muc == "--tach" && !tach_vb::kho::giu_khoa_ung_dung() {
+                eprintln!("Ứng dụng đang mở (hoặc lệnh --tach khác đang chạy) — đóng ứng dụng rồi chạy lại lệnh.");
+                4
+            } else if thu_muc == "--tach" {
                 chay_tach(&kt, &std::env::args().skip(2).collect::<Vec<_>>())
             } else {
                 let khong_ghi = std::env::args().any(|a| a == "--khong-ghi");
@@ -63,6 +66,18 @@ fn main() {
             std::process::exit(ma);
         }
         None => {
+            // Chỉ 1 cửa sổ app (1 tiến trình ghi kho dữ liệu)
+            if !tach_vb::kho::giu_khoa_ung_dung() {
+                rfd::MessageDialog::new().set_title("Sao Mai").set_description("Ứng dụng đang mở ở cửa sổ khác.").set_level(rfd::MessageLevel::Info).show();
+                return;
+            }
+            // Dọn kho (bỏ bản ghi cũ đã bị thay) khi cần — ở luồng nền, không chậm lúc mở
+            std::thread::spawn(|| {
+                let mut k = tach_vb::kho::kho();
+                if k.nen_don() {
+                    let _ = k.nen();
+                }
+            });
             if let Err(e) = gui::chay() {
                 let chu = format!("Không mở được giao diện: {e}\n\nThử cập nhật driver card đồ hoạ, hoặc chạy với biến môi trường WGPU_BACKEND=gl.");
                 eprintln!("{chu}");
@@ -147,65 +162,88 @@ fn chay_dong_lenh(kt: &license::KiemTra, thu_muc: &str, kiem_tra_dpi: bool, kiem
     }
 }
 
-/// `--tach <thư mục pdf> [--nhan <file>] [--ra <thư mục cha>]`: cắt theo nhãn có sẵn (không phân tích).
-/// Nhãn mặc định `index_and_blank.txt`, góc xoay `xoay_trang.txt` (nếu có) trong thư mục dữ liệu ẩn của `<thư mục>`.
+/// `--tach <thư mục pdf> [--nhan <file>] [--xuat-nhan <file>] [--ra <thư mục cha>]`: cắt theo nhãn có sẵn.
+/// Nhãn + góc xoay lấy từ kho theo nội dung từng PDF (chưa có gì → phân tích tự động, ghi vào kho); `--nhan` = đọc
+/// file nhãn dạng chữ ngoài; `--xuat-nhan` = ghi nhãn trong kho ra file chữ rồi dừng (không tách).
 fn chay_tach(kt: &license::KiemTra, tham_so: &[String]) -> i32 {
     use std::path::{Path, PathBuf};
-    use tach_vb::{nhan, tach};
+    use tach_vb::{kho, nhan, tach};
     let mut thu_muc: Option<PathBuf> = None;
-    let (mut file_nhan, mut cha_ra): (Option<PathBuf>, Option<PathBuf>) = (None, None);
+    let (mut file_nhan, mut xuat_nhan, mut cha_ra): (Option<PathBuf>, Option<PathBuf>, Option<PathBuf>) = (None, None, None);
     let mut i = 0;
     while i < tham_so.len() {
         match tham_so[i].as_str() {
             "--nhan" => { file_nhan = tham_so.get(i + 1).map(PathBuf::from); i += 1; }
+            "--xuat-nhan" => { xuat_nhan = tham_so.get(i + 1).map(PathBuf::from); i += 1; }
             "--ra" => { cha_ra = tham_so.get(i + 1).map(PathBuf::from); i += 1; }
             khac => thu_muc = Some(PathBuf::from(khac)),
         }
         i += 1;
     }
     let Some(thu_muc) = thu_muc.filter(|p| p.is_dir()) else {
-        eprintln!("Cách dùng: dema4_saomai --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]\nThiếu thư mục PDF hoặc thư mục không tồn tại.");
+        eprintln!("Cách dùng: dema4_saomai --tach <thư mục pdf> [--nhan <file nhãn>] [--xuat-nhan <file>] [--ra <thư mục cha>]\nThiếu thư mục PDF hoặc thư mục không tồn tại.");
         return 2;
     };
     let thu_muc = std::fs::canonicalize(&thu_muc).unwrap_or(thu_muc);
     tach_vb::du_lieu_an::chuyen_du_lieu_cu(&thu_muc);
     let an = tach_vb::phien::thu_muc_an(&thu_muc);
-    let co_nhan_rieng = file_nhan.is_some();
-    let file_nhan = file_nhan.unwrap_or_else(|| an.join("index_and_blank.txt"));
-    if !co_nhan_rieng && !file_nhan.exists() {
-        // Chưa có nhãn: phân tích tự động (Cấu hình mặc định) rồi ghi index_and_blank.txt để kiểm tra
-        println!("Chưa có {} — phân tích tự động…", file_nhan.display());
-        let ch = tach_vb::phan_tich::CauHinhPhanTich::default();
-        let phien = tach_vb::phien::phan_tich_thu_muc(&thu_muc, &ch, &|xong, tong| {
-            if xong % 500 == 0 || xong == tong { eprintln!("  {xong}/{tong} trang"); }
-        });
-        let bang = phien.bang_nhan_tu_dong(&ch);
-        if let Err(e) = std::fs::create_dir_all(&an).and_then(|_| std::fs::write(&file_nhan, nhan::ghi_file_nhan(&bang))) {
-            eprintln!("Không ghi được {}: {e}", file_nhan.display());
-            return 1;
-        }
-        let _ = tach_vb::moc_sua::cap_nhat(&an.join(tach_vb::moc_sua::TEN_FILE), &tach_vb::moc_sua::chu_ky_tu_nhan(&bang), tach_vb::moc_sua::bay_gio_ms());
-    }
-    let Ok(noi_dung) = std::fs::read_to_string(&file_nhan) else {
-        eprintln!("Không đọc được file nhãn {}", file_nhan.display());
-        return 2;
-    };
-    let goc_nhan = if file_nhan.starts_with(&an) { thu_muc.clone() } else { file_nhan.parent().map(Path::to_path_buf).unwrap_or_else(|| thu_muc.clone()) };
-    let bang_nhan = match nhan::doc_file_nhan(&noi_dung, &|_| None) {
-        Ok((b, cb)) => { cb.iter().for_each(|c| eprintln!("Cảnh báo: {c}")); b }
-        Err(loi) => { loi.iter().for_each(|l| eprintln!("{}: dòng {}: {}", file_nhan.display(), l.dong, l.ly_do)); return 1; }
-    };
-    let file_xoay = an.join("xoay_trang.txt");
-    let bang_xoay = match std::fs::read_to_string(&file_xoay) {
-        Err(_) => Default::default(),
-        Ok(nd) => match nhan::doc_file_xoay(&nd, &|_| None) {
-            Ok(b) => b,
-            Err(loi) => { loi.iter().for_each(|l| eprintln!("{}: dòng {}: {}", file_xoay.display(), l.dong, l.ly_do)); return 1; }
-        },
-    };
     let (gui, _nhan_su_kien) = mpsc::channel();
     let pdf = dem_pdf::tim_file_pdf(&thu_muc.to_string_lossy(), &AtomicBool::new(false), &gui);
-    let (ho_so, canh_bao) = tach::ghep_ho_so(&pdf, bang_nhan, &goc_nhan, bang_xoay, &thu_muc);
+    let (ho_so, canh_bao) = if let Some(file_nhan) = &file_nhan {
+        // File nhãn dạng chữ ngoài: đường dẫn trong file tương đối với thư mục chứa file
+        let Ok(noi_dung) = std::fs::read_to_string(file_nhan) else {
+            eprintln!("Không đọc được file nhãn {}", file_nhan.display());
+            return 2;
+        };
+        let bang_nhan = match nhan::doc_file_nhan(&noi_dung, &|_| None) {
+            Ok((b, cb)) => { cb.iter().for_each(|c| eprintln!("Cảnh báo: {c}")); b }
+            Err(loi) => { loi.iter().for_each(|l| eprintln!("{}: dòng {}: {}", file_nhan.display(), l.dong, l.ly_do)); return 1; }
+        };
+        let goc_nhan = file_nhan.parent().map(Path::to_path_buf).unwrap_or_else(|| thu_muc.clone());
+        tach::ghep_ho_so(&pdf, bang_nhan, &goc_nhan, Default::default(), &thu_muc)
+    } else {
+        let ids = kho::ids_cua(&pdf);
+        tach_vb::chuyen_kho::chuyen(&thu_muc, &pdf, &ids);
+        let co_nhan = { let mut k = kho::kho(); ids.iter().flatten().any(|id| k.tach(*id).is_some_and(|b| !b.bia_mo)) };
+        if !co_nhan && xuat_nhan.is_none() {
+            // Chưa có nhãn: phân tích tự động (Cấu hình mặc định), ghi nhãn tự động vào kho
+            println!("Chưa có nhãn — phân tích tự động…");
+            let ch = tach_vb::phan_tich::CauHinhPhanTich::default();
+            let phien = tach_vb::phien::phan_tich_thu_muc(&thu_muc, &ch, &|xong, tong| {
+                if xong % 500 == 0 || xong == tong { eprintln!("  {xong}/{tong} trang"); }
+            });
+            let bang = phien.bang_nhan_tu_dong(&ch);
+            let bay_gio = tach_vb::moc_sua::bay_gio_ms();
+            let mut k = kho::kho();
+            for h in &phien.ho_so {
+                let (Some(id), None) = (h.id, &h.loi) else { continue };
+                let n = bang.get(&h.tuong_doi).cloned().unwrap_or_default();
+                let chu_ky = kho::chu_ky_tach(&n, &Default::default(), &Default::default());
+                k.them_tach(id, &kho::BanTach { so_trang: h.trang.len() as u32, nhan: n, luc: bay_gio, chu_ky, ..Default::default() });
+            }
+            if let Err(e) = k.day() {
+                eprintln!("Không ghi được nhãn vào kho: {e}");
+                return 1;
+            }
+        }
+        let mut k = kho::kho();
+        let ho_so: Vec<tach::HoSoTach> = pdf
+            .iter()
+            .zip(&ids)
+            .map(|(p, id)| {
+                let bt = id.and_then(|id| k.tach(id)).filter(|b| !b.bia_mo).unwrap_or_default();
+                tach::HoSoTach { pdf: p.clone(), nhan: bt.nhan, xoay: bt.xoay.into_iter().filter(|(_, x)| x.goc != 0).collect(), id: *id }
+            })
+            .collect();
+        (ho_so, Vec::new())
+    };
+    if let Some(f) = &xuat_nhan {
+        let bang: nhan::BangNhan = ho_so.iter().filter(|h| !h.nhan.is_empty()).map(|h| (nhan::duong_dan_ghi(&thu_muc, &h.pdf), h.nhan.clone())).collect();
+        return match std::fs::write(f, nhan::ghi_file_nhan(&bang)) {
+            Ok(()) => { println!("Đã ghi nhãn {} hồ sơ ra {}", bang.len(), f.display()); 0 }
+            Err(e) => { eprintln!("Không ghi được {}: {e}", f.display()); 1 }
+        };
+    }
     canh_bao.iter().for_each(|c| eprintln!("Cảnh báo: {c}"));
     let ra = match tach::thu_muc_ra(&thu_muc, cha_ra.as_deref()) {
         Ok(r) => r,
@@ -320,12 +358,16 @@ mod tests {
         std::fs::create_dir_all(&nguon).unwrap();
         crate::tach_vb::tach::tests::tao_pdf(&nguon.join("b.pdf"), 3);
         assert_eq!(chay_tach(&kt(), &[nguon.to_string_lossy().into_owned()]), 0);
-        let an = crate::tach_vb::phien::thu_muc_an(&nguon);
-        let nhan = std::fs::read_to_string(an.join("index_and_blank.txt")).unwrap();
-        assert_eq!(nhan.lines().count(), 3, "3 trang chữ nhỏ → blank: {nhan}");
-        assert!(an.join("cache").is_dir());
-        let moc = crate::tach_vb::moc_sua::doc(&an.join(crate::tach_vb::moc_sua::TEN_FILE));
-        assert!(moc.contains_key("b.pdf"), "dòng lệnh phân tích tự động cũng ghi mốc sửa: {moc:?}");
+        let id = crate::tach_vb::kho::ids_cua(&[nguon.join("b.pdf")])[0].unwrap();
+        let mut k = crate::tach_vb::kho::kho();
+        let bt = k.tach(id).expect("nhãn tự động ghi vào kho");
+        assert_eq!(bt.nhan.len(), 3, "3 trang chữ nhỏ → blank: {bt:?}");
+        assert!(bt.luc > 0 && k.phan_tich(id).is_some(), "có mốc + kết quả phân tích");
+        drop(k);
+        // Xuất nhãn trong kho ra file chữ
+        let f = goc.join("nhan.txt");
+        assert_eq!(chay_tach(&kt(), &[nguon.to_string_lossy().into_owned(), "--xuat-nhan".into(), f.to_string_lossy().into_owned()]), 0);
+        assert_eq!(std::fs::read_to_string(&f).unwrap().lines().count(), 3);
         assert!(!nguon.join(".sm-dema4").exists(), "không ghi gì vào thư mục đầu vào");
         let _ = std::fs::remove_dir_all(&goc);
     }

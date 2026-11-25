@@ -72,6 +72,8 @@ pub struct HopCauHinh {
     /// Thư mục đang mở còn cache phân tích (bật nút Xoá cache); `xoa_cache` = vừa bấm, app xoá rồi cập nhật `co_cache`.
     pub co_cache: bool,
     pub xoa_cache: bool,
+    /// Vừa bấm "Dọn dữ liệu cũ" (PDF không thấy lại quá 12 tháng).
+    pub don_cu: bool,
     pub bt: crate::gui_boc_tach::cau_hinh::TabBocTach,
     /// Khoá API / bí mật Bóc tách đang sửa (app nạp vào khi mở, lấy ra khi Lưu; không nằm trong `CauHinh`).
     pub khoa: std::collections::BTreeMap<String, String>,
@@ -154,6 +156,7 @@ impl HopCauHinh {
             tay_chon: None,
             co_cache: false,
             xoa_cache: false,
+            don_cu: false,
             bt: crate::gui_boc_tach::cau_hinh::TabBocTach::moi(&cfg.boc_tach),
             khoa: Default::default(),
         };
@@ -202,7 +205,13 @@ impl HopCauHinh {
         let phan_hoi = kh::hop(ctx, "hop_cau_hinh", rong, "Cấu hình", |ui| {
             let co_cache = self.co_cache;
             let mut bam_xoa = false;
+            let mut bam_don = false;
             kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF"), (TabCauHinh::MucLuc, "Sinh mục lục"), (TabCauHinh::BocTach, "Bóc tách")], &mut self.tab, |ui| {
+                let nut_don = egui::Button::new(RichText::new("Dọn dữ liệu cũ").size(12.0)).min_size(egui::vec2(0.0, 22.0));
+                bam_don = ui
+                    .add(nut_don)
+                    .on_hover_text("Bỏ phần đã làm (nhãn, kết quả phân tích, con trỏ kết quả bóc tách) của các PDF không mở lại quá 12 tháng, rồi thu gọn kho dữ liệu. Không đụng file PDF và file kết quả Excel.")
+                    .clicked();
                 // Canh phải, thẳng hàng 2 tab: chỉ bấm được khi thư mục đang mở còn cache
                 let nut = egui::Button::new(RichText::new("Xoá cache").size(12.0)).min_size(egui::vec2(0.0, 22.0));
                 bam_xoa = ui
@@ -213,6 +222,9 @@ impl HopCauHinh {
             });
             if bam_xoa {
                 self.xoa_cache = true;
+            }
+            if bam_don {
+                self.don_cu = true;
             }
             kh::than(ui, "than_cau_hinh", CAO_THAN, Margin { left: 20, right: 20, top: 16, bottom: 8 }, |ui| match self.tab {
                 TabCauHinh::Tach => self.tab_tach(ui),

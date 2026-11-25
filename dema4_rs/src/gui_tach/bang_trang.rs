@@ -472,22 +472,22 @@ impl BangTrang {
     /// mục; hồ sơ không còn gì → `CHU_KY_RONG` (bia mộ nếu trước đó từng có).
     /// `bo_co_duyet`: bỏ cờ duyệt khỏi chữ ký (sau Xoá cache — cờ duyệt chỉ nằm trong cache).
     pub fn chu_ky_ho_so(&self, bo_co_duyet: bool) -> BTreeMap<String, u64> {
-        use std::fmt::Write;
-        let mut nd: BTreeMap<String, String> = self.ho_so.iter().map(|k| (k.clone(), String::new())).collect();
+        type Ban = (BTreeMap<usize, Nhan>, BTreeMap<usize, Xoay>, BTreeMap<usize, u8>);
+        let mut ban: Vec<Ban> = vec![Default::default(); self.ho_so.len()];
         for t in &self.trang {
-            let s = nd.entry(self.ho_so[t.ho_so as usize].clone()).or_default();
-            if let Some(c) = t.nhan().chu() {
-                let _ = write!(s, "n{}:{c};", t.so);
+            let (n, x, d) = &mut ban[t.ho_so as usize];
+            if t.nhan() != Nhan::NoiDung {
+                n.insert(t.so as usize, t.nhan());
             }
             let xac_nhan = t.sua.co & CO_XAC_NHAN != 0;
             if t.sua.goc != 0 || xac_nhan {
-                let _ = write!(s, "x{}:{}:{};", t.so, t.sua.goc, xac_nhan as u8);
+                x.insert(t.so as usize, Xoay { goc: t.sua.goc, xac_nhan });
             }
             if !bo_co_duyet && t.trang_thai_cache() != 0 {
-                let _ = write!(s, "d{}:{};", t.so, t.trang_thai_cache());
+                d.insert(t.so as usize, t.trang_thai_cache());
             }
         }
-        nd.into_iter().map(|(k, v)| (k, crate::tach_vb::moc_sua::chu_ky(&v))).collect()
+        self.ho_so.iter().zip(ban).map(|(k, (n, x, d))| (k.clone(), crate::tach_vb::kho::chu_ky_tach(&n, &x, &d))).collect()
     }
 
     /// Góc xoay + xác nhận (ghi `xoay_trang.txt`).
@@ -507,20 +507,22 @@ impl BangTrang {
     /// Dựng bảng từ phiên phân tích. Mở lại thư mục: nhãn trong file khác nhãn tự động → là sửa tay
     /// (trang có kết quả mà file không ghi nhãn → người đã bỏ nhãn); góc + xác nhận từ file xoay;
     /// cờ duyệt (giữ nội dung, đã xoá, đang chỉnh) từ cache.
-    pub fn tu_phien(phien: &PhienPhanTich, ch: &CauHinhPhanTich, nhan_file: Option<&BangNhan>, xoay_file: Option<&BangXoay>) -> Self {
+    /// `nhan_luu`: nhãn đã lưu **của từng hồ sơ có bản lưu** (hồ sơ có mục = nhãn của nó là nhãn người duyệt, kể cả
+    /// trang không ghi = Nội dung); hồ sơ không có mục → nhãn tự động.
+    pub fn tu_phien(phien: &PhienPhanTich, ch: &CauHinhPhanTich, nhan_luu: &BangNhan, xoay_luu: &BangXoay) -> Self {
         let mut trang = Vec::new();
         for (h, hs) in phien.ho_so.iter().enumerate() {
-            let nf = nhan_file.and_then(|b| b.get(&hs.tuong_doi));
-            let xf = xoay_file.and_then(|b| b.get(&hs.tuong_doi));
+            let nf = nhan_luu.get(&hs.tuong_doi);
+            let xf = xoay_luu.get(&hs.tuong_doi);
             for (i, tc) in hs.trang.iter().enumerate() {
                 let so = i + 1;
                 let tu_dong = tc.ket_qua.as_ref().map(|kq| gan_nhan(kq, ch));
-                let tay = match (nhan_file, tu_dong) {
-                    (Some(_), Some(td)) => {
-                        let trong_file = nf.and_then(|m| m.get(&so)).copied().unwrap_or(Nhan::NoiDung);
-                        (trong_file != td.nhan).then_some(trong_file)
+                let tay = match (nf, tu_dong) {
+                    (Some(m), Some(td)) => {
+                        let da_luu = m.get(&so).copied().unwrap_or(Nhan::NoiDung);
+                        (da_luu != td.nhan).then_some(da_luu)
                     }
-                    (Some(_), None) => nf.and_then(|m| m.get(&so)).copied(),
+                    (Some(m), None) => m.get(&so).copied(),
                     _ => None,
                 };
                 let x = xf.and_then(|m| m.get(&so));
@@ -539,6 +541,13 @@ impl BangTrang {
             if let Some(kq) = phien.ho_so[t.ho_so as usize].trang[t.so as usize - 1].ket_qua.as_ref() {
                 self.dat_tu_dong(k, gan_nhan(kq, ch));
             }
+        }
+    }
+
+    /// Bỏ cờ duyệt mọi trang (Xoá cache: cờ duyệt đi cùng kết quả phân tích).
+    pub fn bo_co_duyet(&mut self) {
+        for t in &mut self.trang {
+            t.sua.co &= !BIT_CACHE;
         }
     }
 
@@ -821,11 +830,11 @@ mod tests {
         let kq = |v: f32| Some(KetQuaTrang { chi_so: Some(ChiSoTrang { dam: v, mau: 0.0 }), ..Default::default() });
         // 5 trang: Trắng, Nghi trắng, nội dung, nội dung, chưa phân tích
         let trang: Vec<TrangCache> = [kq(0.001), kq(0.02), kq(0.2), kq(0.2), None].into_iter().map(|ket_qua| TrangCache { ket_qua, ..Default::default() }).collect();
-        let mut phien = PhienPhanTich { goc: "/x".into(), ho_so: vec![HoSoPhanTich { pdf: "/x/a.pdf".into(), tuong_doi: "a.pdf".into(), khoa: None, trang, loi: None }] };
+        let mut phien = PhienPhanTich { goc: "/x".into(), ho_so: vec![HoSoPhanTich { pdf: "/x/a.pdf".into(), tuong_doi: "a.pdf".into(), id: None, doi: false, trang, loi: None }] };
         phien.ho_so[0].trang[3].trang_thai = CO_DA_XOA;
         let ch = CauHinhPhanTich { quet_ma: false, quet_xoay: false, ..Default::default() };
         // Không có file nhãn: toàn nhãn tự động
-        let b = BangTrang::tu_phien(&phien, &ch, None, None);
+        let b = BangTrang::tu_phien(&phien, &ch, &Default::default(), &Default::default());
         assert_eq!(b.trang.iter().map(|t| t.nhan()).collect::<Vec<_>>(), [Nhan::Trang, Nhan::NoiDung, Nhan::NoiDung, Nhan::NoiDung, Nhan::NoiDung]);
         assert!(b.trang[1].nghi_trang() && b.trang[3].da_xoa());
         // File nhãn: trang 1 người bỏ Trắng, trang 3 gán Index, trang 5 (chưa phân tích) Split; trang 2 đã duyệt → Trắng
@@ -833,7 +842,7 @@ mod tests {
         nf.entry("a.pdf".into()).or_default().extend([(2, Nhan::Trang), (3, Nhan::Index), (5, Nhan::Split)]);
         let mut xf = BangXoay::new();
         xf.entry("a.pdf".into()).or_default().extend([(3, Xoay { goc: 90, xac_nhan: false }), (4, Xoay { goc: 0, xac_nhan: true })]);
-        let mut b = BangTrang::tu_phien(&phien, &ch, Some(&nf), Some(&xf));
+        let mut b = BangTrang::tu_phien(&phien, &ch, &nf, &xf);
         assert_eq!(b.trang.iter().map(|t| t.sua.tay).collect::<Vec<_>>(), [Some(Nhan::NoiDung), Some(Nhan::Trang), Some(Nhan::Index), None, Some(Nhan::Split)]);
         assert_eq!(b.bang_nhan(), nf, "khứ hồi file nhãn");
         assert_eq!(b.bang_xoay(), xf, "khứ hồi file xoay");

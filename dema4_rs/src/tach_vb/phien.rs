@@ -1,7 +1,9 @@
-//! Phiên phân tích 1 thư mục đầu vào: tìm PDF, nạp cache hoặc đọc nhanh dung lượng, liệt kê trang còn thiếu
-//! kết quả, nhận kết quả từ hàng đợi, ghi cache, xuất nhãn tự động. Dùng cho CLI `--tach` và giao diện.
+//! Phiên phân tích 1 thư mục đầu vào: tìm PDF, nạp kết quả phân tích từ kho (theo id nội dung PDF) hoặc đọc nhanh
+//! dung lượng, liệt kê trang còn thiếu kết quả, nhận kết quả từ hàng đợi, ghi vào kho, xuất nhãn tự động. Dùng cho
+//! CLI `--tach` và giao diện.
 
-use super::cache_trang::{self, KhoaFile, TrangCache};
+use super::cache_trang::{self, TrangCache};
+use super::kho::{self, Id};
 use super::dung_luong::doc_thong_tin_file;
 use super::hang_doi::ViecTrang;
 use super::huong_trang::can_tang_2;
@@ -18,7 +20,10 @@ pub struct HoSoPhanTich {
     pub pdf: PathBuf,
     /// Đường dẫn tương đối từ thư mục gốc, dùng `/` (ghi vào file nhãn / cache).
     pub tuong_doi: String,
-    pub khoa: Option<KhoaFile>,
+    /// Id nội dung PDF trong kho (`None` = không đọc được file).
+    pub id: Option<Id>,
+    /// Có kết quả phân tích mới chưa ghi vào kho.
+    pub doi: bool,
     pub trang: Vec<TrangCache>,
     /// Lỗi mở / đọc file (hồ sơ vẫn nằm trong danh sách, không có trang).
     pub loi: Option<String>,
@@ -118,29 +123,50 @@ pub fn duyet_pdf_theo_cay(goc: &Path, dung: &AtomicBool, mut moi_thu_muc: impl F
 }
 
 impl PhienPhanTich {
-    /// Mở thư mục: file có cache khớp → dùng ngay; chưa có → đọc dung lượng + kích thước (không render).
+    /// Mở thư mục: PDF có kết quả phân tích trong kho → dùng ngay; chưa có → đọc dung lượng + kích thước (không render).
     pub fn mo(goc: &Path, dung: &AtomicBool) -> Self {
+        Self::mo_lam_lai(goc, dung, false)
+    }
+
+    /// `lam_lai` (Phân tích lại): bỏ kết quả phân tích + nhãn của mọi PDF trong thư mục trước khi mở.
+    pub fn mo_lam_lai(goc: &Path, dung: &AtomicBool, lam_lai: bool) -> Self {
         chuyen_du_lieu_cu(goc);
         let mut pdf = Vec::new();
         duyet_pdf_theo_cay(goc, dung, |ds| pdf.extend(ds));
-        Self::mo_tu_ds(goc, pdf)
+        Self::mo_tu_ds_lam_lai(goc, pdf, lam_lai)
     }
 
     /// Như `mo` nhưng dùng danh sách PDF đã duyệt sẵn (bước xem trước) — khỏi duyệt lại cây thư mục.
     pub fn mo_tu_ds(goc: &Path, pdf: Vec<PathBuf>) -> Self {
+        Self::mo_tu_ds_lam_lai(goc, pdf, false)
+    }
+
+    pub fn mo_tu_ds_lam_lai(goc: &Path, pdf: Vec<PathBuf>, lam_lai: bool) -> Self {
         chuyen_du_lieu_cu(goc);
-        let cache = thu_muc_an(goc).join("cache");
+        let ids = kho::ids_cua(&pdf);
+        // Dữ liệu bản 2.3 của thư mục này (1 lần) → kho, trước khi đọc / làm lại
+        super::chuyen_kho::chuyen(goc, &pdf, &ids);
+        if lam_lai {
+            let ds: Vec<Id> = ids.iter().flatten().copied().collect();
+            let _ = kho::lam_lai(&ds, super::moc_sua::bay_gio_ms());
+        }
+        // Kết quả phân tích đã có: đọc từ kho 1 lượt (giữ khoá ngắn); còn lại đọc dung lượng song song
+        let co_san: Vec<Option<Vec<TrangCache>>> = {
+            let mut k = kho::kho();
+            ids.iter().map(|id| id.and_then(|id| k.phan_tich(id))).collect()
+        };
         let ho_so = pdf
             .into_par_iter()
-            .map(|pdf| {
+            .zip(ids.into_par_iter())
+            .zip(co_san.into_par_iter())
+            .map(|((pdf, id), co_san)| {
                 let tuong_doi = duong_dan_ghi(goc, &pdf);
-                let khoa = KhoaFile::cua(&pdf, &tuong_doi);
-                if let Some((k, trang)) = khoa.as_ref().and_then(|k| cache_trang::doc(&cache, &pdf, k)) {
-                    return HoSoPhanTich { pdf, tuong_doi, khoa: Some(k), trang, loi: None };
+                if let Some(trang) = co_san {
+                    return HoSoPhanTich { pdf, tuong_doi, id, doi: false, trang, loi: None };
                 }
                 match doc_thong_tin_file(&pdf) {
-                    Ok(tt) => HoSoPhanTich { pdf, tuong_doi, khoa, trang: tt.into_iter().map(|thong_tin| TrangCache { thong_tin, ..Default::default() }).collect(), loi: None },
-                    Err(e) => HoSoPhanTich { pdf, tuong_doi, khoa, trang: Vec::new(), loi: Some(e) },
+                    Ok(tt) => HoSoPhanTich { pdf, tuong_doi, id, doi: false, trang: tt.into_iter().map(|thong_tin| TrangCache { thong_tin, ..Default::default() }).collect(), loi: None },
+                    Err(e) => HoSoPhanTich { pdf, tuong_doi, id, doi: false, trang: Vec::new(), loi: Some(e) },
                 }
             })
             .collect();
@@ -157,11 +183,11 @@ impl PhienPhanTich {
         });
         let _ = gui.send(XemTruocSuKien::DaDuyet);
         chuyen_du_lieu_cu(goc);
-        let cache = thu_muc_an(goc).join("cache");
-        let so: Vec<Option<usize>> = tat_ca
-            .par_iter()
-            .map(|pdf| KhoaFile::cua(pdf, &duong_dan_ghi(goc, pdf)).and_then(|k| cache_trang::doc(&cache, pdf, &k)).map(|(_, t)| t.len()))
-            .collect();
+        // Chỉ PDF đã biết id (không đọc nội dung PDF ở bước xem trước)
+        let so: Vec<Option<usize>> = {
+            let mut k = kho::kho();
+            tat_ca.iter().map(|pdf| k.id_da_biet(pdf).and_then(|id| k.phan_tich(id)).map(|t| t.len())).collect()
+        };
         let _ = gui.send(XemTruocSuKien::SoTrang(so));
     }
 
@@ -197,28 +223,30 @@ impl PhienPhanTich {
 
     /// Ghi kết quả 1 trang từ hàng đợi (giữ trạng thái duyệt của người dùng).
     pub fn nhan_ket_qua(&mut self, viec: ViecTrang, kq: KetQuaTrang) {
-        if let Some(t) = self.ho_so.get_mut(viec.file).and_then(|h| h.trang.get_mut(viec.trang - 1)) {
-            t.ket_qua = Some(kq);
+        if let Some(h) = self.ho_so.get_mut(viec.file) {
+            if let Some(t) = h.trang.get_mut(viec.trang - 1) {
+                t.ket_qua = Some(kq);
+                h.doi = true;
+            }
         }
     }
 
-    /// Ghi cache mọi hồ sơ (song song). Trả số file ghi lỗi (thư mục chỉ đọc… — app vẫn chạy không cache).
-    /// Vân tay tính 1 lần rồi giữ trong khoá của hồ sơ (lần ghi sau không đọc lại PDF).
+    /// Ghi vào kho kết quả phân tích **mới** (hồ sơ có `doi`) — ghi nối, không ghi lại hồ sơ không đổi. Trả số hồ sơ
+    /// ghi lỗi (ổ đầy… — giữ `doi`, lần sau ghi lại).
     pub fn ghi_cache(&mut self) -> usize {
-        let cache = thu_muc_an(&self.goc).join("cache");
-        self.ho_so
-            .par_iter_mut()
-            .map(|h| {
-                let Some(k) = &h.khoa else { return 0 };
-                match cache_trang::ghi(&cache, &h.pdf, k, &h.trang) {
-                    Ok(k) => {
-                        h.khoa = Some(k);
-                        0
-                    }
-                    Err(_) => 1,
-                }
-            })
-            .sum()
+        let mut k = kho::kho();
+        for h in self.ho_so.iter_mut().filter(|h| h.doi) {
+            if let Some(id) = h.id {
+                k.ghi_phan_tich(id, &h.trang);
+            }
+        }
+        match k.day() {
+            Ok(()) => {
+                self.ho_so.iter_mut().for_each(|h| h.doi = false);
+                0
+            }
+            Err(_) => self.ho_so.iter().filter(|h| h.doi).count(),
+        }
     }
 
     /// Nhãn tự động theo Cấu hình (chỉ index / trắng; trang nội dung không ghi).

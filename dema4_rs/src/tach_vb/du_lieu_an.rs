@@ -41,6 +41,20 @@ pub fn chuyen_du_lieu_cu(goc: &Path) {
     }
 }
 
+/// Ghi `thu_muc_goc.txt` (đường dẫn đầy đủ của thư mục đầu vào) vào thư mục dữ liệu nếu chưa có — để kết quả của thư
+/// mục này tìm lại được theo đường dẫn khi bản ghi cũ chưa có id.
+pub fn ghi_goc(goc: &Path) {
+    let an = thu_muc_an(goc);
+    if !an.join(FILE_GOC).exists() {
+        let _ = std::fs::create_dir_all(&an).and_then(|_| std::fs::write(an.join(FILE_GOC), chuan_hoa(goc)));
+    }
+}
+
+/// Thư mục đầu vào của 1 thư mục dữ liệu (đọc `thu_muc_goc.txt`).
+pub fn goc_cua(an: &Path) -> Option<PathBuf> {
+    std::fs::read_to_string(an.join(FILE_GOC)).ok().map(|s| PathBuf::from(s.trim()))
+}
+
 /// Đường dẫn tuyệt đối thống nhất (cùng thư mục gõ khác kiểu → cùng chuỗi), giữ nguyên hoa thường.
 fn chuan_hoa(goc: &Path) -> String {
     let p = std::fs::canonicalize(goc).or_else(|_| std::path::absolute(goc)).unwrap_or_else(|_| goc.to_path_buf());

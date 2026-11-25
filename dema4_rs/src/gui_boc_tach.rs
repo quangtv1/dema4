@@ -47,6 +47,8 @@ pub struct FilePdf {
     /// Tên hiển thị: đường dẫn tương đối so với thư mục nguồn.
     pub ten: String,
     pub so_trang: usize,
+    /// Id nội dung PDF (kho) — kết quả tìm lại được khi đổi tên / di chuyển thư mục.
+    pub id: Option<crate::tach_vb::kho::Id>,
 }
 
 /// Kết quả kiểm tra kết nối mô hình đang chọn.
@@ -766,20 +768,71 @@ fn quet_pdf(goc: &Path) -> Result<Vec<FilePdf>, String> {
         .map(|e| e.path())
         .collect();
     ds.sort();
-    Ok(ds
+    let ids = crate::tach_vb::kho::ids_cua(&ds);
+    let files: Vec<FilePdf> = ds
         .into_iter()
-        .map(|p| {
+        .zip(ids)
+        .map(|(p, id)| {
             let so_trang = mupdf::Document::open(p.to_string_lossy().as_ref()).and_then(|d| d.page_count()).map_or(0, |n| n.max(0) as usize);
             // Khoá file dùng chung với Tách: tương đối, `/`, NFC — giống nhau trên Mac và Windows
             let ten = crate::tach_vb::nhan::duong_dan_ghi(goc, &p);
-            FilePdf { duong_dan: p, ten, so_trang }
+            FilePdf { duong_dan: p, ten, so_trang, id }
         })
-        .collect())
+        .collect();
+    // Kết quả đã đọc ở thư mục khác (đổi tên, di chuyển, thư mục cha / con) → chép về theo đường dẫn mới
+    crate::boc_tach::theo_id::bo_sung(goc, &files.iter().map(|f| (f.ten.clone(), f.id)).collect::<Vec<_>>());
+    Ok(files)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn mo_cho(man: &mut ManBocTach, tm: &Path) {
+        let ctx = egui::Context::default();
+        man.chon_thu_muc(tm.display().to_string(), &ctx);
+        let t = std::time::Instant::now();
+        while man.quet.is_some() {
+            assert!(t.elapsed() < Duration::from_secs(10));
+            std::thread::sleep(Duration::from_millis(10));
+            man.nhan_nen(&ctx);
+        }
+    }
+
+    /// Kết quả theo id nội dung PDF: đổi tên thư mục → vẫn thấy; kết quả bản cũ (không id) → mở thư mục cha vẫn thấy.
+    #[test]
+    fn ket_qua_boc_theo_id_doi_ten_va_ban_cu_khong_id() {
+        use crate::boc_tach::luu::{ghi_them, BanGhi};
+        let p = std::env::temp_dir().join(format!("dema4_boc_theo_id_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&p);
+        let (con, cu) = (p.join("Con"), p.join("Cu"));
+        std::fs::create_dir_all(&con).unwrap();
+        std::fs::create_dir_all(&cu).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&con.join("a.pdf"), 2);
+        crate::tach_vb::tach::tests::tao_pdf(&cu.join("b.pdf"), 2);
+        let mut man = ManBocTach { loai: Some(0), ..Default::default() };
+        let loai = man.loai_chon().unwrap().ten.clone();
+        let bg = |file: &str, id| {
+            let mut gia_tri = std::collections::BTreeMap::new();
+            gia_tri.insert("so".to_string(), "15/TTr".to_string());
+            BanGhi { file: file.into(), loai: loai.clone(), so_trang: 2, gia_tri, loi: None, sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc: 1, id }
+        };
+        // Con: kết quả mới (có id); Cu: kết quả bản cũ (không id)
+        let id_a = crate::tach_vb::kho::ids_cua(&[con.join("a.pdf")])[0];
+        crate::boc_tach::theo_id::ghi(&con, &bg("a.pdf", id_a)).unwrap();
+        ghi_them(&crate::boc_tach::luu::file_jsonl(&cu), &bg("b.pdf", None)).unwrap();
+        mo_cho(&mut man, &cu); // mở thư mục cũ 1 lần: đăng ký kết quả bản cũ vào kho
+        let moi = p.join("Con_doi_ten");
+        std::fs::rename(&con, &moi).unwrap();
+        mo_cho(&mut man, &moi);
+        assert!(matches!(man.tt[0], ket_qua::TrangThai::Xong(_)), "đổi tên thư mục vẫn thấy: {:?}", man.tt);
+        mo_cho(&mut man, &p);
+        for ten in ["Con_doi_ten/a.pdf", "Cu/b.pdf"] {
+            let i = man.files.iter().position(|f| f.ten == ten).unwrap();
+            assert!(matches!(man.tt[i], ket_qua::TrangThai::Xong(_)), "{ten}: {:?}", man.tt[i]);
+        }
+        let _ = std::fs::remove_dir_all(&p);
+    }
 
     #[test]
     fn quet_pdf_gom_thu_muc_con_va_dem_trang() {
@@ -798,7 +851,7 @@ mod tests {
     #[test]
     fn trang_se_doc_theo_loai() {
         let mut m = ManBocTach { ds_loai: loai_tai_lieu::co_san(), ..Default::default() };
-        m.files = [1, 4, 2].iter().map(|&n| FilePdf { duong_dan: PathBuf::new(), ten: String::new(), so_trang: n }).collect();
+        m.files = [1, 4, 2].iter().map(|&n| FilePdf { duong_dan: PathBuf::new(), ten: String::new(), so_trang: n, id: None }).collect();
         assert_eq!(m.so_trang_doc(), 0, "chưa chọn loại");
         m.loai = Some(0);
         assert_eq!(m.so_trang_doc(), 1 + 2 + 2, "đầu + cuối");

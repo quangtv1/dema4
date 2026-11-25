@@ -38,6 +38,9 @@ pub struct BanGhi {
     /// Lúc tạo / sửa tay bản ghi (unix ms) — gộp phiên giữa 2 máy: bản sau cùng thắng. Bản ghi cũ không có = 0.
     #[serde(default)]
     pub luc: u64,
+    /// Id nội dung PDF (kho Tách) — đổi tên / di chuyển / mở thư mục cha-con vẫn tìm lại kết quả. Bản ghi cũ không có.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<(u64, u64)>,
 }
 
 impl BanGhi {
@@ -53,11 +56,12 @@ impl BanGhi {
             giay: kq.thoi_gian.as_secs_f32(),
             tho: kq.tho.clone(),
             luc: crate::tach_vb::moc_sua::bay_gio_ms(),
+            id: None,
         }
     }
 
     pub fn loi(file: &str, loai: &LoaiTaiLieu, so_trang: usize, loi: &str) -> Self {
-        Self { file: file.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: Some(loi.into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc: crate::tach_vb::moc_sua::bay_gio_ms() }
+        Self { file: file.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: Some(loi.into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc: crate::tach_vb::moc_sua::bay_gio_ms(), id: None }
     }
 
     /// Giá trị theo thứ tự trường của loại (biến thiếu → rỗng).
@@ -71,6 +75,14 @@ pub fn file_jsonl(thu_muc_nguon: &Path) -> PathBuf {
 }
 
 pub fn ghi_them(f: &Path, b: &BanGhi) -> std::io::Result<()> {
+    ghi_them_nhieu(f, std::slice::from_ref(b))
+}
+
+/// Ghi nối nhiều bản ghi trong 1 lần mở file (gộp hàng nghìn kết quả).
+pub fn ghi_them_nhieu(f: &Path, ds: &[BanGhi]) -> std::io::Result<()> {
+    if ds.is_empty() {
+        return Ok(());
+    }
     if let Some(cha) = f.parent() {
         std::fs::create_dir_all(cha)?;
     }
@@ -83,8 +95,12 @@ pub fn ghi_them(f: &Path, b: &BanGhi) -> std::io::Result<()> {
         tep.read_exact(&mut c)?;
         c[0] != b'\n'
     };
-    let dong = serde_json::to_string(b).map_err(std::io::Error::other)?;
-    writeln!(tep, "{}{dong}", if do_dang { "\n" } else { "" })
+    let mut noi_dung = String::from(if do_dang { "\n" } else { "" });
+    for b in ds {
+        noi_dung += &serde_json::to_string(b).map_err(std::io::Error::other)?;
+        noi_dung.push('\n');
+    }
+    tep.write_all(noi_dung.as_bytes())
 }
 
 /// Bản ghi mới nhất của từng file thuộc loại `loai`; dòng hỏng (ghi dở khi tắt máy) bỏ qua.

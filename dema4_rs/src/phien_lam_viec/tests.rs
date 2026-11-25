@@ -1,8 +1,9 @@
+use std::sync::Mutex;
+
 use super::*;
 use crate::tach_vb::nhan::Nhan;
 use crate::tach_vb::tach::tests::tao_pdf;
 
-/// Thư mục test riêng: `<tạm>/dema4_phien_<ten>_<pid>/`, trả (gốc test, file loại tài liệu riêng).
 fn tam(ten: &str) -> (PathBuf, PathBuf) {
     let d = std::env::temp_dir().join(format!("dema4_phien_{ten}_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
@@ -11,38 +12,50 @@ fn tam(ten: &str) -> (PathBuf, PathBuf) {
     (d, f_loai)
 }
 
-/// Thư mục đầu vào có `a.pdf` (3 trang), `b.pdf` (2 trang), `c.pdf` (2 trang); xoá dữ liệu làm dở cũ.
-fn thu_muc(cha: &Path, ten: &str) -> PathBuf {
-    let g = cha.join(ten);
+/// Bộ PDF mẫu `a.pdf` (3 trang), `b.pdf`, `c.pdf` (2 trang) của `d`; `thu_muc` chép bộ này (giống hệt nhau — như
+/// cùng hồ sơ trên 2 máy) vào `d/<duong>`.
+fn thu_muc(d: &Path, duong: &str) -> PathBuf {
+    let mau = d.join("_mau_pdf");
+    if !mau.join("c.pdf").exists() {
+        std::fs::create_dir_all(&mau).unwrap();
+        tao_pdf(&mau.join("a.pdf"), 3);
+        tao_pdf(&mau.join("b.pdf"), 2);
+        tao_pdf(&mau.join("c.pdf"), 2);
+    }
+    let g = d.join(duong);
     std::fs::create_dir_all(&g).unwrap();
-    tao_pdf(&g.join("a.pdf"), 3);
-    tao_pdf(&g.join("b.pdf"), 2);
-    tao_pdf(&g.join("c.pdf"), 2);
+    for f in ["a.pdf", "b.pdf", "c.pdf"] {
+        std::fs::copy(mau.join(f), g.join(f)).unwrap();
+    }
     let _ = std::fs::remove_dir_all(thu_muc_an(&g));
     g
 }
 
-fn ghi_nhan(goc: &Path, ds: &[(&str, usize, Nhan)]) {
-    let mut b = BangNhan::new();
-    for (k, t, n) in ds {
-        b.entry(k.to_string()).or_default().insert(*t, *n);
-    }
-    ghi_an_toan(&thu_muc_an(goc).join(F_NHAN), nhan::ghi_file_nhan(&b)).unwrap();
+/// Kho riêng của 1 "máy".
+fn may(d: &Path, ten: &str) -> Mutex<Kho> {
+    Mutex::new(Kho::mo(&d.join(format!("{ten}.kho"))).unwrap())
 }
 
-fn ghi_moc(goc: &Path, ds: &[(&str, u64, u64)]) {
-    let m = ds.iter().map(|(k, luc, ck)| (k.to_string(), Moc { luc: *luc, chu_ky: *ck })).collect();
-    moc_sua::ghi(&thu_muc_an(goc).join(moc_sua::TEN_FILE), &m).unwrap();
+fn id(k: &Mutex<Kho>, pdf: &Path) -> Id {
+    kho::ids_cua_trong(k, &[pdf.to_path_buf()])[0].unwrap()
 }
 
-fn doc_nhan(goc: &Path) -> BangNhan {
-    nhan::doc_file_nhan(&std::fs::read_to_string(thu_muc_an(goc).join(F_NHAN)).unwrap_or_default(), &|_| None).unwrap().0
+fn gan(k: &Mutex<Kho>, pdf: &Path, ds: &[(usize, Nhan)], luc: u64) {
+    let i = id(k, pdf);
+    let nhan: BTreeMap<usize, Nhan> = ds.iter().copied().collect();
+    let chu_ky = kho::chu_ky_tach(&nhan, &Default::default(), &Default::default());
+    k.lock().unwrap().ghi_tach(i, &BanTach { nhan, luc, chu_ky, ..Default::default() }).unwrap();
+}
+
+fn tach(k: &Mutex<Kho>, pdf: &Path) -> Option<BanTach> {
+    let i = id(k, pdf);
+    k.lock().unwrap().tach(i)
 }
 
 fn ban_ghi(file: &str, loai: &str, so: &str, luc: u64, loi: bool) -> BanGhi {
     let mut gia_tri = BTreeMap::new();
-    gia_tri.insert("so_ky_hieu".to_string(), so.to_string());
-    BanGhi { file: file.into(), loai: loai.into(), so_trang: 1, gia_tri, loi: loi.then(|| "500".into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc }
+    gia_tri.insert("so".to_string(), so.to_string());
+    BanGhi { file: file.into(), loai: loai.into(), so_trang: 1, gia_tri, loi: loi.then(|| "500".into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc, id: None }
 }
 
 fn ten_trong_goi(f: &Path) -> Vec<String> {
@@ -50,7 +63,7 @@ fn ten_trong_goi(f: &Path) -> Vec<String> {
     z.file_names().map(|n| n.unwrap().into_owned()).collect()
 }
 
-/// Gói tự dựng (test gói độc / phiên bản lạ).
+/// Gói tự dựng (test gói độc / phiên bản lạ / gói bản 2.3).
 fn tao_goi(f: &Path, muc: &[(&str, &[u8])]) {
     let mut z = zip::ZipWriter::new(std::fs::File::create(f).unwrap());
     for (ten, b) in muc {
@@ -60,77 +73,70 @@ fn tao_goi(f: &Path, muc: &[(&str, &[u8])]) {
     z.finish().unwrap();
 }
 
-fn manifest_mau(phien_ban: u32) -> Vec<u8> {
-    serde_json::to_vec(&Manifest { phien_ban_goi: phien_ban, phien_ban_app: "x".into(), ten_thu_muc: "B".into(), tao_luc: 1, pdf: vec![], loai_tai_lieu: vec![] }).unwrap()
+fn manifest(phien_ban: u32, pdf: Vec<PdfGoi>) -> Vec<u8> {
+    serde_json::to_vec(&Manifest { phien_ban_goi: phien_ban, phien_ban_app: "x".into(), ten_thu_muc: "B".into(), tao_luc: 1, pdf, loai_tai_lieu: vec![] }).unwrap()
 }
 
+/// Máy A làm ở `P` (nhãn, phân tích, kết quả bóc bản cũ không id) → xuất; máy B có cùng hồ sơ ở chỗ khác, tên khác,
+/// mở ở cấp thư mục con → nhập: khớp theo nội dung; gói chỉ có đúng danh sách trắng.
 #[test]
-fn xuat_roi_nhap_sang_may_khac_ten_nfd_nfc_giu_nhan_cache_ket_qua_khong_mang_khoa_license() {
-    let (d, f_loai) = tam("khu_hoi");
-    // Máy A: tên thư mục dạng NFD (Drive trên Mac); máy B: cùng nội dung, đường dẫn khác, tên NFC, mtime khác (chép)
-    let a = thu_muc(&d, "Ha\u{0309}i_A");
-    let an = thu_muc_an(&a);
-    ghi_nhan(&a, &[("a.pdf", 2, Nhan::Index)]);
-    ghi_moc(&a, &[("a.pdf", 100, 7)]);
-    let khoa = cache_trang::KhoaFile::cua(&a.join("a.pdf"), "a.pdf").unwrap();
-    cache_trang::ghi(&an.join("cache"), &a.join("a.pdf"), &khoa, &[Default::default(), Default::default(), Default::default()]).unwrap();
-    luu::ghi_them(&an.join(F_JSONL), &ban_ghi("a.pdf", "VB", "15/TTr", 50, false)).unwrap();
-    // Những thứ không bao giờ được vào gói, dù nằm trong thư mục việc
-    for f in ["khoa.bin", "license_so_luot.json", ".dema4_saomai.cfg", "ketqua_tach.txt"] {
-        std::fs::write(an.join(f), "bi mat").unwrap();
-    }
-    let goi = d.join("A.sm-dema4.zip");
-    let tt = xuat_voi(&a, &goi, &f_loai).unwrap();
+fn xuat_nhap_khac_may_khop_theo_noi_dung_o_cap_thu_muc_khac() {
+    let (d, f_loai) = tam("tron_vong");
+    let (ka, kb) = (may(&d, "A"), may(&d, "B"));
+    let p = d.join("A/P");
+    let con = thu_muc(&d, "A/P/Con");
+    gan(&ka, &con.join("a.pdf"), &[(2, Nhan::Index)], 1_000);
+    let ia = id(&ka, &con.join("a.pdf"));
+    ka.lock().unwrap().ghi_phan_tich(ia, &vec![cache_trang::TrangCache::default(); 3]);
+    ka.lock().unwrap().day().unwrap();
+    luu::ghi_them(&luu::file_jsonl(&p), &ban_ghi("Con/b.pdf", "VB", "15/TTr", 1_000, false)).unwrap();
+    let goi = d.join("P.zip");
+    let tt = xuat_trong(&p, &goi, &f_loai, &ka).unwrap();
     assert_eq!((tt.so_ho_so, tt.so_ban_ghi_boc), (1, 1));
-    let ten = ten_trong_goi(&goi);
-    for f in ["khoa.bin", "license_so_luot.json", ".dema4_saomai.cfg", "ketqua_tach.txt"] {
-        assert!(!ten.iter().any(|t| t.ends_with(f)), "{f} không được vào gói: {ten:?}");
-    }
+    let mut ten = ten_trong_goi(&goi);
+    ten.sort();
+    assert_eq!(ten, [F_JSONL, F_MANIFEST, F_PHAN_TICH, F_TACH], "chỉ đúng danh sách trắng");
 
-    let b = d.join("H\u{1ea3}i_B");
-    std::fs::create_dir_all(&b).unwrap();
-    for f in ["a.pdf", "b.pdf", "c.pdf"] {
-        std::fs::write(b.join(f), std::fs::read(a.join(f)).unwrap()).unwrap(); // chép: mtime mới
-    }
-    let _ = std::fs::remove_dir_all(thu_muc_an(&b));
-    let xt = xem_truoc_voi(&b, &goi, &f_loai).unwrap();
-    assert_eq!((xt.so_pdf_goi, xt.so_pdf_khop, xt.so_ho_so), (3, 3, 1));
-    let bc = nhap_voi(&b, &goi, &f_loai).unwrap();
+    let con_b = thu_muc(&d, "B/Khac/Con_doi_ten");
+    let xt = xem_truoc_trong(&con_b, &goi, &f_loai, &kb).unwrap();
+    assert_eq!((xt.so_pdf_khop, xt.so_pdf_goi, xt.so_ho_so), (3, 3, 1), "{xt:?}");
+    let bc = nhap_trong(&con_b, &goi, &f_loai, &kb).unwrap();
     assert_eq!((bc.nhan, bc.boc_nhan, bc.bo_qua.len()), (1, 1, 0), "{bc:?}");
-    assert_eq!(doc_nhan(&b)["a.pdf"][&2], Nhan::Index);
-    let kb = cache_trang::KhoaFile::cua(&b.join("a.pdf"), "a.pdf").unwrap();
-    assert!(cache_trang::doc(&thu_muc_an(&b).join("cache"), &b.join("a.pdf"), &kb).is_some(), "cache dùng được trên máy nhận (khớp nhờ vân tay)");
-    assert_eq!(luu::doc(&luu::file_jsonl(&b), "VB")["a.pdf"].gia_tri["so_ky_hieu"], "15/TTr");
-    assert_eq!(moc_sua::doc(&thu_muc_an(&b).join(moc_sua::TEN_FILE))["a.pdf"].luc, 100);
-    // Nhập lại cùng gói: không đổi gì
-    let bc2 = nhap_voi(&b, &goi, &f_loai).unwrap();
-    assert_eq!((bc2.nhan, bc2.boc_nhan), (0, 0));
-    for g in [&a, &b] {
-        let _ = std::fs::remove_dir_all(thu_muc_an(g));
-    }
+    assert_eq!(tach(&kb, &con_b.join("a.pdf")).unwrap().nhan.get(&2), Some(&Nhan::Index));
+    assert_eq!(kb.lock().unwrap().phan_tich(ia).map(|t| t.len()), Some(3), "kết quả phân tích sang theo");
+    let bg = luu::doc_tat_ca(&std::fs::read_to_string(luu::file_jsonl(&con_b)).unwrap());
+    assert!(bg.contains_key(&("b.pdf".to_string(), "VB".to_string())), "kết quả bóc theo đường dẫn mới: {bg:?}");
+    let _ = std::fs::remove_dir_all(thu_muc_an(&p));
+    let _ = std::fs::remove_dir_all(thu_muc_an(&con_b));
     let _ = std::fs::remove_dir_all(&d);
 }
 
+/// 2 máy cùng sửa: mốc sau cùng thắng cả 2 chiều; bia mộ (Phân tích lại) mới hơn → máy nhận bỏ nhãn; hồ sơ gói
+/// không có → máy nhận giữ nguyên.
 #[test]
-fn hai_may_chia_ho_so_gop_sau_cung_thang_bia_mo_khong_hoi_nhan_cu() {
-    let (d, f_loai) = tam("a_b");
+fn hai_may_sau_cung_thang_bia_mo_khong_dong_ho_so_khac() {
+    let (d, f_loai) = tam("hai_may");
+    let (ka, kb) = (may(&d, "A"), may(&d, "B"));
     let (a, b) = (thu_muc(&d, "A"), thu_muc(&d, "B"));
-    // Máy A: a.pdf sửa lúc 100; b.pdf sửa lúc 300; c.pdf đã xoá hết nhãn lúc 500 (bia mộ)
-    ghi_nhan(&a, &[("a.pdf", 2, Nhan::Index), ("b.pdf", 1, Nhan::Index)]);
-    ghi_moc(&a, &[("a.pdf", 100, 1), ("b.pdf", 300, 2), ("c.pdf", 500, moc_sua::CHU_KY_RONG)]);
-    // Máy B: a.pdf sửa sau (200, khác), b.pdf sửa trước (250, khác), c.pdf còn nhãn cũ (400)
-    ghi_nhan(&b, &[("a.pdf", 3, Nhan::Trang), ("b.pdf", 2, Nhan::Trang), ("c.pdf", 1, Nhan::Index)]);
-    ghi_moc(&b, &[("a.pdf", 200, 11), ("b.pdf", 250, 12), ("c.pdf", 400, 13)]);
-    let goi = d.join("B.zip");
-    xuat_voi(&b, &goi, &f_loai).unwrap();
-    let bc = nhap_voi(&a, &goi, &f_loai).unwrap();
-    let n = doc_nhan(&a);
-    assert_eq!(n["a.pdf"].get(&3), Some(&Nhan::Trang), "a.pdf: B sửa sau → lấy của B");
-    assert_eq!(n["b.pdf"].get(&1), Some(&Nhan::Index), "b.pdf: A sửa sau → giữ của A");
-    assert!(!n.contains_key("c.pdf"), "c.pdf: bia mộ A mới hơn → không hồi nhãn cũ của B");
-    assert_eq!((bc.nhan, bc.giu), (1, 2));
-    assert_eq!(bc.trung.len(), 3);
-    assert!(bc.trung.iter().any(|t| t.khoa == "a.pdf" && t.lay_goi && t.moc_goi == 200 && t.moc_may == 100));
+    gan(&ka, &a.join("a.pdf"), &[(2, Nhan::Index)], 2_000);
+    gan(&kb, &b.join("a.pdf"), &[(3, Nhan::Index)], 1_000);
+    gan(&ka, &a.join("b.pdf"), &[(1, Nhan::Index)], 1_000);
+    gan(&kb, &b.join("b.pdf"), &[(2, Nhan::Index)], 3_000);
+    gan(&kb, &b.join("c.pdf"), &[(1, Nhan::Trang)], 1_000);
+    let goi = d.join("A.zip");
+    xuat_trong(&a, &goi, &f_loai, &ka).unwrap();
+    let bc = nhap_trong(&b, &goi, &f_loai, &kb).unwrap();
+    assert_eq!((bc.nhan, bc.giu, bc.trung.len()), (1, 1, 2), "{bc:?}");
+    assert!(tach(&kb, &b.join("a.pdf")).unwrap().nhan.contains_key(&2), "A mới hơn → lấy");
+    assert!(tach(&kb, &b.join("b.pdf")).unwrap().nhan.contains_key(&2), "B mới hơn → giữ");
+    assert!(tach(&kb, &b.join("c.pdf")).unwrap().nhan.contains_key(&1), "gói không có → giữ");
+    // A Phân tích lại (bia mộ mới hơn) → nhập: B bỏ nhãn a.pdf
+    let ia = id(&ka, &a.join("a.pdf"));
+    ka.lock().unwrap().ghi_tach(ia, &BanTach { luc: 9_000, chu_ky: moc_sua::CHU_KY_RONG, bia_mo: true, ..Default::default() }).unwrap();
+    xuat_trong(&a, &goi, &f_loai, &ka).unwrap();
+    nhap_trong(&b, &goi, &f_loai, &kb).unwrap();
+    let t = tach(&kb, &b.join("a.pdf")).unwrap();
+    assert!(t.bia_mo && t.nhan.is_empty(), "{t:?}");
     for g in [&a, &b] {
         let _ = std::fs::remove_dir_all(thu_muc_an(g));
     }
@@ -140,224 +146,255 @@ fn hai_may_chia_ho_so_gop_sau_cung_thang_bia_mo_khong_hoi_nhan_cu() {
 #[test]
 fn boc_tach_loi_moi_hon_khong_de_ket_qua_tot_hai_loai_cung_giu() {
     let (d, f_loai) = tam("boc");
+    let (ka, kb) = (may(&d, "A"), may(&d, "B"));
     let (a, b) = (thu_muc(&d, "A"), thu_muc(&d, "B"));
-    let (fa, fb) = (luu::file_jsonl(&a), luu::file_jsonl(&b));
-    luu::ghi_them(&fa, &ban_ghi("a.pdf", "VB", "15/TTr", 100, false)).unwrap(); // A: kết quả tốt
-    luu::ghi_them(&fb, &ban_ghi("a.pdf", "VB", "", 900, true)).unwrap(); // B: đọc lại bị lỗi (mới hơn)
-    luu::ghi_them(&fb, &ban_ghi("a.pdf", "HD", "HĐ-01", 50, false)).unwrap(); // B: loại khác
-    luu::ghi_them(&fb, &ban_ghi("b.pdf", "VB", "16/QĐ", u64::MAX, false)).unwrap(); // đồng hồ B sai
-    let goi = d.join("B.zip");
-    xuat_voi(&b, &goi, &f_loai).unwrap();
-    let bc = nhap_voi(&a, &goi, &f_loai).unwrap();
-    assert_eq!(luu::doc(&fa, "VB")["a.pdf"].gia_tri["so_ky_hieu"], "15/TTr", "bản lỗi không đè kết quả tốt");
-    assert_eq!(luu::doc(&fa, "HD")["a.pdf"].gia_tri["so_ky_hieu"], "HĐ-01", "loại khác của cùng file vẫn nhận");
-    let b_pdf = &luu::doc(&fa, "VB")["b.pdf"];
-    assert!(b_pdf.luc < u64::MAX, "mốc từ đồng hồ sai bị kẹp");
-    assert_eq!((bc.boc_nhan, bc.boc_giu, bc.lech_dong_ho), (2, 1, 1));
+    for (f, l, so, luc, loi) in [("a.pdf", "VB", "", 9, true), ("b.pdf", "VB", "16", 9, false), ("c.pdf", "HD", "1", 1, false)] {
+        luu::ghi_them(&luu::file_jsonl(&a), &ban_ghi(f, l, so, luc, loi)).unwrap();
+    }
+    for (f, l, so, luc, loi) in [("a.pdf", "VB", "15/TTr", 1, false), ("b.pdf", "VB", "15", 1, false), ("c.pdf", "VB", "x", 1, false)] {
+        luu::ghi_them(&luu::file_jsonl(&b), &ban_ghi(f, l, so, luc, loi)).unwrap();
+    }
+    let goi = d.join("A.zip");
+    xuat_trong(&a, &goi, &f_loai, &ka).unwrap();
+    let bc = nhap_trong(&b, &goi, &f_loai, &kb).unwrap();
+    let bg = luu::doc_tat_ca(&std::fs::read_to_string(luu::file_jsonl(&b)).unwrap());
+    let gt = |f: &str, l: &str| bg[&(f.to_string(), l.to_string())].gia_tri["so"].clone();
+    assert_eq!((gt("a.pdf", "VB"), gt("b.pdf", "VB"), gt("c.pdf", "VB"), gt("c.pdf", "HD")), ("15/TTr".into(), "16".into(), "x".into(), "1".into()));
+    assert_eq!((bc.boc_nhan, bc.boc_giu), (2, 1), "{bc:?}");
     for g in [&a, &b] {
         let _ = std::fs::remove_dir_all(thu_muc_an(g));
     }
     let _ = std::fs::remove_dir_all(&d);
 }
 
+/// Gói độc: khoá lạ, PDF không có trên máy → không ghi gì; gói từ bản mới hơn / zip cắt cụt / mục trùng tên → từ chối.
 #[test]
-fn goi_doc_khoa_la_bi_bo_qua_phien_ban_moi_hon_va_zip_cut_cut_bi_tu_choi() {
+fn goi_doc_phien_ban_moi_hon_cat_cut_trung_ten_bi_tu_choi() {
     let (d, f_loai) = tam("doc");
-    let a = thu_muc(&d, "A");
-    ghi_nhan(&a, &[("a.pdf", 2, Nhan::Index)]);
-    let truoc = std::fs::read_to_string(thu_muc_an(&a).join(F_NHAN)).unwrap();
-    // Khoá lạ trong file nhãn / mốc / jsonl: ../, tuyệt đối, ổ đĩa, file không có trên máy
+    let kb = may(&d, "B");
+    let b = thu_muc(&d, "B");
     let nhan_doc = "../x.pdf;1;index\n/etc/x.pdf;1;index\nC:/x.pdf;1;index\nkhong_co.pdf;1;index\n";
     let moc_doc = "../x.pdf;9;1\n/etc/x.pdf;9;1\nC:/x.pdf;9;1\nkhong_co.pdf;9;1\n";
-    let jsonl = serde_json::to_string(&ban_ghi("../a.pdf", "VB", "x", 1, false)).unwrap();
+    let pdf = vec![PdfGoi { khoa: "khong_co.pdf".into(), kich_thuoc: 1, ma: Some(1) }];
     let goi = d.join("doc.zip");
-    tao_goi(&goi, &[(F_MANIFEST, &manifest_mau(1)), (F_NHAN, nhan_doc.as_bytes()), (moc_sua::TEN_FILE, moc_doc.as_bytes()), (F_JSONL, jsonl.as_bytes())]);
-    let bc = nhap_voi(&a, &goi, &f_loai).unwrap();
-    assert_eq!((bc.nhan, bc.boc_nhan), (0, 0), "{bc:?}");
-    assert_eq!(bc.bo_qua.len(), 5, "{:?}", bc.bo_qua);
-    assert_eq!(std::fs::read_to_string(thu_muc_an(&a).join(F_NHAN)).unwrap(), truoc, "không ghi gì");
-    assert!(!d.join("x.pdf").exists() && !a.parent().unwrap().join("x.pdf").exists());
-    // Gói từ bản mới hơn
+    tao_goi(&goi, &[(F_MANIFEST, &manifest(1, pdf)), (F_NHAN, nhan_doc.as_bytes()), (moc_sua::TEN_FILE, moc_doc.as_bytes())]);
+    let bc = nhap_trong(&b, &goi, &f_loai, &kb).unwrap();
+    assert_eq!((bc.nhan, bc.boc_nhan, bc.bo_qua.len()), (0, 0, 1), "{bc:?}");
+    assert_eq!(kb.lock().unwrap().so_khoa(), 0, "không ghi gì vào kho");
     let moi = d.join("moi.zip");
-    tao_goi(&moi, &[(F_MANIFEST, &manifest_mau(2))]);
-    assert!(nhap_voi(&a, &moi, &f_loai).unwrap_err().contains("mới hơn"));
-    // Zip cắt cụt
-    let b = std::fs::read(&goi).unwrap();
+    tao_goi(&moi, &[(F_MANIFEST, &manifest(PHIEN_BAN_GOI + 1, vec![]))]);
+    assert!(nhap_trong(&b, &moi, &f_loai, &kb).unwrap_err().contains("mới hơn"));
+    let byte = std::fs::read(&goi).unwrap();
     let cut = d.join("cut.zip");
-    std::fs::write(&cut, &b[..b.len() / 2]).unwrap();
-    assert!(nhap_voi(&a, &cut, &f_loai).is_err());
-    assert_eq!(std::fs::read_to_string(thu_muc_an(&a).join(F_NHAN)).unwrap(), truoc, "gói hỏng → máy nhận không đổi");
-    let _ = std::fs::remove_dir_all(thu_muc_an(&a));
+    std::fs::write(&cut, &byte[..byte.len() / 2]).unwrap();
+    assert!(nhap_trong(&b, &cut, &f_loai, &kb).is_err());
+    // ZipWriter không cho 2 mục cùng tên: tạo "manifest.json" + "manifest.jsoX" rồi vá byte cho trùng tên thật
+    let trung = d.join("trung.zip");
+    tao_goi(&trung, &[(F_MANIFEST, &manifest(2, vec![])), ("manifest.jsoX", &manifest(2, vec![]))]);
+    let mut byte = std::fs::read(&trung).unwrap();
+    let mau = b"manifest.jsoX";
+    for i in 0..byte.len().saturating_sub(mau.len()) {
+        if &byte[i..i + mau.len()] == mau {
+            byte[i + mau.len() - 1] = b'n';
+        }
+    }
+    std::fs::write(&trung, byte).unwrap();
+    assert!(nhap_trong(&b, &trung, &f_loai, &kb).unwrap_err().contains("trùng tên"));
+    let _ = std::fs::remove_dir_all(thu_muc_an(&b));
     let _ = std::fs::remove_dir_all(&d);
 }
 
 #[test]
 fn loai_tai_lieu_chi_them_loai_moi_hop_le_trung_ten_giu_may_nay() {
     let (d, f_loai) = tam("loai");
-    let a = thu_muc(&d, "A");
-    let co_san = loai_tai_lieu::co_san();
-    loai_tai_lieu::ghi(&f_loai, &co_san).unwrap();
-    let mut moi = co_san[0].clone();
-    moi.ten = "Loại riêng B".into();
-    let mut trung = co_san[0].clone();
-    trung.huong_dan = "khác nội dung".into();
-    let mut sai = co_san[0].clone();
-    sai.ten = "Loại sai".into();
-    sai.truong[0].bien = "../x".into();
-    let m = Manifest { loai_tai_lieu: vec![moi.clone(), trung.clone(), sai], ..serde_json::from_slice(&manifest_mau(1)).unwrap() };
+    let kb = may(&d, "B");
+    let b = thu_muc(&d, "B");
+    let mut co_san = loai_tai_lieu::doc(&f_loai);
+    let mut rieng = co_san[0].clone();
+    rieng.ten = "Loại riêng A".into();
+    let mut sua = co_san[0].clone();
+    sua.huong_dan = "sửa khác".into();
+    let mut hong = co_san[0].clone();
+    hong.ten = "Hỏng".into();
+    hong.truong.clear();
+    let m = serde_json::to_vec(&Manifest { phien_ban_goi: 2, phien_ban_app: "x".into(), ten_thu_muc: "B".into(), tao_luc: 1, pdf: vec![], loai_tai_lieu: vec![rieng.clone(), sua.clone(), hong] }).unwrap();
     let goi = d.join("loai.zip");
-    tao_goi(&goi, &[(F_MANIFEST, &serde_json::to_vec(&m).unwrap())]);
-    let xt = xem_truoc_voi(&a, &goi, &f_loai).unwrap();
-    assert_eq!(xt.loai_moi.iter().map(|(t, _)| t.as_str()).collect::<Vec<_>>(), ["Loại riêng B"]);
-    let bc = nhap_voi(&a, &goi, &f_loai).unwrap();
-    assert_eq!((bc.loai_moi, bc.loai_trung, bc.loai_loi), (vec!["Loại riêng B".to_string()], vec![trung.ten.clone()], vec!["Loại sai".to_string()]));
-    let sau = loai_tai_lieu::doc(&f_loai);
-    assert!(sau.contains(&moi));
-    assert_eq!(sau.iter().find(|l| l.ten == trung.ten).unwrap(), &co_san[0], "trùng tên → giữ bản máy này");
-    let _ = std::fs::remove_dir_all(thu_muc_an(&a));
+    tao_goi(&goi, &[(F_MANIFEST, &m)]);
+    let xt = xem_truoc_trong(&b, &goi, &f_loai, &kb).unwrap();
+    assert_eq!(xt.loai_moi.iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), ["Loại riêng A"]);
+    let bc = nhap_trong(&b, &goi, &f_loai, &kb).unwrap();
+    assert_eq!((bc.loai_moi.len(), bc.loai_trung.len(), bc.loai_loi.len()), (1, 1, 1), "{bc:?}");
+    co_san.push(rieng);
+    assert_eq!(loai_tai_lieu::doc(&f_loai), co_san, "thêm loại mới, giữ loại cùng tên của máy này");
+    let _ = std::fs::remove_dir_all(thu_muc_an(&b));
     let _ = std::fs::remove_dir_all(&d);
 }
 
 #[test]
-fn xem_truoc_ty_le_khop_khi_mo_nham_thu_muc() {
-    let (d, f_loai) = tam("ty_le");
+fn mo_nham_thu_muc_ty_le_khop_thap_pdf_khac_noi_dung_khong_nhan() {
+    let (d, f_loai) = tam("nham");
+    let (ka, kb) = (may(&d, "A"), may(&d, "B"));
     let a = thu_muc(&d, "A");
-    let b = d.join("B");
-    std::fs::create_dir_all(&b).unwrap();
-    std::fs::write(b.join("a.pdf"), std::fs::read(a.join("a.pdf")).unwrap()).unwrap();
-    std::fs::write(b.join("x.pdf"), b"khac").unwrap();
+    gan(&ka, &a.join("a.pdf"), &[(2, Nhan::Index)], 1_000);
     let goi = d.join("A.zip");
-    xuat_voi(&a, &goi, &f_loai).unwrap();
-    let xt = xem_truoc_voi(&b, &goi, &f_loai).unwrap();
-    assert_eq!((xt.so_pdf_goi, xt.so_pdf_khop), (3, 1));
-    assert!((xt.ty_le_khop() - 1.0 / 3.0).abs() < 1e-6);
-    let _ = std::fs::remove_dir_all(thu_muc_an(&a));
+    xuat_trong(&a, &goi, &f_loai, &ka).unwrap();
+    // Thư mục khác: cùng tên file, khác nội dung
+    let khac = d.join("Khac");
+    std::fs::create_dir_all(&khac).unwrap();
+    for (f, n) in [("a.pdf", 3), ("b.pdf", 2), ("c.pdf", 2)] {
+        tao_pdf(&khac.join(f), n);
+    }
+    let xt = xem_truoc_trong(&khac, &goi, &f_loai, &kb).unwrap();
+    assert_eq!((xt.so_pdf_khop, xt.ty_le_khop()), (0, 0.0));
+    let bc = nhap_trong(&khac, &goi, &f_loai, &kb).unwrap();
+    assert_eq!((bc.nhan, bc.bo_qua.len()), (0, 3), "{bc:?}");
+    assert!(tach(&kb, &khac.join("a.pdf")).is_none(), "trùng tên khác nội dung → không nhận");
+    for g in [&a, &khac] {
+        let _ = std::fs::remove_dir_all(thu_muc_an(g));
+    }
     let _ = std::fs::remove_dir_all(&d);
 }
 
 #[test]
 fn khoa_phien_chan_xuat_nhap_cung_luc() {
     let (d, f_loai) = tam("khoa");
+    let ka = may(&d, "A");
     let a = thu_muc(&d, "A");
     let _k = KhoaPhien::lay(&thu_muc_an(&a)).unwrap();
-    assert!(xuat_voi(&a, &d.join("x.zip"), &f_loai).unwrap_err().contains("cửa sổ khác"));
+    assert!(xuat_trong(&a, &d.join("x.zip"), &f_loai, &ka).unwrap_err().contains("cửa sổ khác"));
     drop(_k);
-    assert!(xuat_voi(&a, &d.join("x.zip"), &f_loai).is_ok(), "nhả khoá → làm được");
+    assert!(xuat_trong(&a, &d.join("x.zip"), &f_loai, &ka).is_ok(), "nhả khoá → làm được");
     let _ = std::fs::remove_dir_all(thu_muc_an(&a));
     let _ = std::fs::remove_dir_all(&d);
 }
 
+/// Trang ngoài số trang thật bị bỏ; mốc từ đồng hồ máy gửi sai (vượt xa giờ máy nhận) bị kẹp.
 #[test]
-fn goi_co_muc_trung_ten_bi_tu_choi() {
-    let (d, f_loai) = tam("trung_ten");
-    let a = thu_muc(&d, "A");
-    let goi = d.join("trung.zip");
-    // ZipWriter không cho 2 mục cùng tên: tạo "manifest.json" + "manifest.jsoX" rồi vá byte cho trùng tên thật
-    tao_goi(&goi, &[(F_MANIFEST, &manifest_mau(1)), ("manifest.jsoX", &manifest_mau(1))]);
-    let mut b = std::fs::read(&goi).unwrap();
-    let mau = b"manifest.jsoX";
-    let mut i = 0;
-    while i + mau.len() <= b.len() {
-        if &b[i..i + mau.len()] == mau {
-            b[i + mau.len() - 1] = b'n';
-        }
-        i += 1;
-    }
-    std::fs::write(&goi, b).unwrap();
-    assert!(nhap_voi(&a, &goi, &f_loai).unwrap_err().contains("trùng tên"));
-    let _ = std::fs::remove_dir_all(thu_muc_an(&a));
-    let _ = std::fs::remove_dir_all(&d);
-}
-
-#[test]
-fn file_nhan_may_nay_loi_thi_dung_khong_ghi_de() {
-    let (d, f_loai) = tam("nhan_loi");
-    let (a, b) = (thu_muc(&d, "A"), thu_muc(&d, "B"));
-    ghi_nhan(&b, &[("a.pdf", 2, Nhan::Index)]);
-    ghi_moc(&b, &[("a.pdf", 100, 1)]);
-    let goi = d.join("B.zip");
-    xuat_voi(&b, &goi, &f_loai).unwrap();
-    std::fs::create_dir_all(thu_muc_an(&a)).unwrap();
-    let hong = "b.pdf;1;index\ndòng hỏng không đủ cột\n";
-    std::fs::write(thu_muc_an(&a).join(F_NHAN), hong).unwrap();
-    assert!(nhap_voi(&a, &goi, &f_loai).unwrap_err().contains("Lưu nhãn lại"));
-    assert_eq!(std::fs::read_to_string(thu_muc_an(&a).join(F_NHAN)).unwrap(), hong, "không ghi đè mất nhãn của máy này");
-    for g in [&a, &b] {
-        let _ = std::fs::remove_dir_all(thu_muc_an(g));
-    }
-    let _ = std::fs::remove_dir_all(&d);
-}
-
-#[test]
-fn pdf_trung_ten_trung_kich_thuoc_khac_noi_dung_bi_bo_qua() {
-    let (d, f_loai) = tam("ma");
-    let (a, b) = (thu_muc(&d, "A"), thu_muc(&d, "B"));
-    ghi_an_toan(&thu_muc_an(&b).join(F_NHAN), "a.pdf;2;index\nb.pdf;2;index\n").unwrap();
-    ghi_moc(&b, &[("a.pdf", 100, 1), ("b.pdf", 100, 2)]);
-    let goi = d.join("B.zip");
-    xuat_voi(&b, &goi, &f_loai).unwrap();
-    // Máy nhận: b.pdf cùng tên, cùng kích thước nhưng khác 1 byte nội dung (bản scan khác)
-    let mut noi_dung = std::fs::read(a.join("b.pdf")).unwrap();
-    let n = noi_dung.len();
-    noi_dung[n - 2] ^= 0x20;
-    std::fs::write(a.join("b.pdf"), &noi_dung).unwrap();
-    assert_eq!(xem_truoc_voi(&a, &goi, &f_loai).unwrap().so_pdf_khop, 2, "a.pdf, c.pdf giống hệt; b.pdf khác bản");
-    let bc = nhap_voi(&a, &goi, &f_loai).unwrap();
-    let nh = doc_nhan(&a);
-    assert!(nh.contains_key("a.pdf") && !nh.contains_key("b.pdf"), "{nh:?}");
-    assert!(bc.bo_qua.contains(&"b.pdf".to_string()), "{bc:?}");
-    for g in [&a, &b] {
-        let _ = std::fs::remove_dir_all(thu_muc_an(g));
-    }
-    let _ = std::fs::remove_dir_all(&d);
-}
-
-#[test]
-fn trang_ngoai_so_trang_that_bi_bo_pdf_khac_kich_thuoc_bi_bo_qua() {
+fn trang_ngoai_so_trang_bi_bo_dong_ho_sai_bi_kep() {
     let (d, f_loai) = tam("trang");
+    let (ka, kb) = (may(&d, "A"), may(&d, "B"));
     let (a, b) = (thu_muc(&d, "A"), thu_muc(&d, "B"));
-    // Gói: a.pdf (3 trang) có nhãn trang 99; b.pdf ở máy nhận là bản khác (kích thước khác)
-    ghi_an_toan(&thu_muc_an(&b).join(F_NHAN), "a.pdf;2;index\na.pdf;99;index\nb.pdf;1;index\n").unwrap();
-    ghi_moc(&b, &[("a.pdf", 100, 1), ("b.pdf", 100, 2)]);
-    let goi = d.join("B.zip");
-    xuat_voi(&b, &goi, &f_loai).unwrap();
-    tao_pdf(&a.join("b.pdf"), 5);
-    let bc = nhap_voi(&a, &goi, &f_loai).unwrap();
-    let n = doc_nhan(&a);
-    assert_eq!(n["a.pdf"].keys().copied().collect::<Vec<_>>(), [2], "trang 99 không có trong PDF → bỏ");
-    assert!(!n.contains_key("b.pdf") && bc.bo_qua.contains(&"b.pdf".to_string()), "PDF khác bản → bỏ qua: {bc:?}");
-    // File nhãn sau gộp vẫn đọc được với số trang thật (giao diện mở được)
-    let so = |k: &str| if k == "a.pdf" { Some(3) } else { Some(5) };
-    assert!(nhan::doc_file_nhan(&std::fs::read_to_string(thu_muc_an(&a).join(F_NHAN)).unwrap(), &so).is_ok());
+    gan(&ka, &a.join("a.pdf"), &[(2, Nhan::Index), (99, Nhan::Index)], u64::MAX);
+    let goi = d.join("A.zip");
+    xuat_trong(&a, &goi, &f_loai, &ka).unwrap();
+    let bc = nhap_trong(&b, &goi, &f_loai, &kb).unwrap();
+    let t = tach(&kb, &b.join("a.pdf")).unwrap();
+    assert_eq!((t.nhan.keys().copied().collect::<Vec<_>>(), t.so_trang), (vec![2], 3), "trang 99 không có trong PDF → bỏ");
+    assert!(bc.lech_dong_ho == 1 && t.luc < u64::MAX, "mốc bị kẹp về giờ máy nhận");
     for g in [&a, &b] {
         let _ = std::fs::remove_dir_all(thu_muc_an(g));
     }
     let _ = std::fs::remove_dir_all(&d);
 }
 
+/// Gói bản 2.3 (theo đường dẫn: file nhãn + mốc + cache) vẫn nhập được; hồ sơ không có mốc trong gói không ghi đè.
 #[test]
-fn nhan_chua_co_moc_khong_bi_xoa_bia_mo_moi_hon_trong_goi_xoa_nhan_va_cache() {
-    let (d, f_loai) = tam("chua_moc");
-    let (a, b) = (thu_muc(&d, "A"), thu_muc(&d, "B"));
-    // Máy A: a.pdf có nhãn từ trước khi có mốc; b.pdf có nhãn + cache, mốc 100
-    ghi_nhan(&a, &[("a.pdf", 2, Nhan::Index), ("b.pdf", 1, Nhan::Index)]);
-    ghi_moc(&a, &[("b.pdf", 100, 5)]);
-    let kb = cache_trang::KhoaFile::cua(&a.join("b.pdf"), "b.pdf").unwrap();
-    cache_trang::ghi(&thu_muc_an(&a).join("cache"), &a.join("b.pdf"), &kb, &[Default::default(), Default::default()]).unwrap();
-    // Gói B: a.pdf chỉ có dòng xoay, không mốc; b.pdf bia mộ mốc 200 (đã Phân tích lại); mốc a.pdf từ đồng hồ sai
-    ghi_an_toan(&thu_muc_an(&b).join(F_XOAY), "a.pdf;1;90\n").unwrap();
-    ghi_moc(&b, &[("b.pdf", 200, moc_sua::CHU_KY_RONG), ("c.pdf", u64::MAX, 9)]);
-    let goi = d.join("B.zip");
-    xuat_voi(&b, &goi, &f_loai).unwrap();
-    let bc = nhap_voi(&a, &goi, &f_loai).unwrap();
-    let n = doc_nhan(&a);
-    assert_eq!(n["a.pdf"][&2], Nhan::Index, "gói không có mốc → không xoá nhãn máy này");
-    assert!(!n.contains_key("b.pdf"), "bia mộ trong gói mới hơn → xoá nhãn");
-    assert!(!cache_trang::file_cache(&thu_muc_an(&a).join("cache"), "b.pdf").exists(), "và bỏ cache cũ (cờ duyệt không trộn với nhãn mới)");
-    assert_eq!(bc.lech_dong_ho, 1);
-    assert!(moc_sua::doc(&thu_muc_an(&a).join(moc_sua::TEN_FILE))["c.pdf"].luc < u64::MAX, "mốc đồng hồ sai bị kẹp");
-    for g in [&a, &b] {
-        let _ = std::fs::remove_dir_all(thu_muc_an(g));
-    }
+fn goi_ban_cu_theo_duong_dan_van_nhap_duoc() {
+    let (d, f_loai) = tam("ban_cu");
+    let kb = may(&d, "B");
+    let b = thu_muc(&d, "B");
+    let (na, nb) = (std::fs::metadata(b.join("a.pdf")).unwrap().len(), std::fs::metadata(b.join("b.pdf")).unwrap().len());
+    gan(&kb, &b.join("b.pdf"), &[(1, Nhan::Trang)], 1_000);
+    let kf = cache_trang::KhoaFile { duong_dan: "a.pdf".into(), kich_thuoc: na, sua_luc: 1, van_tay: 1 };
+    let cache = cache_trang::ma_hoa(&kf, &vec![cache_trang::TrangCache::default(); 3]);
+    // 2.3.0: không có mã nội dung → khớp theo đường dẫn + kích thước
+    let pdf = vec![PdfGoi { khoa: "a.pdf".into(), kich_thuoc: na, ma: None }, PdfGoi { khoa: "b.pdf".into(), kich_thuoc: nb, ma: None }];
+    let goi = d.join("cu.zip");
+    tao_goi(&goi, &[(F_MANIFEST, &manifest(1, pdf)), (F_NHAN, b"a.pdf;2;index\nb.pdf;2;index\n"), (moc_sua::TEN_FILE, b"a.pdf;5000;1\n"), (&ten_muc_cache("a.pdf"), &cache)]);
+    let bc = nhap_trong(&b, &goi, &f_loai, &kb).unwrap();
+    assert_eq!(bc.nhan, 1, "{bc:?}");
+    assert_eq!(tach(&kb, &b.join("a.pdf")).unwrap().nhan.get(&2), Some(&Nhan::Index));
+    assert!(tach(&kb, &b.join("b.pdf")).unwrap().nhan.contains_key(&1), "gói không có mốc cho b.pdf → giữ máy này");
+    let _ = std::fs::remove_dir_all(thu_muc_an(&b));
     let _ = std::fs::remove_dir_all(&d);
+}
+
+/// Đo cả luồng với kho theo id: N PDF (mặc định 100.000 × 20 trang, 100 thư mục con × 1.000, mỗi file khác nội dung).
+/// Chạy: DEMA4_DO=<thư mục tạm> [DEMA4_SO_FILE=100000] cargo test --release -- --ignored do_hieu_nang_kho --nocapture
+#[test]
+#[ignore = "đo hiệu năng — tạo vài trăm MB dữ liệu thử"]
+fn do_hieu_nang_kho() {
+    use crate::tach_vb::phien::PhienPhanTich;
+    use std::time::Instant;
+    let goc_do = PathBuf::from(std::env::var("DEMA4_DO").expect("DEMA4_DO"));
+    let n: usize = std::env::var("DEMA4_SO_FILE").ok().and_then(|v| v.parse().ok()).unwrap_or(100_000);
+    let _ = std::fs::remove_dir_all(&goc_do);
+    std::fs::create_dir_all(&goc_do).unwrap();
+    let in_ra = |ten: &str, gt: String| println!("DO|{ten}|{gt}");
+    let giay = |t: Instant| format!("{:.2} s", t.elapsed().as_secs_f64());
+    let dung = std::sync::atomic::AtomicBool::new(false);
+    // Mẫu 20 trang + kết quả phân tích thật
+    let mau_dir = goc_do.join("mau");
+    std::fs::create_dir_all(&mau_dir).unwrap();
+    tao_pdf(&mau_dir.join("mau.pdf"), 20);
+    let ch = crate::tach_vb::phan_tich::CauHinhPhanTich::default();
+    let trang_mau = crate::tach_vb::phien::phan_tich_thu_muc(&mau_dir, &ch, &|_, _| {}).ho_so.remove(0).trang;
+    let mau = std::fs::read(mau_dir.join("mau.pdf")).unwrap();
+    // N PDF khác nội dung (dòng chú thích cuối khác nhau)
+    let p = goc_do.join("P");
+    let t = Instant::now();
+    let mut ds = Vec::with_capacity(n);
+    for i in 0..n {
+        let f = p.join(format!("Con_{:03}", i / 1000)).join(format!("f_{:05}.pdf", i % 1000));
+        if i % 1000 == 0 {
+            std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+        }
+        let mut b = mau.clone();
+        b.extend(format!("% {i:012}\n").bytes());
+        std::fs::write(&f, b).unwrap();
+        ds.push(f);
+    }
+    in_ra("tao_pdf", giay(t));
+    // Lần đầu: tính id (đọc nội dung) + ghi phân tích + nhãn vào kho (như đã làm xong ở các thư mục con)
+    let t = Instant::now();
+    let ids = kho::ids_cua(&ds);
+    in_ra("tinh_id_lan_dau", giay(t));
+    let t = Instant::now();
+    {
+        let mut k = kho::kho();
+        for id in ids.iter().flatten() {
+            k.ghi_phan_tich(*id, &trang_mau);
+            let nhan: BTreeMap<usize, Nhan> = [(1, Nhan::Index), (12, Nhan::Index)].into_iter().collect();
+            let chu_ky = kho::chu_ky_tach(&nhan, &Default::default(), &Default::default());
+            k.them_tach(*id, &BanTach { so_trang: 20, nhan, luc: 1, chu_ky, ..Default::default() });
+        }
+        k.day().unwrap();
+        in_ra("kho_sau_ghi", format!("{:.1} MB", k.dung_luong() as f64 / 1e6));
+    }
+    in_ra("ghi_phan_tich_va_nhan_vao_kho", giay(t));
+    // Mở thư mục cha: id theo bảng đường dẫn + đọc phân tích từ kho
+    let t = Instant::now();
+    let ph = PhienPhanTich::mo(&p, &dung);
+    let co = ph.ho_so.iter().filter(|h| h.trang.iter().all(|t| t.ket_qua.is_some())).count();
+    in_ra("mo_thu_muc_cha", format!("{} ({} hồ sơ, {co} có kết quả phân tích)", giay(t), ph.ho_so.len()));
+    let t = Instant::now();
+    let _ = PhienPhanTich::mo(&p, &dung);
+    in_ra("mo_lai_thu_muc_cha", giay(t));
+    // Đổi tên 1 thư mục con (1.000 PDF) rồi mở lại: id của 1.000 file tính lại theo nội dung
+    std::fs::rename(p.join("Con_000"), p.join("Con_000_doi_ten")).unwrap();
+    let t = Instant::now();
+    let ph = PhienPhanTich::mo(&p, &dung);
+    let co = ph.ho_so.iter().filter(|h| h.tuong_doi.starts_with("Con_000_doi_ten/") && h.trang.iter().all(|t| t.ket_qua.is_some())).count();
+    in_ra("mo_sau_doi_ten_1_thu_muc_con", format!("{} ({co}/1000 hồ sơ đổi tên vẫn có kết quả)", giay(t)));
+    // Sửa nhãn 1 hồ sơ: 1 bản ghi ghi ngay
+    let id0 = ph.ho_so[0].id.unwrap();
+    let truoc = kho::kho().dung_luong();
+    let t = Instant::now();
+    kho::kho().ghi_tach(id0, &BanTach { so_trang: 20, nhan: [(2, Nhan::Index)].into_iter().collect(), luc: 2, chu_ky: 5, ..Default::default() }).unwrap();
+    in_ra("sua_1_nhan", format!("{:.1} ms, ghi {} byte", t.elapsed().as_secs_f64() * 1000.0, kho::kho().dung_luong() - truoc));
+    // Xuất / nhập sang máy khác (kho riêng)
+    let t = Instant::now();
+    let tt = xuat_trong(&p, &goc_do.join("P.zip"), &goc_do.join("loai.json"), kho::chung()).unwrap();
+    in_ra("xuat_phien", format!("{} ({:.1} MB, {} hồ sơ)", giay(t), tt.dung_luong as f64 / 1e6, tt.so_ho_so));
+    let kb = Mutex::new(Kho::mo(&goc_do.join("B.kho")).unwrap());
+    let t = Instant::now();
+    let bc = nhap_trong(&p, &goc_do.join("P.zip"), &goc_do.join("loai.json"), &kb).unwrap();
+    in_ra("nhap_phien_may_khac", format!("{} ({} hồ sơ)", giay(t), bc.nhan));
+    let t = Instant::now();
+    let mut k = kho::kho();
+    let truoc = k.dung_luong();
+    k.nen().unwrap();
+    in_ra("don_kho", format!("{} ({:.1} → {:.1} MB)", giay(t), truoc as f64 / 1e6, k.dung_luong() as f64 / 1e6));
+    drop(k);
+    let _ = std::fs::remove_dir_all(&goc_do);
 }

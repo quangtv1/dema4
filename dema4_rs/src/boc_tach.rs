@@ -10,5 +10,6 @@ pub mod excel;
 pub mod khoa_cache;
 pub mod loai_tai_lieu;
 pub mod luu;
+pub mod theo_id;
 pub mod mo_hinh;
 pub mod sheet;

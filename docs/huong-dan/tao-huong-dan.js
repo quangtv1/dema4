@@ -9,7 +9,7 @@ const {
   AlignmentType, HeadingLevel, PageBreak, Header, Footer, PageNumber, TableOfContents, LevelFormat, TabStopType,
 } = require('docx');
 
-const PHIEN_BAN = '2.3.0';
+const PHIEN_BAN = '2.4.0';
 const NGAY = '25/11/2026';
 // HD_DIR: chạy bản chép ở thư mục khác (nơi đã cài docx) mà vẫn đọc ảnh / ghi file ở docs/huong-dan
 const GOC = process.env.HD_DIR || __dirname;
@@ -185,11 +185,12 @@ them(H2('1.5 An toàn dữ liệu'),
     'Kết quả Bóc tách (kể cả phần sửa tay) được gửi về trạm Sao Mai để sao lưu và nâng chất lượng bóc tách. Thông tin thống kê lượt chạy (tên máy, thư mục, số lượng) cũng được ghi nhận.',
   ]),
   ...hop('luuy', ['Cấu hình, khoá API (mã hoá), lượt chạy, nhãn / cache / log của Tách văn bản, kết quả Bóc tách và lịch sử gần đây nằm trong **thư mục dữ liệu** của người dùng: Windows `%LOCALAPPDATA%\\sm-dema4`, macOS `~/Library/Application Support/sm-dema4`. Không xoá thư mục này khi đang xử lý dở.']),
+  ...hop('meo', ['Phần đã làm của Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) gắn với **nội dung từng file PDF**, không gắn với tên thư mục: đổi tên, di chuyển thư mục, mở thư mục cha hay thư mục con, chép sang ổ khác đều thấy lại, không phải phân tích lại. Cùng 1 file PDF ở nhiều chỗ dùng chung nhãn. Kết quả Bóc tách cũng tìm lại được như vậy. Chỉ mở được 1 cửa sổ phần mềm.']),
 );
 them(H2('1.6 Làm tiếp trên máy khác'),
   P('Mang phần đang làm dở của một thư mục (Tách văn bản, Bóc tách dữ liệu) sang máy khác để làm tiếp hoặc chia việc cho nhiều người.'),
   ...buoc('Ở màn **Tách văn bản** hoặc **Bóc tách dữ liệu**, mở thư mục cần mang đi, chọn **Chức năng › Xuất phiên làm việc…**.', 'Phần mềm ghi file `<tên thư mục>.sm-dema4.zip` (mặc định vào thư mục Tải về) gồm nhãn, góc xoay, cache phân tích và kết quả bóc tách — không có khoá API, lượt chạy, cấu hình.'),
-  ...buoc('Ở máy kia, mở **cùng thư mục** hồ sơ (qua Drive dùng chung, USB…) ở màn tương ứng, chọn **Chức năng › Nhập phiên làm việc…** và chọn file `.zip`.', 'Hộp xác nhận cho biết số hồ sơ, % PDF khớp với thư mục đang mở và loại tài liệu mới sẽ thêm.'),
+  ...buoc('Ở máy kia, mở thư mục chứa các PDF đó (qua Drive dùng chung, USB…; **cấp nào, tên gì cũng được** — phần mềm khớp theo nội dung file) ở màn tương ứng, chọn **Chức năng › Nhập phiên làm việc…** và chọn file `.zip`.', 'Hộp xác nhận cho biết số hồ sơ, % PDF khớp với thư mục đang mở và loại tài liệu mới sẽ thêm.'),
   ...buoc('Bấm **Nhập**.', 'Mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói); kết quả bóc tách đọc được không bị bản lỗi đè. Hộp kết quả liệt kê hồ sơ hai máy cùng sửa.'),
   ...hop('chuy', ['Nên **chia hồ sơ** cho từng người; không đổi ngưỡng hay **Phân tích lại** giữa chừng; để **đồng hồ máy đúng giờ** (phần mềm chọn bản sửa theo thời điểm sửa).']),
 );
@@ -438,12 +439,12 @@ them(batDauChuong('Phụ lục'));
 them(H2('A. Tệp và thư mục phần mềm tạo ra'),
   ...bang(['Tệp / thư mục', 'Vị trí', 'Nội dung'], [
     ['`.dema4_saomai.cfg`', 'Thư mục dữ liệu', 'Cấu hình người dùng.'],
-    ['`viec/<thư mục>-…/`', 'Thư mục dữ liệu', 'Nhãn, cache, log Tách; kết quả Bóc tách của từng thư mục đầu vào.'],
+    ['`kho_tach.bin`', 'Thư mục dữ liệu', 'Kho phần đã làm của Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) theo nội dung từng PDF.'],
+    ['`viec/<thư mục>-…/`', 'Thư mục dữ liệu', 'Kết quả Bóc tách, log Tách của từng thư mục đầu vào.'],
     ['`gan_day.json`', 'Thư mục dữ liệu', 'Danh sách Làm tiếp gần đây.'],
     ['`<tên>.sm-dema4.zip`', 'Nơi người dùng chọn (mặc định Tải về)', 'Gói Xuất phiên làm việc.'],
     ['`<thư mục>_dem.txt`, `_dem_chitiet.txt`', 'Cạnh thư mục đếm', 'Kết quả Đếm trang A4.'],
     ['`<gốc>_vanban/`', 'Cạnh thư mục gốc', 'Văn bản đã tách.'],
-    ['`index_and_blank.txt`', 'Trong `viec/<thư mục>-…/`', 'Nhãn đã duyệt của Tách văn bản.'],
     ['`<thư mục>_boc_tach.xlsx`', 'Cạnh thư mục nguồn', 'Kết quả Bóc tách dữ liệu.'],
   ], [3000, 2400, 3626]),
 );
@@ -471,7 +472,8 @@ them(H2('C. Liên hệ hỗ trợ'),
 them(H2('D. Lịch sử sửa đổi'),
   ...bang(['Phiên bản tài liệu', 'Ngày', 'Phiên bản phần mềm', 'Nội dung'], [
     ['1.0', '02/11/2026', '2.2.0', 'Ban hành lần đầu.'],
-    ['1.1', NGAY, PHIEN_BAN, 'Thư mục dữ liệu chung theo người dùng; Làm tiếp trên máy khác (Xuất / Nhập phiên); Trang chủ có Làm tiếp gần đây.'],
+    ['1.1', '25/11/2026', '2.3.0', 'Thư mục dữ liệu chung theo người dùng; Làm tiếp trên máy khác (Xuất / Nhập phiên); Trang chủ có Làm tiếp gần đây.'],
+    ['1.2', NGAY, PHIEN_BAN, 'Phần đã làm theo nội dung từng PDF: đổi tên / di chuyển / mở thư mục cha-con vẫn thấy lại; Nhập phiên khớp theo nội dung; 1 cửa sổ; Dọn dữ liệu cũ.'],
   ], [2000, 1700, 2000, 3326]),
 );
 

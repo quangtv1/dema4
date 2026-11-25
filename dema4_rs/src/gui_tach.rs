@@ -16,7 +16,6 @@ pub mod thuoc_kho;
 pub mod van_ban;
 pub mod xem_trang;
 
-use crate::ghi_file::ghi_an_toan;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
@@ -32,7 +31,6 @@ use crate::tach_vb::hang_doi::{self, HangDoi, SuKienPhanTich, ViecTrang};
 use crate::tach_vb::nhan::{self, Nhan};
 use crate::tach_vb::phan_tich::{gan_nhan, CauHinhPhanTich};
 use crate::tach_vb::phien::{thu_muc_an, PhienPhanTich};
-use crate::tach_vb::cache_trang;
 use bang_trang::{ke_tiep, ten_nhan, BangTrang, EnterXoay, Loc, Nhom, Sap};
 use anh_nho::{bac_cho, AnhNho, KhoaAnh, YeuCau};
 use bieu_tuong::{atom, muc_menu_icon, nut_phang, BieuTuong};
@@ -79,7 +77,7 @@ pub enum Tab {
 enum Chay {
     /// Đang tìm PDF + đọc dung lượng / cache.
     Mo { nhan: Receiver<PhienPhanTich>, dung: Arc<AtomicBool> },
-    PhanTich { nhan: Receiver<SuKienPhanTich>, hang: Arc<HangDoi>, tong: usize, xong: usize, loi: usize, bat_dau: Instant, xep: hang_doi::XepThuTu<KetQuaVe> },
+    PhanTich { nhan: Receiver<SuKienPhanTich>, hang: Arc<HangDoi>, tong: usize, xong: usize, loi: usize, bat_dau: Instant, xep: hang_doi::XepThuTu<KetQuaVe>, ghi_luc: Instant },
 }
 
 /// Kết quả 1 trang chờ tới lượt hiển thị (nhiều luồng về lệch thứ tự).
@@ -215,6 +213,15 @@ pub struct ManTach {
     /// Đang gõ ô thư mục (chưa quét cho tới khi gõ xong) / hộp chọn thư mục chạy luồng riêng (Windows).
     dang_go_tm: bool,
     chon_tm: Option<Receiver<Option<PathBuf>>>,
+    /// (lúc sửa, chữ ký) phần Tách của từng PDF trong kho lúc mở / lần ghi gần nhất — chỉ ghi hồ sơ có thay đổi.
+    moc_kho: std::collections::HashMap<crate::tach_vb::kho::Id, (u64, u64)>,
+    /// Chữ ký phần Tách (kể cả nhãn tự động) của từng hồ sơ (đường dẫn) lúc mở / lần ghi gần nhất — chỉ ghi hồ sơ có
+    /// chữ ký đổi (2 PDF giống hệt trong thư mục: chỉ bản vừa sửa, không đè qua lại).
+    ck_da_ghi: std::collections::HashMap<String, u64>,
+    /// PDF trùng id mà khác số trang với bản ghi trong kho (file khác): không đọc, không bao giờ ghi đè.
+    id_bo_qua: std::collections::HashSet<crate::tach_vb::kho::Id>,
+    /// Vừa ghi kết quả phân tích: lưu nhãn tự động theo (sau khi nhận sự kiện).
+    cho_luu_kho: bool,
     /// Mở lại thư mục từ đĩa ở lần vẽ tới (sau Nhập phiên / mở từ Làm tiếp gần đây).
     cho_mo_lai: bool,
     /// Lần tách gần nhất của thư mục đang mở: (số hồ sơ, số văn bản) — cho tình trạng Làm tiếp gần đây.
@@ -307,6 +314,10 @@ impl Default for ManTach {
             dang_go_tm: false,
             chon_tm: None,
             cho_mo_lai: false,
+            moc_kho: Default::default(),
+            ck_da_ghi: Default::default(),
+            id_bo_qua: Default::default(),
+            cho_luu_kho: false,
             da_tach: None,
             khoa_phim: false,
         }
@@ -409,13 +420,6 @@ impl ManTach {
         self.bao = Some((s.into(), Instant::now()));
     }
 
-    fn file_nhan(&self) -> PathBuf {
-        thu_muc_an(Path::new(&self.thu_muc)).join("index_and_blank.txt")
-    }
-
-    fn file_xoay(&self) -> PathBuf {
-        thu_muc_an(Path::new(&self.thu_muc)).join("xoay_trang.txt")
-    }
 
     /// Có sửa tay (nhãn, góc, cờ duyệt) → Phân tích lại phải hỏi.
     fn co_sua_tay(&self) -> bool {
@@ -447,17 +451,6 @@ impl ManTach {
             self.trang_thai = "Thư mục không tồn tại".into();
             return;
         }
-        if lam_lai {
-            let _ = cache_trang::xoa_het(&thu_muc_an(&goc).join("cache"));
-            for f in [self.file_nhan(), self.file_xoay()] {
-                if f.exists() {
-                    let _ = ghi_an_toan(&f, "");
-                }
-            }
-            // Mọi hồ sơ đã có mục → bia mộ (gộp với máy khác không hồi lại nhãn cũ đã bỏ)
-            let f = thu_muc_an(&goc).join(crate::tach_vb::moc_sua::TEN_FILE);
-            let _ = crate::tach_vb::moc_sua::danh_dau_xoa_het(&f, crate::tach_vb::moc_sua::bay_gio_ms());
-        }
         self.bang = None;
         self.phien = None;
         self.anh = None;
@@ -479,20 +472,51 @@ impl ManTach {
         let _ = ch;
         let x = &self.xem_truoc;
         let co_san = (x.da_duyet && Path::new(&x.thu_muc) == goc).then(|| x.pdf.clone());
+        // Phân tích lại: bỏ kết quả phân tích + bia mộ nhãn trong kho (theo id các PDF) ở luồng nền, trước khi đọc
         std::thread::spawn(move || {
             let _ = gui.send(match co_san {
-                Some(pdf) => PhienPhanTich::mo_tu_ds(&goc, pdf),
-                None => PhienPhanTich::mo(&goc, &dung2),
+                Some(pdf) => PhienPhanTich::mo_tu_ds_lam_lai(&goc, pdf, lam_lai),
+                None => PhienPhanTich::mo_lam_lai(&goc, &dung2, lam_lai),
             });
         });
         self.chay = Some(Chay::Mo { nhan, dung });
     }
 
-    fn da_mo(&mut self, phien: PhienPhanTich, ch: &CauHinhPhanTich) {
-        let so_trang_cua = |p: &str| phien.ho_so.iter().find(|h| h.tuong_doi == p).map(|h| h.trang.len());
-        let nf = std::fs::read_to_string(self.file_nhan()).ok().and_then(|s| nhan::doc_file_nhan(&s, &so_trang_cua).ok()).map(|(b, _)| b);
-        let xf = std::fs::read_to_string(self.file_xoay()).ok().and_then(|s| nhan::doc_file_xoay(&s, &so_trang_cua).ok());
-        let bang = BangTrang::tu_phien(&phien, ch, nf.as_ref(), xf.as_ref());
+    fn da_mo(&mut self, mut phien: PhienPhanTich, ch: &CauHinhPhanTich) {
+        // Nhãn, góc xoay, cờ duyệt, mốc của từng PDF từ kho (theo id nội dung). PDF trùng id mà khác số trang → bỏ qua
+        // (không gắn nhãn của file khác).
+        let (mut nf, mut xf) = (nhan::BangNhan::new(), nhan::BangXoay::new());
+        self.moc_kho.clear();
+        self.id_bo_qua.clear();
+        {
+            let mut k = crate::tach_vb::kho::kho();
+            for h in phien.ho_so.iter_mut() {
+                h.trang.iter_mut().for_each(|t| t.trang_thai = 0);
+                let Some(id) = h.id else { continue };
+                let Some(bt) = k.tach(id) else { continue };
+                // Khác số trang → file khác trùng id: không gắn nhãn, không ghi đè
+                if h.loi.is_none() && bt.so_trang != 0 && bt.so_trang as usize != h.trang.len() {
+                    self.id_bo_qua.insert(id);
+                    continue;
+                }
+                self.moc_kho.insert(id, (bt.luc, bt.chu_ky));
+                // Bia mộ (Phân tích lại) → nhãn tự động
+                if bt.bia_mo || h.loi.is_some() {
+                    continue;
+                }
+                for (so, d) in &bt.duyet {
+                    if let Some(t) = h.trang.get_mut(so.wrapping_sub(1)) {
+                        t.trang_thai = *d;
+                    }
+                }
+                nf.insert(h.tuong_doi.clone(), bt.nhan);
+                xf.insert(h.tuong_doi.clone(), bt.xoay);
+            }
+        }
+        let bang = BangTrang::tu_phien(&phien, ch, &nf, &xf);
+        // Chữ ký lúc mở (nhãn đang hiện, kể cả tự động): lần lưu sau chỉ ghi PDF có chữ ký khác
+        let ck = bang.chu_ky_ho_so(false);
+        self.ck_da_ghi = ck.into_iter().collect();
         self.ten_hien = ten_hien_ho_so(&bang.ho_so);
         self.ten_cot = kem_duoi(&self.ten_hien, &bang.ho_so);
         self.bang = Some(bang);
@@ -519,7 +543,7 @@ impl ManTach {
         let xep = hang_doi::XepThuTu::moi(viec.clone());
         let hang = HangDoi::moi(viec);
         hang_doi::chay(hang.clone(), Arc::new(phien.duong_dan_pdf()), ch.clone(), so_luong, gui);
-        self.chay = Some(Chay::PhanTich { nhan, hang, tong, xong: 0, loi: 0, bat_dau, xep });
+        self.chay = Some(Chay::PhanTich { nhan, hang, tong, xong: 0, loi: 0, bat_dau, xep, ghi_luc: Instant::now() });
     }
 
     fn nhan_su_kien(&mut self, ch: &CauHinhPhanTich, ctx: Option<&egui::Context>) {
@@ -533,7 +557,7 @@ impl ManTach {
                     self.trang_thai = "Không đọc được thư mục".into();
                 }
             },
-            Some(Chay::PhanTich { nhan, hang, tong, xong, loi, bat_dau, xep }) => {
+            Some(Chay::PhanTich { nhan, hang, tong, xong, loi, bat_dau, xep, ghi_luc }) => {
                 let (Some(phien), Some(bang)) = (self.phien.as_mut(), self.bang.as_mut()) else { return };
                 let mut ket_thuc = false;
                 let mut toi_luot: Vec<(ViecTrang, KetQuaVe)> = Vec::new();
@@ -568,10 +592,16 @@ impl ManTach {
                         KetQuaVe::Loi => *loi += 1,
                     }
                 }
+                // Kết quả phân tích ghi vào kho ~mỗi giây (tắt máy giữa chừng chỉ mất phần chưa ghi)
+                if !ket_thuc && ghi_luc.elapsed() >= Duration::from_secs(1) {
+                    phien.ghi_cache();
+                    *ghi_luc = Instant::now();
+                    self.cho_luu_kho = true;
+                }
                 if ket_thuc {
                     let (da_dung, phan_tram, loi, tg) = (hang.da_dung(), *xong * 100 / (*tong).max(1), *loi, gio_phut_giay(bat_dau.elapsed()));
-                    bang.chep_trang_thai(phien);
                     phien.ghi_cache();
+                    self.cho_luu_kho = true;
                     self.chay = None;
                     self.tien_do_hs.ket_thuc();
                     self.nhay_het = !da_dung;
@@ -582,6 +612,10 @@ impl ManTach {
                     self.trang_thai += &self.chu_ho_so_loi();
                 }
             }
+        }
+        // Nhãn tự động của trang vừa phân tích → kho cùng kết quả phân tích (không có sửa tay chưa lưu)
+        if std::mem::take(&mut self.cho_luu_kho) && !self.chua_luu() {
+            let _ = self.luu_vao_kho(false);
         }
     }
 
@@ -713,18 +747,70 @@ impl ManTach {
     // ---- Lưu ----
 
     pub fn luu_nhan(&mut self) {
-        let Some(b) = &mut self.bang else { return };
-        let goc = self.phien.as_ref().map(|p| p.goc.clone()).unwrap_or_else(|| PathBuf::from(self.thu_muc.trim()));
-        let (n, x) = (nhan::ghi_file_nhan(&b.bang_nhan()), nhan::ghi_file_xoay(&b.bang_xoay()));
-        let fx = thu_muc_an(&goc).join("xoay_trang.txt");
-        let kq = ghi_an_toan(&thu_muc_an(&goc).join("index_and_blank.txt"), &n).and_then(|_| if x.is_empty() && !fx.exists() { Ok(()) } else { ghi_an_toan(&fx, &x) });
-        match kq {
+        if self.bang.is_none() {
+            return;
+        }
+        match self.luu_vao_kho(false) {
             Ok(()) => {
-                b.chua_luu = false;
-                self.cap_nhat_moc(false);
+                if let Some(b) = &mut self.bang {
+                    b.chua_luu = false;
+                }
             }
             Err(e) => self.trang_thai = format!("Không ghi được nhãn: {e}"),
         }
+    }
+
+    /// Ghi phần Tách (nhãn, góc xoay, cờ duyệt) vào kho cho **hồ sơ có thay đổi** (chữ ký khác bản trong kho) —
+    /// mỗi hồ sơ 1 bản ghi nhỏ, mốc sửa = bây giờ (không lùi). Hồ sơ lỗi đọc / chưa có id không đụng.
+    /// `bo_co_duyet`: sau Xoá cache (cờ duyệt đi cùng kết quả phân tích).
+    fn luu_vao_kho(&mut self, bo_co_duyet: bool) -> std::io::Result<()> {
+        use crate::tach_vb::kho::BanTach;
+        #[cfg(test)]
+        if tests::GIA_LOI_LUU.with(|g| g.get()) {
+            return Err(std::io::Error::other("lỗi ghi giả lập"));
+        }
+        use crate::tach_vb::moc_sua::{bay_gio_ms, CHU_KY_RONG};
+        let (Some(b), Some(p)) = (&self.bang, &self.phien) else { return Ok(()) };
+        let (nhan_b, xoay_b, chu_ky) = (b.bang_nhan(), b.bang_xoay(), b.chu_ky_ho_so(bo_co_duyet));
+        let mut duyet: Vec<std::collections::BTreeMap<usize, u8>> = vec![Default::default(); p.ho_so.len()];
+        if !bo_co_duyet {
+            for t in &b.trang {
+                if t.trang_thai_cache() != 0 {
+                    duyet[t.ho_so as usize].insert(t.so as usize, t.trang_thai_cache());
+                }
+            }
+        }
+        let bay_gio = bay_gio_ms();
+        // Mỗi id 1 bản ghi: PDF có chữ ký khác lần ghi trước (2 PDF giống hệt trong thư mục: chỉ bản vừa sửa)
+        let mut chon: Vec<(usize, crate::tach_vb::kho::Id, u64)> = Vec::new();
+        let mut da: std::collections::HashSet<crate::tach_vb::kho::Id> = Default::default();
+        for (i, h) in p.ho_so.iter().enumerate() {
+            let (Some(id), None) = (h.id, &h.loi) else { continue };
+            let ck = chu_ky.get(&h.tuong_doi).copied().unwrap_or(CHU_KY_RONG);
+            if self.id_bo_qua.contains(&id) || self.ck_da_ghi.get(&h.tuong_doi) == Some(&ck) || da.contains(&id) {
+                continue;
+            }
+            da.insert(id);
+            chon.push((i, id, ck));
+        }
+        let mut k = crate::tach_vb::kho::kho();
+        for (i, id, ck) in chon {
+            let h = &p.ho_so[i];
+            let luc = self.moc_kho.get(&id).map_or(bay_gio, |c| bay_gio.max(c.0 + 1));
+            let bt = BanTach {
+                so_trang: h.trang.len() as u32,
+                nhan: nhan_b.get(&h.tuong_doi).cloned().unwrap_or_default(),
+                xoay: xoay_b.get(&h.tuong_doi).cloned().unwrap_or_default(),
+                duyet: std::mem::take(&mut duyet[i]),
+                luc,
+                chu_ky: ck,
+                bia_mo: false,
+            };
+            k.them_tach(id, &bt);
+            self.moc_kho.insert(id, (luc, ck));
+            self.ck_da_ghi.insert(h.tuong_doi.clone(), ck);
+        }
+        k.day()
     }
 
     /// Trước Xuất / Nhập phiên: ghi nhãn chưa lưu, cờ duyệt (cache) và mốc sửa xuống đĩa.
@@ -803,19 +889,6 @@ impl ManTach {
         self.cho_mo_lai = true;
     }
 
-    /// Ghi mốc sửa từng hồ sơ (gộp phiên giữa 2 máy: bản sửa sau cùng thắng) theo đúng nội dung **đã ghi xuống đĩa**.
-    /// Hồ sơ lỗi đọc không đưa vào (giữ mốc cũ — trục trặc đọc file không thành "xoá hết nhãn").
-    fn cap_nhat_moc(&mut self, bo_co_duyet: bool) {
-        use crate::tach_vb::moc_sua;
-        let (Some(b), Some(p)) = (&self.bang, &self.phien) else { return };
-        let loi: std::collections::HashSet<&str> = p.ho_so.iter().filter(|h| h.loi.is_some()).map(|h| h.tuong_doi.as_str()).collect();
-        let mut chu_ky = b.chu_ky_ho_so(bo_co_duyet);
-        chu_ky.retain(|k, _| !loi.contains(k.as_str()));
-        let f = thu_muc_an(&p.goc).join(moc_sua::TEN_FILE);
-        if let Err(e) = moc_sua::cap_nhat(&f, &chu_ky, moc_sua::bay_gio_ms()) {
-            self.trang_thai = format!("Không ghi được mốc sửa: {e}");
-        }
-    }
 
     /// Cấu hình vừa lưu: đổi ngưỡng / mã index / độ tin cậy → gán lại nhãn tự động ngay (không render lại,
     /// nhãn người đã sửa giữ nguyên).
@@ -837,40 +910,49 @@ impl ManTach {
         self.bang.as_ref().is_some_and(|b| b.chua_luu)
     }
 
-    /// Ghi cache (cờ duyệt) — gọi khi đóng app / đổi thư mục.
-    fn thu_muc_cache(&self) -> PathBuf {
-        let goc = self.phien.as_ref().map(|p| p.goc.clone()).unwrap_or_else(|| PathBuf::from(self.thu_muc.trim()));
-        thu_muc_an(&goc).join("cache")
+    /// Thông báo nổi ngắn ở màn Tách.
+    pub fn bao_tin(&mut self, chu: String) {
+        self.bao = Some((chu, Instant::now()));
     }
 
-    /// Thư mục đang mở còn cache phân tích (để bật nút Xoá cache).
+    /// Thư mục đang mở còn kết quả phân tích trong kho (để bật nút Xoá cache).
     pub fn co_cache(&self) -> bool {
-        !self.thu_muc.trim().is_empty() && std::fs::read_dir(self.thu_muc_cache()).is_ok_and(|mut d| d.next().is_some())
+        let Some(p) = &self.phien else { return false };
+        let k = crate::tach_vb::kho::kho();
+        p.ho_so.iter().any(|h| h.id.is_some_and(|id| k.co_phan_tich(id)))
     }
 
-    /// Xoá cache phân tích của thư mục đang mở; không ghi lại cache cũ trong bộ nhớ khi đóng / đổi thư mục.
+    /// Xoá kết quả phân tích (kèm cờ duyệt) của thư mục đang mở; không ghi lại bản trong bộ nhớ khi đóng / đổi thư mục.
     pub fn xoa_cache(&mut self) {
-        match cache_trang::xoa_het(&self.thu_muc_cache()) {
-            Ok(()) => {
-                self.khong_ghi_cache = true;
-                self.cap_nhat_moc(true); // cờ duyệt mất cùng cache
-                self.bao = Some(("Đã xoá cache — lần Phân tích sau sẽ phân tích lại mọi trang".into(), Instant::now()));
+        if let Some(p) = &self.phien {
+            let mut k = crate::tach_vb::kho::kho();
+            for id in p.ho_so.iter().filter_map(|h| h.id) {
+                k.bo_phan_tich(id);
             }
-            Err(e) => self.trang_thai = format!("Không xoá được cache: {e}"),
+            if let Err(e) = k.day() {
+                self.trang_thai = format!("Không xoá được cache: {e}");
+                return;
+            }
         }
+        self.khong_ghi_cache = true;
+        if let Some(b) = &mut self.bang {
+            b.bo_co_duyet();
+        }
+        let _ = self.luu_vao_kho(true);
+        self.bao = Some(("Đã xoá cache — lần Phân tích sau sẽ phân tích lại mọi trang".into(), Instant::now()));
     }
 
+    /// Ghi kết quả phân tích mới + (khi không còn nhãn chưa lưu) cờ duyệt — gọi khi đóng app / đổi thư mục.
     pub fn ghi_cache(&mut self) {
         if self.khong_ghi_cache {
             return;
         }
-        if let (Some(b), Some(p)) = (&self.bang, &mut self.phien) {
-            b.chep_trang_thai(p);
+        if let Some(p) = &mut self.phien {
             p.ghi_cache();
         }
-        // Còn nhãn chưa lưu (vừa chọn Bỏ khi đóng, hoặc chế độ lưu tay): không ghi mốc cho nhãn chưa nằm trên đĩa
-        if !self.bang.as_ref().is_some_and(|b| b.chua_luu) {
-            self.cap_nhat_moc(false);
+        // Còn nhãn chưa lưu (vừa chọn Bỏ khi đóng, hoặc chế độ lưu tay): không ghi nhãn chưa được lưu
+        if !self.chua_luu() {
+            let _ = self.luu_vao_kho(false);
         }
     }
 
@@ -2786,53 +2868,145 @@ mod tests {
         assert_eq!(kem_duoi(&ten_hien_ho_so(&ds), &ds), ["4766/4766.pdf", "HOP 463/4766.pdf", "L1_05_13.pdf", "a.PDF"]);
     }
 
-    /// Gán nhãn 1 hồ sơ → chỉ mốc sửa của hồ sơ đó tăng; ghi cache (đóng / đổi thư mục) với cờ duyệt mới cũng tăng mốc.
+    thread_local! {
+        /// Giả lập ghi nhãn vào kho lỗi (chỉ luồng test đang chạy).
+        pub(super) static GIA_LOI_LUU: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    }
+
+    /// Phần Tách trong kho của hồ sơ `ten` của thư mục đang mở.
+    fn tach_kho(man: &ManTach, ten: &str) -> Option<crate::tach_vb::kho::BanTach> {
+        let id = man.phien.as_ref()?.ho_so.iter().find(|h| h.tuong_doi == ten)?.id?;
+        crate::tach_vb::kho::kho().tach(id)
+    }
+
+    fn cho_xong(man: &mut ManTach, ch: &CauHinhPhanTich) {
+        let t = Instant::now();
+        while man.dang_chay() {
+            assert!(t.elapsed() < Duration::from_secs(30));
+            std::thread::sleep(Duration::from_millis(20));
+            man.nhan_su_kien(ch, None);
+        }
+    }
+
+    /// Gán nhãn 1 hồ sơ → chỉ bản ghi kho của hồ sơ đó đổi (mốc mới); nhãn chưa lưu không ghi; Phân tích lại → bia mộ.
     #[test]
     fn gan_nhan_chi_tang_moc_sua_ho_so_do() {
-        use crate::tach_vb::moc_sua;
         let goc = std::env::temp_dir().join(format!("dema4_moc_tach_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&goc);
         std::fs::create_dir_all(&goc).unwrap();
         crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 3);
         crate::tach_vb::tach::tests::tao_pdf(&goc.join("b.pdf"), 2);
-        let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
         let mut cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
         let mut man = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };
         let ch = cfg.cau_hinh_phan_tich();
         man.bam_phan_tich(&ch);
-        let bat_dau = Instant::now();
-        while man.dang_chay() {
-            assert!(bat_dau.elapsed() < Duration::from_secs(30));
-            std::thread::sleep(Duration::from_millis(20));
-            man.nhan_su_kien(&ch, None);
-        }
+        cho_xong(&mut man, &ch);
         man.ghi_cache();
-        let f = thu_muc_an(&goc).join(moc_sua::TEN_FILE);
-        let truoc = moc_sua::doc(&f);
+        let (a0, b0) = (tach_kho(&man, "a.pdf"), tach_kho(&man, "b.pdf"));
         std::thread::sleep(Duration::from_millis(5));
         man.cap_nhat_thu_tu();
         let b = man.bang.as_ref().unwrap();
         let t = man.thu_tu.iter().copied().filter(|&t| b.ho_so[b.trang[t as usize].ho_so as usize] == "a.pdf").nth(1).unwrap(); // trang 2 của a.pdf
         man.chon.chon_rieng(t);
         man.lam(Viec::Gan(Nhan::Index), &mut cfg);
-        let sau = moc_sua::doc(&f);
-        assert!(sau["a.pdf"].luc > truoc.get("a.pdf").map_or(0, |m| m.luc), "a.pdf vừa gán nhãn → mốc mới");
-        assert_eq!(sau.get("b.pdf"), truoc.get("b.pdf"), "b.pdf không đụng → mốc giữ nguyên");
-        // Nhãn chưa lưu (như chọn Bỏ khi đóng app): ghi cache không ghi mốc cho nhãn đó
+        let a1 = tach_kho(&man, "a.pdf").unwrap();
+        assert!(a1.luc > a0.as_ref().map_or(0, |x| x.luc) && a1.nhan.get(&2) == Some(&Nhan::Index), "a.pdf vừa gán nhãn → bản ghi mới");
+        assert_eq!(tach_kho(&man, "b.pdf"), b0, "b.pdf không đụng → giữ nguyên");
+        // Nhãn chưa lưu (như chọn Bỏ khi đóng app): ghi cache không ghi nhãn đó
         man.bang.as_mut().unwrap().chua_luu = true;
         let t2 = man.thu_tu.iter().copied().find(|&t| { let b = man.bang.as_ref().unwrap(); b.ho_so[b.trang[t as usize].ho_so as usize] == "b.pdf" }).unwrap();
         man.bang.as_mut().unwrap().trang[t2 as usize].sua.tay = Some(Nhan::Index);
         man.ghi_cache();
-        assert_eq!(moc_sua::doc(&f).get("b.pdf"), truoc.get("b.pdf"), "nhãn chưa lưu → không đổi mốc");
-        // Phân tích lại từ đầu: mọi hồ sơ đã có mục thành bia mộ
+        assert_eq!(tach_kho(&man, "b.pdf"), b0, "nhãn chưa lưu → không ghi");
+        // Phân tích lại từ đầu: bia mộ (mở lại dùng nhãn tự động)
+        let ids: Vec<_> = man.phien.as_ref().unwrap().ho_so.iter().filter_map(|h| h.id).collect();
         man.bat_dau(&ch, true);
-        assert!(moc_sua::doc(&f).values().all(|m| m.chu_ky == moc_sua::CHU_KY_RONG), "Làm lại → bia mộ");
-        while man.dang_chay() {
-            std::thread::sleep(Duration::from_millis(20));
-            man.nhan_su_kien(&ch, None);
+        cho_xong(&mut man, &ch);
+        {
+            let mut k = crate::tach_vb::kho::kho();
+            assert!(ids.iter().all(|id| k.tach(*id).is_none_or(|b| b.bia_mo || b.luc > a1.luc)), "Làm lại → bia mộ");
         }
-        let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
+        assert_eq!(man.bang.as_ref().unwrap().trang.iter().filter(|t| t.sua.tay.is_some()).count(), 0, "sau làm lại: không còn nhãn sửa tay");
         let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// 2 PDF giống hệt trong 1 thư mục: sửa 1 bản không bị bản kia đè lại; bỏ nhãn cuối cùng của hồ sơ được giữ.
+    #[test]
+    fn hai_pdf_giong_het_khong_de_nhau_bo_het_nhan_duoc_giu() {
+        let goc = std::env::temp_dir().join(format!("dema4_hai_ban_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&goc);
+        std::fs::create_dir_all(&goc).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&goc.join("a.pdf"), 3);
+        std::fs::copy(goc.join("a.pdf"), goc.join("b.pdf")).unwrap();
+        let mut cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
+        let ch = cfg.cau_hinh_phan_tich();
+        let mo = |goc: &Path| {
+            let mut m = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };
+            m.bam_phan_tich(&ch);
+            cho_xong(&mut m, &ch);
+            m
+        };
+        let mut m = mo(&goc);
+        m.cap_nhat_thu_tu();
+        let trang_cua = |m: &ManTach, ten: &str, so: u32| {
+            let b = m.bang.as_ref().unwrap();
+            let h = b.ho_so.iter().position(|x| x == ten).unwrap() as u32;
+            b.trang.iter().position(|t| t.ho_so == h && t.so == so).unwrap() as u32
+        };
+        let t = trang_cua(&m, "b.pdf", 2);
+        m.chon.chon_rieng(t);
+        m.lam(Viec::Gan(Nhan::Index), &mut cfg);
+        m.ghi_cache();
+        m.luu_nhan();
+        drop(m);
+        let mut m = mo(&goc);
+        m.cap_nhat_thu_tu();
+        let t = trang_cua(&m, "b.pdf", 2);
+        assert_eq!(m.bang.as_ref().unwrap().trang[t as usize].nhan(), Nhan::Index, "sửa ở b.pdf còn (a.pdf không đè lại)");
+        // Bỏ nhãn đó (về Nội dung) → mở lại vẫn là Nội dung
+        m.chon.chon_rieng(t);
+        m.lam(Viec::Gan(Nhan::NoiDung), &mut cfg);
+        m.ghi_cache();
+        drop(m);
+        let m = mo(&goc);
+        let t = trang_cua(&m, "b.pdf", 2);
+        assert_eq!(m.bang.as_ref().unwrap().trang[t as usize].nhan(), Nhan::NoiDung, "bỏ nhãn được giữ");
+        let _ = std::fs::remove_dir_all(&goc);
+    }
+
+    /// Kho theo nội dung PDF: đổi tên thư mục, rồi mở thư mục cha → nhãn sửa tay vẫn có, không phân tích lại.
+    #[test]
+    fn doi_ten_thu_muc_mo_thu_muc_cha_van_thay_nhan() {
+        let p = std::env::temp_dir().join(format!("dema4_kho_doi_ten_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&p);
+        let con = p.join("Con");
+        std::fs::create_dir_all(&con).unwrap();
+        crate::tach_vb::tach::tests::tao_pdf(&con.join("a.pdf"), 3);
+        let mut cfg = CauHinh { quet_ma: false, quet_xoay: false, ..Default::default() };
+        let ch = cfg.cau_hinh_phan_tich();
+        let mo = |tm: &Path| {
+            let mut m = ManTach { thu_muc: tm.display().to_string(), ..Default::default() };
+            m.bam_phan_tich(&ch);
+            cho_xong(&mut m, &ch);
+            m
+        };
+        let mut m = mo(&con);
+        m.cap_nhat_thu_tu();
+        m.chon.chon_rieng(m.thu_tu[1]);
+        m.lam(Viec::Gan(Nhan::Index), &mut cfg);
+        m.ghi_cache();
+        drop(m);
+        let moi = p.join("Con_da_doi_ten");
+        std::fs::rename(&con, &moi).unwrap();
+        for tm in [moi.clone(), p.clone()] {
+            let m = mo(&tm);
+            let b = m.bang.as_ref().unwrap();
+            let h = b.ho_so.iter().position(|h| h.ends_with("a.pdf")).unwrap() as u32;
+            let t = b.trang.iter().find(|t| t.ho_so == h && t.so == 2).unwrap();
+            assert_eq!(t.nhan(), Nhan::Index, "{}: nhãn sửa tay theo nội dung PDF", tm.display());
+            assert!(m.phien.as_ref().unwrap().ho_so.iter().all(|h| h.trang.iter().all(|t| t.ket_qua.is_some())), "không phân tích lại");
+        }
+        let _ = std::fs::remove_dir_all(&p);
     }
 
     /// Xuất / Nhập phiên: ghi hết xuống đĩa (cả nhãn chưa lưu); sau khi bỏ phiên, mọi đường lưu (đóng app, đổi thư mục)
@@ -2861,13 +3035,15 @@ mod tests {
         man.bang.as_mut().unwrap().trang[1].sua.tay = Some(Nhan::Index);
         man.bang.as_mut().unwrap().chua_luu = true;
         man.ghi_het_xuong_dia();
-        assert!(std::fs::read_to_string(thu_muc_an(&goc).join("index_and_blank.txt")).unwrap().contains("a.pdf;2;index"));
-        // Nhập: bỏ phiên không lưu, gói ghi nhãn mới, rồi mọi đường lưu cũ không đè
+        assert_eq!(tach_kho(&man, "a.pdf").unwrap().nhan.get(&2), Some(&Nhan::Index));
+        // Nhập: bỏ phiên không lưu, gói ghi nhãn mới vào kho, rồi mọi đường lưu cũ không đè
+        let id = man.phien.as_ref().unwrap().ho_so[0].id.unwrap();
         man.bo_phien_khong_luu();
-        std::fs::write(thu_muc_an(&goc).join("index_and_blank.txt"), "a.pdf;3;index\n").unwrap();
+        let moi = crate::tach_vb::kho::BanTach { so_trang: 3, nhan: [(3, Nhan::Index)].into_iter().collect(), luc: crate::tach_vb::moc_sua::bay_gio_ms() + 1000, chu_ky: 99, ..Default::default() };
+        crate::tach_vb::kho::kho().ghi_tach(id, &moi).unwrap();
         man.ghi_cache();
         man.luu_nhan();
-        assert_eq!(std::fs::read_to_string(thu_muc_an(&goc).join("index_and_blank.txt")).unwrap(), "a.pdf;3;index\n");
+        assert_eq!(crate::tach_vb::kho::kho().tach(id), Some(moi), "bản trong bộ nhớ không đè");
         man.mo_lai_tu_dia();
         assert!(!man.dang_chay(), "chưa vẽ màn Tách → chưa mở (không kẹt đang phân tích khi ở màn khác)");
         man.cho_mo_lai = false;
@@ -2880,10 +3056,8 @@ mod tests {
     }
 
     /// Mở thư mục khác từ Làm tiếp gần đây khi nhãn đang sửa không ghi được → giữ thư mục cũ + nhãn trong bộ nhớ.
-    #[cfg(unix)]
     #[test]
     fn mo_tu_gan_day_ghi_nhan_loi_thi_giu_thu_muc_cu() {
-        use std::os::unix::fs::PermissionsExt;
         let goc = std::env::temp_dir().join(format!("dema4_gd_loi_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&goc);
         std::fs::create_dir_all(&goc).unwrap();
@@ -2902,9 +3076,9 @@ mod tests {
         }
         man.bang.as_mut().unwrap().trang[1].sua.tay = Some(Nhan::Index);
         man.bang.as_mut().unwrap().chua_luu = true;
-        std::fs::set_permissions(&an, std::fs::Permissions::from_mode(0o555)).unwrap();
+        GIA_LOI_LUU.with(|g| g.set(true));
         let mo = man.mo_tu_gan_day("/thu_muc/khac");
-        std::fs::set_permissions(&an, std::fs::Permissions::from_mode(0o755)).unwrap();
+        GIA_LOI_LUU.with(|g| g.set(false));
         assert!(!mo, "ghi nhãn lỗi → không mở thư mục khác");
         assert!(Path::new(&man.thu_muc) == goc && man.chua_luu() && !man.cho_mo_lai, "giữ thư mục + nhãn chưa lưu");
         assert!(man.mo_tu_gan_day("/thu_muc/khac") && man.cho_mo_lai, "ghi được → mở");
@@ -2926,7 +3100,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&goc);
     }
 
-    /// Phân tích thư mục nhỏ qua màn Tách (không mở cửa sổ): lưới đủ trang, gán nhãn tự lưu file.
+    /// Phân tích thư mục nhỏ qua màn Tách (không mở cửa sổ): lưới đủ trang, gán nhãn tự lưu vào kho.
     #[test]
     fn phan_tich_gan_nhan_va_tu_luu() {
         let goc = std::env::temp_dir().join(format!("dema4_man_tach_{}", std::process::id()));
@@ -2949,8 +3123,7 @@ mod tests {
         man.cap_nhat_thu_tu();
         man.chon.chon_rieng(man.thu_tu[1]);
         man.lam(Viec::Gan(Nhan::Index), &mut cfg);
-        let file = std::fs::read_to_string(thu_muc_an(&goc).join("index_and_blank.txt")).unwrap();
-        assert!(file.contains("a.pdf;2;index"), "{file}");
+        assert_eq!(tach_kho(&man, "a.pdf").unwrap().nhan.get(&2), Some(&Nhan::Index), "tự lưu vào kho");
         // Mở lại: nhãn sửa tay còn nguyên
         let mut man2 = ManTach { thu_muc: goc.display().to_string(), ..Default::default() };
         man2.bam_phan_tich(&ch);
@@ -2992,7 +3165,7 @@ mod tests {
         let t_mo = t.elapsed();
         let ch = CauHinhPhanTich::default();
         let t = Instant::now();
-        let b = BangTrang::tu_phien(&phien, &ch, None, None);
+        let b = BangTrang::tu_phien(&phien, &ch, &Default::default(), &Default::default());
         let t_bang = t.elapsed();
         let t = Instant::now();
         let tt = b.thu_tu(Loc::TatCa, None, Sap::DungLuongTang);

@@ -65,6 +65,8 @@ pub struct HoSoTach {
     pub pdf: PathBuf,
     pub nhan: BTreeMap<usize, Nhan>,
     pub xoay: BTreeMap<usize, Xoay>,
+    /// Id nội dung lúc lấy nhãn (`None` = không kiểm): file đã bị thay bản khác → không tách theo nhãn cũ.
+    pub id: Option<(u64, u64)>,
 }
 
 /// 1 dòng log (chưa có STT): văn bản đã ghi.
@@ -207,6 +209,14 @@ pub fn tach_thu_muc(nguon: &Path, ra: &Path, ho_so: &[HoSoTach], mau: &str, dung
             let ten = hs.pdf.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             // Một hồ sơ gây panic (lỗi trong thư viện PDF) chỉ thành lỗi của hồ sơ đó, không làm hỏng cả lô
             let thu_muc_hs = ra.join(con).join(ten);
+            // Nhãn lấy theo nội dung file lúc mở: file bị thay bản khác (kể cả giữ thời điểm sửa) → không tách hồ sơ này
+            if let Some((ma, n)) = hs.id {
+                let that = std::fs::metadata(&hs.pdf).ok().and_then(|m| Some((super::cache_trang::van_tay_file(&hs.pdf, m.len()).ok()?, m.len())));
+                if that != Some((ma, n)) {
+                    bao(SuKienTach::XongHoSo { ho_so: i, so_trang: 0, dung_luong: 0, loi: true });
+                    return (i, Err("file đã thay đổi so với lúc phân tích — mở lại thư mục / Phân tích lại rồi tách".to_string()));
+                }
+            }
             let kq = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tach_ho_so(hs, &thu_muc_hs, mau, i, bao)))
                 .unwrap_or_else(|p| Err(format!("lỗi bất ngờ khi tách: {}", chu_panic(&*p))))
                 .map_err(ro_loi);
@@ -259,7 +269,7 @@ pub fn ghep_ho_so(pdf: &[PathBuf], nhan: super::nhan::BangNhan, goc_nhan: &Path,
     use super::nhan::duong_dan_that;
     // Khớp theo đường dẫn tuyệt đối dạng NFC: khoá trong file nhãn đã NFC, tên trên đĩa (Drive trên Mac) có thể NFD
     let chuan = |p: &Path| super::nhan::nfc(&chuan_hoa_mot_phan(p).to_string_lossy());
-    let mut theo_file: std::collections::HashMap<String, HoSoTach> = pdf.iter().map(|p| (chuan(p), HoSoTach { pdf: p.clone(), nhan: BTreeMap::new(), xoay: BTreeMap::new() })).collect();
+    let mut theo_file: std::collections::HashMap<String, HoSoTach> = pdf.iter().map(|p| (chuan(p), HoSoTach { pdf: p.clone(), nhan: BTreeMap::new(), xoay: BTreeMap::new(), id: None })).collect();
     let mut canh_bao = Vec::new();
     for (p, n) in nhan {
         match theo_file.get_mut(&chuan(&duong_dan_that(goc_nhan, &p))) {
@@ -303,6 +313,28 @@ pub fn dong_log_loi(loi: &[(PathBuf, String)], canh_bao: &[String]) -> String {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn file_bi_thay_ban_khac_giu_thoi_diem_sua_khong_tach_theo_nhan_cu() {
+        let d = std::env::temp_dir().join(format!("dema4_tach_thay_file_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let nguon = d.join("nguon");
+        std::fs::create_dir_all(&nguon).unwrap();
+        let pdf = nguon.join("a.pdf");
+        tao_pdf(&pdf, 3);
+        let md = std::fs::metadata(&pdf).unwrap();
+        let id = (super::super::cache_trang::van_tay_file(&pdf, md.len()).unwrap(), md.len());
+        // Thay bằng bản khác cùng kích thước, giữ thời điểm sửa
+        let mut b = std::fs::read(&pdf).unwrap();
+        let n = b.len();
+        b[n - 3] ^= 1;
+        std::fs::write(&pdf, &b).unwrap();
+        std::fs::File::options().write(true).open(&pdf).unwrap().set_modified(md.modified().unwrap()).unwrap();
+        let hs = vec![HoSoTach { pdf: pdf.clone(), nhan: [(2, Nhan::Index)].into_iter().collect(), xoay: BTreeMap::new(), id: Some(id) }];
+        let kq = tach_thu_muc(&nguon, &d.join("ra"), &hs, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
+        assert!(kq.dong.is_empty() && kq.loi.len() == 1 && kq.loi[0].1.contains("đã thay đổi"), "{:?}", kq.loi);
+        let _ = std::fs::remove_dir_all(&d);
+    }
 
     #[test]
     fn ghep_ho_so_khop_ten_file_nfd_tren_dia_voi_khoa_nfc() {
@@ -351,6 +383,10 @@ pub(crate) mod tests {
             ra.extend(format!("{v:010} 00000 n \n").bytes());
         }
         ra.extend(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", obj.len() + 1).bytes());
+        // Mỗi file tạo ra khác nội dung (dòng chú thích cuối, cùng độ dài): kho dữ liệu dùng chung cả máy khoá theo nội
+        // dung — các test chạy song song không dùng chung dữ liệu. Cần 2 file giống hệt → chép file.
+        static DEM: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        ra.extend(format!("% dema4-thu {:010}-{:012}\n", std::process::id(), DEM.fetch_add(1, std::sync::atomic::Ordering::Relaxed)).bytes());
         std::fs::write(duong_dan, ra).unwrap();
     }
 
@@ -371,8 +407,8 @@ pub(crate) mod tests {
         }
         let nhan: BTreeMap<usize, Nhan> = [(2, Nhan::Index)].into();
         let ho_so = vec![
-            HoSoTach { pdf: nguon.join("mk_user.pdf"), nhan: nhan.clone(), xoay: BTreeMap::new() },
-            HoSoTach { pdf: nguon.join("mk_owner.pdf"), nhan, xoay: BTreeMap::new() },
+            HoSoTach { pdf: nguon.join("mk_user.pdf"), nhan: nhan.clone(), xoay: BTreeMap::new(), id: None },
+            HoSoTach { pdf: nguon.join("mk_owner.pdf"), nhan, xoay: BTreeMap::new(), id: None },
         ];
         let ra = thu_muc_ra(&nguon, None).unwrap();
         let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
@@ -402,7 +438,7 @@ pub(crate) mod tests {
         std::fs::create_dir_all(ra.join("ok")).unwrap();
         std::fs::write(ra.join("ok").join("ok.9.pdf.tmp"), b"do dang").unwrap();
         let nhan: BTreeMap<usize, Nhan> = [(2, Nhan::Index)].into();
-        let ho_so: Vec<HoSoTach> = ["ok.pdf", "trong.pdf", "hong.pdf"].iter().map(|t| HoSoTach { pdf: nguon.join(t), nhan: nhan.clone(), xoay: BTreeMap::new() }).collect();
+        let ho_so: Vec<HoSoTach> = ["ok.pdf", "trong.pdf", "hong.pdf"].iter().map(|t| HoSoTach { pdf: nguon.join(t), nhan: nhan.clone(), xoay: BTreeMap::new(), id: None }).collect();
         let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert_eq!(kq.loi.len(), 1, "{:?}", kq.loi);
         assert!(kq.loi[0].0.ends_with("hong.pdf") && kq.loi[0].1.contains("file hỏng hoặc không phải PDF"), "{:?}", kq.loi);
@@ -426,7 +462,7 @@ pub(crate) mod tests {
         tao_pdf(&nguon.join("a.pdf"), 5);
         tao_pdf(&nguon.join("b.pdf"), 2);
         let nhan: BTreeMap<usize, Nhan> = [(2, Nhan::Index), (4, Nhan::Split)].into();
-        let ho_so = vec![HoSoTach { pdf: nguon.join("a.pdf"), nhan, xoay: BTreeMap::new() }, HoSoTach { pdf: nguon.join("b.pdf"), nhan: BTreeMap::new(), xoay: BTreeMap::new() }];
+        let ho_so = vec![HoSoTach { pdf: nguon.join("a.pdf"), nhan, xoay: BTreeMap::new(), id: None }, HoSoTach { pdf: nguon.join("b.pdf"), nhan: BTreeMap::new(), xoay: BTreeMap::new(), id: None }];
         let ra = thu_muc_ra(&nguon, None).unwrap();
         let sk: Mutex<Vec<SuKienTach>> = Mutex::new(Vec::new());
         let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|s| sk.lock().unwrap().push(s)).unwrap();
@@ -488,8 +524,8 @@ pub(crate) mod tests {
         let nhan: BTreeMap<usize, Nhan> = [(3, Nhan::Index), (5, Nhan::Trang), (7, Nhan::Split)].into_iter().collect();
         let xoay: BTreeMap<usize, Xoay> = [(9, Xoay { goc: 90, xac_nhan: false })].into_iter().collect();
         let ho_so = vec![
-            HoSoTach { pdf: con.join("4766.pdf"), nhan: nhan.clone(), xoay: xoay.clone() },
-            HoSoTach { pdf: nguon.join("goc.pdf"), nhan: BTreeMap::new(), xoay: BTreeMap::new() },
+            HoSoTach { pdf: con.join("4766.pdf"), nhan: nhan.clone(), xoay: xoay.clone(), id: None },
+            HoSoTach { pdf: nguon.join("goc.pdf"), nhan: BTreeMap::new(), xoay: BTreeMap::new(), id: None },
         ];
         let ra = thu_muc_ra(&nguon, None).unwrap();
         let kq = tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
@@ -514,7 +550,7 @@ pub(crate) mod tests {
         assert_eq!(dong.len(), 1 + 4);
         // Chạy lại với ít văn bản hơn → part thừa cũ bị xoá, file khác trong thư mục giữ nguyên
         std::fs::write(thu_muc_hs.join("ghi_chu.txt"), b"giu").unwrap();
-        let ho_so_2 = vec![HoSoTach { pdf: con.join("4766.pdf"), nhan: [(3, Nhan::Index)].into_iter().collect(), xoay: BTreeMap::new() }];
+        let ho_so_2 = vec![HoSoTach { pdf: con.join("4766.pdf"), nhan: [(3, Nhan::Index)].into_iter().collect(), xoay: BTreeMap::new(), id: None }];
         let kq2 = tach_thu_muc(&nguon, &ra, &ho_so_2, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert_eq!(kq2.dong.len(), 2);
         assert!(!thu_muc_hs.join("4766.3.pdf").exists());
@@ -539,7 +575,7 @@ pub(crate) mod tests {
         }
         tao_pdf(&nguon.join("a").join("x.pdf"), 2);
         tao_pdf(&nguon.join("b").join("x.pdf"), 3);
-        let ho_so: Vec<HoSoTach> = ["a", "b"].iter().map(|d| HoSoTach { pdf: nguon.join(d).join("x.pdf"), nhan: [(1, Nhan::Trang)].into_iter().collect(), xoay: BTreeMap::new() }).collect();
+        let ho_so: Vec<HoSoTach> = ["a", "b"].iter().map(|d| HoSoTach { pdf: nguon.join(d).join("x.pdf"), nhan: [(1, Nhan::Trang)].into_iter().collect(), xoay: BTreeMap::new(), id: None }).collect();
         let ra = thu_muc_ra(&nguon, None).unwrap();
         tach_thu_muc(&nguon, &ra, &ho_so, MAU_TEN_MAC_DINH, &AtomicBool::new(false), &|_| {}).unwrap();
         assert_eq!(chu_cac_trang(&ra.join("a/x/x.1.pdf")), vec!["Trang 2"]);
@@ -555,7 +591,7 @@ pub(crate) mod tests {
         use super::super::nhan::{doc_file_nhan, duong_dan_that};
         let mau = crate::tach_vb::thu_muc_mau().expect("đặt DEMA4_MAU_TACH");
         let (bang, _) = doc_file_nhan(&std::fs::read_to_string(mau.join("index_and_blank.txt")).unwrap(), &|_| None).unwrap();
-        let ho_so: Vec<HoSoTach> = bang.into_iter().map(|(p, nhan)| HoSoTach { pdf: duong_dan_that(&mau, &p), nhan, xoay: BTreeMap::new() }).collect();
+        let ho_so: Vec<HoSoTach> = bang.into_iter().map(|(p, nhan)| HoSoTach { pdf: duong_dan_that(&mau, &p), nhan, xoay: BTreeMap::new(), id: None }).collect();
         let nguon = mau.join("pdf_goc");
         let ra = std::env::temp_dir().join("dema4_tach_mau1");
         let _ = std::fs::remove_dir_all(&ra);
@@ -592,7 +628,7 @@ pub(crate) mod tests {
             .map(|p| {
                 let ten = p.file_name().unwrap().to_string_lossy().to_string();
                 let nhan = bang.iter().find(|(k, _)| k.rsplit(['/', '\\']).next() == Some(ten.as_str())).map(|(_, v)| v.clone()).unwrap_or_default();
-                HoSoTach { pdf: p.clone(), nhan, xoay: BTreeMap::new() }
+                HoSoTach { pdf: p.clone(), nhan, xoay: BTreeMap::new(), id: None }
             })
             .collect();
         let tong_vb: usize = ho_so.iter().map(|h| tinh_dai(so_trang_pdf(&h.pdf).unwrap(), &h.nhan, &h.xoay).van_ban.len()).sum();

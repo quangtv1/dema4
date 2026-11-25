@@ -120,7 +120,7 @@ impl XongTach {
 
 /// Hồ sơ cần tách từ bảng trang hiện tại: nhãn dùng (khác nội dung) + góc xoay ≠ 0.
 pub fn ho_so_tach(phien: &PhienPhanTich, b: &BangTrang) -> Vec<HoSoTach> {
-    let mut ds: Vec<HoSoTach> = phien.ho_so.iter().map(|h| HoSoTach { pdf: h.pdf.clone(), nhan: Default::default(), xoay: Default::default() }).collect();
+    let mut ds: Vec<HoSoTach> = phien.ho_so.iter().map(|h| HoSoTach { pdf: h.pdf.clone(), nhan: Default::default(), xoay: Default::default(), id: h.id }).collect();
     for t in &b.trang {
         let hs = &mut ds[t.ho_so as usize];
         let n = t.nhan();

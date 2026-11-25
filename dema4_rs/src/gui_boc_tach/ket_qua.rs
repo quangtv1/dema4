@@ -295,7 +295,7 @@ impl ManBocTach {
     pub(crate) fn nhan_chay(&mut self, ctx: &egui::Context, cfg: &CauHinhBocTach) {
         let Some(loai) = self.chay.as_ref().map(|c| c.loai.clone()) else { return };
         let goc = PathBuf::from(self.thu_muc.trim());
-        let f_jsonl = luu::file_jsonl(&goc);
+
         loop {
             let Some(c) = &mut self.chay else { return };
             let sk = match c.nhan.try_recv() {
@@ -317,8 +317,8 @@ impl ManBocTach {
                     }
                 }
                 SuKien::Xong(i, kq) => {
-                    let b = BanGhi::tu_ket_qua(&self.files[i].ten, &loai, &kq);
-                    let _ = luu::ghi_them(&f_jsonl, &b);
+                    let b = BanGhi { id: self.files[i].id, ..BanGhi::tu_ket_qua(&self.files[i].ten, &loai, &kq) };
+                    let _ = crate::boc_tach::theo_id::ghi(&goc, &b);
                     c.xong += 1;
                     c.ok += 1;
                     c.truong_boc += kq.so_co();
@@ -326,7 +326,7 @@ impl ManBocTach {
                     self.danh_dau_sheet();
                 }
                 SuKien::Loi(i, e) => {
-                    let _ = luu::ghi_them(&f_jsonl, &BanGhi::loi(&self.files[i].ten, &loai, self.files[i].so_trang, &e));
+                    let _ = crate::boc_tach::theo_id::ghi(&goc, &BanGhi { id: self.files[i].id, ..BanGhi::loi(&self.files[i].ten, &loai, self.files[i].so_trang, &e) });
                     c.xong += 1;
                     // Đọc lại bị lỗi: giữ kết quả tốt cũ (jsonl cũng giữ bản tốt), không đẩy dòng lỗi lên Sheet
                     match c.truoc.remove(&i) {
@@ -458,7 +458,8 @@ impl ManBocTach {
                 BanGhi::loi(&ten, &loai, self.files[i].so_trang, &e)
             }
         };
-        let _ = luu::ghi_them(&luu::file_jsonl(Path::new(self.thu_muc.trim())), &b);
+        let b = BanGhi { id: self.files[i].id, ..b };
+        let _ = crate::boc_tach::theo_id::ghi(Path::new(self.thu_muc.trim()), &b);
         self.tt[i] = match &b.loi {
             Some(e) => TrangThai::Loi(e.clone()),
             None => TrangThai::Xong(b),
@@ -869,7 +870,7 @@ fn luu_sua(m: &mut ManBocTach, loai: &LoaiTaiLieu, i: usize, ten: &str, so_trang
     let Some((_, goc, ban)) = m.kq.sua.clone() else { return };
     let mut b = match m.tt.get(i) {
         Some(TrangThai::Xong(b)) => b.clone(),
-        _ => BanGhi { file: ten.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: None, sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc: 0 },
+        _ => BanGhi { file: ten.into(), loai: loai.ten.clone(), so_trang, gia_tri: BTreeMap::new(), loi: None, sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc: 0, id: None },
     };
     // Chỉ ghi các trường người dùng đã sửa (trường khác giữ giá trị hiện có)
     for (k, tr) in loai.truong.iter().enumerate() {
@@ -884,7 +885,8 @@ fn luu_sua(m: &mut ManBocTach, loai: &LoaiTaiLieu, i: usize, ten: &str, so_trang
     }
     b.loi = None;
     b.luc = crate::tach_vb::moc_sua::bay_gio_ms(); // sửa tay = lần sửa mới nhất của file này
-    let _ = luu::ghi_them(&luu::file_jsonl(Path::new(m.thu_muc.trim())), &b);
+    b.id = b.id.or(m.files[i].id);
+    let _ = crate::boc_tach::theo_id::ghi(Path::new(m.thu_muc.trim()), &b);
     m.tt[i] = TrangThai::Xong(b);
     m.kq.sua = None;
 }
@@ -1141,7 +1143,7 @@ mod tests {
 
     fn xong(n: usize) -> TrangThai {
         let gia_tri = (0..6).map(|k| (format!("b{k}"), if k < n { "x".to_string() } else { String::new() })).collect();
-        TrangThai::Xong(BanGhi { file: String::new(), loai: String::new(), so_trang: 1, gia_tri, loi: None, sua: vec![], canh_bao: None, giay: 1.0, tho: vec![], luc: 0 })
+        TrangThai::Xong(BanGhi { file: String::new(), loai: String::new(), so_trang: 1, gia_tri, loi: None, sua: vec![], canh_bao: None, giay: 1.0, tho: vec![], luc: 0, id: None })
     }
 
     #[test]

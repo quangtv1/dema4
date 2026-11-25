@@ -198,8 +198,10 @@ impl UngDungChinh {
 
     /// Màn Tách đang ghi vào thư mục dữ liệu của `goc` → ghi nhãn chưa lưu, cờ duyệt, mốc xuống đĩa
     /// (Bóc tách ghi từng bản ghi ngay). Trả `false` khi còn nhãn chưa lưu được (lỗi ghi).
-    fn ghi_xuong_dia_neu_dang_mo(&mut self, goc: &Path) -> bool {
-        if self.tach.cung_du_lieu(goc) {
+    /// Kho dùng chung theo nội dung PDF: màn Tách đang mở **bất kỳ** thư mục nào cũng ghi xuống trước khi xuất / nhập
+    /// (cùng PDF có thể nằm ở thư mục đang xuất / nhập).
+    fn ghi_xuong_dia_neu_dang_mo(&mut self, _goc: &Path) -> bool {
+        if self.tach.co_phien() {
             self.tach.ghi_het_xuong_dia();
             return !self.tach.chua_luu();
         }
@@ -216,8 +218,9 @@ impl UngDungChinh {
                     self.hop_phien.bao_loi(format!("Không lưu được nhãn đang sửa của thư mục này ({}) — chưa nhập gì. Sửa lỗi ghi rồi nhập lại.", self.tach.trang_thai));
                     return;
                 }
-                self.mo_lai_tach_sau_nhap = self.tach.cung_du_lieu(&goc) && self.tach.co_phien();
-                if self.tach.cung_du_lieu(&goc) {
+                // Nhập ghi vào kho theo nội dung PDF: bỏ phiên Tách đang mở (thư mục nào cũng vậy), nhập xong mở lại
+                self.mo_lai_tach_sau_nhap = self.tach.co_phien();
+                if self.tach.co_phien() {
                     self.tach.bo_phien_khong_luu();
                 }
                 self.hop_phien.nhap(goc, zip, ctx);
@@ -683,6 +686,14 @@ impl eframe::App for UngDungChinh {
         if let Some(hop) = &mut self.hop_cau_hinh {
             use crate::gui_tach::hop_cau_hinh::KetQuaHop;
             let kq = hop.ve(&ctx);
+            if std::mem::take(&mut hop.don_cu) {
+                // Dọn ở luồng nền (kho lớn: vài giây) — không đứng giao diện
+                std::thread::spawn(|| {
+                    let mot_nam = 365 * 86_400_000;
+                    let _ = crate::tach_vb::kho::kho().don(crate::tach_vb::moc_sua::bay_gio_ms().saturating_sub(mot_nam));
+                });
+                self.tach.bao_tin("Đang dọn dữ liệu của PDF không mở lại quá 12 tháng (chạy ngầm)…".into());
+            }
             if std::mem::take(&mut hop.xoa_cache) {
                 self.tach.xoa_cache();
                 hop.co_cache = self.tach.co_cache();

@@ -16,6 +16,8 @@ Lần đầu mở (file chưa ký số với Apple / Microsoft):
 - **Windows** (SmartScreen): **More info › Run anyway**.
 - **Windows, mở không lên cửa sổ** (máy card Intel driver cũ): từ v2.2.2 app không còn dò Vulkan nên không còn crash ở `igvk64.dll`. Vẫn không lên → cập nhật driver card đồ hoạ, hoặc thử chạy trong PowerShell: `$env:WGPU_BACKEND="gl"; .\dema4_saomai.exe`.
 
+**Nâng cấp lên v2.4.0**: phần đã làm ở Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) chuyển vào **1 kho theo nội dung từng PDF** — đổi tên / di chuyển thư mục, mở thư mục cha hay con, chép sang ổ khác vẫn thấy lại, tới từng file. Dữ liệu bản 2.3 tự chuyển vào kho lần đầu mở thư mục (file cũ giữ nguyên). Cùng 1 PDF ở nhiều chỗ dùng chung nhãn. Chỉ mở được 1 cửa sổ app.
+
 **Nâng cấp lên v2.3.0**: dữ liệu làm việc chuyển sang thư mục dữ liệu của người dùng (xem [Dữ liệu làm việc](#dữ-liệu-làm-việc-và-làm-tiếp-trên-máy-khác)); bản mới **không mang dữ liệu bản cũ sang** — làm xong / xuất Excel phần đang dở trước khi nâng cấp, sau đó dán lại khoá API và chỉnh lại Cấu hình. Số lượt chạy lấy từ trạm: máy chưa từng kích hoạt, và máy Windows lần chạy đầu sau nâng cấp, **cần có mạng**. Thư mục `.sm-dema4` cạnh file chạy của bản cũ không còn dùng, xoá tay được (quay lại bản cũ thì bản cũ vẫn đọc thư mục đó, không thấy phần làm trên bản mới).
 
 **Hướng dẫn sử dụng chi tiết** (có hình minh hoạ): [docs/huong-dan/huong-dan-su-dung-dema4.docx](docs/huong-dan/huong-dan-su-dung-dema4.docx) · [bản PDF](docs/huong-dan/huong-dan-su-dung-dema4.pdf).
@@ -95,15 +97,17 @@ Mọi dữ liệu làm việc (cấu hình, khoá API mã hoá, license, nhãn /
 - Windows: `%LOCALAPPDATA%\sm-dema4`
 - macOS: `~/Library/Application Support/sm-dema4`
 
-Mỗi thư mục đầu vào có 1 thư mục con trong `viec/`. Cache phân tích nhận PDF theo nội dung, nên thư mục chép qua USB / Drive sang máy khác không phải phân tích lại.
+Phần Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) nằm trong **1 file kho** `kho_tach.bin`, khoá theo **nội dung từng PDF** (64 KB đầu + 64 KB cuối + kích thước) chứ không theo đường dẫn: đổi tên / di chuyển thư mục, mở thư mục cha hay con, chép sang ổ khác vẫn thấy lại phần đã làm của từng file, không phân tích lại. Cùng 1 PDF ở nhiều chỗ dùng chung nhãn. Trước khi **Tách**, app đọc lại nội dung từng file: file đã bị thay bản khác (cùng tên) không bị tách theo nhãn cũ. Kết quả Bóc tách vẫn ở `viec/<thư mục>/boc_tach.jsonl`, mỗi kết quả kèm id nội dung nên cũng tìm lại được khi đổi tên / di chuyển. Kho ghi nối từng thay đổi nhỏ (sửa 1 nhãn ghi vài chục byte), tắt máy giữa chừng không hỏng; **Cấu hình › Dọn dữ liệu cũ** bỏ phần đã làm của PDF không mở lại quá 12 tháng. Chỉ mở được 1 cửa sổ app (1 nơi ghi kho).
 
-**Làm tiếp trên máy khác** (màn Tách hoặc Bóc tách, đã mở thư mục): **Chức năng › Xuất phiên làm việc…** đóng gói nhãn, góc xoay, cache phân tích và kết quả bóc tách của thư mục đó thành `<tên>.sm-dema4.zip` (mặc định vào thư mục Tải về; không có khoá API, license, cấu hình). Ở máy kia mở **cùng thư mục** (Drive, USB…) rồi **Chức năng › Nhập phiên làm việc…**: hộp xác nhận cho biết % PDF khớp, loại tài liệu mới; mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói), kết quả bóc tách đọc được không bị bản lỗi đè; báo cáo liệt kê hồ sơ hai máy cùng sửa. Nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, và để đồng hồ máy đúng giờ.
+**Làm tiếp trên máy khác** (màn Tách hoặc Bóc tách, đã mở thư mục): **Chức năng › Xuất phiên làm việc…** đóng gói nhãn, góc xoay, cache phân tích và kết quả bóc tách của thư mục đó thành `<tên>.sm-dema4.zip` (mặc định vào thư mục Tải về; không có khoá API, license, cấu hình). Ở máy kia mở thư mục chứa các PDF đó — **cấp nào, tên gì cũng được**: khớp theo nội dung file — rồi **Chức năng › Nhập phiên làm việc…**: hộp xác nhận cho biết % PDF khớp, loại tài liệu mới; mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói), kết quả bóc tách đọc được không bị bản lỗi đè; báo cáo liệt kê hồ sơ hai máy cùng sửa. Nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, và để đồng hồ máy đúng giờ.
 
 ## Dòng lệnh
 
 ```
 dema4_saomai <thư mục> [--dpi] [--kyso] [--khong-ghi]                        # Đếm
-dema4_saomai --tach <thư mục pdf> [--nhan <index_and_blank.txt>] [--ra <thư mục cha>]
+dema4_saomai --tach <thư mục pdf> [--nhan <file nhãn>] [--xuat-nhan <file>] [--ra <thư mục cha>]
+                                     # nhãn lấy từ kho (chưa có → phân tích tự động); --nhan: file nhãn dạng chữ ngoài;
+                                     # --xuat-nhan: ghi nhãn trong kho ra file chữ rồi dừng; ứng dụng đang mở → báo, không chạy
 ```
 
 ## Trợ giúp

@@ -82,7 +82,7 @@ mod tests {
     fn bg(luc: u64, loi: bool, gt: &str) -> BanGhi {
         let mut gia_tri = std::collections::BTreeMap::new();
         gia_tri.insert("so".to_string(), gt.to_string());
-        BanGhi { file: "a.pdf".into(), loai: "VB".into(), so_trang: 1, gia_tri, loi: loi.then(|| "500".into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc }
+        BanGhi { file: "a.pdf".into(), loai: "VB".into(), so_trang: 1, gia_tri, loi: loi.then(|| "500".into()), sua: vec![], canh_bao: None, giay: 0.0, tho: vec![], luc, id: None }
     }
 
     #[test]

@@ -2,6 +2,8 @@
 
 pub mod anh;
 pub mod cache_trang;
+pub mod chuyen_kho;
+pub mod kho;
 pub mod cat_pdf;
 pub mod chi_so_trang;
 pub mod doc_ma;
