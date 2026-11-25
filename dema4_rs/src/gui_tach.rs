@@ -445,6 +445,9 @@ impl ManTach {
                     let _ = ghi_an_toan(&f, "");
                 }
             }
+            // Mọi hồ sơ đã có mục → bia mộ (gộp với máy khác không hồi lại nhãn cũ đã bỏ)
+            let f = thu_muc_an(&goc).join(crate::tach_vb::moc_sua::TEN_FILE);
+            let _ = crate::tach_vb::moc_sua::danh_dau_xoa_het(&f, crate::tach_vb::moc_sua::bay_gio_ms());
         }
         self.bang = None;
         self.phien = None;
@@ -706,19 +709,25 @@ impl ManTach {
         let fx = thu_muc_an(&goc).join("xoay_trang.txt");
         let kq = ghi_an_toan(&thu_muc_an(&goc).join("index_and_blank.txt"), &n).and_then(|_| if x.is_empty() && !fx.exists() { Ok(()) } else { ghi_an_toan(&fx, &x) });
         match kq {
-            Ok(()) => b.chua_luu = false,
+            Ok(()) => {
+                b.chua_luu = false;
+                self.cap_nhat_moc(false);
+            }
             Err(e) => self.trang_thai = format!("Không ghi được nhãn: {e}"),
         }
-        self.cap_nhat_moc();
     }
 
-    /// Ghi mốc sửa từng hồ sơ (gộp phiên giữa 2 máy: bản sửa sau cùng thắng). Gọi ở mọi chỗ ghi nhãn / cờ duyệt.
-    fn cap_nhat_moc(&self) {
-        let Some(b) = &self.bang else { return };
-        let goc = self.phien.as_ref().map(|p| p.goc.clone()).unwrap_or_else(|| PathBuf::from(self.thu_muc.trim()));
-        let f = thu_muc_an(&goc).join(crate::tach_vb::moc_sua::TEN_FILE);
-        if let Err(e) = crate::tach_vb::moc_sua::cap_nhat(&f, &b.chu_ky_ho_so(), crate::tach_vb::moc_sua::bay_gio_ms()) {
-            eprintln!("Không ghi được mốc sửa: {e}");
+    /// Ghi mốc sửa từng hồ sơ (gộp phiên giữa 2 máy: bản sửa sau cùng thắng) theo đúng nội dung **đã ghi xuống đĩa**.
+    /// Hồ sơ lỗi đọc không đưa vào (giữ mốc cũ — trục trặc đọc file không thành "xoá hết nhãn").
+    fn cap_nhat_moc(&mut self, bo_co_duyet: bool) {
+        use crate::tach_vb::moc_sua;
+        let (Some(b), Some(p)) = (&self.bang, &self.phien) else { return };
+        let loi: std::collections::HashSet<&str> = p.ho_so.iter().filter(|h| h.loi.is_some()).map(|h| h.tuong_doi.as_str()).collect();
+        let mut chu_ky = b.chu_ky_ho_so(bo_co_duyet);
+        chu_ky.retain(|k, _| !loi.contains(k.as_str()));
+        let f = thu_muc_an(&p.goc).join(moc_sua::TEN_FILE);
+        if let Err(e) = moc_sua::cap_nhat(&f, &chu_ky, moc_sua::bay_gio_ms()) {
+            self.trang_thai = format!("Không ghi được mốc sửa: {e}");
         }
     }
 
@@ -758,6 +767,7 @@ impl ManTach {
         match cache_trang::xoa_het(&self.thu_muc_cache()) {
             Ok(()) => {
                 self.khong_ghi_cache = true;
+                self.cap_nhat_moc(true); // cờ duyệt mất cùng cache
                 self.bao = Some(("Đã xoá cache — lần Phân tích sau sẽ phân tích lại mọi trang".into(), Instant::now()));
             }
             Err(e) => self.trang_thai = format!("Không xoá được cache: {e}"),
@@ -772,7 +782,10 @@ impl ManTach {
             b.chep_trang_thai(p);
             p.ghi_cache();
         }
-        self.cap_nhat_moc();
+        // Còn nhãn chưa lưu (vừa chọn Bỏ khi đóng, hoặc chế độ lưu tay): không ghi mốc cho nhãn chưa nằm trên đĩa
+        if !self.bang.as_ref().is_some_and(|b| b.chua_luu) {
+            self.cap_nhat_moc(false);
+        }
     }
 
     // ---- Thứ tự hiện ----
@@ -2715,6 +2728,19 @@ mod tests {
         let sau = moc_sua::doc(&f);
         assert!(sau["a.pdf"].luc > truoc.get("a.pdf").map_or(0, |m| m.luc), "a.pdf vừa gán nhãn → mốc mới");
         assert_eq!(sau.get("b.pdf"), truoc.get("b.pdf"), "b.pdf không đụng → mốc giữ nguyên");
+        // Nhãn chưa lưu (như chọn Bỏ khi đóng app): ghi cache không ghi mốc cho nhãn đó
+        man.bang.as_mut().unwrap().chua_luu = true;
+        let t2 = man.thu_tu.iter().copied().find(|&t| { let b = man.bang.as_ref().unwrap(); b.ho_so[b.trang[t as usize].ho_so as usize] == "b.pdf" }).unwrap();
+        man.bang.as_mut().unwrap().trang[t2 as usize].sua.tay = Some(Nhan::Index);
+        man.ghi_cache();
+        assert_eq!(moc_sua::doc(&f).get("b.pdf"), truoc.get("b.pdf"), "nhãn chưa lưu → không đổi mốc");
+        // Phân tích lại từ đầu: mọi hồ sơ đã có mục thành bia mộ
+        man.bat_dau(&ch, true);
+        assert!(moc_sua::doc(&f).values().all(|m| m.chu_ky == moc_sua::CHU_KY_RONG), "Làm lại → bia mộ");
+        while man.dang_chay() {
+            std::thread::sleep(Duration::from_millis(20));
+            man.nhan_su_kien(&ch, None);
+        }
         let _ = std::fs::remove_dir_all(thu_muc_an(&goc));
         let _ = std::fs::remove_dir_all(&goc);
     }

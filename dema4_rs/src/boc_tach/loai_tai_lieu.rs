@@ -176,12 +176,36 @@ pub fn doc(duong_dan: &Path) -> Vec<LoaiTaiLieu> {
         .unwrap_or_else(co_san)
 }
 
+/// Ghi danh sách loại (file tạm rồi đổi tên — tắt app giữa chừng không làm mất các loại riêng).
 pub fn ghi(duong_dan: &Path, ds: &[LoaiTaiLieu]) -> std::io::Result<()> {
-    if let Some(cha) = duong_dan.parent() {
-        std::fs::create_dir_all(cha)?;
-    }
     let s = serde_json::to_string_pretty(ds).map_err(std::io::Error::other)?;
-    std::fs::write(duong_dan, s)
+    crate::ghi_file::ghi_an_toan(duong_dan, s)
+}
+
+/// Lỗi khiến loại không dùng được (dùng cho hộp sửa loại và khi nhập loại từ gói phiên): tên trống, chưa có trường,
+/// tên cột trống, biến trống / sai ký tự / trùng, Danh sách chưa có giá trị. `None` = hợp lệ.
+pub fn kiem(l: &LoaiTaiLieu) -> Option<String> {
+    if l.ten.trim().is_empty() {
+        return Some("Nhập tên loại".into());
+    }
+    if l.truong.is_empty() {
+        return Some("Cần ít nhất 1 trường".into());
+    }
+    for (i, t) in l.truong.iter().enumerate() {
+        if t.ten_cot.trim().is_empty() {
+            return Some(format!("Trường {}: nhập tên cột", i + 1));
+        }
+        if t.bien.is_empty() || !t.bien.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') {
+            return Some(format!("Biến \"{}\": chỉ dùng chữ thường không dấu, số và _", t.bien));
+        }
+        if l.truong[..i].iter().any(|x| x.bien == t.bien) {
+            return Some(format!("Biến \"{}\" bị trùng", t.bien));
+        }
+        if t.chuan_hoa == ChuanHoa::DanhSach && t.danh_sach.is_empty() {
+            return Some(format!("Trường \"{}\": nhập danh sách giá trị", t.ten_cot));
+        }
+    }
+    None
 }
 
 #[cfg(test)]

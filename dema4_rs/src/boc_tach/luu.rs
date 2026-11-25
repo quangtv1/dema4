@@ -90,11 +90,20 @@ pub fn ghi_them(f: &Path, b: &BanGhi) -> std::io::Result<()> {
 /// Bản ghi mới nhất của từng file thuộc loại `loai`; dòng hỏng (ghi dở khi tắt máy) bỏ qua.
 /// Bản ghi lỗi không đè bản ghi đọc được trước đó (đọc lại / Chạy lại bị lỗi không làm mất kết quả tốt, giá trị sửa tay).
 pub fn doc(f: &Path, loai: &str) -> HashMap<String, BanGhi> {
-    let mut ds = HashMap::new();
-    let Ok(s) = std::fs::read_to_string(f) else { return ds };
-    for b in s.lines().filter_map(|d| serde_json::from_str::<BanGhi>(d).ok()) {
-        if b.loai == loai && !(b.loi.is_some() && ds.get(&b.file).is_some_and(|cu: &BanGhi| cu.loi.is_none())) {
-            ds.insert(b.file.clone(), b);
+    let Ok(s) = std::fs::read_to_string(f) else { return HashMap::new() };
+    doc_tat_ca(&s).into_iter().filter(|((_, l), _)| l == loai).map(|((file, _), b)| (file, b)).collect()
+}
+
+/// Bản ghi mới nhất của từng (file, loại) trong nội dung jsonl — cùng luật với `doc`: bản ghi sau thắng, riêng bản ghi
+/// lỗi không đè bản ghi đọc được. Dòng hỏng bỏ qua.
+pub fn doc_tat_ca(noi_dung: &str) -> HashMap<(String, String), BanGhi> {
+    let mut ds: HashMap<(String, String), BanGhi> = HashMap::new();
+    for mut b in noi_dung.lines().filter_map(|d| serde_json::from_str::<BanGhi>(d).ok()) {
+        // Bản ghi cũ (trước 2.3) có thể giữ `\` (Windows) hoặc tên dạng NFD (Drive trên Mac): chuẩn về khoá chung
+        b.file = crate::tach_vb::nhan::chuan_duong_dan(&b.file);
+        let k = (b.file.clone(), b.loai.clone());
+        if !(b.loi.is_some() && ds.get(&k).is_some_and(|cu| cu.loi.is_none())) {
+            ds.insert(k, b);
         }
     }
     ds

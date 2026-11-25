@@ -321,6 +321,8 @@ mod tests {
         let nhan = std::fs::read_to_string(an.join("index_and_blank.txt")).unwrap();
         assert_eq!(nhan.lines().count(), 3, "3 trang chữ nhỏ → blank: {nhan}");
         assert!(an.join("cache").is_dir());
+        let moc = crate::tach_vb::moc_sua::doc(&an.join(crate::tach_vb::moc_sua::TEN_FILE));
+        assert!(moc.contains_key("b.pdf"), "dòng lệnh phân tích tự động cũng ghi mốc sửa: {moc:?}");
         assert!(!nguon.join(".sm-dema4").exists(), "không ghi gì vào thư mục đầu vào");
         let _ = std::fs::remove_dir_all(&goc);
     }

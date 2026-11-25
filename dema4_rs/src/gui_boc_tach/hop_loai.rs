@@ -35,28 +35,7 @@ impl BanSua {
 
     /// Lỗi chặn Lưu: tên trống, chưa có trường, biến trống / sai ký tự / trùng, Danh sách chưa có giá trị.
     pub fn loi(&self) -> Option<String> {
-        let l = self.ket_qua();
-        if l.ten.is_empty() {
-            return Some("Nhập tên loại".into());
-        }
-        if l.truong.is_empty() {
-            return Some("Cần ít nhất 1 trường".into());
-        }
-        for (i, t) in l.truong.iter().enumerate() {
-            if t.ten_cot.trim().is_empty() {
-                return Some(format!("Trường {}: nhập tên cột", i + 1));
-            }
-            if t.bien.is_empty() || !t.bien.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') {
-                return Some(format!("Biến \"{}\": chỉ dùng chữ thường không dấu, số và _", t.bien));
-            }
-            if l.truong[..i].iter().any(|x| x.bien == t.bien) {
-                return Some(format!("Biến \"{}\" bị trùng", t.bien));
-            }
-            if t.chuan_hoa == ChuanHoa::DanhSach && t.danh_sach.is_empty() {
-                return Some(format!("Trường \"{}\": nhập danh sách giá trị", t.ten_cot));
-            }
-        }
-        None
+        crate::boc_tach::loai_tai_lieu::kiem(&self.ket_qua())
     }
 
     fn them(&mut self) {

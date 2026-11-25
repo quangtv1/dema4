@@ -470,7 +470,8 @@ impl BangTrang {
 
     /// Chữ ký nội dung từng hồ sơ (nhãn + góc xoay + cờ duyệt) cho mốc sửa (`tach_vb::moc_sua`). Mọi hồ sơ đều có
     /// mục; hồ sơ không còn gì → `CHU_KY_RONG` (bia mộ nếu trước đó từng có).
-    pub fn chu_ky_ho_so(&self) -> BTreeMap<String, u64> {
+    /// `bo_co_duyet`: bỏ cờ duyệt khỏi chữ ký (sau Xoá cache — cờ duyệt chỉ nằm trong cache).
+    pub fn chu_ky_ho_so(&self, bo_co_duyet: bool) -> BTreeMap<String, u64> {
         use std::fmt::Write;
         let mut nd: BTreeMap<String, String> = self.ho_so.iter().map(|k| (k.clone(), String::new())).collect();
         for t in &self.trang {
@@ -482,7 +483,7 @@ impl BangTrang {
             if t.sua.goc != 0 || xac_nhan {
                 let _ = write!(s, "x{}:{}:{};", t.so, t.sua.goc, xac_nhan as u8);
             }
-            if t.trang_thai_cache() != 0 {
+            if !bo_co_duyet && t.trang_thai_cache() != 0 {
                 let _ = write!(s, "d{}:{};", t.so, t.trang_thai_cache());
             }
         }
