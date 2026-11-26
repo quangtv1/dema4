@@ -11,7 +11,7 @@ use eframe::egui::{self, Color32, Rect, Sense, Stroke, StrokeKind};
 use super::thiet_ke as tk;
 use super::widget::{self, font};
 use super::xem_truoc::YeuCau;
-use super::{bieu_tuong, ManXoaGhim, TyLe};
+use super::{bieu_tuong, Keo, ManXoaGhim, TyLe};
 
 const GIU_QUANH: u32 = 4;
 const CAC_PHONG: [u16; 6] = [25, 50, 75, 100, 125, 150];
@@ -274,8 +274,27 @@ impl ManXoaGhim {
         let ra = sa.show(&mut con, |ui| {
             let (r, _) = ui.allocate_exact_size(noi, Sense::hover());
             let nhin = ui.clip_rect();
+            let o_cua = |y0: f32, co: egui::Vec2| Rect::from_min_size(egui::pos2(r.left() + ((r.width() - co.x) / 2.0).max(tk::LE_VUA / 2.0), r.top() + y0), co);
+            // Kéo bắt đầu ở nền xám ngoài trang (khung Gốc): vẽ vùng (− / +) hoặc quét chọn vẫn được — điểm đầu kéo về
+            // điểm gần nhất trên mép trang gần nhất. Đăng ký trước các trang nên trên trang thì trang nhận chuột.
+            if la_goc {
+                let nen = ui.interact(nhin, ui.scope_id().with("xg_nen_keo"), Sense::drag());
+                if nen.drag_started() && self.keo.is_none() {
+                    if let Some(q) = ctx.input(|i| i.pointer.press_origin()) {
+                        let gan = bo_cuc.iter().map(|&(t, y0, co)| (t, o_cua(y0, co))).min_by(|a, b| a.1.distance_sq_to_pos(q).total_cmp(&b.1.distance_sq_to_pos(q)));
+                        if let Some((t, o)) = gan {
+                            let dau = q.clamp(o.min, o.max);
+                            let them = ctx.input(|i| i.modifiers.shift);
+                            self.keo = Some(if self.ve.is_some() { Keo::Moi { trang: t, dau } } else { Keo::Quet { trang: t, dau, them } });
+                        }
+                    }
+                }
+                if self.ve.is_some() {
+                    nen.on_hover_cursor(egui::CursorIcon::Crosshair);
+                }
+            }
             for &(t, y0, co) in bo_cuc {
-                let o_trang = Rect::from_min_size(egui::pos2(r.left() + ((r.width() - co.x) / 2.0).max(tk::LE_VUA / 2.0), r.top() + y0), co);
+                let o_trang = o_cua(y0, co);
                 if la_goc && trang_tren.is_none() && o_trang.bottom() > nhin.top() + nhin.height() * 0.3 {
                     trang_tren = Some(t);
                 }
