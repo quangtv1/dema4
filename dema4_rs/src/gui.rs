@@ -2426,44 +2426,117 @@ mod tests {
         assert!(h.query_by_label("Phân tích").is_none());
     }
 
-    /// Hộp Cấu hình: Huỷ đóng không đổi gì; ô sai khoá Lưu.
+    /// Trang Cấu hình: mở đúng chức năng của màn; thay đổi → chấm / nhãn chưa lưu; ô sai khoá Lưu; Huỷ thay đổi trả
+    /// bản cũ; Quay lại đóng không đổi cấu hình.
     #[test]
     fn cau_hinh_huy_va_o_sai_khoa_luu() {
+        use crate::gui_tach::hop_cau_hinh::TabCauHinh;
         use egui_kittest::kittest::{NodeT, Queryable};
         let mut h = harness_chinh(Man::Tach);
         h.run();
         h.get_by_label("Cấu hình").click();
         h.run();
-        assert!(h.state().hop_cau_hinh.is_some());
-        assert!(!h.get_by_label("Lưu").accesskit_node().is_disabled());
+        assert_eq!(h.state().hop_cau_hinh.as_ref().map(|x| x.tab), Some(TabCauHinh::Tach));
+        assert!(h.get_by_label("Lưu").accesskit_node().is_disabled(), "chưa đổi gì → Lưu mờ");
         h.state_mut().hop_cau_hinh.as_mut().unwrap().nhap.mau_ten = "{hoso}".into();
         h.run();
+        assert_eq!(h.state().hop_cau_hinh.as_ref().unwrap().ds_doi(), [TabCauHinh::Tach]);
+        h.get_by_label("1 chức năng chưa lưu");
         assert!(h.get_by_label("Lưu").accesskit_node().is_disabled(), "mẫu tên thiếu {{n}} → khoá Lưu");
         h.get_by_label_contains("Mẫu phải có");
-        h.get_by_label("Huỷ").click();
+        h.get_by_label("Huỷ thay đổi").click();
+        h.run();
+        assert!(h.state().hop_cau_hinh.as_ref().unwrap().ds_doi().is_empty());
+        h.get_by_label("Quay lại").click();
         h.run();
         assert!(h.state().hop_cau_hinh.is_none());
         assert_eq!(h.state().cfg.mau_ten, "{hoso}.{n}");
     }
 
-    /// Cửa sổ thấp (980×600) hay mặc định: nút Lưu/Huỷ của hộp Cấu hình vẫn nằm trong cửa sổ, cả 2 tab.
+    /// Còn thay đổi mà rời trang (Esc / Quay lại) → hỏi; Ở lại giữ trang; Không lưu đóng, cấu hình không đổi; Lưu ở lại trang.
     #[test]
-    fn cau_hinh_khong_tran_cua_so() {
+    fn cau_hinh_hoi_khi_roi_va_luu_o_lai_trang() {
         use egui_kittest::kittest::Queryable;
-        for (rong, cao) in [(980.0, 600.0), (1100.0, 720.0), (800.0, 420.0)] {
-            let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(rong, cao)).build_eframe(|cc| {
-                cai_giao_dien(&cc.egui_ctx);
-                UngDungChinh { man: Man::Dem, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() }
-            });
+        let mut h = harness_chinh(Man::Dem);
+        h.run();
+        h.get_by_label("Cấu hình").click();
+        h.run();
+        h.state_mut().hop_cau_hinh.as_mut().unwrap().nhap.xoa_ghim.lo_10 = false;
+        h.run();
+        h.key_press(egui::Key::Escape);
+        h.run();
+        h.get_by_label("Ở lại").click();
+        h.run();
+        assert!(h.state().hop_cau_hinh.is_some());
+        h.get_by_label("Lưu").click();
+        h.run();
+        assert!(h.state().hop_cau_hinh.as_ref().is_some_and(|x| x.ds_doi().is_empty()), "Lưu không đóng trang");
+        assert!(!h.state().cfg.xoa_ghim.lo_10);
+        h.state_mut().hop_cau_hinh.as_mut().unwrap().nhap.xoa_ghim.lo_10 = true;
+        h.run();
+        h.get_by_label("Quay lại").click();
+        h.run();
+        h.get_by_label("Không lưu").click();
+        h.run();
+        assert!(h.state().hop_cau_hinh.is_none());
+        assert!(!h.state().cfg.xoa_ghim.lo_10, "Không lưu → giữ bản đã lưu");
+    }
+
+    /// Mở từ từng màn → đúng chức năng; "Quay lại <màn>".
+    #[test]
+    fn cau_hinh_mo_dung_chuc_nang_cua_man() {
+        use crate::gui_tach::hop_cau_hinh::TabCauHinh;
+        use egui_kittest::kittest::Queryable;
+        for (man, tab) in [(Man::TrangChu, TabCauHinh::Dem), (Man::Dem, TabCauHinh::Dem), (Man::Tach, TabCauHinh::Tach), (Man::MucLuc, TabCauHinh::MucLuc), (Man::BocTach, TabCauHinh::BocTach), (Man::XoaGhim, TabCauHinh::XoaGhim)] {
+            let mut h = harness_chinh(man);
             h.run();
             h.get_by_label("Cấu hình").click();
             h.run();
-            for tab in ["Đếm trang A4", "Tách PDF", "Bóc tách"] {
-                h.get_by_label(tab).click();
+            let hop = h.state().hop_cau_hinh.as_ref().expect("mở Cấu hình");
+            assert_eq!((hop.tab, hop.tu), (tab, man.ten_ngan()), "{man:?}");
+        }
+    }
+
+    /// Ctrl+M / Ctrl+B đổi dạng hiển thị và nhớ vào cấu hình ngay; ✕ của cửa sổ thu nhỏ đóng trang.
+    #[test]
+    fn cau_hinh_cua_so_nho_va_thu_sidebar_nho_vao_cau_hinh() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = harness_chinh(Man::Tach);
+        h.run();
+        h.get_by_label("Cấu hình").click();
+        h.run();
+        h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::M);
+        h.run();
+        assert!(h.state().hop_cau_hinh.as_ref().unwrap().cua_so_nho);
+        assert!(h.state().cfg.ch_cua_so_nho, "nhớ ngay, không cần Lưu");
+        h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::B);
+        h.run();
+        assert!(h.state().cfg.ch_thu_ds);
+        h.get_by_label("Đóng").click();
+        h.run();
+        assert!(h.state().hop_cau_hinh.is_none());
+    }
+
+    /// Cửa sổ thấp (980×600) hay mặc định: nút Lưu / Huỷ thay đổi trên tiêu đề vẫn nằm trong cửa sổ, cả 2 dạng hiển thị.
+    #[test]
+    fn cau_hinh_khong_tran_cua_so() {
+        use egui_kittest::kittest::Queryable;
+        for nho in [false, true] {
+            for (rong, cao) in [(980.0, 600.0), (1100.0, 720.0), (800.0, 420.0)] {
+                let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(rong, cao)).build_eframe(move |cc| {
+                    cai_giao_dien(&cc.egui_ctx);
+                    UngDungChinh { man: Man::Dem, cfg: crate::cau_hinh::CauHinh { ch_cua_so_nho: nho, ..Default::default() }, ..Default::default() }
+                });
                 h.run();
-                for nut in ["Lưu", "Huỷ"] {
-                    let r = h.get_by_label(nut).rect();
-                    assert!(r.min.y >= 0.0 && r.max.y <= cao, "{rong}×{cao} tab {tab}: nút {nut} tràn ({r:?})");
+                h.get_by_label("Cấu hình").click();
+                h.run();
+                for tab in ["Đếm trang A4", "Tách văn bản", "Bóc tách dữ liệu"] {
+                    h.get_by_role_and_label(egui::accesskit::Role::Tab, tab).click();
+                    h.run();
+                    for nut in ["Lưu", "Huỷ thay đổi"] {
+                        let r = h.get_by_label(nut).rect();
+                        assert!(r.min.y >= 0.0 && r.max.y <= cao && r.max.x <= rong, "{rong}×{cao} nhỏ={nho} {tab}: nút {nut} tràn ({r:?})");
+                    }
                 }
             }
         }
@@ -2501,8 +2574,8 @@ mod tests {
         assert_eq!(h.state().hop_cau_hinh.as_ref().unwrap().nhap.boc_tach.mac_dinh, Some(NhaCungCap::Gemini));
         h.get_by_label("Lưu").click();
         h.run();
-        assert!(h.state().hop_cau_hinh.is_none());
         assert_eq!(h.state().cfg.boc_tach.mac_dinh, Some(NhaCungCap::Gemini));
+        assert!(h.state().hop_cau_hinh.as_ref().is_some_and(|x| x.ds_doi().is_empty()), "Lưu ở lại trang, hết thay đổi");
     }
 
     /// Thư mục 3 PDF tổng hợp + máy chủ giả trả lần lượt `phan_hoi` (nội dung JSON hoặc mã lỗi).

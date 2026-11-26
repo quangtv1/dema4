@@ -317,8 +317,9 @@ impl HopCauHinh {
             }
             let ds = self.ds_doi();
             let co = !ds.is_empty();
-            let nut_luu = egui::Button::new(RichText::new("Lưu").color(Color32::WHITE).dam()).fill(if co { XANH } else { Color32::from_rgb(0x9D, 0xB7, 0xE6) }).min_size(egui::vec2(48.0, 26.0));
-            let r = ui.add_enabled(co, nut_luu).on_hover_text("Lưu thay đổi của mọi chức năng (Ctrl+S)");
+            let nut_luu = egui::Button::new(RichText::new("Lưu").color(Color32::WHITE).dam()).fill(if co && self.loi().is_empty() { XANH } else { Color32::from_rgb(0x9D, 0xB7, 0xE6) }).min_size(egui::vec2(48.0, 26.0));
+            let sai = !self.loi().is_empty();
+            let r = ui.add_enabled(co && !sai, nut_luu).on_hover_text("Lưu thay đổi của mọi chức năng (Ctrl+S)").on_disabled_hover_text(if sai { "Sửa ô đang báo đỏ trước" } else { "Chưa có thay đổi" });
             if r.clicked() {
                 self.luu(kq, false);
             }
@@ -423,4 +424,34 @@ fn nut_bieu_tuong(ui: &mut egui::Ui, o: Rect, bt: &str, tip: &str) -> egui::Resp
     let ten = tip.split(" (").next().unwrap_or(tip).to_string();
     ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, ten.clone()));
     ph.on_hover_text(tip)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// Cửa sổ thu nhỏ vẽ trước màn chức năng và lấy hết phím: màn vẽ sau (vd Tách — phím B gán nhãn) không thấy phím.
+    #[test]
+    fn cua_so_nho_lay_het_phim_truoc_man_phia_sau() {
+        let thay_b = Rc::new(Cell::new(false));
+        let t = thay_b.clone();
+        let mut hop = HopCauHinh::moi(&CauHinh::default(), TabCauHinh::Dem);
+        hop.cua_so_nho = true;
+        let mut da_cai = false;
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui(move |ui| {
+            if !std::mem::replace(&mut da_cai, true) {
+                crate::gui::cai_giao_dien(ui.ctx());
+            }
+            let _ = hop.ve_cua_so(ui.ctx());
+            if ui.ctx().input(|i| i.key_pressed(egui::Key::B)) {
+                t.set(true);
+            }
+        });
+        h.run();
+        h.key_press(egui::Key::B);
+        h.run();
+        assert!(!thay_b.get());
+    }
 }
