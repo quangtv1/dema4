@@ -861,7 +861,8 @@ pub fn khop_nang_cao(tt: &ThongTinFile, l: &LocNangCao, qt: &crate::dem_pdf::Quy
     tt.kho_chieu(qt).enumerate().any(|(i, (kho, ngang))| trong.as_ref().is_none_or(|f| f(i as u32 + 1)) && l.kho.get(kho).copied().unwrap_or(false) && if ngang { l.ngang } else { l.doc })
 }
 
-/// Khổ (A0..A7) và chiều (ngang, dọc) **có mặt** trong các file đã đọc — ô lọc không có trang nào thì mờ.
+/// Khổ (A0..A7) và chiều (ngang, dọc) **có mặt** trong các file đã đọc.
+#[cfg(test)]
 pub fn co_mat(ds: &[Option<ThongTinFile>], qt: &crate::dem_pdf::QuyTac) -> ([bool; 8], bool, bool) {
     let (kho, ngang, doc) = dem_file(ds, qt);
     (kho.map(|n| n > 0), ngang > 0, doc > 0)
