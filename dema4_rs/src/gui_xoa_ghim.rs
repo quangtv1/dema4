@@ -229,6 +229,8 @@ pub struct ManXoaGhim {
     ty_le: TyLe,
     /// Tỉ lệ đang hiển thị ở khung vừa vẽ (cho − / +, ô tỉ lệ).
     ty_le_cuoi: f32,
+    /// Khoá bố cục khung hình trước (chế độ, bề ngang / chiều cao khung hoặc tỉ lệ cố định) — đổi thì neo lại.
+    khoa_bo_cuc: Option<(u8, f32)>,
     trang: u32,
     /// Cuộn tới trang này ở khung tới (chuyển trang / file).
     cuon_toi: Option<u32>,
@@ -314,6 +316,7 @@ impl Default for ManXoaGhim {
             cho_nho: HashSet::new(),
             ty_le: TyLe::VuaNgang,
             ty_le_cuoi: 1.0,
+            khoa_bo_cuc: None,
             trang: 0,
             cuon_toi: None,
             cuon_goc: egui::Vec2::ZERO,

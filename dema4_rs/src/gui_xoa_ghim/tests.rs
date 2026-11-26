@@ -670,3 +670,33 @@ fn phong_thu_lien_tuc_khong_troi() {
     assert!((cuoi.x - dau.x).abs() < 1.0, "ngang trôi: {dau:?} → {cuoi:?}");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// File trộn dọc / ngang, vừa ngang, cuộn liên tiếp: trang nào cũng đúng bề ngang khung (không cuộn ngang), cuộn
+/// sang trang khác khổ không đổi bố cục / không kéo vị trí cuộn.
+#[test]
+fn vua_ngang_tron_doc_ngang_khong_cuon_ngang() {
+    let d = thu_muc_mau("tron", &[("a.pdf", 3)]);
+    let mut man = ManXoaGhim::default();
+    man.mo_thu_muc(d.clone());
+    let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+    let m2 = man.clone();
+    let mut da_cai = false;
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 800.0)).build_ui(move |ui| {
+        if !std::mem::replace(&mut da_cai, true) {
+            crate::gui::cai_giao_dien(ui.ctx());
+        }
+        m2.borrow_mut().ve(ui, &mut CauHinhXoaGhim::default());
+    });
+    man.borrow_mut().kho_trang = vec![(595.0, 842.0), (842.0, 595.0), (595.0, 842.0)];
+    h.run_steps(4);
+    let rong: Vec<f32> = man.borrow().bo_cuc_cu.iter().map(|b| b.2.x).collect();
+    assert!(rong.iter().all(|w| (w - rong[0]).abs() < 0.5), "mọi trang cùng bề ngang khung: {rong:?}");
+    man.borrow_mut().cuon_toi = Some(1);
+    h.run_steps(4);
+    let m = man.borrow();
+    let y_trang2 = m.bo_cuc_cu[1].1 - thiet_ke::DEM_TREN_TRANG;
+    assert_eq!(m.cuon_goc.x, 0.0, "không cuộn ngang");
+    assert!((m.cuon_goc.y - y_trang2).abs() < 1.0, "cuộn tới trang ngang rồi đứng yên: {} vs {y_trang2}", m.cuon_goc.y);
+    drop(m);
+    let _ = std::fs::remove_dir_all(&d);
+}

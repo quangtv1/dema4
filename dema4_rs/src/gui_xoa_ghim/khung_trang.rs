@@ -176,28 +176,41 @@ impl ManXoaGhim {
             }
         }
         let rong_max = self.kho_trang.iter().map(|k| k.0).fold(1.0, f32::max);
-        // Vừa ngang / vừa cao theo **trang đang xem** (file trộn khổ: trang A4 không bị thu nhỏ theo trang A3)
-        let (w_hien, h_hien) = self.kho_trang.get(self.trang as usize).copied().unwrap_or((rong_max, 1.0));
-        let ty = match self.ty_le {
-            TyLe::VuaNgang => (x - tk::LE_VUA) / w_hien.max(1.0),
-            TyLe::VuaCao => (o_goc.height() - tk::DEM_TREN_TRANG - tk::DEM_DUOI_TRANG) / h_hien.max(1.0),
-            TyLe::CoDinh(v) => v,
-        }
-        .max(0.05);
-        // Đổi tỉ lệ (phóng / thu, vừa ngang, sang trang khác khổ): trục giữa khung xem trùng trục giữa trang giấy
-        // theo chiều ngang; chiều dọc giữ điểm đang ở giữa khung
-        let doi_ty = (ty - self.ty_le_cuoi).abs() > 1e-4 && self.ty_le_cuoi > 0.0;
+        // Vừa ngang / vừa cao: **mỗi trang một tỉ lệ** cho vừa khung (file trộn dọc / ngang: trang nào cũng đúng bề
+        // ngang khung) → cuộn qua trang khác khổ không đổi phóng, vừa ngang không còn cuộn ngang
+        let cao_vua = o_goc.height() - tk::DEM_TREN_TRANG - tk::DEM_DUOI_TRANG;
+        let ty_trang = |(w, h): (f32, f32)| {
+            match self.ty_le {
+                TyLe::VuaNgang => (x - tk::LE_VUA) / w.max(1.0),
+                TyLe::VuaCao => cao_vua / h.max(1.0),
+                TyLe::CoDinh(v) => v,
+            }
+            .max(0.05)
+        };
+        let ty = ty_trang(self.kho_trang.get(self.trang as usize).copied().unwrap_or((rong_max, 1.0)));
+        // Bố cục chỉ đổi khi đổi chế độ / tỉ lệ cố định / cỡ khung — không phải khi cuộn sang trang khác khổ.
+        // Đổi bố cục: trục giữa khung trùng trục giữa trang; chiều dọc giữ điểm đang ở giữa khung
+        let khoa = match self.ty_le {
+            TyLe::VuaNgang => (0, x),
+            TyLe::VuaCao => (1, cao_vua),
+            TyLe::CoDinh(v) => (2, v),
+        };
+        let doi_ty = self.khoa_bo_cuc.is_some_and(|k| k.0 != khoa.0 || (k.1 - khoa.1).abs() > 1e-4);
+        self.khoa_bo_cuc = Some(khoa);
         self.ty_le_cuoi = ty;
         let n = self.kho_trang.len() as u32;
         let cac: Vec<u32> = if self.cfg.tung_trang { vec![self.trang.min(n - 1)] } else { (0..n).collect() };
         let mut bo_cuc: BoCuc = Vec::with_capacity(cac.len());
         let mut y = tk::DEM_TREN_TRANG;
+        let mut rong_noi: f32 = 0.0;
         for &t in &cac {
             let (w, h) = self.kho_trang[t as usize];
-            bo_cuc.push((t, y, egui::vec2(w * ty, h * ty)));
-            y += h * ty + tk::DEM_DUOI_TRANG.min(tk::KHE_TRANG + 12.0);
+            let k = ty_trang((w, h));
+            bo_cuc.push((t, y, egui::vec2(w * k, h * k)));
+            rong_noi = rong_noi.max(w * k);
+            y += h * k + tk::DEM_DUOI_TRANG.min(tk::KHE_TRANG + 12.0);
         }
-        let noi = egui::vec2((rong_max * ty + tk::LE_VUA).max(x), y + tk::DEM_DUOI_TRANG);
+        let noi = egui::vec2((rong_noi + tk::LE_VUA).max(x), y + tk::DEM_DUOI_TRANG);
         // Neo ngang: trục đứng trang đang xem ở trục giữa khung — giữ mỗi khung hình (kể cả khi ScrollArea còn kẹp
         // theo nội dung cũ) tới khi người dùng tự cuộn ngang; đổi tỉ lệ / đổi bề rộng khung (ẩn hiện Danh sách, Đích) neo lại
         let rong_xem = o_goc.width();
