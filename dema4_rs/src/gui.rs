@@ -59,6 +59,11 @@ fn cau_hinh_wgpu() -> eframe::egui_wgpu::WgpuConfiguration {
 
 pub fn chay() -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default().with_inner_size([1100.0, 720.0]).with_min_inner_size([800.0, 420.0]).with_title(TIEU_DE);
+    // macOS: chữ tiêu đề hệ thống in đậm → ẩn đi, nội dung tràn lên dưới thanh tiêu đề trong suốt, app tự vẽ dải tiêu
+    // đề chữ thường (giữ 3 nút cửa sổ của hệ thống)
+    if TIEU_DE_RIENG {
+        viewport = viewport.with_fullsize_content_view(true).with_title_shown(false).with_titlebar_shown(false);
+    }
     if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../../icon.png")) {
         viewport = viewport.with_icon(Arc::new(icon));
     }
@@ -68,7 +73,8 @@ pub fn chay() -> eframe::Result {
         options,
         Box::new(|cc| {
             cai_giao_dien(&cc.egui_ctx);
-            let app = UngDungChinh::default();
+            let mut app = UngDungChinh::default();
+            app.tieu_de_rieng = TIEU_DE_RIENG;
             app.dem.license.mo_app();
             Ok(Box::new(app))
         }),
@@ -149,6 +155,8 @@ struct UngDungChinh {
     /// "Chọn lại…" dòng gần đây đang mở hộp chọn: (dòng, kết quả).
     chon_lai: Option<(crate::gan_day::MucGanDay, std::sync::mpsc::Receiver<Option<PathBuf>>)>,
     cho_dong: bool,
+    /// Tự vẽ dải tiêu đề (macOS, cửa sổ thật — test không bật).
+    tieu_de_rieng: bool,
 }
 
 impl Default for UngDungChinh {
@@ -164,7 +172,7 @@ impl Default for UngDungChinh {
         let mut xoa_ghim = crate::gui_xoa_ghim::ManXoaGhim::default();
         xoa_ghim.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: "", dem, tach, muc_luc, boc_tach, xoa_ghim, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: "", dem, tach, muc_luc, boc_tach, xoa_ghim, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false, tieu_de_rieng: false }
     }
 }
 
@@ -523,6 +531,23 @@ impl UngDungChinh {
         self.viec_dang_chay().mo_ta().is_some()
     }
 
+    /// Dải tiêu đề tự vẽ (macOS): chữ thường giữa dải, chừa chỗ 3 nút cửa sổ bên trái; kéo để di chuyển cửa sổ,
+    /// bấm đúp để phóng to / thu lại như thanh tiêu đề hệ thống.
+    fn dai_tieu_de(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::top("tieu_de_rieng").exact_size(CAO_DAI_TIEU_DE).frame(egui::Frame::new().fill(NEN_TAB)).show(ui, |ui| {
+            let o = ui.max_rect();
+            let ph = ui.interact(o, ui.scope_id().with("keo_cua_so"), egui::Sense::click_and_drag());
+            if ph.drag_started() {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+            }
+            if ph.double_clicked() {
+                let to = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!to));
+            }
+            ui.painter().text(o.center(), egui::Align2::CENTER_CENTER, self.tieu_de_da_dat, egui::FontId::proportional(13.0), Color32::from_gray(0x44));
+        });
+    }
+
     fn thanh_menu(&mut self, ui: &mut egui::Ui) {
         let khoa = self.dang_chay();
         use crate::gui_tach::bieu_tuong::{atom_mau, BieuTuong};
@@ -757,6 +782,9 @@ impl eframe::App for UngDungChinh {
             self.tro_giup = Some(crate::tro_giup::HopTroGiup::HuongDan(self.tab_huong_dan()));
         }
         self.tach.khoa_phim = self.hop_phien.dang_mo();
+        if self.tieu_de_rieng {
+            self.dai_tieu_de(ui);
+        }
         self.thanh_menu(ui);
         // Cấu hình: toàn cửa sổ thay màn chức năng; cửa sổ thu nhỏ vẽ trước (lấy hết phím) rồi màn phía sau
         let kq_ch = self.hop_cau_hinh.as_mut().map(|h| if h.cua_so_nho { h.ve_cua_so(&ctx) } else { h.ve_trang(ui) });
@@ -1219,6 +1247,10 @@ pub(crate) const NEN_XEN_KE: Color32 = Color32::from_rgb(0xF6, 0xF6, 0xF6);
 /// Lề trái/phải trong mỗi ô để chữ không sát mép
 const LE_O: f32 = 8.0;
 const CAO_TIEU_DE: f32 = 26.0;
+/// Cao dải tiêu đề tự vẽ trên macOS (bằng thanh tiêu đề hệ thống).
+const CAO_DAI_TIEU_DE: f32 = 28.0;
+/// Tự vẽ tiêu đề chữ thường thay chữ đậm của hệ thống — chỉ macOS.
+const TIEU_DE_RIENG: bool = cfg!(target_os = "macos");
 const CAO_DONG: f32 = 22.0;
 
 /// Làm tròn một kích thước (điểm) về số pixel nguyên theo tỷ lệ màn hình.
