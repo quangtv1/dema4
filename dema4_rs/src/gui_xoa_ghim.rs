@@ -35,7 +35,7 @@ use crate::xoa_ghim::xuat;
 use sua_vung::{BoVung, Canh, ChonVung};
 use xem_truoc::{CauHinhXem, KetQua, XemTruoc, YeuCau};
 
-pub use the_cau_hinh::TabXoaGhim;
+pub use the_cau_hinh::{CauHinhThuMuc, TabXoaGhim};
 pub use widget::{HO_FONT_XG, HO_FONT_XG_DAM};
 
 pub const TIEU_DE: &str = "Xóa ghim (Giải pháp số Sao Mai)";

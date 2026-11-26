@@ -115,7 +115,8 @@ fn chup_man_xoa_ghim() {
         }
         m2.borrow_mut().ve(ui, &mut CauHinhXoaGhim::default());
         if let Some(h) = hop2.borrow_mut().as_mut() {
-            let _ = h.ve(ui.ctx());
+            h.cua_so_nho = true;
+            let _ = h.ve_cua_so(ui.ctx());
         }
     });
     let cho = |h: &mut egui_kittest::Harness, n: usize| {
@@ -313,7 +314,8 @@ fn chup_doi_chieu_prototype() {
             }
             m2.borrow_mut().ve(ui, &mut CauHinhXoaGhim::default());
             if let Some(hop) = &mut hop {
-                let _ = hop.ve(ui.ctx());
+                hop.cua_so_nho = true;
+                let _ = hop.ve_cua_so(ui.ctx());
             }
         });
         for _ in 0..90 {

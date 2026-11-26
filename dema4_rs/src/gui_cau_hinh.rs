@@ -3,10 +3,14 @@
 //!
 //! Module này giữ phần dùng chung cho thân các chức năng: thẻ (`the`), dòng `nhãn | ô` (`dong`), chữ gợi ý (`goi_y`).
 
-#[allow(dead_code)]
+pub mod bieu_tuong;
 pub mod du_lieu;
+pub mod khung;
+pub mod phan;
 
 use eframe::egui::{self, Color32, Margin, RichText, Stroke};
+
+use crate::gui::ChuDam;
 
 /// Bề rộng cột nội dung — cố định cho mọi chức năng (cửa sổ thu nhỏ: hết bề ngang trừ lề).
 pub const RONG_COT: f32 = 880.0;
@@ -42,7 +46,7 @@ pub fn the(ui: &mut egui::Ui, tieu_de: &str, giai_thich: Option<&str>, pham: Opt
         ui.spacing_mut().item_spacing.y = 0.0;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
-            ui.label(RichText::new(tieu_de).strong().size(13.5).color(CHU));
+            ui.label(RichText::new(tieu_de).size(13.5).color(CHU).dam());
             if let Some(g) = giai_thich {
                 crate::gui_tach::bieu_tuong::thong_tin(ui, g);
             }

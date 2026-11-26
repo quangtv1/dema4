@@ -1,5 +1,5 @@
-//! Hộp Cấu hình (menu Cấu hình): 5 tab (Đếm, Tách PDF, Sinh mục lục, Bóc tách, Xóa ghim), thân cao cố định để hộp không nhảy khi đổi tab.
-//! Tab Tách PDF: nhóm 1 "Tự động nhận dạng khi Phân tích", nhóm 2 "Kết quả tách".
+//! Trạng thái trang Cấu hình (bản nháp, chức năng đang xem, phần gốc để biết thay đổi chưa lưu) + thân từng chức năng.
+//! Khung trang (sidebar, tiêu đề, cửa sổ) ở `crate::gui_cau_hinh::khung`.
 
 use eframe::egui::{self, Align, Color32, CornerRadius, Margin, Rect, RichText, Sense, Stroke, StrokeKind};
 
@@ -9,7 +9,7 @@ use super::thanh_nguong::{self as tn, Mep};
 use super::thuoc_kho as tk;
 use crate::cau_hinh::{A0Lon, CauHinh, LoaiMa, LoiCauHinh, LuuNhan, CANH_CHUAN_MM, RANH_GIOI_MAC_DINH, TIN_CAY_KHOANG};
 use crate::dem_pdf::{KHO, PT_MOI_MM};
-use crate::gui::{ChuDam, CHU, CHU_PHU, DO, HO_FONT_DAM, VIEN_NHAT, VIEN_TAB_CHON, XANH_LA};
+use crate::gui::{ChuDam, CHU, CHU_PHU, DO, HO_FONT_DAM, VIEN_NHAT, VIEN_TAB_CHON};
 
 /// Dòng `nhãn | ô`: cột nhãn cố định, ô kéo tới mép phải (macro để 2 khối cùng mượn `self`).
 macro_rules! dong {
@@ -21,14 +21,6 @@ macro_rules! dong {
     };
 }
 
-const RONG_HOP: f32 = 560.0;
-/// Tab Bóc tách rộng hơn: 5 ô nhà cung cấp trên 1 hàng.
-const RONG_HOP_BOC_TACH: f32 = 780.0;
-/// Tab Xóa ghim: 4 thẻ trên 2 cột.
-const RONG_HOP_XOA_GHIM: f32 = 820.0;
-const CAO_THAN: f32 = 470.0;
-/// Tab Xóa ghim: đủ 4 thẻ không cuộn.
-const CAO_THAN_XOA_GHIM: f32 = 612.0;
 /// Cột nhãn tab Tách PDF (vừa "☑ Trang trắng ⓘ"); ô bắt đầu ở `LE_O`.
 const RONG_NHAN: f32 = 118.0;
 const LE_O: f32 = 126.0;
@@ -45,12 +37,47 @@ pub enum TabCauHinh {
     MucLuc,
     BocTach,
     XoaGhim,
+    /// Dữ liệu ứng dụng: thư mục dữ liệu, xoá cache, dọn dữ liệu cũ (không có tuỳ chọn để lưu).
+    DuLieu,
 }
 
-pub enum KetQuaHop {
-    Mo,
-    Huy,
-    Luu(CauHinh),
+impl TabCauHinh {
+    /// Thứ tự sidebar.
+    pub const CHUC_NANG: [TabCauHinh; 5] = [TabCauHinh::Dem, TabCauHinh::Tach, TabCauHinh::MucLuc, TabCauHinh::BocTach, TabCauHinh::XoaGhim];
+
+    pub fn ten(self) -> &'static str {
+        match self {
+            TabCauHinh::Dem => "Đếm trang A4",
+            TabCauHinh::Tach => "Tách văn bản",
+            TabCauHinh::MucLuc => "Sinh mục lục",
+            TabCauHinh::BocTach => "Bóc tách dữ liệu",
+            TabCauHinh::XoaGhim => "Xóa ghim",
+            TabCauHinh::DuLieu => "Dữ liệu ứng dụng",
+        }
+    }
+
+    pub fn mo_ta(self) -> &'static str {
+        match self {
+            TabCauHinh::Dem => "Hệ số quy đổi khổ giấy ra A4 và ranh giới nhận khổ theo cạnh dài.",
+            TabCauHinh::Tach => "Tự động nhận dạng khi Phân tích và cách ghi kết quả tách.",
+            TabCauHinh::MucLuc => "Nơi ghi và tên file mục lục.",
+            TabCauHinh::BocTach => "Nguồn văn bản → mô hình đọc → nơi ghi kết quả.",
+            TabCauHinh::XoaGhim => "Nhận diện, bảo vệ, xuất file (theo thư mục đang mở) và hiệu năng, hiển thị (chung).",
+            TabCauHinh::DuLieu => "Thư mục dữ liệu, cache phân tích và dọn dữ liệu cũ — dùng chung mọi chức năng.",
+        }
+    }
+
+    /// Tên biểu tượng (`gui_cau_hinh::bieu_tuong`).
+    pub fn bieu_tuong(self) -> &'static str {
+        match self {
+            TabCauHinh::Dem => "dem",
+            TabCauHinh::Tach => "tach",
+            TabCauHinh::MucLuc => "muc_luc",
+            TabCauHinh::BocTach => "boc_tach",
+            TabCauHinh::XoaGhim => "xoa_ghim",
+            TabCauHinh::DuLieu => "du_lieu",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -84,6 +111,21 @@ pub struct HopCauHinh {
     pub khoa: std::collections::BTreeMap<String, String>,
     /// Tab Xóa ghim: tuỳ chọn thư mục đang mở + việc tải mô hình AI (app nạp vào khi mở, lấy ra khi đóng).
     pub xg: crate::gui_xoa_ghim::TabXoaGhim,
+    /// Trang Dữ liệu ứng dụng.
+    pub du_lieu: crate::gui_cau_hinh::du_lieu::TrangDuLieu,
+    /// Bản đang dùng (đã lưu) — so với `nhap` để biết chức năng nào còn thay đổi.
+    pub goc: CauHinh,
+    khoa_goc: std::collections::BTreeMap<String, String>,
+    xg_goc: Option<crate::gui_xoa_ghim::CauHinhThuMuc>,
+    /// Tên màn sẽ quay lại ("Quay lại <màn>").
+    pub tu: &'static str,
+    /// Dạng hiển thị (nhớ trong cấu hình app, đổi là ghi ngay — không qua Lưu).
+    pub cua_so_nho: bool,
+    pub thu_ds: bool,
+    pub doi_giao_dien: bool,
+    /// Đang hỏi "Lưu thay đổi trước khi quay lại?".
+    pub(crate) hoi_roi: bool,
+    pub(crate) toast: Option<(String, std::time::Instant)>,
 }
 
 fn so_o(v: f32) -> String {
@@ -167,9 +209,69 @@ impl HopCauHinh {
             bt: crate::gui_boc_tach::cau_hinh::TabBocTach::moi(&cfg.boc_tach),
             khoa: Default::default(),
             xg: Default::default(),
+            du_lieu: Default::default(),
+            goc: cfg.clone(),
+            khoa_goc: Default::default(),
+            xg_goc: None,
+            tu: "",
+            cua_so_nho: cfg.ch_cua_so_nho,
+            thu_ds: cfg.ch_thu_ds,
+            doi_giao_dien: false,
+            hoi_roi: false,
+            toast: None,
         };
         h.dong_bo_o();
         h
+    }
+
+    /// Chốt phần gốc của khoá Bóc tách / tuỳ chọn thư mục Xóa ghim sau khi app nạp vào (gọi ngay sau khi tạo).
+    pub fn chot_goc(&mut self) {
+        self.khoa_goc = self.khoa.clone();
+        self.xg_goc = self.xg.thu_muc.clone();
+    }
+
+    /// Chức năng `tab` còn thay đổi chưa lưu.
+    pub fn doi(&self, tab: TabCauHinh) -> bool {
+        crate::gui_cau_hinh::phan::khac(tab, &self.nhap, &self.goc)
+            || (tab == TabCauHinh::BocTach && self.khoa != self.khoa_goc)
+            || (tab == TabCauHinh::XoaGhim && self.xg.thu_muc != self.xg_goc)
+    }
+
+    /// Các chức năng còn thay đổi chưa lưu (thứ tự sidebar).
+    pub fn ds_doi(&self) -> Vec<TabCauHinh> {
+        TabCauHinh::CHUC_NANG.into_iter().filter(|t| self.doi(*t)).collect()
+    }
+
+    /// Huỷ mọi thay đổi: nháp = bản đang dùng.
+    pub fn huy_thay_doi(&mut self) {
+        self.nhap = self.goc.clone();
+        self.khoa = self.khoa_goc.clone();
+        self.xg.thu_muc = self.xg_goc.clone();
+        self.bt = crate::gui_boc_tach::cau_hinh::TabBocTach::moi(&self.goc.boc_tach);
+        self.dong_bo_o();
+    }
+
+    /// App đã áp bản `cfg` vừa lưu → thành gốc mới.
+    pub fn da_luu(&mut self, cfg: &CauHinh) {
+        self.goc = cfg.clone();
+        self.chot_goc();
+    }
+
+    /// Đưa chức năng đang xem về mặc định (chưa lưu).
+    pub fn mac_dinh_tab(&mut self) {
+        self.nhap = match self.tab {
+            TabCauHinh::Tach => mac_dinh_tach(&self.nhap),
+            TabCauHinh::Dem => mac_dinh_dem(&self.nhap),
+            TabCauHinh::MucLuc => mac_dinh_muc_luc(&self.nhap),
+            TabCauHinh::BocTach => crate::gui_boc_tach::cau_hinh::mac_dinh(&self.nhap),
+            TabCauHinh::XoaGhim => {
+                let mut n = self.nhap.clone();
+                self.xg.mac_dinh(&mut n.xoa_ghim);
+                n
+            }
+            TabCauHinh::DuLieu => return,
+        };
+        self.dong_bo_o();
     }
 
     #[cfg(test)]
@@ -207,75 +309,23 @@ impl HopCauHinh {
         l
     }
 
-    pub fn ve(&mut self, ctx: &egui::Context) -> KetQuaHop {
-        let mut kq = KetQuaHop::Mo;
-        let rong = match self.tab {
-            TabCauHinh::BocTach => RONG_HOP_BOC_TACH,
-            TabCauHinh::XoaGhim => RONG_HOP_XOA_GHIM,
-            _ => RONG_HOP,
-        };
-        let phan_hoi = kh::hop(ctx, "hop_cau_hinh", rong, "Cấu hình", |ui| {
-            let co_cache = self.co_cache;
-            let mut bam_xoa = false;
-            let mut bam_don = false;
-            kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF"), (TabCauHinh::MucLuc, "Sinh mục lục"), (TabCauHinh::BocTach, "Bóc tách"), (TabCauHinh::XoaGhim, "Xóa ghim")], &mut self.tab, |ui| {
-                let nut_don = egui::Button::new(RichText::new("Dọn dữ liệu cũ").size(12.0)).min_size(egui::vec2(0.0, 22.0));
-                bam_don = ui
-                    .add(nut_don)
-                    .on_hover_text("Bỏ phần đã làm (nhãn, kết quả phân tích, con trỏ kết quả bóc tách) của các PDF không mở lại quá 12 tháng, rồi thu gọn kho dữ liệu. Không đụng file PDF và file kết quả Excel.")
-                    .clicked();
-                // Canh phải, thẳng hàng 2 tab: chỉ bấm được khi thư mục đang mở còn cache
-                let nut = egui::Button::new(RichText::new("Xoá cache").size(12.0)).min_size(egui::vec2(0.0, 22.0));
-                bam_xoa = ui
-                    .add_enabled(co_cache, nut)
-                    .on_hover_text("Xoá kết quả phân tích đã lưu (cache, trong thư mục dữ liệu của ứng dụng) của thư mục đang mở. Nhãn đã gán không mất; lần Phân tích sau sẽ phân tích lại mọi trang.")
-                    .on_disabled_hover_text("Thư mục đang mở chưa có cache phân tích")
-                    .clicked();
-            });
-            if bam_xoa {
-                self.xoa_cache = true;
-            }
-            if bam_don {
-                self.don_cu = true;
-            }
-            kh::than(ui, "than_cau_hinh", if self.tab == TabCauHinh::XoaGhim { CAO_THAN_XOA_GHIM } else { CAO_THAN }, Margin { left: 20, right: 20, top: 16, bottom: 8 }, |ui| match self.tab {
-                TabCauHinh::Tach => self.tab_tach(ui),
-                TabCauHinh::Dem => self.tab_dem(ui),
-                TabCauHinh::MucLuc => self.tab_muc_luc(ui),
-                TabCauHinh::BocTach => self.bt.ve(ui, &mut self.nhap.boc_tach, &mut self.khoa),
-                TabCauHinh::XoaGhim => self.xg.ve(ui, &mut self.nhap.xoa_ghim),
-            });
-            let loi = self.loi();
-            kh::chan(ui, |ui| {
-                if ui.add(kh::nut_chan("Mặc định")).on_hover_text("Đưa tab đang mở về giá trị mặc định").clicked() {
-                    self.nhap = match self.tab {
-                        TabCauHinh::Tach => mac_dinh_tach(&self.nhap),
-                        TabCauHinh::Dem => mac_dinh_dem(&self.nhap),
-                        TabCauHinh::MucLuc => mac_dinh_muc_luc(&self.nhap),
-                        TabCauHinh::BocTach => crate::gui_boc_tach::cau_hinh::mac_dinh(&self.nhap),
-                        TabCauHinh::XoaGhim => {
-                            let mut n = self.nhap.clone();
-                            self.xg.mac_dinh(&mut n.xoa_ghim);
-                            n
-                        }
-                    };
-                    self.dong_bo_o();
+    /// Thân chức năng đang xem (trong cột nội dung của trang).
+    pub fn ve_than(&mut self, ui: &mut egui::Ui) {
+        match self.tab {
+            TabCauHinh::Tach => self.tab_tach(ui),
+            TabCauHinh::Dem => self.tab_dem(ui),
+            TabCauHinh::MucLuc => self.tab_muc_luc(ui),
+            TabCauHinh::BocTach => self.bt.ve(ui, &mut self.nhap.boc_tach, &mut self.khoa),
+            TabCauHinh::XoaGhim => self.xg.ve(ui, &mut self.nhap.xoa_ghim),
+            TabCauHinh::DuLieu => {
+                use crate::gui_cau_hinh::du_lieu::ViecDuLieu;
+                match self.du_lieu.ve(ui) {
+                    ViecDuLieu::XoaCache => self.xoa_cache = true,
+                    ViecDuLieu::DonCu => self.don_cu = true,
+                    ViecDuLieu::Khong => {}
                 }
-                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                    let luu = ui.add_enabled(loi.is_empty(), kh::nut_chan_mau("Lưu", XANH_LA)).on_disabled_hover_text("Sửa ô đang báo đỏ trước");
-                    if luu.clicked() {
-                        kq = KetQuaHop::Luu(self.nhap.clone());
-                    }
-                    if ui.add(kh::nut_chan("Huỷ")).clicked() {
-                        kq = KetQuaHop::Huy;
-                    }
-                });
-            });
-        });
-        if phan_hoi.should_close() && matches!(kq, KetQuaHop::Mo) {
-            kq = KetQuaHop::Huy;
+            }
         }
-        kq
     }
 
     fn tab_tach(&mut self, ui: &mut egui::Ui) {

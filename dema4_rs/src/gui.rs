@@ -89,6 +89,21 @@ enum Man {
 }
 
 impl Man {
+    /// Tên ngắn (nút "Quay lại <màn>" của trang Cấu hình).
+    fn ten_ngan(self) -> &'static str {
+        match self {
+            Man::TrangChu => "Trang chủ",
+            Man::Dem => "Đếm trang A4",
+            Man::Tach => "Tách văn bản",
+            Man::MucLuc => "Sinh mục lục",
+            Man::BocTach => "Bóc tách dữ liệu",
+            Man::XoaGhim => "Xóa ghim",
+            Man::ChuanTen => "Chuẩn hoá tên",
+            Man::Ky => "Ký văn bản",
+            Man::Aip => "Đóng gói AIP",
+        }
+    }
+
     fn tieu_de(self) -> &'static str {
         match self {
             Man::TrangChu => "dema4-saomai (Giải pháp số Sao Mai)",
@@ -107,7 +122,7 @@ impl Man {
 /// Cửa sổ chính: menu Chức năng + các màn (Đếm, Tách, Ký giữ chỗ).
 struct UngDungChinh {
     man: Man,
-    tieu_de_da_dat: Man,
+    tieu_de_da_dat: &'static str,
     dem: UngDung,
     tach: crate::gui_tach::ManTach,
     muc_luc: crate::gui_muc_luc::ManMucLuc,
@@ -149,7 +164,7 @@ impl Default for UngDungChinh {
         let mut xoa_ghim = crate::gui_xoa_ghim::ManXoaGhim::default();
         xoa_ghim.license = dem.license.clone();
         // Mở app vào Trang chủ (chọn chức năng); tiêu đề cửa sổ ban đầu là của Đếm → khung đầu tiên đặt lại
-        Self { man: Man::TrangChu, tieu_de_da_dat: Man::Dem, dem, tach, muc_luc, boc_tach, xoa_ghim, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false }
+        Self { man: Man::TrangChu, tieu_de_da_dat: "", dem, tach, muc_luc, boc_tach, xoa_ghim, trang_chu: Default::default(), cfg, hop_cau_hinh: None, khoa_bt: crate::boc_tach::khoa_cache::doc(), tro_giup: None, hoi_dong: false, hoi_dong_chay: false, bao_goc_tam: crate::tach_vb::du_lieu_an::goc_la_tam(), hop_phien: Default::default(), mo_lai_tach_sau_nhap: false, gan_day: crate::gan_day::DanhSach::mac_dinh(), chon_lai: None, cho_dong: false }
     }
 }
 
@@ -544,15 +559,16 @@ impl UngDungChinh {
                 })
                 .response
                 .on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để đổi chức năng");
-                let cau_hinh = ui.add_enabled(!khoa, egui::Button::new((atom_mau(BieuTuong::BanhRang, 14.0, xam), "Cấu hình")).frame(false)).on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để sửa Cấu hình");
-                if cau_hinh.clicked() {
+                let dang_mo = self.hop_cau_hinh.is_some();
+                let cau_hinh = ui.add_enabled(!khoa, egui::Button::new((atom_mau(BieuTuong::BanhRang, 14.0, xam), "Cấu hình")).frame(false).selected(dang_mo)).on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong để sửa Cấu hình");
+                if cau_hinh.clicked() && !dang_mo {
                     use crate::gui_tach::hop_cau_hinh::{HopCauHinh, TabCauHinh};
                     let tab = match self.man {
-                        Man::Dem => TabCauHinh::Dem,
+                        Man::Tach => TabCauHinh::Tach,
                         Man::MucLuc => TabCauHinh::MucLuc,
                         Man::BocTach => TabCauHinh::BocTach,
                         Man::XoaGhim => TabCauHinh::XoaGhim,
-                        _ => TabCauHinh::Tach,
+                        _ => TabCauHinh::Dem,
                     };
                     self.mo_cau_hinh(HopCauHinh::moi(&self.cfg, tab));
                 }
@@ -584,17 +600,22 @@ impl UngDungChinh {
         ui.painter().hline(r.response.rect.x_range(), r.response.rect.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
     }
 
-    /// Menu **Tệp tin** (đầu mọi màn): mở file / thư mục theo màn đang mở, Gần đây, thư mục kết quả, Xuất / Nhập phiên,
-    /// đóng thư mục. Mục màn hiện tại chưa hỗ trợ: mờ + lý do khi rê.
-    /// Mở hộp Cấu hình: nạp cache Tách, khoá Bóc tách, tuỳ chọn thư mục + việc tải mô hình của màn Xóa ghim.
+    /// Mở trang Cấu hình: nạp cache Tách, khoá Bóc tách, tuỳ chọn thư mục + việc tải mô hình của màn Xóa ghim; nhớ
+    /// màn để "Quay lại".
     fn mo_cau_hinh(&mut self, mut hop: crate::gui_tach::hop_cau_hinh::HopCauHinh) {
         hop.co_cache = self.tach.co_cache();
         hop.khoa = self.khoa_bt.clone();
         hop.xg.thu_muc = self.xoa_ghim.cau_hinh_thu_muc();
         hop.xg.mo_hinh = self.xoa_ghim.mo_hinh.take();
+        hop.du_lieu.thu_muc_tach = (!self.tach.thu_muc.trim().is_empty()).then(|| std::path::PathBuf::from(self.tach.thu_muc.trim()));
+        hop.du_lieu.co_cache = hop.co_cache;
+        hop.tu = self.man.ten_ngan();
+        hop.chot_goc();
         self.hop_cau_hinh = Some(hop);
     }
 
+    /// Menu **Tệp tin** (đầu mọi màn): mở file / thư mục theo màn đang mở, Gần đây, thư mục kết quả, Xuất / Nhập phiên,
+    /// đóng thư mục. Mục màn hiện tại chưa hỗ trợ: mờ + lý do khi rê.
     fn menu_tep_tin(&mut self, ui: &mut egui::Ui) {
         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
         const RONG: f32 = 230.0;
@@ -707,9 +728,10 @@ impl UngDungChinh {
 impl eframe::App for UngDungChinh {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        if self.tieu_de_da_dat != self.man {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.man.tieu_de().into()));
-            self.tieu_de_da_dat = self.man;
+        let tieu_de = if self.hop_cau_hinh.is_some() { "Cấu hình — dema4-saomai (Giải pháp số Sao Mai)" } else { self.man.tieu_de() };
+        if self.tieu_de_da_dat != tieu_de {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(tieu_de.into()));
+            self.tieu_de_da_dat = tieu_de;
         }
         self.nhan_gan_day(&ctx);
         if ctx.input(|i| i.viewport().close_requested()) {
@@ -736,6 +758,10 @@ impl eframe::App for UngDungChinh {
         }
         self.tach.khoa_phim = self.hop_phien.dang_mo();
         self.thanh_menu(ui);
+        // Cấu hình: toàn cửa sổ thay màn chức năng; cửa sổ thu nhỏ vẽ trước (lấy hết phím) rồi màn phía sau
+        let kq_ch = self.hop_cau_hinh.as_mut().map(|h| if h.cua_so_nho { h.ve_cua_so(&ctx) } else { h.ve_trang(ui) });
+        let ve_man = self.hop_cau_hinh.as_ref().is_none_or(|h| h.cua_so_nho);
+        if ve_man {
         match self.man {
             Man::TrangChu => {
                 if let Some(c) = self.trang_chu.ve(ui, &self.dem.license, &self.gan_day.ds, &self.gan_day.mat) {
@@ -795,6 +821,7 @@ impl eframe::App for UngDungChinh {
                 });
             }
         }
+        }
         // Bấm logo Sao Mai góc dưới phải màn giới thiệu → về Trang chủ (không đổi màn khi đang chạy)
         if ctx.data_mut(|d| d.remove_temp::<bool>(crate::gioi_thieu::id_ve_trang_chu())).unwrap_or(false) && !self.dang_chay() {
             self.chuyen_man(Man::TrangChu);
@@ -802,47 +829,65 @@ impl eframe::App for UngDungChinh {
         if self.tro_giup.as_mut().is_some_and(|h| h.ve(&ctx)) {
             self.tro_giup = None;
         }
-        if let Some(hop) = &mut self.hop_cau_hinh {
-            use crate::gui_tach::hop_cau_hinh::KetQuaHop;
-            let kq = hop.ve(&ctx);
-            if std::mem::take(&mut hop.don_cu) {
-                // Dọn ở luồng nền (kho lớn: vài giây) — không đứng giao diện
-                std::thread::spawn(|| {
-                    let mot_nam = 365 * 86_400_000;
-                    let truoc = crate::tach_vb::moc_sua::bay_gio_ms().saturating_sub(mot_nam);
-                    // Tập PDF còn dùng lấy từ kho Tách **trước** khi dọn nó; mỗi lần chỉ giữ 1 khoá kho
-                    let con_song = crate::tach_vb::kho::kho().id_con_song(truoc);
-                    let _ = crate::xoa_ghim::kho::don(&mut crate::xoa_ghim::kho::kho(), &con_song, truoc);
-                    let _ = crate::tach_vb::kho::kho().don(truoc);
-                });
-                self.tach.bao_tin("Đang dọn dữ liệu của PDF không mở lại quá 12 tháng (chạy ngầm)…".into());
+        if let Some(kq) = kq_ch {
+            self.sau_cau_hinh(kq);
+        }
+    }
+}
+
+impl UngDungChinh {
+    /// Xử lý sau 1 khung hình của trang Cấu hình: việc Dữ liệu ứng dụng, đổi dạng hiển thị, Lưu, rời trang.
+    fn sau_cau_hinh(&mut self, kq: crate::gui_cau_hinh::khung::KetQuaTrang) {
+        use crate::gui_cau_hinh::khung::KetQuaTrang;
+        let Some(hop) = &mut self.hop_cau_hinh else { return };
+        if std::mem::take(&mut hop.don_cu) {
+            // Dọn ở luồng nền (kho lớn: vài giây) — không đứng giao diện
+            std::thread::spawn(|| {
+                let mot_nam = 365 * 86_400_000;
+                let truoc = crate::tach_vb::moc_sua::bay_gio_ms().saturating_sub(mot_nam);
+                // Tập PDF còn dùng lấy từ kho Tách **trước** khi dọn nó; mỗi lần chỉ giữ 1 khoá kho
+                let con_song = crate::tach_vb::kho::kho().id_con_song(truoc);
+                let _ = crate::xoa_ghim::kho::don(&mut crate::xoa_ghim::kho::kho(), &con_song, truoc);
+                let _ = crate::tach_vb::kho::kho().don(truoc);
+            });
+            hop.bao("Đang dọn dữ liệu của PDF không mở lại quá 12 tháng (chạy ngầm)…");
+        }
+        if std::mem::take(&mut hop.xoa_cache) {
+            self.tach.xoa_cache();
+            hop.co_cache = self.tach.co_cache();
+            hop.du_lieu.co_cache = hop.co_cache;
+            hop.bao("Đã xoá cache phân tích");
+        }
+        // Dạng hiển thị: nhớ ngay, không qua Lưu
+        if std::mem::take(&mut hop.doi_giao_dien) {
+            (self.cfg.ch_cua_so_nho, self.cfg.ch_thu_ds) = (hop.cua_so_nho, hop.thu_ds);
+            (hop.goc.ch_cua_so_nho, hop.goc.ch_thu_ds) = (hop.cua_so_nho, hop.thu_ds);
+            (hop.nhap.ch_cua_so_nho, hop.nhap.ch_thu_ds) = (hop.cua_so_nho, hop.thu_ds);
+            let _ = crate::cau_hinh::ghi(&self.cfg);
+        }
+        let (moi, dong) = match kq {
+            KetQuaTrang::Mo => return,
+            KetQuaTrang::Dong => (None, true),
+            KetQuaTrang::Luu(c) => (Some(c), false),
+            KetQuaTrang::LuuDong(c) => (Some(c), true),
+        };
+        if let Some(mut moi) = moi {
+            (moi.ch_cua_so_nho, moi.ch_thu_ds) = (hop.cua_so_nho, hop.thu_ds);
+            if let Some(c) = hop.xg.thu_muc.clone() {
+                self.xoa_ghim.ap_cau_hinh_thu_muc(c);
             }
-            if std::mem::take(&mut hop.xoa_cache) {
-                self.tach.xoa_cache();
-                hop.co_cache = self.tach.co_cache();
+            self.khoa_bt = hop.khoa.clone();
+            self.khoa_bt.retain(|_, v| !v.trim().is_empty());
+            // Bản build không có bí mật: khoá chỉ giữ trong phiên (ô Khoá API đã báo)
+            let _ = crate::boc_tach::khoa_cache::ghi(&self.khoa_bt);
+            self.ap_cau_hinh(moi, true);
+            if let Some(hop) = &mut self.hop_cau_hinh {
+                hop.da_luu(&self.cfg);
             }
-            match kq {
-                KetQuaHop::Mo => {}
-                KetQuaHop::Huy => {
-                    if let Some(m) = hop.xg.mo_hinh.take() {
-                        self.xoa_ghim.mo_hinh = Some(m);
-                    }
-                    self.hop_cau_hinh = None;
-                }
-                KetQuaHop::Luu(moi) => {
-                    if let Some(m) = hop.xg.mo_hinh.take() {
-                        self.xoa_ghim.mo_hinh = Some(m);
-                    }
-                    if let Some(c) = hop.xg.thu_muc.take() {
-                        self.xoa_ghim.ap_cau_hinh_thu_muc(c);
-                    }
-                    self.khoa_bt = std::mem::take(&mut hop.khoa);
-                    self.khoa_bt.retain(|_, v| !v.trim().is_empty());
-                    // Bản build không có bí mật: khoá chỉ giữ trong phiên (ô Khoá API đã báo)
-                    let _ = crate::boc_tach::khoa_cache::ghi(&self.khoa_bt);
-                    self.ap_cau_hinh(moi, true);
-                    self.hop_cau_hinh = None;
-                }
+        }
+        if dong {
+            if let Some(m) = self.hop_cau_hinh.take().and_then(|mut h| h.xg.mo_hinh.take()) {
+                self.xoa_ghim.mo_hinh = Some(m);
             }
         }
     }
@@ -928,6 +973,7 @@ pub(crate) fn cai_giao_dien(ctx: &egui::Context) {
 
     crate::gui_tach::bieu_tuong::dang_ky_svg(ctx);
     crate::gui_xoa_ghim::dang_ky_bieu_tuong(ctx);
+    crate::gui_cau_hinh::bieu_tuong::dang_ky(ctx);
     ctx.set_theme(egui::ThemePreference::Light);
     ctx.all_styles_mut(|style| {
         use egui::{FontFamily::Proportional, FontId};

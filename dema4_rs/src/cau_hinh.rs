@@ -82,6 +82,10 @@ pub struct CauHinh {
     pub ty_le_vb: u16,
     pub che_do_vb: CheDoVb,
     pub an_dong_thu_muc: bool,
+    /// Trang Cấu hình ở dạng cửa sổ thu nhỏ (không phủ toàn cửa sổ).
+    pub ch_cua_so_nho: bool,
+    /// Sidebar trang Cấu hình thu thành dải biểu tượng.
+    pub ch_thu_ds: bool,
     pub muc_luc: CauHinhMucLuc,
     pub boc_tach: CauHinhBocTach,
     pub xoa_ghim: CauHinhXoaGhim,
@@ -286,6 +290,8 @@ impl Default for CauHinh {
             ty_le_vb: 100,
             che_do_vb: CheDoVb::Luoi,
             an_dong_thu_muc: false,
+            ch_cua_so_nho: false,
+            ch_thu_ds: false,
             muc_luc: CauHinhMucLuc::default(),
             boc_tach: CauHinhBocTach::default(),
             xoa_ghim: CauHinhXoaGhim::default(),
@@ -463,6 +469,8 @@ impl CauHinh {
                     _ => {}
                 },
                 "an_dong_thu_muc" => c.an_dong_thu_muc = bool_().unwrap_or(c.an_dong_thu_muc),
+                "ch_cua_so_nho" => c.ch_cua_so_nho = bool_().unwrap_or(c.ch_cua_so_nho),
+                "ch_thu_ds" => c.ch_thu_ds = bool_().unwrap_or(c.ch_thu_ds),
                 "xg_lo_10" => c.xoa_ghim.lo_10 = bool_().unwrap_or(c.xoa_ghim.lo_10),
                 "xg_tu_luu" => c.xoa_ghim.tu_luu_phut = so().map_or(c.xoa_ghim.tu_luu_phut, |x| (x as u16).min(120)),
                 "xg_tung_trang" => c.xoa_ghim.tung_trang = bool_().unwrap_or(c.xoa_ghim.tung_trang),
@@ -534,6 +542,7 @@ impl CauHinh {
             }
         );
         s += &format!("an_dong_thu_muc={}\n", bool_(self.an_dong_thu_muc));
+        s += &format!("ch_cua_so_nho={}\nch_thu_ds={}\n", bool_(self.ch_cua_so_nho), bool_(self.ch_thu_ds));
         let x = &self.xoa_ghim;
         s += &format!(
             "xg_lo_10={}\nxg_tu_luu={}\nxg_tung_trang={}\nxg_thu_nho={}\nxg_khung_dich={}\nxg_cuon_cung={}\nxg_rong_ds={}\n",
@@ -726,6 +735,8 @@ mod tests {
             ty_le_vb: 150,
             che_do_vb: CheDoVb::HaiTrang,
             an_dong_thu_muc: true,
+            ch_cua_so_nho: true,
+            ch_thu_ds: true,
             muc_luc: CauHinhMucLuc {
                 thu_muc_ra: r"E:\Mục lục".into(),
                 mau_ten: "ML-{so_ho_so}".into(),
