@@ -9,7 +9,7 @@ const {
   AlignmentType, HeadingLevel, PageBreak, Header, Footer, PageNumber, TableOfContents, LevelFormat, TabStopType,
 } = require('docx');
 
-const PHIEN_BAN = '2.5.0';
+const PHIEN_BAN = '2.6.0';
 const NGAY = '26/11/2026';
 // HD_DIR: chạy bản chép ở thư mục khác (nơi đã cài docx) mà vẫn đọc ảnh / ghi file ở docs/huong-dan
 const GOC = process.env.HD_DIR || __dirname;
@@ -190,8 +190,8 @@ them(H2('1.5 An toàn dữ liệu'),
 );
 them(H2('1.6 Làm tiếp trên máy khác'),
   P('Mang phần đang làm dở của một thư mục (Tách văn bản, Bóc tách dữ liệu) sang máy khác để làm tiếp hoặc chia việc cho nhiều người.'),
-  ...buoc('Ở màn **Tách văn bản** hoặc **Bóc tách dữ liệu**, mở thư mục cần mang đi, chọn **Chức năng › Xuất phiên làm việc…**.', 'Phần mềm ghi file `<tên thư mục>.sm-dema4.zip` (mặc định vào thư mục Tải về) gồm nhãn, góc xoay, cache phân tích và kết quả bóc tách — không có khoá API, lượt chạy, cấu hình.'),
-  ...buoc('Ở máy kia, mở thư mục chứa các PDF đó (qua Drive dùng chung, USB…; **cấp nào, tên gì cũng được** — phần mềm khớp theo nội dung file) ở màn tương ứng, chọn **Chức năng › Nhập phiên làm việc…** và chọn file `.zip`.', 'Hộp xác nhận cho biết số hồ sơ, % PDF khớp với thư mục đang mở và loại tài liệu mới sẽ thêm.'),
+  ...buoc('Ở màn **Tách văn bản** hoặc **Bóc tách dữ liệu**, mở thư mục cần mang đi, chọn **Tệp tin › Xuất phiên làm việc…**.', 'Phần mềm ghi file `<tên thư mục>.sm-dema4.zip` (mặc định vào thư mục Tải về) gồm nhãn, góc xoay, cache phân tích và kết quả bóc tách — không có khoá API, lượt chạy, cấu hình.'),
+  ...buoc('Ở máy kia, mở thư mục chứa các PDF đó (qua Drive dùng chung, USB…; **cấp nào, tên gì cũng được** — phần mềm khớp theo nội dung file) ở màn tương ứng, chọn **Tệp tin › Nhập phiên làm việc…** và chọn file `.zip`.', 'Hộp xác nhận cho biết số hồ sơ, % PDF khớp với thư mục đang mở và loại tài liệu mới sẽ thêm.'),
   ...buoc('Bấm **Nhập**.', 'Mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói); kết quả bóc tách đọc được không bị bản lỗi đè. Hộp kết quả liệt kê hồ sơ hai máy cùng sửa.'),
   ...hop('chuy', ['Nên **chia hồ sơ** cho từng người; không đổi ngưỡng hay **Phân tích lại** giữa chừng; để **đồng hồ máy đúng giờ** (phần mềm chọn bản sửa theo thời điểm sửa).']),
 );
@@ -422,39 +422,43 @@ them(H2('6.5 Ghi Google Sheet'),
 // ===== Chương 7: Xóa ghim =====
 them(batDauChuong('Xóa ghim'));
 them(H2('7.1 Tổng quan'),
-  P('Xoá vết **ghim, kẹp giấy, lỗ bấm, bóng mép** trên PDF scan. Mỗi **vùng** là một khung trên trang: trong khung, điểm tối hơn màu nền quá **ngưỡng** được coi là vết và tô lại bằng màu nền; nét chữ rất đậm được giữ (**Bảo vệ nét đen**). File PDF gốc không bị sửa — kết quả ghi vào thư mục `<nguồn>_xoaghim` cạnh thư mục nguồn, giữ thư mục con và **tên file gốc**.'),
-  ...hinh('07-xoa-ghim.png', 'Màn Xóa ghim — Gốc | Kết quả, vùng cạnh trái đang chọn, vùng Bảo vệ (xanh lá) giữ số trang'),
+  P('Xoá vết **ghim, kẹp giấy, lỗ bấm, bóng mép** trên PDF scan. Mỗi **vùng** là một khung trên trang: trong khung, điểm tối hơn màu nền quá **ngưỡng** được coi là vết và tô lại bằng màu nền; nét chữ rất đậm được giữ (**Bảo vệ nét đen**). Mặc định file gốc không bị sửa — kết quả ghi vào thư mục `<nguồn>_xoaghim` (giữ thư mục con, giữ **tên file gốc**), hoặc cạnh file gốc, hoặc ghi đè (tuỳ **File đích**).'),
+  P('Màn gồm: cột **Danh sách** bên trái (kéo mép để đổi rộng, thu nhỏ thành dải dọc); thanh công cụ chia đôi đúng ranh giới **Gốc | Đích** — nửa trái chọn vùng, nửa phải **Đầu vào** / **File đích**; hai khung **Gốc** (có cột trang thu nhỏ) và **Đích** rộng bằng nhau, cuộn cùng nhau; thanh đáy chuyển trang, kiểu xem, tỉ lệ và nút **Xóa ghim (n)**.'),
+  ...hinh('07-xoa-ghim.png', 'Màn Xóa ghim — Danh sách, thanh công cụ, Gốc | Đích; vùng cạnh trái đang chọn, vùng bảo vệ (hồng, nét đứt) giữ số trang'),
   ...hop('luuy', ['Nên **Xóa ghim trước** rồi mới gắn nhãn ở Tách: file kết quả là file mới, nhãn Tách gắn trên file gốc không theo sang.', 'Xóa ghim chỉ tô lại vùng có vết — **không** phải công cụ che thông tin.']),
 );
 them(H2('7.2 Thao tác'));
 batDauThaoTac();
-them(...buoc('Mở **Chức năng › Xóa ghim**. Bấm **Chọn thư mục…** hoặc kéo thả thư mục / file PDF vào cửa sổ.', 'Cột trái liệt kê các PDF (cả thư mục con); thư mục kết quả `*_xoaghim` bị bỏ qua. Lần đầu mở thư mục: bật sẵn **Góc trên trái** và **Góc trên phải**.'),
-  ...buoc('Hàng **Có sẵn**: bật / tắt 4 góc, 4 cạnh. Bấm vào khung vùng trên ảnh **Gốc** (chế độ **Chọn**, phím `C`) để chỉnh **rộng / cao / độ sâu** và **ngưỡng** (nhỏ = xoá nhiều hơn); kéo cạnh phía trong của khung để đổi kích thước.'),
-  ...buoc('Cần vùng khác: chọn **Vẽ vùng** (phím `V`), chọn loại và phạm vi rồi kéo chuột trên ảnh Gốc. Kéo thân / cạnh vùng vẽ để di chuyển / đổi cỡ; `Delete` xoá vùng chọn, `Ctrl+Z` hoàn tác.'),
-  ...buoc('Xem ảnh **Kết quả** bên phải — đây đúng là ảnh sẽ ghi vào file (cùng độ phân giải, cùng cách xoá; chỉ khác ở bước nén JPEG). `[` `]` đổi file, `PageUp` / `PageDown` hoặc số trang để đổi trang, `Ctrl` + cuộn chuột hoặc `+` `-` `=` để phóng (hai ảnh cuộn / phóng cùng nhau).'),
-  ...buoc('Bấm **Xóa ghim (n file)**. Nút **⌄** bên cạnh › **Chạy lại cả thư mục** để chạy lại mọi file.', 'Hộp tiến độ (số file, số trang, thời gian còn lại, **Dừng**) rồi hộp kết quả: **Mở thư mục**, **Mở ở Tách** (mở thư mục kết quả ở màn Tách văn bản).'),
-  ...hinh('07-xoa-ghim-xong.png', 'Đã xoá ghim — hộp kết quả; chấm xanh cạnh từng file'),
+them(...buoc('Mở **Chức năng › Xóa ghim**. Bấm **Mở file pdf** / **Mở thư mục** giữa màn (hoặc **Tệp tin › Mở file PDF… / Mở thư mục…**, nút **File** / **Thư mục** ở ô **Đầu vào**, kéo thả vào cửa sổ).', 'Danh sách liệt kê các PDF (cả thư mục con); file kết quả `*_xoaghim` bị bỏ qua. Lần đầu mở thư mục: bật sẵn **Góc trên trái** và **Góc trên phải**.'),
+  ...buoc('Biểu tượng **Góc** / **Cạnh**: bấm đúng góc / cạnh trên hình trang giấy để thêm vùng, bấm lại để bỏ. Vùng mới áp theo cột **Tất cả / Trang lẻ / Trang chẵn / Từng trang**. Chọn vùng (bấm trên ảnh Gốc hoặc ô **Vùng**) để chỉnh **Rộng / Cao** (% trang) và **Ngưỡng** (nhỏ = xoá nhiều hơn) bằng thanh trượt hoặc ô số; kéo cạnh phía trong của khung để đổi cỡ. Cạnh luôn hết chiều dài trang, chỉ đổi bề dày.'),
+  ...buoc('Biểu tượng **Tùy biến**: nửa trên **−** vẽ vùng xoá, nửa dưới **+** vẽ vùng bảo vệ; kéo chuột trên ảnh Gốc (`Esc` để thôi). Khi vẽ / chọn vùng xoá vẽ tay có thêm **Vô đối** (xoá cả trong vùng bảo vệ). Vùng vẽ tay là vùng riêng của file đang xem.'),
+  ...buoc('Chọn nhiều vùng như AutoCAD: kéo khung **sang phải** chọn vùng nằm trọn trong khung, **sang trái** chọn vùng chạm khung; `Shift` + bấm thêm / bớt, `Ctrl+A` chọn hết. Kéo thân để di chuyển cả nhóm. `Delete` xoá ngay vùng vẽ đang chọn; chuột phải: xoá, đổi xoá ↔ bảo vệ, nhân bản, phạm vi trang. Nút **Xóa vùng vẽ** xoá mọi vùng Tùy biến (có hỏi lại); góc / cạnh giữ nguyên. `Ctrl+Z` hoàn tác.'),
+  ...buoc('Xem khung **Đích** — đúng là ảnh sẽ ghi vào file (cùng độ phân giải, cùng cách xoá; chỉ khác ở bước nén JPEG). ◂ ▸ trên tiêu đề Gốc hoặc `[` `]` đổi file; trang thu nhỏ, `PageUp` / `PageDown` hoặc ô số trang để đổi trang; **Liên tiếp / Từng trang**, vừa ngang / vừa cao, tỉ lệ 25–150 %, `Ctrl` + cuộn chuột hoặc `+` `-` `=` để phóng.'),
+  ...buoc('Bấm **Xóa ghim (n)** góc dưới phải — n = số file đã tick cần chạy. Nút **▾** › **Chạy lại mọi file đã tick**.', 'Hộp tiến độ (số file, số trang, thời gian còn lại, **Dừng**) rồi hộp kết quả: **Mở thư mục**, **Mở ở Tách** (mở thư mục kết quả ở màn Tách văn bản).'),
+  ...hinh('07-xoa-ghim-xong.png', 'Đã xoá ghim — hộp kết quả; dấu trạng thái cạnh từng file'),
+  P('Phím tắt đầy đủ: bấm `F1` ở màn Xóa ghim (bảng **thao tác nhanh**).'),
 );
-them(H2('7.3 Loại vùng và phạm vi'),
+them(H2('7.3 Danh sách, đầu vào và file đích'),
   ...bang(['Mục', 'Lựa chọn', 'Ý nghĩa'], [
-    ['Loại', '**Xoá**', 'Xoá vết trong vùng, tránh mọi vùng Bảo vệ (lề an toàn 5 điểm ảnh).'],
-    ['', '**Bảo vệ**', 'Không xoá gì trong vùng (chữ, số trang, dấu, chữ ký sát ghim).'],
-    ['', '**Xoá vô đối**', 'Xoá cả trong vùng Bảo vệ; chạy trước các vùng khác.'],
-    ['Phạm vi', '**Chung thư mục**', 'Áp cho mọi PDF trong thư mục.'],
-    ['', '**Riêng file**', 'Chỉ PDF đang xem (mọi trang / lẻ / chẵn).'],
-    ['', '**Riêng trang**', 'Chỉ trang đang xem của PDF đang xem.'],
+    ['Danh sách', 'Sắp xếp', 'Bấm **Tên file** hoặc **Trang** (bấm lại đảo chiều). Ô tick: file được chạy.'],
+    ['', 'Lọc', 'Ô lọc tên; ô lọc gộp chọn trạng thái (**Cần chạy**, **Chưa xóa**, **Đã xóa**, **Đã đổi vùng**, **Mất kết quả**) hoặc gõ số trang `1-3, 7, >10`. **Lọc nâng cao** (bấm để mở): khổ A0–A7, chiều, dải trang.'],
+    ['File đích', '**Nhân bản thư mục**', '`<nguồn>_xoaghim/` hoặc thư mục chọn bằng nút **Thư mục**; giữ thư mục con và tên file. ⊗ về mặc định.'],
+    ['', '**Cạnh file gốc**', '`<tên>_xoaghim.pdf` cùng thư mục với file gốc (danh sách tự ẩn các file này).'],
+    ['', '**Ghi đè** (Cấu hình)', 'Thay thẳng file gốc — không hoàn tác được, nên sao lưu trước.'],
   ], [1600, 2200, 5226]),
 );
-them(H2('7.4 Tuỳ chọn và trạng thái'),
-  ...bang(['Tuỳ chọn', 'Ý nghĩa'], [
-    ['Bảo vệ nét đen', 'Bật sẵn. Không lấy điểm rất tối làm vết (giữ nét chữ đen). Vết sát chữ vẫn được xoá loang lên nét chữ sát bên — muốn giữ chắc, vẽ vùng **Bảo vệ**.'],
-    ['Bảo vệ dấu đỏ / chữ ký xanh', 'Không xoá điểm đỏ / xanh dương. Tắt sẵn (vết gỉ ghim có màu nâu đỏ cũng bị giữ lại).'],
-    ['Tô nền trắng', 'Tô vết bằng trắng thay cho màu nền đo được của trang.'],
-    ['DPI', '**Gốc** = theo ảnh scan của từng trang (tối đa 600); hoặc 300 / 250 / 200 / 100 / 72.'],
-    ['Nén · Nén đen trắng', 'Chất lượng JPEG trang đã xử lý; trang đen trắng / xám ghi gọn hơn.'],
-  ], [2600, 6426]),
-  P('Chấm cạnh tên file: **xanh** = đã xoá đúng vùng / tuỳ chọn hiện tại; **cam** = đã xoá nhưng vùng / tuỳ chọn đã đổi; **đỏ** = file kết quả không còn / đã bị thay; **xám** = chưa xoá. **Xóa ghim (n file)** chỉ chạy các file chưa xanh. Chạy lại ghi đè kết quả cũ của chính file đó; file kết quả là của PDF khác trùng tên thì không ghi đè (báo lỗi file đó).'),
-  P('Vùng tự lưu trên máy: vùng chung theo **thư mục** (đổi tên thư mục → phải chọn lại vùng chung), vùng riêng theo **nội dung từng PDF** (đổi tên / di chuyển file vẫn còn). Mang sang máy khác: **Chức năng › Xuất / Nhập phiên làm việc** ở màn Xóa ghim. Mỗi lần chạy có ít nhất 1 file ra tính 1 lượt (chung hạn mức); không ra file nào → hoàn lượt.'),
+them(H2('7.4 Loại vùng và tuỳ chọn'),
+  ...bang(['Mục', 'Lựa chọn', 'Ý nghĩa'], [
+    ['Loại', '**Xoá** (góc / cạnh xanh lá, vẽ tay xanh lam)', 'Xoá vết trong vùng, tránh mọi vùng Bảo vệ (lề an toàn 5 điểm ảnh).'],
+    ['', '**Bảo vệ** (hồng, nét đứt)', 'Không xoá gì trong vùng (chữ, số trang, dấu, chữ ký sát ghim).'],
+    ['', '**Vô đối** (cam)', 'Xoá cả trong vùng Bảo vệ; chạy trước các vùng khác.'],
+    ['Tuỳ chọn', '**Nhận diện layout**', 'Mô hình AI tìm khối chữ, bảng… và không xoá vào đó (tô đỏ nhạt trên Gốc). Tải 1 lần (37,5 MB) ở **Cấu hình › Xóa ghim**, dùng ngoại tuyến.'],
+    ['', '**Tô nền trắng**', 'Tô vết bằng trắng thay cho màu nền đo được.'],
+  ], [1600, 2600, 4826]),
+  P('**Cấu hình › Xóa ghim**: thẻ **theo thư mục** (lưu cùng vùng của thư mục đang mở) — Nhận diện layout, Bảo vệ nét đen, Bảo vệ dấu đỏ / chữ ký xanh, DPI (Gốc / 300 / 200 / 150), chất lượng JPEG, Nén đen trắng, Tô nền trắng, Ghi đè file gốc; thẻ **chung** — Xử lý theo lô 10 trang (song song, nhanh hơn nhưng tốn RAM hơn), Tự lưu vùng, Kiểu xem, Cột trang thu nhỏ, Khung Đích, Cuộn Gốc | Đích cùng nhau.'),
+  ...hinh('07-xoa-ghim-cau-hinh.png', 'Cấu hình › Xóa ghim — 4 thẻ, nhãn theo thư mục / chung, nút Tải mô hình'),
+  P('Dấu cạnh tên file: **✓ xanh** = đã xoá đúng vùng / tuỳ chọn hiện tại; **↻ cam** = đã xoá nhưng vùng / tuỳ chọn đã đổi; **! đỏ** = file kết quả không còn / đã bị thay; **○ xám** = chưa xoá. **Xóa ghim (n)** chỉ chạy các file đã tick chưa xanh. Chạy lại ghi đè kết quả cũ của chính file đó; file kết quả là của PDF khác trùng tên thì không ghi đè (báo lỗi file đó).'),
+  P('Vùng tự lưu trên máy: vùng chung theo **thư mục** (đổi tên thư mục → phải chọn lại vùng chung), vùng riêng theo **nội dung từng PDF** (đổi tên / di chuyển file vẫn còn). Mang sang máy khác: **Tệp tin › Xuất / Nhập phiên làm việc**. Mỗi lần chạy có ít nhất 1 file ra tính 1 lượt (chung hạn mức); không ra file nào → hoàn lượt.'),
 );
 
 // ===== Chương 8: Xử lý sự cố =====
@@ -469,9 +473,10 @@ them(P('Khi gặp sự cố, tra bảng dưới đây trước khi liên hệ h�
     ['Bóc tách báo lỗi 404 (Gemini)', 'Model không có trên dự án / vùng.', 'Chọn model khác trong danh sách (vd `gemini-3.7-flash`).'],
     ['Bóc tách báo lỗi kết nối', 'Sai địa chỉ / khoá API, máy chủ nội bộ tắt, mất mạng.', '**Kiểm tra kết nối** ở Cấu hình; kiểm tra mạng.'],
     ['Không ghi được Google Sheet', 'Chưa chia sẻ Sheet cho service account; sai link / mã bí mật Apps Script.', '**Ghi thử 1 dòng** để xem lỗi chi tiết.'],
-    ['Xóa ghim còn sót vết', 'Ngưỡng cao, vùng nhỏ hơn vết.', 'Chọn vùng → giảm **ngưỡng** / nới kích thước; xem lại ảnh Kết quả.'],
+    ['Xóa ghim còn sót vết', 'Ngưỡng cao, vùng nhỏ hơn vết.', 'Chọn vùng → giảm **ngưỡng** / nới kích thước; xem lại khung Đích.'],
     ['Xóa ghim ăn mất chữ / số trang sát mép', 'Vùng phủ lên chữ.', 'Thu nhỏ vùng hoặc vẽ vùng **Bảo vệ** lên chữ.'],
-    ['Nút **Xóa ghim (0 file)** mờ', 'Mọi file đã xoá đúng vùng / tuỳ chọn hiện tại.', 'Dùng **⌄ › Chạy lại cả thư mục** nếu muốn chạy lại.'],
+    ['Nút **Xóa ghim (0)** mờ', 'Mọi file đã tick đều đã xoá đúng vùng / tuỳ chọn hiện tại.', 'Dùng **▾ › Chạy lại mọi file đã tick** nếu muốn chạy lại.'],
+    ['Ô **Nhận diện layout** mờ', 'Chưa có mô hình AI.', '**Cấu hình › Xóa ghim › Tải mô hình** (máy không mạng: nút **…** chọn file đã chép sẵn).'],
     ['Sinh mục lục thiếu dữ liệu', 'Biến chưa ghép hoặc sai **Dòng tiêu đề**.', 'Kiểm tra tab Mẫu (biến chưa ghép) và nút ⌄ xem 10 dòng đầu.'],
   ], [2500, 3100, 3426]),
 );
@@ -519,7 +524,8 @@ them(H2('D. Lịch sử sửa đổi'),
     ['1.0', '02/11/2026', '2.2.0', 'Ban hành lần đầu.'],
     ['1.1', '25/11/2026', '2.3.0', 'Thư mục dữ liệu chung theo người dùng; Làm tiếp trên máy khác (Xuất / Nhập phiên); Trang chủ có Làm tiếp gần đây.'],
     ['1.2', '25/11/2026', '2.4.0', 'Phần đã làm theo nội dung từng PDF: đổi tên / di chuyển / mở thư mục cha-con vẫn thấy lại; Nhập phiên khớp theo nội dung; 1 cửa sổ; Dọn dữ liệu cũ.'],
-    ['1.3', NGAY, PHIEN_BAN, 'Chương 7 Xóa ghim; Trang chủ 7 ô / hàng; Xuất / Nhập phiên ở màn Xóa ghim.'],
+    ['1.3', NGAY, '2.5.0', 'Chương 7 Xóa ghim; Trang chủ 7 ô / hàng; Xuất / Nhập phiên ở màn Xóa ghim.'],
+    ['1.4', NGAY, PHIEN_BAN, 'Chương 7 theo màn Xóa ghim mới: Danh sách lọc / sắp xếp, File đích, chọn nhiều vùng, Nhận diện layout (AI), Cấu hình › Xóa ghim; menu Tệp tin.'],
   ], [2000, 1700, 2000, 3326]),
 );
 
