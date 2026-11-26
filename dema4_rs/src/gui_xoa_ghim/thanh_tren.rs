@@ -49,6 +49,9 @@ impl ManXoaGhim {
         let trai = chia_doi(tong.width(), self.rong_nho());
         let dau = tong.left_top();
         let r_trai = ui.scope_builder(egui::UiBuilder::new().max_rect(Rect::from_min_size(dau, egui::vec2(trai, 400.0))), |ui| {
+            // Nửa trái không bao giờ vẽ đè sang nửa phải (cửa sổ hẹp)
+            ui.set_clip_rect(ui.clip_rect().intersect(Rect::from_min_size(dau, egui::vec2(trai, 400.0))));
+            let x_phai = dau.x + trai - 12.0;
             egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 12, top: 12, bottom: 10 }).show(ui, |ui| {
                 ui.set_width((trai - 26.0).max(10.0));
                 ui.horizontal_top(|ui| {
@@ -56,7 +59,7 @@ impl ManXoaGhim {
                     self.ba_bieu_tuong(ui);
                     self.cot_loc_trang(ui);
                     widget::vach_doc(ui, 104.0);
-                    self.khoi_vung(ui);
+                    self.khoi_vung(ui, x_phai);
                 });
             });
         });
@@ -220,12 +223,15 @@ impl ManXoaGhim {
         self.bo.doi_ap_trang(c, ap, l == LocTrang::VoDoi);
     }
 
-    /// Combo Vùng + Rộng / Cao / Ngưỡng (thanh trượt + ô số).
-    fn khoi_vung(&mut self, ui: &mut egui::Ui) {
+    /// Combo Vùng + Rộng / Cao / Ngưỡng (thanh trượt + ô số) trong phần còn lại tới `x_phai` (mép phải nửa trái).
+    /// Hẹp hơn `RONG_CO_THANH`: ẩn thanh trượt, chỉ còn ô số.
+    fn khoi_vung(&mut self, ui: &mut egui::Ui, x_phai: f32) {
+        const RONG_CO_THANH: f32 = 250.0;
+        let rong = (x_phai - ui.cursor().min.x).max(120.0);
+        let co_thanh = rong >= RONG_CO_THANH;
         ui.vertical(|ui| {
-            ui.set_min_width(200.0);
+            ui.set_width(rong);
             ui.spacing_mut().item_spacing.y = 6.0;
-            let rong = ui.available_width();
             ui.horizontal(|ui| {
                 let nhan = ui.add_sized(egui::vec2(tk::RONG_NHAN_VUNG, 20.0), egui::Label::new(egui::RichText::new("Vùng:").font(font(tk::CHU_CO)).color(Color32::from_gray(0x33))));
                 let chu = match self.bo.chon.len() {
@@ -235,7 +241,8 @@ impl ManXoaGhim {
                 };
                 let ds: Vec<_> = self.bo.tat_ca().into_iter().map(|c| (c, format!("{} · {}", self.ten_vung(c), self.bo.lay(c).map_or(String::new(), |z| ten_pham_vi(z.ap_trang))))).collect();
                 egui::ComboBox::from_id_salt("xg_vung")
-                    .width((rong - tk::RONG_NHAN_VUNG - 8.0).max(80.0))
+                    .width((rong - tk::RONG_NHAN_VUNG - 46.0).max(60.0))
+                    .wrap_mode(egui::TextWrapMode::Truncate)
                     .height(320.0)
                     .selected_text(egui::RichText::new(chu).font(font(tk::CHU_CO)))
                     .show_ui(ui, |ui| {
@@ -269,10 +276,12 @@ impl ManXoaGhim {
                 let mut doi = false;
                 ui.horizontal(|ui| {
                     ui.add_sized(egui::vec2(tk::RONG_NHAN_VUNG, 20.0), egui::Label::new(egui::RichText::new(ten).font(font(tk::CHU_CO)).color(Color32::from_gray(0x33))));
-                    let w = (ui.available_width() - 58.0 - 8.0).max(40.0);
+                    let w = (rong - tk::RONG_NHAN_VUNG - 58.0 - 16.0).max(40.0);
                     let max_hien = if !duoc && co { 100.0 } else { max };
                     let ten_gon = ten.trim_end_matches(':');
-                    doi |= widget::thanh_truot(ui, gt, 1.0, max_hien, w, duoc, ten_gon).changed();
+                    if co_thanh {
+                        doi |= widget::thanh_truot(ui, gt, 1.0, max_hien, w, duoc, ten_gon).changed();
+                    }
                     doi |= widget::o_so(ui, gt, 1.0, max_hien, don_vi, duoc, &format!("{ten_gon} (số)"));
                 });
                 doi

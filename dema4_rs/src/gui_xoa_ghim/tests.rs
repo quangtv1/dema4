@@ -333,3 +333,35 @@ fn chup_doi_chieu_prototype() {
     man.mo_thu_muc(PathBuf::from(&mau));
     chup("doi-chieu-cau-hinh.png", man, true);
 }
+
+/// Cửa sổ mặc định / hẹp: khối Vùng · Rộng · Cao · Ngưỡng không tràn sang nửa phải (Đầu vào); hẹp thì chỉ còn ô số.
+#[test]
+fn khoi_vung_khong_tran_sang_nua_phai() {
+    use egui_kittest::kittest::{NodeT, Queryable};
+    for (rong, co_thanh) in [(1120.0, false), (1600.0, true), (980.0, false)] {
+        let mut man = ManXoaGhim::default();
+        man.ds_mo = Some(false);
+        let mut da_cai = false;
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(rong, 760.0)).build_ui(move |ui| {
+            if !std::mem::replace(&mut da_cai, true) {
+                crate::gui::cai_giao_dien(ui.ctx());
+            }
+            man.ve(ui, &mut CauHinhXoaGhim::default());
+        });
+        h.run_steps(3);
+        let dau_vao = h.get_by_label("Đầu vào").rect();
+        let vung = h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Vùng:").rect();
+        assert!(vung.max.x <= dau_vao.min.x - 20.0, "{rong}: ô Vùng ({vung:?}) tràn");
+        for o in ["Rộng (số)", "Cao (số)", "Ngưỡng (số)"] {
+            let r = h.get_by_label(o).rect();
+            assert!(r.max.x <= dau_vao.min.x - 60.0, "{rong}: ô {o} ({r:?}) tràn sang Đầu vào ({dau_vao:?})");
+        }
+        assert_eq!(h.query_by_role_and_label(egui::accesskit::Role::Slider, "Rộng").is_some(), co_thanh, "{rong}: thanh trượt");
+        // Có DEMA4_ANH (máy có GPU): lưu ảnh để xem bằng mắt
+        if let Some(d) = std::env::var_os("DEMA4_ANH") {
+            if let Ok(anh) = h.render() {
+                let _ = anh.save(PathBuf::from(d).join(format!("xoa-ghim-rong-{rong}.png")));
+            }
+        }
+    }
+}
