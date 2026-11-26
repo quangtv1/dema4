@@ -199,8 +199,8 @@ fn dai_dau(ui: &egui::Ui, r: Rect) {
         y += 18.0;
     }
     p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, Color32::from_rgb(0xE1, 0xE7, 0xF0)));
-    let kich = crate::logo_sao_mai::kich(44.0);
-    let ten = p.layout_no_wrap(TIEU_DE.into(), font(19.0, true), CHU);
+    let kich = crate::logo_sao_mai::kich(60.0);
+    let ten = p.layout_no_wrap(TIEU_DE.into(), font(15.0, true), CHU);
     let moi = p.layout_no_wrap("Chọn chức năng để bắt đầu".into(), font(12.5, false), CHU_PHU);
     let cao = kich.y + 6.0 + ten.size().y + 2.0 + moi.size().y;
     let mut y = r.center().y - cao / 2.0;
