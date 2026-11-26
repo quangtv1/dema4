@@ -10,10 +10,12 @@ use eframe::egui::{self, Color32, CornerRadius, Margin, Rect, RichText, Sense, S
 use crate::boc_tach::mo_hinh::NhaCungCap;
 use crate::cau_hinh::{CachGhiSheet, CauHinh, CauHinhBocTach, MoHinhBocTach, CANH_KHOANG, CHO_KHOANG, DPI_KHOANG, JPEG_KHOANG, SONG_SONG_KHOANG, TOKEN_KHOANG};
 use crate::gui::{ChuDam, CHU, CHU_MO, CHU_PHU, DO, VIEN, VIEN_NHAT, VIEN_TAB_CHON, XANH_LA};
+use crate::gui_cau_hinh as gc;
 use crate::gui_tach::bieu_tuong::{self as bt, BieuTuong};
 use crate::gui_tach::khung_hop as kh;
 
-const RONG_NHAN: f32 = 110.0;
+/// Cao nút bước.
+const CAO_BUOC: f32 = 46.0;
 const NEN_CHON: Color32 = Color32::from_rgb(0xEE, 0xF5, 0xFE);
 const NAU: Color32 = Color32::from_rgb(0x8A, 0x5A, 0x00);
 const NEN_CANH_BAO: Color32 = Color32::from_rgb(0xFF, 0xF8, 0xE5);
@@ -103,18 +105,19 @@ impl TabBocTach {
         self.nang_cao = true;
     }
 
+    /// Thân tab trong cột nội dung: 3 nút bước rồi các thẻ của bước đang chọn.
     pub fn ve(&mut self, ui: &mut egui::Ui, ch: &mut CauHinhBocTach, khoa: &mut BTreeMap<String, String>) {
         self.nhan_kiem_tra(ui.ctx(), ch);
         self.so_do(ui, ch, khoa);
-        ui.add_space(10.0);
-        the(ui, |ui| match self.muc {
+        ui.add_space(gc::KHE_THE);
+        match self.muc {
             Muc::MoHinh => self.muc_mo_hinh(ui, ch, khoa),
             Muc::Nguon => muc_nguon(ui),
             Muc::Ghi => self.muc_ghi(ui, ch, khoa),
-        });
+        }
     }
 
-    /// 3 ô sơ đồ luồng nối mũi tên; ô là nút chuyển mục, dòng phụ tóm tắt lựa chọn.
+    /// 3 nút bước rộng đều nối mũi tên; nút là chuyển mục, dòng phụ tóm tắt lựa chọn.
     fn so_do(&mut self, ui: &mut egui::Ui, ch: &CauHinhBocTach, khoa: &BTreeMap<String, String>) {
         let mo_hinh = match ch.mac_dinh.filter(|n| ch.da_cai(*n, khoa_cua(khoa, *n))) {
             Some(n) => ten_mo_hinh(ch, n),
@@ -122,22 +125,22 @@ impl TabBocTach {
         };
         let ghi = if ch.ghi_sheet || !ch.sheet_link.trim().is_empty() { "Excel + Google Sheet" } else { "Excel" };
         let o = [(Muc::Nguon, BieuTuong::ThuMuc, "Nguồn văn bản", "Máy tính".to_string()), (Muc::MoHinh, BieuTuong::MoHinhDoc, "Mô hình đọc", mo_hinh), (Muc::Ghi, BieuTuong::BangKetQua, "Ghi kết quả", ghi.into())];
-        let mui = 26.0;
+        let mui = 24.0;
         let rong = (ui.available_width() - 2.0 * mui) / 3.0;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
             for (i, (muc, icon, ten, phu)) in o.into_iter().enumerate() {
                 if i > 0 {
-                    let (r, _) = ui.allocate_exact_size(egui::vec2(mui, 44.0), Sense::hover());
-                    let (a, b) = (egui::pos2(r.left() + 4.0, r.center().y), egui::pos2(r.right() - 4.0, r.center().y));
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(mui, CAO_BUOC), Sense::hover());
+                    let (a, b) = (egui::pos2(r.left() + 7.0, r.center().y), egui::pos2(r.right() - 7.0, r.center().y));
                     ui.painter().line_segment([a, b], Stroke::new(1.0, VIEN));
                     ui.painter().add(egui::Shape::convex_polygon(vec![b, b + egui::vec2(-5.0, -3.5), b + egui::vec2(-5.0, 3.5)], VIEN, Stroke::NONE));
                 }
-                let (r, p) = ui.allocate_exact_size(egui::vec2(rong, 44.0), Sense::click());
+                let (r, p) = ui.allocate_exact_size(egui::vec2(rong, CAO_BUOC), Sense::click());
                 let chon = self.muc == muc;
-                o_chon(ui, r, &p, chon, true);
-                bt::ve(ui.painter(), Rect::from_center_size(egui::pos2(r.left() + 24.0, r.center().y), egui::vec2(20.0, 20.0)), icon, CHU);
-                hai_dong(ui, egui::pos2(r.left() + 46.0, r.top() + 7.0), r.width() - 54.0, ten, &phu, false, 13.0);
+                o_chon(ui, r, &p, chon, true, 6);
+                bt::ve(ui.painter(), Rect::from_center_size(egui::pos2(r.left() + 26.0, r.center().y), egui::vec2(20.0, 20.0)), icon, CHU);
+                hai_dong(ui, egui::pos2(r.left() + 48.0, r.top() + 9.0), r.width() - 58.0, ten, &phu, false, 13.0);
                 p.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, chon, ten));
                 if p.clicked() {
                     self.muc = muc;
@@ -148,86 +151,107 @@ impl TabBocTach {
 
     fn muc_mo_hinh(&mut self, ui: &mut egui::Ui, ch: &mut CauHinhBocTach, khoa: &mut BTreeMap<String, String>) {
         let n = self.ncc;
-        // Bước 1: 5 ô nhà cung cấp 1 hàng + ★ Mặc định / Đặt làm mặc định · Xoá
-        ui.horizontal(|ui| {
-            buoc(ui, 1, "Chọn nhà cung cấp");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.spacing_mut().item_spacing.x = 14.0;
-                if lien_ket(ui, "Xoá", DO).on_hover_text("Xoá địa chỉ, khoá, model đã khai của nhà cung cấp này").clicked() {
-                    *ch.mo_hinh_mut(n) = MoHinhBocTach::mac_dinh(n);
-                    khoa.remove(n.ma());
-                    self.kq_kiem_tra.remove(&n);
-                    if ch.mac_dinh == Some(n) {
-                        ch.mac_dinh = None;
+        // Thẻ 1: 5 ô nhà cung cấp 1 hàng; tiêu đề có Xoá · ★ Mặc định / Đặt làm mặc định (áp sau khi vẽ thẻ)
+        let (mut dat_mac_dinh, mut xoa) = (false, false);
+        let la_mac_dinh = ch.mac_dinh == Some(n);
+        gc::the_tuy_bien(
+            ui,
+            |ui| {
+                buoc(ui, 1, "Chọn nhà cung cấp");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing.x = 14.0;
+                    if la_mac_dinh {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        ui.label(RichText::new("Mặc định").size(12.0).color(NAU));
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(13.0, 13.0), Sense::hover());
+                        sao(ui.painter(), r, NAU);
+                    } else if lien_ket(ui, "Đặt làm mặc định", VIEN_TAB_CHON).on_hover_text("Chọn sẵn mô hình này ở màn Bóc tách").clicked() {
+                        dat_mac_dinh = true;
                     }
-                }
-                if ch.mac_dinh == Some(n) {
-                    ui.spacing_mut().item_spacing.x = 4.0;
-                    ui.label(RichText::new("Mặc định").size(12.5).color(NAU));
-                    let (r, _) = ui.allocate_exact_size(egui::vec2(13.0, 13.0), Sense::hover());
-                    sao(ui.painter(), r, NAU);
-                } else if lien_ket(ui, "Đặt làm mặc định", VIEN_TAB_CHON).on_hover_text("Chọn sẵn mô hình này ở màn Bóc tách").clicked() {
-                    ch.mac_dinh = Some(n);
-                }
-            });
-        });
-        let rong = (ui.available_width() - 4.0 * 8.0) / 5.0;
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 8.0;
-            for x in NhaCungCap::TAT_CA {
-                let cai = ch.da_cai(x, khoa_cua(khoa, x));
-                let phu = if cai { ch.mo_hinh(x).model.clone() } else { "Chưa cài đặt".into() };
-                let (r, p) = ui.allocate_exact_size(egui::vec2(rong, 40.0), Sense::click());
-                o_chon(ui, r, &p, x == n, true);
-                bt::ve(ui.painter(), Rect::from_center_size(egui::pos2(r.left() + 17.0, r.center().y), egui::vec2(15.0, 15.0)), icon_ncc(x), CHU);
-                hai_dong(ui, egui::pos2(r.left() + 32.0, r.top() + 5.0), r.width() - 38.0, x.ten(), &phu, !cai, 12.5);
-                p.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, x == n, x.ten()));
-                if p.clicked() {
-                    self.ncc = x;
-                }
+                    ui.spacing_mut().item_spacing.x = 14.0;
+                    if lien_ket(ui, "Xoá", DO).on_hover_text("Xoá địa chỉ, khoá, model đã khai của nhà cung cấp này").clicked() {
+                        xoa = true;
+                    }
+                });
+            },
+            |ui| {
+                let rong = (ui.available_width() - 4.0 * 8.0) / 5.0;
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    for x in NhaCungCap::TAT_CA {
+                        let cai = ch.da_cai(x, khoa_cua(khoa, x));
+                        let phu = if cai { ch.mo_hinh(x).model.clone() } else { "Chưa cài đặt".into() };
+                        let (r, p) = ui.allocate_exact_size(egui::vec2(rong, 42.0), Sense::click());
+                        o_chon(ui, r, &p, x == n, true, 5);
+                        bt::ve(ui.painter(), Rect::from_center_size(egui::pos2(r.left() + 18.0, r.center().y), egui::vec2(15.0, 15.0)), icon_ncc(x), CHU);
+                        hai_dong(ui, egui::pos2(r.left() + 34.0, r.top() + 6.0), r.width() - 40.0, x.ten(), &phu, !cai, 12.5);
+                        p.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, x == n, x.ten()));
+                        if p.clicked() {
+                            self.ncc = x;
+                        }
+                    }
+                });
+                ui.add_space(4.0);
+            },
+        );
+        if dat_mac_dinh {
+            ch.mac_dinh = Some(n);
+        }
+        if xoa {
+            *ch.mo_hinh_mut(n) = MoHinhBocTach::mac_dinh(n);
+            khoa.remove(n.ma());
+            self.kq_kiem_tra.remove(&n);
+            if ch.mac_dinh == Some(n) {
+                ch.mac_dinh = None;
             }
-        });
-        ui.add_space(6.0);
-        // Bước 2: địa chỉ (dịch vụ đám mây tự điền, khoá ô) + khoá API
-        buoc(ui, 2, if n.la_dam_may() { "Dán khoá API" } else { "Địa chỉ máy chủ" });
-        if n == NhaCungCap::Gemini {
-            dong(ui, "Kiểu khoá", |ui| {
-                ui.spacing_mut().item_spacing.x = 18.0;
-                kh::o_radio(ui, &mut ch.mo_hinh_mut(n).vertex, true, "Vertex AI (express)");
-                kh::o_radio(ui, &mut ch.mo_hinh_mut(n).vertex, false, "AI Studio");
-            });
         }
-        // Dịch vụ đám mây: trống = địa chỉ mặc định (hiện mờ trong ô); sửa được để đi qua proxy / cổng riêng của đơn vị
-        let mac_dinh = if n == NhaCungCap::Gemini && ch.mo_hinh(n).vertex { crate::boc_tach::mo_hinh::DIA_CHI_VERTEX } else { n.dia_chi_mac_dinh() };
-        dong(ui, "Địa chỉ", |ui| {
-            let goi = if n.la_dam_may() { mac_dinh } else { "http://máy-chủ:cổng/v1" };
-            ui.add(kh::o_nhap(&mut ch.mo_hinh_mut(n).dia_chi).desired_width(ui.available_width()).hint_text(goi));
-        });
-        let dc = ch.mo_hinh(n).dia_chi.trim().to_string();
-        if !n.la_dam_may() {
-            goi_y(ui, "vLLM: cổng 8000 · Ollama: 11434 · LM Studio: 1234 — địa chỉ kết thúc bằng /v1");
-        } else if dc.is_empty() || dc == mac_dinh {
-            goi_y(ui, "Để trống = địa chỉ mặc định của nhà cung cấp");
-        } else if !crate::cau_hinh::dia_chi_hop_le(n, &dc) {
-            goi_y_mau(ui, "Địa chỉ dịch vụ đám mây phải bắt đầu bằng https:// — đang dùng địa chỉ mặc định", DO);
-        } else {
-            goi_y_mau(ui, "Địa chỉ tự nhập: khoá API và ảnh văn bản sẽ gửi tới địa chỉ này — xoá trống để về mặc định", DO);
-        }
-        dong(ui, "Khoá API", |ui| {
-            let k = khoa.entry(n.ma().to_string()).or_default();
-            let goi = if n.la_dam_may() { "Dán khoá API" } else { "Không bắt buộc" };
-            ui.add(kh::o_nhap(k).password(true).desired_width(ui.available_width()).hint_text(goi));
-        });
-        if n.la_dam_may() {
-            let noi = if n == NhaCungCap::Gemini && ch.mo_hinh(n).vertex { "console.cloud.google.com › Vertex AI › API keys (express mode)" } else { n.noi_lay_khoa() };
-            goi_y(ui, &format!("Lấy khoá: {noi}"));
-        }
-        if !crate::boc_tach::khoa_cache::co_luu() {
-            goi_y_mau(ui, "Bản chạy này không lưu khoá ra đĩa — khoá chỉ dùng trong phiên làm việc", NAU);
-        }
-        ui.add_space(6.0);
-        // Bước 3: model + kiểm tra kết nối
-        buoc(ui, 3, "Chọn model, kiểm tra");
+        // Thẻ 2: địa chỉ (dịch vụ đám mây tự điền, khoá ô) + khoá API
+        gc::the_tuy_bien(
+            ui,
+            |ui| buoc(ui, 2, if n.la_dam_may() { "Dán khoá API" } else { "Máy chủ nội bộ" }),
+            |ui| {
+                if n == NhaCungCap::Gemini {
+                    dong(ui, "Kiểu khoá", |ui| {
+                        ui.spacing_mut().item_spacing.x = 18.0;
+                        kh::o_radio(ui, &mut ch.mo_hinh_mut(n).vertex, true, "Vertex AI (express)");
+                        kh::o_radio(ui, &mut ch.mo_hinh_mut(n).vertex, false, "AI Studio");
+                    });
+                }
+                // Dịch vụ đám mây: trống = địa chỉ mặc định (hiện mờ trong ô); sửa được để đi qua proxy / cổng riêng của đơn vị
+                let mac_dinh = if n == NhaCungCap::Gemini && ch.mo_hinh(n).vertex { crate::boc_tach::mo_hinh::DIA_CHI_VERTEX } else { n.dia_chi_mac_dinh() };
+                dong(ui, "Địa chỉ", |ui| {
+                    let goi = if n.la_dam_may() { mac_dinh } else { "http://máy-chủ:cổng/v1" };
+                    ui.add(kh::o_nhap(&mut ch.mo_hinh_mut(n).dia_chi).desired_width(ui.available_width()).hint_text(goi));
+                });
+                let dc = ch.mo_hinh(n).dia_chi.trim().to_string();
+                if !n.la_dam_may() {
+                    goi_y(ui, "vLLM: cổng 8000 · Ollama: 11434 · LM Studio: 1234 — địa chỉ kết thúc bằng /v1");
+                } else if dc.is_empty() || dc == mac_dinh {
+                    goi_y(ui, "Để trống = địa chỉ mặc định của nhà cung cấp");
+                } else if !crate::cau_hinh::dia_chi_hop_le(n, &dc) {
+                    goi_y_mau(ui, "Địa chỉ dịch vụ đám mây phải bắt đầu bằng https:// — đang dùng địa chỉ mặc định", DO);
+                } else {
+                    goi_y_mau(ui, "Địa chỉ tự nhập: khoá API và ảnh văn bản sẽ gửi tới địa chỉ này — xoá trống để về mặc định", DO);
+                }
+                dong(ui, "Khoá API", |ui| {
+                    let k = khoa.entry(n.ma().to_string()).or_default();
+                    let goi = if n.la_dam_may() { "Dán khoá API" } else { "Không bắt buộc" };
+                    ui.add(kh::o_nhap(k).password(true).desired_width(ui.available_width()).hint_text(goi));
+                });
+                if n.la_dam_may() {
+                    let noi = if n == NhaCungCap::Gemini && ch.mo_hinh(n).vertex { "console.cloud.google.com › Vertex AI › API keys (express mode)" } else { n.noi_lay_khoa() };
+                    goi_y(ui, &format!("Lấy khoá: {noi}"));
+                }
+                if !crate::boc_tach::khoa_cache::co_luu() {
+                    goi_y_mau(ui, "Bản chạy này không lưu khoá ra đĩa — khoá chỉ dùng trong phiên làm việc", NAU);
+                }
+            },
+        );
+        // Thẻ 3: model + kiểm tra kết nối (+ Nâng cao)
+        gc::the_tuy_bien(ui, |ui| buoc(ui, 3, "Chọn model, kiểm tra"), |ui| self.the_model(ui, ch, khoa, n));
+    }
+
+    fn the_model(&mut self, ui: &mut egui::Ui, ch: &mut CauHinhBocTach, khoa: &BTreeMap<String, String>, n: NhaCungCap) {
         let dang = self.dang_kiem_tra.as_ref().is_some_and(|(x, _)| *x == n);
         dong(ui, "Model", |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -264,8 +288,7 @@ impl TabBocTach {
             (_, Some(Err(e))) => (e.clone(), DO, Some(false)),
             _ => (if n.la_dam_may() { "Chưa kiểm tra — dán khoá API rồi bấm Kiểm tra kết nối" } else { "Chưa kiểm tra — nhập địa chỉ rồi bấm Kiểm tra kết nối" }.to_string(), CHU_PHU, None),
         };
-        ui.horizontal(|ui| {
-            ui.add_space(RONG_NHAN + 8.0);
+        hang_phu(ui, |ui| {
             ui.spacing_mut().item_spacing.x = 5.0;
             if let Some(ok) = dau {
                 let (r, _) = ui.allocate_exact_size(egui::vec2(11.0, 14.0), Sense::hover());
@@ -274,7 +297,6 @@ impl TabBocTach {
             ui.add(egui::Label::new(RichText::new(chu).size(11.5).color(mau)).wrap());
         });
         if n.la_dam_may() {
-            ui.add_space(4.0);
             egui::Frame::new().fill(NEN_CANH_BAO).stroke(Stroke::new(1.0, VIEN_CANH_BAO)).corner_radius(4).inner_margin(Margin::symmetric(10, 6)).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
@@ -283,8 +305,8 @@ impl TabBocTach {
                     ui.label(RichText::new(format!("Ảnh trang PDF gửi tới máy chủ của {}. Không dùng cho tài liệu mật.", n.cong_ty())).size(12.0).color(NAU));
                 });
             });
+            ui.add_space(6.0);
         }
-        ui.add_space(6.0);
         let mui = if self.nang_cao { BieuTuong::ChevronXuong } else { BieuTuong::PhaiChevron };
         let nut = ui.add(egui::Button::new((bt::atom_mau(mui, 12.0, CHU), RichText::new("Nâng cao: song song, thời gian chờ, ảnh gửi đi").size(12.5))).frame(false));
         if nut.hovered() {
@@ -362,20 +384,25 @@ impl TabBocTach {
     }
 
     fn muc_ghi(&mut self, ui: &mut egui::Ui, ch: &mut CauHinhBocTach, khoa: &mut BTreeMap<String, String>) {
-        tieu_de_the(ui, "File Excel", "— luôn tạo");
-        dong(ui, "Thư mục ghi", |ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            ui.add(kh::o_nhap(&mut ch.thu_muc_excel).desired_width(ui.available_width() - 34.0).hint_text("Để trống = cạnh thư mục nguồn"));
-            if ui.add(egui::Button::new("…").min_size(egui::vec2(30.0, 24.0))).on_hover_text("Chọn thư mục").clicked() {
-                if let Some(p) = rfd::FileDialog::new().pick_folder() {
-                    ch.thu_muc_excel = p.display().to_string();
-                }
-            }
-        });
-        ui.add_space(10.0);
-        kh::ke_ngang(ui, VIEN_NHAT);
-        ui.add_space(8.0);
-        tieu_de_the(ui, "Google Sheet", "— ghi thêm 1 dòng sau mỗi file");
+        gc::the_tuy_bien(
+            ui,
+            |ui| tieu_de_phu(ui, "File Excel", "— luôn tạo"),
+            |ui| {
+                dong(ui, "Thư mục ghi", |ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    ui.add(kh::o_nhap(&mut ch.thu_muc_excel).desired_width(ui.available_width() - 34.0).hint_text("Để trống = cạnh thư mục nguồn"));
+                    if ui.add(egui::Button::new("…").min_size(egui::vec2(30.0, 24.0))).on_hover_text("Chọn thư mục").clicked() {
+                        if let Some(p) = rfd::FileDialog::new().pick_folder() {
+                            ch.thu_muc_excel = p.display().to_string();
+                        }
+                    }
+                });
+            },
+        );
+        gc::the_tuy_bien(ui, |ui| tieu_de_phu(ui, "Google Sheet", "— ghi thêm 1 dòng sau mỗi file"), |ui| self.the_sheet(ui, ch, khoa));
+    }
+
+    fn the_sheet(&mut self, ui: &mut egui::Ui, ch: &mut CauHinhBocTach, khoa: &mut BTreeMap<String, String>) {
         dong(ui, "Link Sheet", |ui| {
             ui.add(kh::o_nhap(&mut ch.sheet_link).desired_width(ui.available_width()).hint_text("https://docs.google.com/spreadsheets/d/…/edit"));
         });
@@ -403,8 +430,7 @@ impl TabBocTach {
                 }
                 match &self.email_sa.1 {
                     Some(email) => {
-                        ui.horizontal(|ui| {
-                            ui.add_space(RONG_NHAN + 8.0);
+                        hang_phu(ui, |ui| {
                             ui.spacing_mut().item_spacing.x = 4.0;
                             ui.label(RichText::new("Chia sẻ Sheet cho").size(11.5).color(CHU_PHU));
                             ui.label(RichText::new(email).size(11.5).dam());
@@ -427,8 +453,7 @@ impl TabBocTach {
                     let bm = khoa.entry(KHOA_APPS_SCRIPT_BI_MAT.to_string()).or_default();
                     ui.add(kh::o_nhap(bm).password(true).desired_width(ui.available_width()).hint_text("Trùng BI_MAT trong script (ai có URL cũng không ghi được nếu thiếu mã)"));
                 });
-                ui.horizontal(|ui| {
-                    ui.add_space(RONG_NHAN + 8.0);
+                hang_phu(ui, |ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
                     ui.label(RichText::new("Dán script mẫu vào Sheet (Tiện ích › Apps Script), triển khai Web app rồi dán URL ·").size(11.5).color(CHU_PHU));
                     if lien_ket(ui, if self.da_chep_script { "Đã chép" } else { "Chép script mẫu" }, VIEN_TAB_CHON).on_hover_text("Chép script Apps Script mẫu vào clipboard").clicked() {
@@ -449,8 +474,7 @@ impl TabBocTach {
                 Err(mpsc::TryRecvError::Disconnected) => self.ghi_thu = None,
             }
         }
-        ui.horizontal(|ui| {
-            ui.add_space(RONG_NHAN + 8.0);
+        dong(ui, "", |ui| {
             let dang = self.ghi_thu.is_some();
             if ui.add_enabled(!dang, egui::Button::new(if dang { "Đang ghi…" } else { "Ghi thử 1 dòng" }).min_size(egui::vec2(0.0, 24.0))).on_hover_text("Ghi 1 dòng thử vào tab đã khai để kiểm tra quyền ghi").clicked() {
                 let (gui, nhan) = mpsc::channel();
@@ -485,27 +509,37 @@ impl TabBocTach {
 
 /// Mục Nguồn văn bản: bản đầu chỉ Máy tính; Drive / Cloud Storage / S3 có ở bản sau.
 fn muc_nguon(ui: &mut egui::Ui) {
-    buoc(ui, 1, "Chọn nguồn");
-    let o = [(BieuTuong::ThuMuc, "Máy tính", "Luôn dùng được", true), (BieuTuong::GgDrive, "Google Drive", "Sắp có", false), (BieuTuong::DamMay, "Google Cloud Storage", "Sắp có", false), (BieuTuong::KhoS3, "Kho S3", "Sắp có", false)];
-    let rong = (ui.available_width() - 3.0 * 8.0) / 4.0;
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 8.0;
-        for (icon, ten, phu, bat) in o {
-            let (r, p) = ui.allocate_exact_size(egui::vec2(rong, 40.0), if bat { Sense::click() } else { Sense::hover() });
-            o_chon(ui, r, &p, bat, bat);
-            bt::ve(ui.painter(), Rect::from_center_size(egui::pos2(r.left() + 17.0, r.center().y), egui::vec2(15.0, 15.0)), icon, if bat { CHU } else { CHU_MO });
-            hai_dong(ui, egui::pos2(r.left() + 32.0, r.top() + 5.0), r.width() - 38.0, ten, phu, !bat, 12.5);
-            if !bat {
-                p.on_hover_text("Có ở bản sau");
-            }
-        }
-    });
-    ui.add_space(6.0);
-    buoc(ui, 2, "Thư mục");
-    dong(ui, "Thư mục", |ui| {
-        ui.label(RichText::new("Chọn ở màn chính (nút Chọn); gồm cả thư mục con.").color(CHU_PHU));
-    });
-    goi_y(ui, "Thư mục Google Drive for Desktop, ổ mạng cũng chọn như thư mục trên máy.");
+    gc::the_tuy_bien(
+        ui,
+        |ui| buoc(ui, 1, "Chọn nguồn"),
+        |ui| {
+            let o = [(BieuTuong::ThuMuc, "Máy tính", "Luôn dùng được", true), (BieuTuong::GgDrive, "Google Drive", "Sắp có", false), (BieuTuong::DamMay, "Google Cloud Storage", "Sắp có", false), (BieuTuong::KhoS3, "Kho S3", "Sắp có", false)];
+            let rong = (ui.available_width() - 3.0 * 8.0) / 4.0;
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 8.0;
+                for (icon, ten, phu, bat) in o {
+                    let (r, p) = ui.allocate_exact_size(egui::vec2(rong, 42.0), if bat { Sense::click() } else { Sense::hover() });
+                    o_chon(ui, r, &p, bat, bat, 5);
+                    bt::ve(ui.painter(), Rect::from_center_size(egui::pos2(r.left() + 18.0, r.center().y), egui::vec2(15.0, 15.0)), icon, if bat { CHU } else { CHU_MO });
+                    hai_dong(ui, egui::pos2(r.left() + 34.0, r.top() + 6.0), r.width() - 40.0, ten, phu, !bat, 12.5);
+                    if !bat {
+                        p.on_hover_text("Có ở bản sau");
+                    }
+                }
+            });
+            ui.add_space(4.0);
+        },
+    );
+    gc::the_tuy_bien(
+        ui,
+        |ui| buoc(ui, 2, "Thư mục"),
+        |ui| {
+            dong(ui, "Thư mục", |ui| {
+                ui.label(RichText::new("Chọn ở màn chính (nút Chọn); gồm cả thư mục con.").color(CHU_PHU));
+            });
+            goi_y(ui, "Thư mục Google Drive for Desktop, ổ mạng cũng chọn như thư mục trên máy.");
+        },
+    );
 }
 
 /// Email `client_email` trong file khoá service account.
@@ -517,21 +551,13 @@ fn email_service_account(duong_dan: &str) -> Option<String> {
     v["client_email"].as_str().filter(|e| e.contains('@')).map(str::to_string)
 }
 
-/// Khung thẻ trắng viền xám bo góc chứa nội dung mục.
-fn the(ui: &mut egui::Ui, f: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::new().stroke(Stroke::new(1.0, VIEN_NHAT)).corner_radius(6).inner_margin(Margin { left: 16, right: 16, top: 12, bottom: 14 }).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        f(ui);
-    });
-}
-
 /// Ô chọn (sơ đồ luồng, nhà cung cấp, nguồn): chọn = viền xanh nền xanh nhạt; rê = viền đậm hơn.
-fn o_chon(ui: &egui::Ui, r: Rect, p: &egui::Response, chon: bool, bat: bool) {
+fn o_chon(ui: &egui::Ui, r: Rect, p: &egui::Response, chon: bool, bat: bool, bo_goc: u8) {
     if bat && p.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     let (nen, vien) = if chon { (NEN_CHON, VIEN_TAB_CHON) } else if bat && p.hovered() { (Color32::WHITE, VIEN) } else { (Color32::WHITE, VIEN_NHAT) };
-    ui.painter().rect(r, CornerRadius::same(5), nen, Stroke::new(1.0, vien), StrokeKind::Inside);
+    ui.painter().rect(r, CornerRadius::same(bo_goc), nen, Stroke::new(1.0, vien), StrokeKind::Inside);
 }
 
 /// Tên đậm + dòng phụ nhỏ (xám nghiêng khi `mo`), cắt bằng "…" khi dài.
@@ -584,43 +610,45 @@ fn canh_bao(p: &egui::Painter, r: Rect, mau: Color32) {
     p.circle_filled(r.center() + egui::vec2(0.0, 4.2), 0.9, mau);
 }
 
-/// Đầu bước: vòng tròn xanh số trắng + chữ đậm.
+/// Đầu bước trong dòng tiêu đề thẻ: vòng tròn xanh số trắng + chữ đậm.
 fn buoc(ui: &mut egui::Ui, so: u8, chu: &str) {
-    ui.horizontal(|ui| {
-        let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
-        ui.painter().circle_filled(r.center(), 9.0, VIEN_TAB_CHON);
-        ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, so.to_string(), egui::FontId::new(11.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), Color32::WHITE);
-        ui.label(RichText::new(chu).size(12.5).dam());
-    });
+    let (r, _) = ui.allocate_exact_size(egui::vec2(20.0, 20.0), Sense::hover());
+    ui.painter().circle_filled(r.center(), 10.0, VIEN_TAB_CHON);
+    ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, so.to_string(), egui::FontId::new(11.0, egui::FontFamily::Name(crate::gui::HO_FONT_DAM.into())), Color32::WHITE);
+    ui.label(RichText::new(chu).size(13.5).dam());
 }
 
-fn tieu_de_the(ui: &mut egui::Ui, chu: &str, phu: &str) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 5.0;
-        ui.label(RichText::new(chu).size(12.5).dam());
-        ui.label(RichText::new(phu).size(12.0).color(CHU_PHU));
-    });
+/// Tiêu đề thẻ: tên đậm + chú thích xám.
+fn tieu_de_phu(ui: &mut egui::Ui, chu: &str, phu: &str) {
+    ui.label(RichText::new(chu).size(13.5).dam());
+    ui.label(RichText::new(phu).size(13.0).color(CHU_PHU));
 }
 
-/// Dòng `nhãn | nội dung` với cột nhãn cố định.
+/// Dòng `nhãn | nội dung` (lưới chung của các thẻ cấu hình), có kẻ mảnh phía trên.
 fn dong(ui: &mut egui::Ui, nhan: &str, f: impl FnOnce(&mut egui::Ui)) {
-    ui.horizontal(|ui| {
-        let (r, _) = ui.allocate_exact_size(egui::vec2(RONG_NHAN, 24.0), Sense::hover());
-        ui.painter().text(egui::pos2(r.left(), r.center().y), egui::Align2::LEFT_CENTER, nhan, egui::FontId::proportional(12.0), CHU);
-        ui.add_space(8.0);
+    gc::dong(ui, false, |ui| {
+        ui.label(RichText::new(nhan).color(CHU));
+    }, f);
+}
+
+/// Hàng phụ thẳng cột ô, ngay dưới dòng `nhãn | ô`.
+fn hang_phu(ui: &mut egui::Ui, f: impl FnOnce(&mut egui::Ui)) {
+    ui.add_space(-4.0);
+    ui.horizontal_wrapped(|ui| {
+        let khe = std::mem::replace(&mut ui.spacing_mut().item_spacing.x, 0.0);
+        ui.add_space(gc::RONG_NHAN + 12.0);
+        ui.spacing_mut().item_spacing.x = khe;
         f(ui);
     });
+    ui.add_space(8.0);
 }
 
 fn goi_y(ui: &mut egui::Ui, chu: &str) {
-    goi_y_mau(ui, chu, CHU_PHU);
+    gc::goi_y(ui, chu, None);
 }
 
 fn goi_y_mau(ui: &mut egui::Ui, chu: &str, mau: Color32) {
-    ui.horizontal(|ui| {
-        ui.add_space(RONG_NHAN + 8.0);
-        ui.add(egui::Label::new(RichText::new(chu).size(11.5).color(mau)).wrap());
-    });
+    gc::goi_y(ui, chu, Some(mau));
 }
 
 fn lien_ket(ui: &mut egui::Ui, chu: &str, mau: Color32) -> egui::Response {

@@ -922,6 +922,13 @@ impl ManTach {
         p.ho_so.iter().any(|h| h.id.is_some_and(|id| k.co_phan_tich(id)))
     }
 
+    /// Thư mục đang mở + id nội dung các PDF của nó trong kho (trang Dữ liệu ứng dụng tính dung lượng cache từ đây);
+    /// `None` = chưa mở thư mục.
+    pub fn cache_dang_mo(&self) -> Option<(PathBuf, Vec<crate::tach_vb::kho::Id>)> {
+        let p = self.phien.as_ref()?;
+        Some((p.goc.clone(), p.ho_so.iter().filter_map(|h| h.id).collect()))
+    }
+
     /// Xoá kết quả phân tích (kèm cờ duyệt) của thư mục đang mở; không ghi lại bản trong bộ nhớ khi đóng / đổi thư mục.
     pub fn xoa_cache(&mut self) {
         if let Some(p) = &self.phien {

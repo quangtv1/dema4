@@ -570,7 +570,7 @@ impl UngDungChinh {
                         Man::XoaGhim => TabCauHinh::XoaGhim,
                         _ => TabCauHinh::Dem,
                     };
-                    self.mo_cau_hinh(HopCauHinh::moi(&self.cfg, tab));
+                    self.mo_cau_hinh(&ui.ctx().clone(), HopCauHinh::moi(&self.cfg, tab));
                 }
                 egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::HoiDap, 14.0, xam), "Trợ giúp", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                     use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
@@ -602,13 +602,13 @@ impl UngDungChinh {
 
     /// Mở trang Cấu hình: nạp cache Tách, khoá Bóc tách, tuỳ chọn thư mục + việc tải mô hình của màn Xóa ghim; nhớ
     /// màn để "Quay lại".
-    fn mo_cau_hinh(&mut self, mut hop: crate::gui_tach::hop_cau_hinh::HopCauHinh) {
+    fn mo_cau_hinh(&mut self, ctx: &egui::Context, mut hop: crate::gui_tach::hop_cau_hinh::HopCauHinh) {
         hop.co_cache = self.tach.co_cache();
         hop.khoa = self.khoa_bt.clone();
         hop.xg.thu_muc = self.xoa_ghim.cau_hinh_thu_muc();
         hop.xg.mo_hinh = self.xoa_ghim.mo_hinh.take();
-        hop.du_lieu.thu_muc_tach = (!self.tach.thu_muc.trim().is_empty()).then(|| std::path::PathBuf::from(self.tach.thu_muc.trim()));
-        hop.du_lieu.co_cache = hop.co_cache;
+        hop.xg.duong_dan = self.xoa_ghim.thu_muc.clone();
+        hop.du_lieu = Some(crate::gui_cau_hinh::du_lieu::TrangDuLieu::moi(ctx, crate::tach_vb::du_lieu_an::goc_du_lieu().to_path_buf(), self.tach.cache_dang_mo()));
         hop.tu = self.man.ten_ngan();
         hop.chot_goc();
         self.hop_cau_hinh = Some(hop);
@@ -774,7 +774,7 @@ impl eframe::App for UngDungChinh {
                     let _ = crate::cau_hinh::ghi(&self.cfg);
                 }
                 if std::mem::take(&mut self.xoa_ghim.mo_cau_hinh) {
-                    self.mo_cau_hinh(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&self.cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::XoaGhim));
+                    self.mo_cau_hinh(&ctx, crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&self.cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::XoaGhim));
                 }
                 if std::mem::take(&mut self.xoa_ghim.ve_trang_chu) && !self.dang_chay() {
                     self.chuyen_man(Man::TrangChu);
@@ -806,7 +806,7 @@ impl eframe::App for UngDungChinh {
                     let _ = crate::cau_hinh::ghi(&self.cfg);
                 }
                 if std::mem::take(&mut self.boc_tach.mo_cau_hinh) {
-                    self.mo_cau_hinh(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&self.cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::BocTach));
+                    self.mo_cau_hinh(&ctx, crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&self.cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::BocTach));
                 }
             }
             // Chức năng đang phát triển: chỉ màn giới thiệu (mờ, nhãn ĐANG PHÁT TRIỂN)
@@ -855,7 +855,9 @@ impl UngDungChinh {
         if std::mem::take(&mut hop.xoa_cache) {
             self.tach.xoa_cache();
             hop.co_cache = self.tach.co_cache();
-            hop.du_lieu.co_cache = hop.co_cache;
+            if let Some(d) = &mut hop.du_lieu {
+                d.da_xoa_cache();
+            }
             hop.bao("Đã xoá cache phân tích");
         }
         // Dạng hiển thị: nhớ ngay, không qua Lưu
@@ -2529,7 +2531,7 @@ mod tests {
                 cai_giao_dien(&cc.egui_ctx);
                 let cfg = crate::cau_hinh::CauHinh { ch_cua_so_nho: nho, ch_thu_ds: thu, ..Default::default() };
                 let mut app = UngDungChinh { man, cfg: cfg.clone(), ..Default::default() };
-                app.mo_cau_hinh(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, tab));
+                app.mo_cau_hinh(&cc.egui_ctx, crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, tab));
                 if sua {
                     let hop = app.hop_cau_hinh.as_mut().unwrap();
                     hop.nhap.nguong_nghi = 3.5;

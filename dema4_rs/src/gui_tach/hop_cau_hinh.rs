@@ -105,8 +105,8 @@ pub struct HopCauHinh {
     pub khoa: std::collections::BTreeMap<String, String>,
     /// Tab Xóa ghim: tuỳ chọn thư mục đang mở + việc tải mô hình AI (app nạp vào khi mở, lấy ra khi đóng).
     pub xg: crate::gui_xoa_ghim::TabXoaGhim,
-    /// Trang Dữ liệu ứng dụng.
-    pub du_lieu: crate::gui_cau_hinh::du_lieu::TrangDuLieu,
+    /// Trang Dữ liệu ứng dụng (app tạo khi mở Cấu hình; chưa có thì tạo lúc vẽ, không biết thư mục Tách).
+    pub du_lieu: Option<crate::gui_cau_hinh::du_lieu::TrangDuLieu>,
     /// Bản đang dùng (đã lưu) — so với `nhap` để biết chức năng nào còn thay đổi.
     pub goc: CauHinh,
     khoa_goc: std::collections::BTreeMap<String, String>,
@@ -203,7 +203,7 @@ impl HopCauHinh {
             bt: crate::gui_boc_tach::cau_hinh::TabBocTach::moi(&cfg.boc_tach),
             khoa: Default::default(),
             xg: Default::default(),
-            du_lieu: Default::default(),
+            du_lieu: None,
             goc: cfg.clone(),
             khoa_goc: Default::default(),
             xg_goc: None,
@@ -313,7 +313,8 @@ impl HopCauHinh {
             TabCauHinh::XoaGhim => self.xg.ve(ui, &mut self.nhap.xoa_ghim),
             TabCauHinh::DuLieu => {
                 use crate::gui_cau_hinh::du_lieu::ViecDuLieu;
-                match self.du_lieu.ve(ui) {
+                let trang = self.du_lieu.get_or_insert_with(|| crate::gui_cau_hinh::du_lieu::TrangDuLieu::moi(ui.ctx(), crate::tach_vb::du_lieu_an::goc_du_lieu().to_path_buf(), None));
+                match trang.ve(ui) {
                     ViecDuLieu::XoaCache => self.xoa_cache = true,
                     ViecDuLieu::DonCu => self.don_cu = true,
                     ViecDuLieu::Khong => {}

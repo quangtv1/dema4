@@ -41,11 +41,9 @@ pub enum Pham {
 
 /// Thẻ nền trắng viền `#e5e7eb` bo 6: tiêu đề 13,5 đậm (+ ⓘ `giai_thich`, + nhãn `pham`), rồi các dòng.
 pub fn the(ui: &mut egui::Ui, tieu_de: &str, giai_thich: Option<&str>, pham: Option<Pham>, noi_dung: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, VIEN_THE)).corner_radius(6).inner_margin(Margin { left: 16, right: 16, top: 12, bottom: 8 }).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.spacing_mut().item_spacing.y = 0.0;
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
+    the_tuy_bien(
+        ui,
+        |ui| {
             ui.label(RichText::new(tieu_de).size(13.5).color(CHU).dam());
             if let Some(g) = giai_thich {
                 crate::gui_tach::bieu_tuong::thong_tin(ui, g);
@@ -53,6 +51,19 @@ pub fn the(ui: &mut egui::Ui, tieu_de: &str, giai_thich: Option<&str>, pham: Opt
             if let Some(p) = pham {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| nhan_pham(ui, p));
             }
+        },
+        noi_dung,
+    );
+}
+
+/// Như `the` nhưng dòng tiêu đề do nơi gọi vẽ (biểu tượng, vòng số bước, liên kết bên phải…); khung, lề, khoảng cách giống nhau.
+pub fn the_tuy_bien(ui: &mut egui::Ui, tieu_de: impl FnOnce(&mut egui::Ui), noi_dung: impl FnOnce(&mut egui::Ui)) {
+    egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, VIEN_THE)).corner_radius(6).inner_margin(Margin { left: 16, right: 16, top: 12, bottom: 8 }).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.spacing_mut().item_spacing.y = 0.0;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            tieu_de(ui);
         });
         ui.add_space(6.0);
         ui.spacing_mut().interact_size.y = 26.0;
@@ -82,12 +93,15 @@ pub fn dong(ui: &mut egui::Ui, dau: bool, nhan: impl FnOnce(&mut egui::Ui), o: i
     }
     ui.add_space(8.0);
     ui.horizontal(|ui| {
+        // Ô bắt đầu đúng cột `RONG_NHAN + 12` (thẳng với chữ gợi ý bên dưới)
+        let khe = std::mem::replace(&mut ui.spacing_mut().item_spacing.x, 0.0);
         ui.allocate_ui_with_layout(egui::vec2(RONG_NHAN, 26.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             ui.set_min_width(RONG_NHAN);
             ui.spacing_mut().item_spacing.x = 6.0;
             nhan(ui);
         });
         ui.add_space(12.0);
+        ui.spacing_mut().item_spacing.x = khe;
         o(ui);
     });
     ui.add_space(8.0);
@@ -97,6 +111,7 @@ pub fn dong(ui: &mut egui::Ui, dau: bool, nhan: impl FnOnce(&mut egui::Ui), o: i
 pub fn goi_y(ui: &mut egui::Ui, chu: &str, mau: Option<Color32>) {
     ui.add_space(-4.0);
     ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
         ui.add_space(RONG_NHAN + 12.0);
         ui.add(egui::Label::new(RichText::new(chu).size(11.5).color(mau.unwrap_or(CHU_PHU))).wrap());
     });
