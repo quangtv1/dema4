@@ -497,7 +497,8 @@ impl ManXoaGhim {
             }
         }
         // Logo góc dưới phải + "Trang chủ"
-        let kich = crate::logo_sao_mai::kich(74.0);
+        // Cùng cỡ logo góc của các chức năng khác
+        let kich = crate::logo_sao_mai::kich(64.0);
         let o_nut = Rect::from_min_size(egui::pos2(than.right() - 18.0 - kich.x - 12.0, than.bottom() - 14.0 - kich.y - 12.0 - 16.0), kich + egui::vec2(12.0, 12.0 + 16.0));
         if o_nut.top() > goc.y + cot.y + 20.0 {
             let ph = ui.interact(o_nut, ui.scope_id().with("xg_logo"), Sense::click());
