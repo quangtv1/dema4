@@ -31,7 +31,7 @@ const TRE_GHI: Duration = Duration::from_millis(600);
 
 /// Vùng mặc định của thư mục chưa chỉnh lần nào: góc trên trái + góc trên phải (như XoaGhim).
 pub fn thu_muc_mac_dinh() -> ThuMuc {
-    ThuMuc { luc: 0, vung: vec![co_san(ViTri::GocTrenTrai), co_san(ViTri::GocTrenPhai)], tuy_chon: Default::default(), xuat: CauHinhXuat::default() }
+    ThuMuc { luc: 0, vung: vec![co_san(ViTri::GocTrenTrai), co_san(ViTri::GocTrenPhai)], tuy_chon: Default::default(), xuat: CauHinhXuat::default(), ghi: Default::default() }
 }
 
 /// Đường dẫn thư mục kết quả mặc định của nguồn (cạnh nguồn).

@@ -1,20 +1,24 @@
 //! Xuất PDF đã xoá ghim: trang không có vùng áp dụng → chép nguyên trang; trang có vùng → vẽ ở DPI (theo ảnh scan
 //! hoặc chọn), xoá ghim, ghi JPEG (hoặc ảnh đen trắng / xám khi "Nén đen trắng") thành trang mới cùng khổ — như XoaGhim.
 //!
-//! Kết quả vào `<tên nguồn>_xoaghim/`, giữ thư mục con và tên file; file gốc không bị sửa. Ghi file tạm → đẩy xuống
-//! đĩa → đổi tên (mất điện không để lại file kết quả dở); nhật ký ghi sau khi đổi tên xong.
+//! Nơi ghi theo `CauHinhGhi` (`dich_cua`): mặc định `<tên nguồn>_xoaghim/` giữ thư mục con và tên file; hoặc thư mục
+//! chọn; hoặc cạnh file (`<tên>_xoaghim.pdf`); hoặc ghi đè chính file nguồn. Ghi file tạm → đẩy xuống đĩa → đổi tên
+//! (mất điện không để lại file kết quả dở, ghi đè không làm hỏng nguồn); nhật ký ghi sau khi đổi tên xong.
 
-use super::kho::{self as kho_xg, CauHinhXuat, NhatKy};
+use super::kho::{self as kho_xg, CauHinhGhi, CauHinhXuat, KieuGhi, NhatKy};
 use super::vung::Vung;
 use super::xu_ly::{xoa_ghim_trang, TuyChon};
 use crate::tach_vb::anh::Anh;
 use crate::tach_vb::kho::Id;
 use mupdf::pdf::{PdfDocument, PdfWriteOptions};
 use std::path::{Path, PathBuf};
+use rayon::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Hậu tố thư mục kết quả.
+/// Hậu tố thư mục kết quả (và tên file kết quả khi ghi cạnh file).
 pub const HAU_TO: &str = "_xoaghim";
+/// Số trang tối đa của 1 file vẽ + xoá song song khi bật "Lô 10 trang".
+pub const LO_TRANG: usize = 10;
 /// DPI khi trang không có ảnh scan (trang chữ / vector) — như XoaGhim.
 const DPI_KHONG_ANH: u16 = 150;
 /// Chặn DPI vẽ trang (bộ nhớ: A4 600 dpi ~ 100 MB / trang).
@@ -65,34 +69,58 @@ fn la_anh_den_trang(xam: &Anh) -> bool {
     n as f64 / xam.du_lieu.len().max(1) as f64 >= 0.85
 }
 
-/// Ảnh trang đã xử lý → ảnh PDF theo cách ghi đã chọn.
-fn anh_pdf(anh: &Anh, xuat: &CauHinhXuat) -> Result<mupdf::Image, String> {
-    let jpeg = |du_lieu: &[u8], mau: jpeg_encoder::ColorType, chat_luong: u8| -> Result<mupdf::Image, String> {
+/// Ảnh trang đã mã hoá xong, chưa thành đối tượng MuPDF (dữ liệu thuần — chuyển được giữa các luồng).
+enum AnhMaHoa {
+    Jpeg(Vec<u8>),
+    /// Ảnh xám 1 kênh đã ngưỡng về 0 / 255.
+    HaiMuc(Anh),
+}
+
+/// Ảnh trang đã xử lý → dữ liệu ảnh theo cách ghi đã chọn (phần nặng, chạy song song được).
+fn ma_hoa_anh(anh: &Anh, xuat: &CauHinhXuat) -> Result<AnhMaHoa, String> {
+    let jpeg = |du_lieu: &[u8], mau: jpeg_encoder::ColorType, chat_luong: u8| -> Result<AnhMaHoa, String> {
         let mut ra = Vec::new();
         let mut bm = jpeg_encoder::Encoder::new(&mut ra, chat_luong.clamp(1, 100));
         // Màu lấy mẫu 4:2:0 ở mọi chất lượng như OpenCV (bộ mã hoá mặc định 4:4:4 khi ≥ 90 → file lớn hơn ~18%)
         bm.set_sampling_factor(jpeg_encoder::SamplingFactor::F_2_2);
         bm.encode(du_lieu, anh.rong as u16, anh.cao as u16, mau).map_err(|e| e.to_string())?;
-        mupdf::Image::from_bytes(&ra).map_err(loi)
+        Ok(AnhMaHoa::Jpeg(ra))
     };
     if anh.rong > u16::MAX as usize || anh.cao > u16::MAX as usize {
         return Err("trang quá lớn".into());
     }
     if xuat.nen_den_trang {
-        let xam = xam_opencv(anh);
+        let mut xam = xam_opencv(anh);
         if la_anh_den_trang(&xam) {
             // Ngưỡng 127 → ảnh 2 mức, ghi nén không mất (PDF nén Flate — gọn với ảnh 2 mức)
-            let mut pix = mupdf::Pixmap::new_with_w_h(&mupdf::Colorspace::device_gray(), xam.rong as i32, xam.cao as i32, false).map_err(loi)?;
-            for (o, v) in pix.samples_mut().iter_mut().zip(&xam.du_lieu) {
-                *o = if *v > 127 { 255 } else { 0 };
+            for v in xam.du_lieu.iter_mut() {
+                *v = if *v > 127 { 255 } else { 0 };
             }
-            return mupdf::Image::from_pixmap(&pix).map_err(loi);
+            return Ok(AnhMaHoa::HaiMuc(xam));
         }
         if la_anh_xam(anh) {
             return jpeg(&xam.du_lieu, jpeg_encoder::ColorType::Luma, xuat.chat_luong.min(90));
         }
     }
     jpeg(&anh.du_lieu, jpeg_encoder::ColorType::Rgb, xuat.chat_luong)
+}
+
+/// Dữ liệu ảnh đã mã hoá → ảnh MuPDF (ở luồng đang ghi PDF đích).
+fn thanh_anh_pdf(a: &AnhMaHoa) -> Result<mupdf::Image, String> {
+    match a {
+        AnhMaHoa::Jpeg(b) => mupdf::Image::from_bytes(b).map_err(loi),
+        AnhMaHoa::HaiMuc(xam) => {
+            let mut pix = mupdf::Pixmap::new_with_w_h(&mupdf::Colorspace::device_gray(), xam.rong as i32, xam.cao as i32, false).map_err(loi)?;
+            pix.samples_mut().copy_from_slice(&xam.du_lieu);
+            mupdf::Image::from_pixmap(&pix).map_err(loi)
+        }
+    }
+}
+
+/// Ảnh trang đã xử lý → ảnh PDF theo cách ghi đã chọn.
+#[cfg(test)]
+fn anh_pdf(anh: &Anh, xuat: &CauHinhXuat) -> Result<mupdf::Image, String> {
+    thanh_anh_pdf(&ma_hoa_anh(anh, xuat)?)
 }
 
 /// Thêm trang mới khổ `rong` × `cao` điểm, phủ kín bằng `anh`, ở vị trí `thu_tu`.
@@ -137,9 +165,37 @@ pub struct KetQuaFile {
     pub dpi: u16,
 }
 
+/// Tuỳ chọn cách chạy (không đổi nội dung kết quả).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TuyChonChay {
+    /// Vẽ + xoá tối đa `LO_TRANG` trang của 1 file song song (nhanh hơn, tốn RAM hơn); tắt = từng trang.
+    pub lo_10: bool,
+}
+
+/// 1 trang đã vẽ + xoá ghim + mã hoá ảnh.
+struct TrangXong {
+    anh: AnhMaHoa,
+    dpi: u16,
+    kho: (f32, f32),
+}
+
+fn xu_ly_trang(doc: &PdfDocument, so: usize, vung: &[Vung], tc: &TuyChon, xuat: &CauHinhXuat) -> Result<TrangXong, String> {
+    let (mut anh, dpi, kho) = ve_trang(doc, so, xuat.dpi)?;
+    xoa_ghim_trang(&mut anh, vung, so as u32, dpi as f64, tc, &[]);
+    Ok(TrangXong { anh: ma_hoa_anh(&anh, xuat)?, dpi, kho })
+}
+
 /// Xoá ghim `nguon` → nội dung PDF kết quả (chưa ghi file). `vung`: vùng chung rồi vùng riêng của file, đúng thứ tự.
 pub fn xoa_ghim_pdf(nguon: &Path, vung: &[Vung], tc: &TuyChon, xuat: &CauHinhXuat, dung: &AtomicBool) -> Result<(Vec<u8>, KetQuaFile), String> {
-    let src = PdfDocument::open(nguon.to_str().ok_or("đường dẫn không hợp lệ")?).map_err(loi)?;
+    xoa_ghim_pdf_voi(nguon, vung, tc, xuat, TuyChonChay::default(), dung)
+}
+
+/// Như `xoa_ghim_pdf`, theo `chay`. Lô 10 trang: mỗi lô vẽ + xoá + mã hoá song song trên `pool()` (mỗi luồng mở
+/// PDF nguồn riêng — tài liệu MuPDF không dùng chung giữa luồng), rồi ghép vào PDF đích đúng thứ tự trang →
+/// nội dung kết quả giống hệt chạy từng trang.
+pub fn xoa_ghim_pdf_voi(nguon: &Path, vung: &[Vung], tc: &TuyChon, xuat: &CauHinhXuat, chay: TuyChonChay, dung: &AtomicBool) -> Result<(Vec<u8>, KetQuaFile), String> {
+    let ten = nguon.to_str().ok_or("đường dẫn không hợp lệ")?;
+    let src = PdfDocument::open(ten).map_err(loi)?;
     if src.needs_password().map_err(loi)? {
         return Err("PDF có mật khẩu".into());
     }
@@ -147,19 +203,42 @@ pub fn xoa_ghim_pdf(nguon: &Path, vung: &[Vung], tc: &TuyChon, xuat: &CauHinhXua
     let mut dst = PdfDocument::new();
     let mut ghep = dst.new_graft_map().map_err(loi)?;
     let mut kq = KetQuaFile { so_trang: so_trang as u32, trang_xu_ly: Vec::new(), dpi: 0 };
-    for so in 0..so_trang {
+    let co_vung = |so: usize| vung.iter().any(|v| v.ap_trang.ap_dung(so as u32));
+    let buoc = if chay.lo_10 { LO_TRANG } else { 1 };
+    for dau in (0..so_trang).step_by(buoc) {
         if dung.load(Ordering::Relaxed) {
             return Err(super::lo::DA_DUNG.into());
         }
-        if !vung.iter().any(|v| v.ap_trang.ap_dung(so as u32)) {
-            crate::tach_vb::cat_pdf::ghep_trang(&src, so, &mut dst, &mut ghep, so, 0)?;
-            continue;
+        let cuoi = (dau + buoc).min(so_trang);
+        let can: Vec<usize> = (dau..cuoi).filter(|&so| co_vung(so)).collect();
+        let xong: Vec<Result<TrangXong, String>> = if can.len() > 1 {
+            pool().install(|| {
+                can.par_iter()
+                    .map_init(
+                        || PdfDocument::open(ten).map_err(loi),
+                        |doc, &so| {
+                            if dung.load(Ordering::Relaxed) {
+                                return Err(super::lo::DA_DUNG.to_string());
+                            }
+                            xu_ly_trang(doc.as_ref().map_err(|e| e.clone())?, so, vung, tc, xuat)
+                        },
+                    )
+                    .collect()
+            })
+        } else {
+            can.iter().map(|&so| xu_ly_trang(&src, so, vung, tc, xuat)).collect()
+        };
+        let mut xong = xong.into_iter();
+        for so in dau..cuoi {
+            if !co_vung(so) {
+                crate::tach_vb::cat_pdf::ghep_trang(&src, so, &mut dst, &mut ghep, so, 0)?;
+                continue;
+            }
+            let t = xong.next().ok_or("thiếu trang đã xử lý")??;
+            them_trang_anh(&mut dst, so, t.kho.0, t.kho.1, &thanh_anh_pdf(&t.anh)?)?;
+            kq.trang_xu_ly.push(so as u32);
+            kq.dpi = kq.dpi.max(t.dpi);
         }
-        let (mut anh, dpi, (rong, cao)) = ve_trang(&src, so, xuat.dpi)?;
-        xoa_ghim_trang(&mut anh, vung, so as u32, dpi as f64, tc, &[]);
-        them_trang_anh(&mut dst, so, rong, cao, &anh_pdf(&anh, xuat)?)?;
-        kq.trang_xu_ly.push(so as u32);
-        kq.dpi = kq.dpi.max(dpi);
     }
     let mut tuy_chon = PdfWriteOptions::default();
     tuy_chon.set_compress(true);
@@ -194,18 +273,95 @@ pub fn ghi_chac(dich: &Path, noi_dung: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Các PDF trong thư mục nguồn (theo thứ tự cây), bỏ thư mục kết quả Xóa ghim (`*_xoaghim`) nằm bên trong,
-/// kèm đường dẫn kết quả tương ứng trong `ra` (giữ thư mục con, giữ tên file).
-pub fn ds_viec(nguon: &Path, ra: &Path, dung: &AtomicBool) -> Vec<(PathBuf, PathBuf)> {
+/// Đường dẫn của `file` so với nguồn `goc` (thư mục, hoặc chính file khi mở 1 file → tên file).
+fn tuong_doi(goc: &Path, file: &Path) -> Option<PathBuf> {
+    if goc == file {
+        return file.file_name().map(PathBuf::from);
+    }
+    file.strip_prefix(goc).ok().map(Path::to_path_buf)
+}
+
+/// Tên file là kết quả Xóa ghim ghi cạnh file (`*_xoaghim.pdf`, không phân biệt hoa thường).
+pub fn la_file_ket_qua(p: &Path) -> bool {
+    p.file_name().is_some_and(|t| t.to_string_lossy().to_lowercase().ends_with(&format!("{HAU_TO}.pdf")))
+}
+
+/// Đích của `file` (trong nguồn `goc` — thư mục, hoặc chính file khi mở 1 file) theo nơi ghi `ghi`:
+/// - ghi đè → chính `file`;
+/// - nhân bản, chưa chọn thư mục → `<goc>_xoaghim/` (mở 1 file: `<thư mục cha>_xoaghim/`) + đường dẫn tương đối;
+/// - nhân bản vào thư mục `d` → `d` + đường dẫn tương đối; `d` nằm trong thư mục nguồn → lỗi (lần quét sau lẫn kết quả);
+/// - cạnh file → `<tên>_xoaghim.pdf` cùng thư mục.
+///
+/// Ngoài ghi đè, đích trùng chính file nguồn → lỗi.
+pub fn dich_cua(goc: &Path, file: &Path, ghi: &CauHinhGhi) -> Result<PathBuf, String> {
+    if ghi.ghi_de {
+        return Ok(file.to_path_buf());
+    }
+    let dich = match ghi.kieu {
+        KieuGhi::CanhFile => {
+            let ten = file.file_stem().ok_or("file không có tên")?.to_string_lossy();
+            file.with_file_name(format!("{ten}{HAU_TO}.pdf"))
+        }
+        KieuGhi::NhanBan => {
+            let mot_file = goc == file || goc.is_file();
+            let thu_muc_goc = if mot_file { goc.parent().ok_or("file không có thư mục cha")? } else { goc };
+            let tuong_doi = tuong_doi(goc, file).ok_or_else(|| format!("{} không nằm trong {}", file.display(), goc.display()))?;
+            let ra = match &ghi.thu_muc {
+                None => crate::tach_vb::tach::thu_muc_ra_hau_to(thu_muc_goc, None, HAU_TO)?,
+                Some(d) if !mot_file && crate::tach_vb::tach::nam_trong(d, thu_muc_goc) => {
+                    return Err(format!("thư mục lưu kết quả {} nằm trong thư mục nguồn — lần quét sau sẽ lẫn kết quả", d.display()));
+                }
+                Some(d) => d.clone(),
+            };
+            ra.join(tuong_doi)
+        }
+    };
+    if crate::tach_vb::tach::nam_trong(&dich, file) {
+        return Err(format!("file kết quả {} trùng file nguồn — chọn nơi lưu khác hoặc bật Ghi đè", dich.display()));
+    }
+    Ok(dich)
+}
+
+/// Các PDF của nguồn (thư mục: theo thứ tự cây; 1 file: chính nó), luôn bỏ kết quả Xóa ghim: thư mục `*_xoaghim`
+/// nằm bên trong và file `*_xoaghim.pdf`.
+pub fn ds_pdf(nguon: &Path, dung: &AtomicBool) -> Vec<PathBuf> {
     let mut ds = Vec::new();
-    crate::tach_vb::phien::duyet_pdf_theo_cay(nguon, dung, |lo| ds.extend(lo));
-    ds.into_iter()
+    if nguon.is_file() {
+        ds.push(nguon.to_path_buf());
+    } else {
+        crate::tach_vb::phien::duyet_pdf_theo_cay(nguon, dung, |lo| ds.extend(lo));
+    }
+    let trong_ket_qua = |p: &Path| tuong_doi(nguon, p).is_some_and(|t| t.parent().is_some_and(|c| c.components().any(|x| x.as_os_str().to_string_lossy().to_lowercase().ends_with(HAU_TO))));
+    ds.retain(|p| !trong_ket_qua(p) && !la_file_ket_qua(p));
+    ds
+}
+
+/// Các PDF của nguồn (`ds_pdf`) kèm đường dẫn kết quả tương ứng trong `ra` (giữ thư mục con, giữ tên file).
+pub fn ds_viec(nguon: &Path, ra: &Path, dung: &AtomicBool) -> Vec<(PathBuf, PathBuf)> {
+    ds_pdf(nguon, dung)
+        .into_iter()
         .filter_map(|p| {
-            let tuong_doi = p.strip_prefix(nguon).ok()?.to_path_buf();
-            let trong_ket_qua = tuong_doi.parent().is_some_and(|c| c.components().any(|x| x.as_os_str().to_string_lossy().to_lowercase().ends_with(HAU_TO)));
-            (!trong_ket_qua).then(|| (p, ra.join(tuong_doi)))
+            let dich = ra.join(tuong_doi(nguon, &p)?);
+            Some((p, dich))
         })
         .collect()
+}
+
+/// Các PDF của nguồn (`ds_pdf`) kèm đích theo `dich_cua`. Nơi ghi không hợp lệ → lỗi (như nhau cho mọi file).
+pub fn ds_viec_ghi(nguon: &Path, ghi: &CauHinhGhi, dung: &AtomicBool) -> Result<Vec<(PathBuf, PathBuf)>, String> {
+    ds_pdf(nguon, dung)
+        .into_iter()
+        .map(|p| {
+            let dich = dich_cua(nguon, &p, ghi)?;
+            Ok((p, dich))
+        })
+        .collect()
+}
+
+/// Id nguồn gốc của 1 file: file đã bị ghi đè bằng kết quả (id nằm trong bảng `nguon_theo_ket_qua`) → id nguồn trước
+/// khi ghi đè (vùng riêng + nhật ký vẫn theo id này); không thì chính nó.
+pub fn id_goc(nguon_theo_ket_qua: &std::collections::HashMap<Id, Id>, id: Id) -> Id {
+    nguon_theo_ket_qua.get(&id).copied().unwrap_or(id)
 }
 
 /// Trạng thái kết quả của 1 PDF nguồn.
@@ -220,6 +376,8 @@ pub enum TrangThai {
 
 /// Trạng thái: chỉ "đã xoá" khi file ở `dich` (tính lại từ nguồn hiện tại) có id đúng id trong nhật ký.
 /// `id_dich`: id file đang có ở `dich` (`None` = không có / không đọc được).
+/// Ghi đè: nhật ký tra theo id file hiện tại qua `nguon_theo_ket_qua` (`None` nếu không phải kết quả) và
+/// `id_dich` = id file hiện tại → chỉ ra "đã xoá" / "chưa xoá" (`lo::doc_tinh_trang` làm sẵn).
 pub fn trang_thai(nk: Option<&NhatKy>, id_dich: Option<Id>, ma_cau_hinh_hien_tai: u64) -> TrangThai {
     match nk {
         None => TrangThai::ChuaXoa,
@@ -251,11 +409,33 @@ pub fn xoa_ghim_file(
     xuat: &CauHinhXuat,
     dung: &AtomicBool,
 ) -> Result<KetQuaFile, String> {
+    xoa_ghim_file_voi(kho, nguon_theo_ket_qua, nguon, id_nguon, dich, vung, tc, xuat, TuyChonChay::default(), dung)
+}
+
+/// Như `xoa_ghim_file`, theo `chay`. `dich == nguon` = ghi đè nguồn: ghi nguyên tử (file tạm cùng thư mục rồi đổi
+/// tên), nhật ký khoá theo id nguồn gốc (`id_goc`) để file đã ghi đè vẫn tra ra nhật ký / vùng riêng.
+#[allow(clippy::too_many_arguments)]
+pub fn xoa_ghim_file_voi(
+    kho: &std::sync::Mutex<crate::tach_vb::kho::Kho>,
+    nguon_theo_ket_qua: &std::collections::HashMap<Id, Id>,
+    nguon: &Path,
+    id_nguon: Id,
+    dich: &Path,
+    vung: &[Vung],
+    tc: &TuyChon,
+    xuat: &CauHinhXuat,
+    chay: TuyChonChay,
+    dung: &AtomicBool,
+) -> Result<KetQuaFile, String> {
     let khoa = || kho.lock().unwrap_or_else(|e| e.into_inner());
-    if id_file(dich).and_then(|id_cu| nguon_theo_ket_qua.get(&id_cu)).is_some_and(|n| *n != id_nguon) {
+    let id_nguon = if dich == nguon {
+        id_goc(nguon_theo_ket_qua, id_nguon)
+    } else if id_file(dich).and_then(|id_cu| nguon_theo_ket_qua.get(&id_cu)).is_some_and(|n| *n != id_nguon) {
         return Err(LOI_NGUON_KHAC.into());
-    }
-    let (noi_dung, kq) = xoa_ghim_pdf(nguon, vung, tc, xuat, dung)?;
+    } else {
+        id_nguon
+    };
+    let (noi_dung, kq) = xoa_ghim_pdf_voi(nguon, vung, tc, xuat, chay, dung)?;
     ghi_chac(dich, &noi_dung).map_err(|e| format!("không ghi được {}: {e}", dich.display()))?;
     let ket_qua = id_file(dich).ok_or_else(|| format!("không đọc lại được {}", dich.display()))?;
     let nk = NhatKy {
@@ -365,13 +545,90 @@ mod tests {
     fn ds_viec_giu_thu_muc_con_bo_thu_muc_ket_qua_ben_trong() {
         let d = tam("ds");
         let nguon = d.join("Nguon");
-        for f in ["a.pdf", "con/b.pdf", "cu_xoaghim/c.pdf", "con/X_XOAGHIM/d.pdf"] {
+        for f in ["a.pdf", "con/b.pdf", "cu_xoaghim/c.pdf", "con/X_XOAGHIM/d.pdf", "a_xoaghim.pdf", "con/B_XoaGhim.PDF"] {
             std::fs::create_dir_all(nguon.join(f).parent().unwrap()).unwrap();
             std::fs::write(nguon.join(f), b"%PDF").unwrap();
         }
         let ra = d.join("Nguon_xoaghim");
-        let ds = ds_viec(&nguon, &ra, &AtomicBool::new(false));
+        let dung = AtomicBool::new(false);
+        let ds = ds_viec(&nguon, &ra, &dung);
         assert_eq!(ds, vec![(nguon.join("a.pdf"), ra.join("a.pdf")), (nguon.join("con/b.pdf"), ra.join("con/b.pdf"))]);
+        // Theo nơi ghi: mặc định như trên; cạnh file; ghi đè
+        assert_eq!(ds_viec_ghi(&nguon, &CauHinhGhi::default(), &dung).unwrap(), ds);
+        let canh = CauHinhGhi { kieu: KieuGhi::CanhFile, ..Default::default() };
+        assert_eq!(ds_viec_ghi(&nguon, &canh, &dung).unwrap()[1], (nguon.join("con/b.pdf"), nguon.join("con/b_xoaghim.pdf")));
+        let de = CauHinhGhi { ghi_de: true, ..canh };
+        assert!(ds_viec_ghi(&nguon, &de, &dung).unwrap().iter().all(|(n, d)| n == d));
+        // Thư mục chọn nằm trong nguồn → lỗi
+        assert!(ds_viec_ghi(&nguon, &CauHinhGhi { thu_muc: Some(nguon.join("con")), ..Default::default() }, &dung).is_err());
+        // Mở 1 file: chính nó; file kết quả `*_xoaghim.pdf` bỏ
+        assert_eq!(ds_pdf(&nguon.join("a.pdf"), &dung), vec![nguon.join("a.pdf")]);
+        assert!(ds_pdf(&nguon.join("a_xoaghim.pdf"), &dung).is_empty());
+    }
+
+    #[test]
+    fn dich_cua_theo_noi_ghi_ca_thu_muc_va_mot_file() {
+        let d = tam("dich");
+        let goc = d.join("Nguon");
+        let f = goc.join("con/a.pdf");
+        std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+        std::fs::write(&f, b"%PDF").unwrap();
+        let mac_dinh = CauHinhGhi::default();
+        assert_eq!(dich_cua(&goc, &f, &mac_dinh).unwrap(), d.join("Nguon_xoaghim/con/a.pdf"));
+        let chon = CauHinhGhi { thu_muc: Some(d.join("Ra")), ..Default::default() };
+        assert_eq!(dich_cua(&goc, &f, &chon).unwrap(), d.join("Ra/con/a.pdf"));
+        assert!(dich_cua(&goc, &f, &CauHinhGhi { thu_muc: Some(goc.join("CON")), ..Default::default() }).is_err(), "trong nguồn (không phân biệt hoa thường)");
+        let canh = CauHinhGhi { kieu: KieuGhi::CanhFile, thu_muc: Some(d.join("Ra")), ghi_de: false };
+        assert_eq!(dich_cua(&goc, &f, &canh).unwrap(), goc.join("con/a_xoaghim.pdf"), "cạnh file bỏ qua thư mục chọn");
+        assert_eq!(dich_cua(&goc, &f, &CauHinhGhi { ghi_de: true, ..canh.clone() }).unwrap(), f, "ghi đè thắng kiểu");
+        // Mở 1 file: tương đối = tên file, mặc định `<cha>_xoaghim`
+        assert_eq!(dich_cua(&f, &f, &mac_dinh).unwrap(), goc.join("con_xoaghim/a.pdf"));
+        assert_eq!(dich_cua(&f, &f, &chon).unwrap(), d.join("Ra/a.pdf"));
+        assert_eq!(dich_cua(&f, &f, &canh).unwrap(), goc.join("con/a_xoaghim.pdf"));
+        assert!(dich_cua(&f, &f, &CauHinhGhi { thu_muc: Some(goc.join("con")), ..Default::default() }).is_err(), "đích trùng nguồn");
+        assert_eq!(dich_cua(&f, &f, &CauHinhGhi { thu_muc: Some(goc.clone()), ..Default::default() }).unwrap(), goc.join("a.pdf"), "1 file: thư mục chọn ở trên vẫn được");
+    }
+
+    #[test]
+    fn lo_10_trang_cho_ket_qua_giong_het_tung_trang() {
+        let d = tam("lo10");
+        let nguon = d.join("a.pdf");
+        tao_pdf(&nguon, 23);
+        let vung = [goc_tren_trai(), Vung { ap_trang: ApTrang::MotTrang(12), ..goc_tren_trai() }];
+        let dung = AtomicBool::new(false);
+        for xuat in [CauHinhXuat::default(), CauHinhXuat { nen_den_trang: true, dpi: 120, ..Default::default() }] {
+            let tung = xoa_ghim_pdf_voi(&nguon, &vung, &TuyChon::default(), &xuat, TuyChonChay { lo_10: false }, &dung).unwrap();
+            let lo = xoa_ghim_pdf_voi(&nguon, &vung, &TuyChon::default(), &xuat, TuyChonChay { lo_10: true }, &dung).unwrap();
+            assert_eq!(tung.1, lo.1);
+            assert_eq!(lo.1.trang_xu_ly, (0..23).step_by(2).chain([12]).collect::<std::collections::BTreeSet<u32>>().into_iter().collect::<Vec<_>>());
+            assert!(tung.0 == lo.0, "nội dung PDF khác nhau");
+        }
+        assert_eq!(xoa_ghim_pdf_voi(&nguon, &vung, &TuyChon::default(), &CauHinhXuat::default(), TuyChonChay { lo_10: true }, &AtomicBool::new(true)).unwrap_err(), super::super::lo::DA_DUNG);
+    }
+
+    #[test]
+    fn ghi_de_nguon_nguyen_tu_nhat_ky_theo_nguon_goc() {
+        let d = tam("ghi_de");
+        let kho = std::sync::Mutex::new(Kho::mo(&d.join("kho_xoa_ghim.bin")).unwrap());
+        let a = d.join("a.pdf");
+        tao_pdf(&a, 2);
+        let id_s = id_file(&a).unwrap();
+        let (vung, tc, xuat, dung) = ([goc_tren_trai()], TuyChon::default(), CauHinhXuat::default(), AtomicBool::new(false));
+        let ma = kho_xg::ma_cau_hinh(&vung, &tc, &xuat);
+        xoa_ghim_file(&kho, &bang(&kho), &a, id_s, &a, &vung, &tc, &xuat, &dung).unwrap();
+        assert!(std::fs::read_dir(&d).unwrap().all(|e| !e.unwrap().file_name().to_string_lossy().ends_with(".tmp")), "không sót file tạm");
+        let id_r1 = id_file(&a).unwrap();
+        assert_ne!(id_r1, id_s);
+        let b = bang(&kho);
+        assert_eq!(b.get(&id_r1), Some(&id_s), "kết quả → nguồn gốc");
+        let nk = kho_xg::doc_nhat_ky(&mut kho.lock().unwrap(), id_goc(&b, id_r1));
+        assert_eq!(trang_thai(nk.as_ref(), Some(id_r1), ma), TrangThai::DaXoa { dung_cau_hinh: true });
+        // Chạy lại trên file đã ghi đè (id hiện tại là kết quả): không báo "nguồn khác", nhật ký vẫn khoá nguồn gốc
+        xoa_ghim_file(&kho, &b, &a, id_r1, &a, &vung, &tc, &xuat, &dung).unwrap();
+        let id_r2 = id_file(&a).unwrap();
+        let b = bang(&kho);
+        assert_eq!(b.get(&id_r2), Some(&id_s));
+        assert_eq!(b.len(), 1, "chỉ 1 nhật ký — khoá nguồn gốc, không thêm nhật ký theo id kết quả");
     }
 
     fn bang(kho: &std::sync::Mutex<Kho>) -> std::collections::HashMap<Id, Id> {

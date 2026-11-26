@@ -21,11 +21,13 @@ pub struct TuyChon {
     pub bao_ve_do_xanh: bool,
     /// Tô trắng thay vì màu nền đo được.
     pub nen_trang: bool,
+    /// Nhận diện layout (chữ / bảng / hình) để không xoá vào nội dung — đổi kết quả nên vào mã cấu hình.
+    pub nhan_dien: bool,
 }
 
 impl Default for TuyChon {
     fn default() -> Self {
-        TuyChon { bao_ve_net_den: true, bao_ve_do_xanh: false, nen_trang: false }
+        TuyChon { bao_ve_net_den: true, bao_ve_do_xanh: false, nen_trang: false, nhan_dien: false }
     }
 }
 

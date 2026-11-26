@@ -1,7 +1,12 @@
 //! Dữ liệu Xóa ghim trong kho riêng `<gốc dữ liệu>/kho_xoa_ghim.bin` (cùng code kho Tách, loại bản ghi riêng):
 //! - `VUNG_FILE`: vùng riêng của 1 PDF (khoá id nội dung PDF — đổi tên / di chuyển vẫn theo);
 //! - `VUNG_THU_MUC`: vùng chung + tuỳ chọn của 1 thư mục nguồn (khoá đường dẫn thư mục — đổi tên thư mục thì chọn lại);
-//! - `NHAT_KY`: lần xoá ghim sau cùng của 1 PDF nguồn (khoá id nguồn): id file kết quả, mã cấu hình, trang đã xử lý.
+//! - `NHAT_KY`: lần xoá ghim sau cùng của 1 PDF nguồn (khoá id nguồn): id file kết quả, mã cấu hình, trang đã xử lý;
+//! - `GHI_THU_MUC`: nơi ghi kết quả của thư mục nguồn (cùng khoá với `VUNG_THU_MUC`).
+//!
+//! Nơi ghi là bản ghi riêng chứ không nối đuôi `VUNG_THU_MUC`: bản 2.5.x đọc `VUNG_THU_MUC` đòi hết byte đúng chỗ
+//! (`het`) nên gặp phần đuôi sẽ bỏ cả vùng của thư mục; còn loại bản ghi lạ thì bản cũ giữ nguyên, không đọc.
+//! "Nhận diện layout" nằm ở bit 4 của byte cờ tuỳ chọn — bản cũ chỉ đọc bit 0–3.
 //!
 //! Mọi nội dung mở đầu bằng phiên bản định dạng (1 byte) + mốc sửa (ms) — gộp giữa máy: mốc sau thắng.
 //! Đọc nội dung lạ / hỏng / ngoài giới hạn → coi như không có (không làm hỏng phần khác).
@@ -10,14 +15,18 @@
 use super::vung::{ApTrang, LoaiVung, ViTri, Vung};
 use super::xu_ly::TuyChon;
 use crate::tach_vb::kho::{Id, Kho, KHAC_TU};
+use std::path::PathBuf;
 
 pub const VUNG_FILE: u8 = KHAC_TU;
 pub const VUNG_THU_MUC: u8 = KHAC_TU + 1;
 pub const NHAT_KY: u8 = KHAC_TU + 2;
+pub const GHI_THU_MUC: u8 = KHAC_TU + 3;
 
 const PHIEN_BAN: u8 = 1;
 /// Giới hạn số vùng của 1 bản ghi (chặn dữ liệu hỏng / gói lạ làm phình bộ nhớ).
 pub const TOI_DA_VUNG: usize = 500;
+/// Giới hạn độ dài đường dẫn thư mục ghi (byte UTF-8).
+const TOI_DA_DUONG_DAN: usize = 32 * 1024;
 
 /// Cách ghi trang đã xử lý.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,6 +45,59 @@ impl Default for CauHinhXuat {
     }
 }
 
+/// Kiểu đặt file kết quả.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum KieuGhi {
+    /// Thư mục nhân bản cây nguồn (`<nguồn>_xoaghim/` hoặc thư mục chọn), giữ thư mục con và tên file.
+    #[default]
+    NhanBan,
+    /// Cạnh file nguồn, tên `<tên>_xoaghim.pdf`.
+    CanhFile,
+}
+
+/// Nơi ghi kết quả của 1 thư mục nguồn (không vào mã cấu hình: vị trí ghi không đổi nội dung kết quả).
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct CauHinhGhi {
+    pub kieu: KieuGhi,
+    /// Thư mục ra khi nhân bản; `None` = `<nguồn>_xoaghim` cạnh nguồn.
+    pub thu_muc: Option<PathBuf>,
+    /// Ghi đè chính file nguồn (thắng `kieu`).
+    pub ghi_de: bool,
+}
+
+impl CauHinhGhi {
+    pub fn ma_hoa(&self, luc: u64) -> Vec<u8> {
+        let mut g = Ghi::moi(luc);
+        g.u8(match self.kieu {
+            KieuGhi::NhanBan => 0,
+            KieuGhi::CanhFile => 1,
+        });
+        g.u8(self.ghi_de as u8);
+        let p = self.thu_muc.as_ref().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+        g.u32(p.len() as u32);
+        g.0.extend(p.as_bytes());
+        g.0
+    }
+    pub fn giai_ma(b: &[u8]) -> Option<Self> {
+        let mut d = Doc(b);
+        d.dau()?;
+        let kieu = match d.u8()? {
+            0 => KieuGhi::NhanBan,
+            1 => KieuGhi::CanhFile,
+            _ => return None,
+        };
+        let ghi_de = match d.u8()? {
+            0 => false,
+            1 => true,
+            _ => return None,
+        };
+        let n = d.u32()? as usize;
+        (n <= TOI_DA_DUONG_DAN && n == d.0.len()).then_some(())?;
+        let p = std::str::from_utf8(d.0).ok()?;
+        Some(CauHinhGhi { kieu, thu_muc: (!p.is_empty()).then(|| PathBuf::from(p)), ghi_de })
+    }
+}
+
 /// Phần chung của 1 thư mục nguồn.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct ThuMuc {
@@ -43,6 +105,8 @@ pub struct ThuMuc {
     pub vung: Vec<Vung>,
     pub tuy_chon: TuyChon,
     pub xuat: CauHinhXuat,
+    /// Nơi ghi kết quả — lưu ở bản ghi `GHI_THU_MUC` (`ma_hoa` / `giai_ma` của `ThuMuc` không chứa phần này).
+    pub ghi: CauHinhGhi,
 }
 
 /// Vùng riêng của 1 PDF.
@@ -242,15 +306,22 @@ impl VungFile {
     }
 }
 
+/// Byte cờ tuỳ chọn: bit 0 nét đen, 1 đỏ / xanh, 2 nền trắng, 3 nén đen trắng, 4 nhận diện layout.
+fn co_tuy_chon(tc: &TuyChon, xuat: &CauHinhXuat) -> u8 {
+    tc.bao_ve_net_den as u8 | (tc.bao_ve_do_xanh as u8) << 1 | (tc.nen_trang as u8) << 2 | (xuat.nen_den_trang as u8) << 3 | (tc.nhan_dien as u8) << 4
+}
+
 impl ThuMuc {
+    /// Vùng + tuỳ chọn + cách ghi trang (bố cục bản 2.5.x; không có nơi ghi `ghi`).
     pub fn ma_hoa(&self) -> Vec<u8> {
         let mut g = Ghi::moi(self.luc);
         g.vung(&self.vung);
-        g.u8(self.tuy_chon.bao_ve_net_den as u8 | (self.tuy_chon.bao_ve_do_xanh as u8) << 1 | (self.tuy_chon.nen_trang as u8) << 2 | (self.xuat.nen_den_trang as u8) << 3);
+        g.u8(co_tuy_chon(&self.tuy_chon, &self.xuat));
         g.u16(self.xuat.dpi);
         g.u8(self.xuat.chat_luong);
         g.0
     }
+    /// Ngược `ma_hoa`; `ghi` = mặc định.
     pub fn giai_ma(b: &[u8]) -> Option<Self> {
         let mut d = Doc(b);
         let luc = d.dau()?;
@@ -263,8 +334,9 @@ impl ThuMuc {
         Some(ThuMuc {
             luc,
             vung,
-            tuy_chon: TuyChon { bao_ve_net_den: co & 1 != 0, bao_ve_do_xanh: co & 2 != 0, nen_trang: co & 4 != 0 },
+            tuy_chon: TuyChon { bao_ve_net_den: co & 1 != 0, bao_ve_do_xanh: co & 2 != 0, nen_trang: co & 4 != 0, nhan_dien: co & 16 != 0 },
             xuat: CauHinhXuat { dpi, chat_luong, nen_den_trang: co & 8 != 0 },
+            ghi: CauHinhGhi::default(),
         })
     }
 }
@@ -309,11 +381,12 @@ pub fn luc_cua(nd: &[u8]) -> Option<u64> {
     Doc(nd).dau()
 }
 
-/// Mã cấu hình: băm vùng áp dụng cho file + tuỳ chọn xử lý + cách ghi.
+/// Mã cấu hình: băm vùng áp dụng cho file + tuỳ chọn xử lý + cách ghi trang (không gồm nơi ghi).
+/// Tắt nhận diện layout cho mã như bản 2.5.x (kết quả cũ vẫn "đúng cấu hình").
 pub fn ma_cau_hinh(vung: &[Vung], tc: &TuyChon, xuat: &CauHinhXuat) -> u64 {
     let mut g = Ghi::moi(0);
     g.vung(vung);
-    g.u8(tc.bao_ve_net_den as u8 | (tc.bao_ve_do_xanh as u8) << 1 | (tc.nen_trang as u8) << 2 | (xuat.nen_den_trang as u8) << 3);
+    g.u8(co_tuy_chon(tc, xuat));
     g.u16(xuat.dpi);
     g.u8(xuat.chat_luong);
     g.0.iter().fold(0xcbf2_9ce4_8422_2325, |h, b| (h ^ *b as u64).wrapping_mul(0x0100_0000_01b3))
@@ -324,12 +397,19 @@ pub fn khoa_thu_muc(thu_muc: &std::path::Path) -> Id {
     (crate::tach_vb::kho::khoa_duong_dan(thu_muc), 0)
 }
 
+/// Vùng chung + tuỳ chọn + nơi ghi của thư mục (nơi ghi chưa có / hỏng → mặc định).
 pub fn doc_thu_muc(k: &mut Kho, thu_muc: &std::path::Path) -> Option<ThuMuc> {
-    ThuMuc::giai_ma(&k.khac(VUNG_THU_MUC, khoa_thu_muc(thu_muc))?)
+    let khoa = khoa_thu_muc(thu_muc);
+    let mut tm = ThuMuc::giai_ma(&k.khac(VUNG_THU_MUC, khoa)?)?;
+    tm.ghi = k.khac(GHI_THU_MUC, khoa).and_then(|b| CauHinhGhi::giai_ma(&b)).unwrap_or_default();
+    Some(tm)
 }
 
+/// Ghi cả 2 bản ghi của thư mục; nơi ghi mặc định → bỏ bản ghi `GHI_THU_MUC`.
 pub fn ghi_thu_muc(k: &mut Kho, thu_muc: &std::path::Path, tm: &ThuMuc) {
-    k.ghi_khac(VUNG_THU_MUC, khoa_thu_muc(thu_muc), &tm.ma_hoa());
+    let khoa = khoa_thu_muc(thu_muc);
+    k.ghi_khac(VUNG_THU_MUC, khoa, &tm.ma_hoa());
+    k.ghi_khac(GHI_THU_MUC, khoa, &if tm.ghi == CauHinhGhi::default() { Vec::new() } else { tm.ghi.ma_hoa(tm.luc) });
 }
 
 pub fn doc_vung_file(k: &mut Kho, id: Id) -> Option<VungFile> {
@@ -374,7 +454,7 @@ pub fn kho() -> std::sync::MutexGuard<'static, Kho> {
 /// và vùng thư mục sửa từ `truoc` (ms) trở đi.
 pub fn don(k: &mut Kho, con_song: &std::collections::HashSet<Id>, truoc: u64) -> std::io::Result<usize> {
     k.don_khac(|loai, id, nd| match loai {
-        VUNG_THU_MUC => luc_cua(nd).is_some_and(|l| l >= truoc),
+        VUNG_THU_MUC | GHI_THU_MUC => luc_cua(nd).is_some_and(|l| l >= truoc),
         VUNG_FILE | NHAT_KY => con_song.contains(&id),
         _ => true,
     })
@@ -394,7 +474,7 @@ mod tests {
 
     #[test]
     fn ma_hoa_giai_ma_ca_ba_loai() {
-        let tm = ThuMuc { luc: 9, vung: vung_mau(), tuy_chon: TuyChon { bao_ve_net_den: false, bao_ve_do_xanh: true, nen_trang: true }, xuat: CauHinhXuat { dpi: 300, chat_luong: 80, nen_den_trang: true } };
+        let tm = ThuMuc { luc: 9, vung: vung_mau(), tuy_chon: TuyChon { bao_ve_net_den: false, bao_ve_do_xanh: true, nen_trang: true, nhan_dien: true }, xuat: CauHinhXuat { dpi: 300, chat_luong: 80, nen_den_trang: true }, ghi: CauHinhGhi::default() };
         assert_eq!(ThuMuc::giai_ma(&tm.ma_hoa()), Some(tm.clone()));
         let vf = VungFile { luc: 5, vung: vung_mau() };
         assert_eq!(VungFile::giai_ma(&vf.ma_hoa()), Some(vf));
@@ -452,6 +532,92 @@ mod tests {
         assert_eq!(don(&mut k, &Default::default(), 50).unwrap(), 2, "bỏ vùng + nhật ký của PDF không còn");
         assert!(doc_thu_muc(&mut k, &thu_muc).is_some());
         assert_eq!(don(&mut k, &Default::default(), 200).unwrap(), 1, "thư mục sửa trước mốc");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Bản 2.5.x: cờ tuỳ chọn 4 bit, đọc đòi hết byte; không có nơi ghi. Chép nguyên mã hoá / giải mã / mã cấu hình cũ.
+    mod ban_cu {
+        use super::super::*;
+
+        pub fn ma_hoa(luc: u64, vung: &[Vung], tc: (bool, bool, bool), xuat: &CauHinhXuat) -> Vec<u8> {
+            let mut g = Ghi::moi(luc);
+            g.vung(vung);
+            g.u8(tc.0 as u8 | (tc.1 as u8) << 1 | (tc.2 as u8) << 2 | (xuat.nen_den_trang as u8) << 3);
+            g.u16(xuat.dpi);
+            g.u8(xuat.chat_luong);
+            g.0
+        }
+
+        /// (luc, vùng, (nét đen, đỏ/xanh, nền trắng), cách ghi trang)
+        pub fn giai_ma(b: &[u8]) -> Option<(u64, Vec<Vung>, (bool, bool, bool), CauHinhXuat)> {
+            let mut d = Doc(b);
+            let luc = d.dau()?;
+            let vung = d.vung()?;
+            let co = d.u8()?;
+            let dpi = d.u16()?;
+            let chat_luong = d.u8()?;
+            d.het()?;
+            (dpi <= 600 && (1..=100).contains(&chat_luong)).then_some(())?;
+            Some((luc, vung, (co & 1 != 0, co & 2 != 0, co & 4 != 0), CauHinhXuat { dpi, chat_luong, nen_den_trang: co & 8 != 0 }))
+        }
+
+        pub fn ma_cau_hinh(vung: &[Vung], tc: (bool, bool, bool), xuat: &CauHinhXuat) -> u64 {
+            let mut g = Ghi::moi(0);
+            g.vung(vung);
+            g.u8(tc.0 as u8 | (tc.1 as u8) << 1 | (tc.2 as u8) << 2 | (xuat.nen_den_trang as u8) << 3);
+            g.u16(xuat.dpi);
+            g.u8(xuat.chat_luong);
+            g.0.iter().fold(0xcbf2_9ce4_8422_2325, |h, b| (h ^ *b as u64).wrapping_mul(0x0100_0000_01b3))
+        }
+    }
+
+    #[test]
+    fn thu_muc_doc_duoc_giua_ban_cu_va_moi() {
+        let xuat = CauHinhXuat { dpi: 200, chat_luong: 70, nen_den_trang: true };
+        // Dữ liệu bản cũ → bản mới: nhận diện tắt, nơi ghi mặc định
+        let cu = ban_cu::ma_hoa(5, &vung_mau(), (true, false, true), &xuat);
+        let tm = ThuMuc::giai_ma(&cu).unwrap();
+        assert_eq!(tm, ThuMuc { luc: 5, vung: vung_mau(), tuy_chon: TuyChon { bao_ve_net_den: true, bao_ve_do_xanh: false, nen_trang: true, nhan_dien: false }, xuat, ghi: CauHinhGhi::default() });
+        assert_eq!(tm.ma_hoa(), cu, "tắt nhận diện: ghi ra đúng byte bản cũ");
+        // Dữ liệu bản mới (bật nhận diện, có nơi ghi) → bản cũ đọc được, giữ phần cũ
+        let moi = ThuMuc { tuy_chon: TuyChon { nhan_dien: true, ..tm.tuy_chon }, ghi: CauHinhGhi { kieu: KieuGhi::CanhFile, thu_muc: Some("/ra/kết quả".into()), ghi_de: true }, ..tm.clone() };
+        assert_eq!(ban_cu::giai_ma(&moi.ma_hoa()), Some((5, vung_mau(), (true, false, true), xuat)));
+        // Mã cấu hình: tắt nhận diện = mã bản cũ (kết quả cũ vẫn đúng cấu hình); bật → khác
+        assert_eq!(ma_cau_hinh(&vung_mau(), &tm.tuy_chon, &xuat), ban_cu::ma_cau_hinh(&vung_mau(), (true, false, true), &xuat));
+        assert_ne!(ma_cau_hinh(&vung_mau(), &moi.tuy_chon, &xuat), ma_cau_hinh(&vung_mau(), &tm.tuy_chon, &xuat));
+    }
+
+    #[test]
+    fn noi_ghi_luu_ban_ghi_rieng_ban_cu_van_doc_vung_thu_muc() {
+        let ghi = CauHinhGhi { kieu: KieuGhi::NhanBan, thu_muc: Some("/Ổ D/Kết quả".into()), ghi_de: false };
+        assert_eq!(CauHinhGhi::giai_ma(&ghi.ma_hoa(3)), Some(ghi.clone()));
+        assert_eq!(luc_cua(&ghi.ma_hoa(3)), Some(3));
+        let b = ghi.ma_hoa(3);
+        assert!(CauHinhGhi::giai_ma(&b[..b.len() - 1]).is_none(), "cụt");
+        let mut sai = b.clone();
+        sai[9] = 7;
+        assert!(CauHinhGhi::giai_ma(&sai).is_none(), "kiểu lạ");
+        let d = std::env::temp_dir().join(format!("dema4_kho_xg_ghi_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let f = d.join("kho_xoa_ghim.bin");
+        let thu_muc = d.join("nguon");
+        let tm = ThuMuc { luc: 100, vung: vung_mau(), ghi: ghi.clone(), ..Default::default() };
+        {
+            let mut k = Kho::mo(&f).unwrap();
+            ghi_thu_muc(&mut k, &thu_muc, &tm);
+            k.day().unwrap();
+        }
+        let mut k = Kho::mo(&f).unwrap();
+        assert_eq!(doc_thu_muc(&mut k, &thu_muc), Some(tm.clone()));
+        // Bản cũ chỉ đọc VUNG_THU_MUC: vẫn nguyên vùng
+        assert_eq!(ban_cu::giai_ma(&k.khac(VUNG_THU_MUC, khoa_thu_muc(&thu_muc)).unwrap()).unwrap().1, vung_mau());
+        // Về nơi ghi mặc định → bỏ bản ghi riêng
+        ghi_thu_muc(&mut k, &thu_muc, &ThuMuc { ghi: CauHinhGhi::default(), ..tm.clone() });
+        assert!(k.khac(GHI_THU_MUC, khoa_thu_muc(&thu_muc)).is_none());
+        assert_eq!(doc_thu_muc(&mut k, &thu_muc).unwrap().ghi, CauHinhGhi::default());
+        // Dọn: nơi ghi theo mốc sửa như vùng thư mục
+        ghi_thu_muc(&mut k, &thu_muc, &tm);
+        assert_eq!(don(&mut k, &Default::default(), 200).unwrap(), 2);
         let _ = std::fs::remove_dir_all(&d);
     }
 
