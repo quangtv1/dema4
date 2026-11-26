@@ -1,6 +1,8 @@
-//! Tab **Xóa ghim** trong hộp Cấu hình (như prototype): 4 thẻ 2 cột — Nhận diện & bảo vệ, Hiệu năng & lưu | Xuất file,
-//! Hiển thị. Thẻ gắn nhãn **theo thư mục** (lưu cùng vùng của thư mục đang mở, kho Xóa ghim) hoặc **chung** (cấu hình
-//! app). Dòng Nhận diện layout có nút tải / nhập mô hình AI và tiến độ tải.
+//! Thân **Xóa ghim** trong trang Cấu hình (như prototype): dải "Thư mục đang mở" rồi 4 thẻ 2 cột — Nhận diện & bảo vệ,
+//! Hiệu năng & lưu | Xuất file, Hiển thị. Thẻ gắn nhãn **theo thư mục** (lưu cùng vùng của thư mục đang mở, kho Xóa
+//! ghim) hoặc **chung** (cấu hình app). Dòng Nhận diện layout có nút tải / nhập mô hình AI và tiến độ tải.
+
+use std::path::PathBuf;
 
 use eframe::egui::{self, Color32, Rect, Sense, Stroke};
 
@@ -8,6 +10,7 @@ use super::thiet_ke as tk;
 use super::widget::{font, font_dam};
 use super::{bieu_tuong, ManXoaGhim};
 use crate::cau_hinh::CauHinhXoaGhim;
+use crate::gui_cau_hinh::{self as gc, Pham};
 use crate::xoa_ghim::kho::CauHinhXuat;
 use crate::xoa_ghim::mo_hinh::{self, TaiMoHinh, TrangThaiMoHinh};
 use crate::xoa_ghim::xu_ly::TuyChon;
@@ -28,6 +31,8 @@ pub struct CauHinhThuMuc {
 pub struct TabXoaGhim {
     /// `None` = chưa mở thư mục (thẻ "theo thư mục" mờ).
     pub thu_muc: Option<CauHinhThuMuc>,
+    /// Đường dẫn thư mục (hoặc file) đang mở ở màn Xóa ghim, hiện ở dải đầu tab; `None` khi chưa mở.
+    pub duong_dan: Option<PathBuf>,
     /// Việc tải / nhập mô hình (mượn của màn Xóa ghim khi mở hộp, trả lại khi đóng — tải tiếp sau khi đóng hộp).
     pub mo_hinh: Option<TaiMoHinh>,
 }
@@ -65,28 +70,20 @@ fn trang_thai(m: &Option<TaiMoHinh>) -> TrangThaiMoHinh {
     }
 }
 
-fn the(ui: &mut egui::Ui, bt: &str, ten: &str, chung: bool, duoc: bool, noi: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, Color32::from_rgb(0xE5, 0xE7, 0xEB))).corner_radius(6).inner_margin(egui::Margin { left: 14, right: 14, top: 10, bottom: 6 }).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.horizontal(|ui| {
+/// Thẻ: biểu tượng + tên + nhãn phạm vi; `duoc` = false → thân mờ, không sửa được (chưa mở thư mục).
+fn the(ui: &mut egui::Ui, bt: &str, ten: &str, pham: Pham, duoc: bool, noi: impl FnOnce(&mut egui::Ui)) {
+    gc::the_tuy_bien(
+        ui,
+        |ui| {
             let (o, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), Sense::hover());
             bieu_tuong::ve(ui, bt, o);
-            ui.label(egui::RichText::new(ten).font(font_dam(13.0)).color(tk::CHU));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let (chu, nen, mau, tip) = if chung { ("chung", Color32::from_rgb(0xF1, 0xF5, 0xF9), Color32::from_rgb(0x47, 0x55, 0x69), "Áp dụng cho mọi thư mục") } else { ("theo thư mục", Color32::from_rgb(0xEF, 0xF6, 0xFF), Color32::from_rgb(0x1D, 0x4E, 0xD8), "Lưu cùng vùng của thư mục đang mở") };
-                let g = ui.painter().layout_no_wrap(chu.to_string(), font(11.0), mau);
-                let (o, ph) = ui.allocate_exact_size(g.size() + egui::vec2(14.0, 4.0), Sense::hover());
-                ui.painter().rect_filled(o, 9.0, nen);
-                ui.painter().galley(o.min + egui::vec2(7.0, 2.0), g, mau);
-                ph.on_hover_text(tip);
-            });
-        });
-        ui.add_space(2.0);
-        if !duoc {
-            ui.label(egui::RichText::new("Mở 1 file hoặc thư mục ở màn Xóa ghim để chỉnh phần này.").font(font(tk::CHU_NHO)).color(tk::CAM_CHU));
-        }
-        ui.add_enabled_ui(duoc, noi);
-    });
+            ui.label(egui::RichText::new(ten).font(font_dam(13.5)).color(tk::CHU));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| gc::nhan_pham(ui, pham));
+        },
+        |ui| {
+            ui.add_enabled_ui(duoc, noi);
+        },
+    );
 }
 
 /// 1 dòng: biểu tượng · tên + mô tả · điều khiển bên phải (`dk`), + dòng phụ `duoi` dưới tên.
@@ -139,22 +136,49 @@ fn tick(ui: &mut egui::Ui, b: &mut bool, ten: &str) {
 impl TabXoaGhim {
     /// Thân tab; `cfg` = bản nháp cấu hình chung.
     pub fn ve(&mut self, ui: &mut egui::Ui, cfg: &mut CauHinhXoaGhim) {
-        ui.spacing_mut().item_spacing.y = 0.0;
+        self.dai_thu_muc(ui);
+        ui.add_space(gc::KHE_THE);
+        ui.spacing_mut().item_spacing = egui::vec2(gc::KHE_THE, 0.0);
         ui.columns(2, |cot| {
-            cot[0].spacing_mut().item_spacing.y = 12.0;
-            cot[1].spacing_mut().item_spacing.y = 12.0;
             self.the_nhan_dien(&mut cot[0]);
             the_hieu_nang(&mut cot[0], cfg);
             self.the_xuat(&mut cot[1]);
             the_hien_thi(&mut cot[1], cfg);
         });
-        ui.add_space(10.0);
-        let mut job = egui::text::LayoutJob::default();
-        job.append("theo thư mục", 0.0, egui::TextFormat::simple(font(tk::CHU_NHO), Color32::from_rgb(0x1D, 0x4E, 0xD8)));
-        job.append(": lưu cùng vùng của thư mục đang mở · ", 0.0, egui::TextFormat::simple(font(tk::CHU_NHO), tk::CHU_PHU));
-        job.append("chung", 0.0, egui::TextFormat::simple(font(tk::CHU_NHO), Color32::from_rgb(0x47, 0x55, 0x69)));
-        job.append(": mọi thư mục", 0.0, egui::TextFormat::simple(font(tk::CHU_NHO), tk::CHU_PHU));
-        ui.label(job);
+    }
+
+    /// Dải đầu tab: xanh nhạt "Thư mục đang mở: <đường dẫn>"; chưa mở → dải cam hướng dẫn mở ở màn Xóa ghim.
+    fn dai_thu_muc(&self, ui: &mut egui::Ui) {
+        let (nen, vien) = if self.thu_muc.is_some() { (Color32::from_rgb(0xEF, 0xF6, 0xFF), Color32::from_rgb(0xBF, 0xDB, 0xFE)) } else { (gc::CAM_NEN, gc::CAM_VIEN) };
+        egui::Frame::new().fill(nen).stroke(Stroke::new(1.0, vien)).corner_radius(5).inner_margin(egui::Margin::symmetric(12, 8)).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                let (o, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), Sense::hover());
+                bieu_tuong::ve(ui, "thu_muc", o);
+                match (&self.thu_muc, &self.duong_dan) {
+                    (Some(_), duong_dan) => {
+                        ui.label(egui::RichText::new("Thư mục đang mở:").font(font(12.0)).color(tk::CHU));
+                        if let Some(p) = duong_dan {
+                            ui.label(egui::RichText::new(p.display().to_string()).font(font_dam(12.0)).color(tk::CHU));
+                        }
+                        ui.label(egui::RichText::new("— thẻ").font(font(12.0)).color(tk::CHU));
+                        gc::nhan_pham(ui, Pham::ThuMuc);
+                        ui.label(egui::RichText::new("áp cho thư mục này.").font(font(12.0)).color(tk::CHU));
+                    }
+                    (None, _) => {
+                        ui.label(egui::RichText::new("Mở 1 file hoặc thư mục ở màn Xóa ghim để chỉnh phần theo thư mục").font(font(12.0)).color(gc::CAM_CHU));
+                    }
+                }
+            });
+        });
+    }
+
+    /// Test / chụp ảnh: tab như khi màn Xóa ghim đang mở thư mục `duong_dan` với tuỳ chọn mặc định.
+    #[cfg(test)]
+    pub fn dang_mo_thu_muc(duong_dan: PathBuf) -> Self {
+        let thu_muc = CauHinhThuMuc { tc: TuyChon::default(), xuat: CauHinhXuat::default(), ghi_de: false };
+        Self { thu_muc: Some(thu_muc), duong_dan: Some(duong_dan), mo_hinh: None }
     }
 
     /// Mặc định: tuỳ chọn thư mục + cấu hình chung về giá trị đầu.
@@ -172,7 +196,7 @@ impl TabXoaGhim {
         let mut nhap = false;
         let mut huy = false;
         let mut tm = self.thu_muc.clone().unwrap_or(CauHinhThuMuc { tc: TuyChon::default(), xuat: CauHinhXuat::default(), ghi_de: false });
-        the(ui, "khien", "Nhận diện & bảo vệ", false, true, |ui| {
+        the(ui, "khien", "Nhận diện & bảo vệ", Pham::ThuMuc, true, |ui| {
             let san = matches!(tt, TrangThaiMoHinh::SanSang);
             let mo_ta = if san { "Tìm khối chữ, bảng; không xoá vào nội dung" } else { "Cần tải mô hình AI (37,5 MB)" };
             dong(
@@ -240,9 +264,6 @@ impl TabXoaGhim {
                 dong(ui, "net_den", "Bảo vệ nét đen", "Không coi điểm rất tối là vết bẩn — giữ nét chữ", 30.0, |ui| tick(ui, &mut tm.tc.bao_ve_net_den, "Bảo vệ nét đen"), |_| {});
                 dong(ui, "dau", "Bảo vệ dấu đỏ / chữ ký xanh", "Giữ con dấu, chữ ký mực màu", 30.0, |ui| tick(ui, &mut tm.tc.bao_ve_do_xanh, "Bảo vệ dấu đỏ / chữ ký xanh"), |_| {});
             });
-            if !duoc {
-                ui.label(egui::RichText::new("Mở 1 file hoặc thư mục ở màn Xóa ghim để chỉnh bảo vệ.").font(font(tk::CHU_NHO)).color(tk::CAM_CHU));
-            }
         });
         if duoc {
             self.thu_muc = Some(tm);
@@ -267,7 +288,7 @@ impl TabXoaGhim {
     fn the_xuat(&mut self, ui: &mut egui::Ui) {
         let duoc = self.thu_muc.is_some();
         let mut tm = self.thu_muc.clone().unwrap_or(CauHinhThuMuc { tc: TuyChon::default(), xuat: CauHinhXuat::default(), ghi_de: false });
-        the(ui, "xuat", "Xuất file", false, duoc, |ui| {
+        the(ui, "xuat", "Xuất file", Pham::ThuMuc, duoc, |ui| {
             let ds_dpi: Vec<(u16, String)> = DPI.iter().map(|(v, t)| (*v, t.to_string())).collect();
             dong(ui, "dpi", "Độ phân giải (DPI)", "Gốc = giữ như bản quét", 118.0, |ui| {
                 combo(ui, "xg_cfg_dpi", &mut tm.xuat.dpi, &ds_dpi, "Độ phân giải (DPI)");
@@ -298,7 +319,7 @@ impl TabXoaGhim {
 }
 
 fn the_hieu_nang(ui: &mut egui::Ui, cfg: &mut CauHinhXoaGhim) {
-    the(ui, "hieu_nang", "Hiệu năng & lưu", true, true, |ui| {
+    the(ui, "hieu_nang", "Hiệu năng & lưu", Pham::Chung, true, |ui| {
         dong(ui, "lop", "Xử lý theo lô 10 trang", "Nhanh hơn, tốn RAM hơn", 30.0, |ui| tick(ui, &mut cfg.lo_10, "Xử lý theo lô 10 trang"), |_| {});
         dong(ui, "dong_ho", "Tự lưu vùng", "0 = lưu ngay khi sửa", 96.0, |ui| {
             let r = ui.add(egui::DragValue::new(&mut cfg.tu_luu_phut).range(0..=60).suffix(" phút"));
@@ -308,7 +329,7 @@ fn the_hieu_nang(ui: &mut egui::Ui, cfg: &mut CauHinhXoaGhim) {
 }
 
 fn the_hien_thi(ui: &mut egui::Ui, cfg: &mut CauHinhXoaGhim) {
-    the(ui, "mat", "Hiển thị", true, true, |ui| {
+    the(ui, "mat", "Hiển thị", Pham::Chung, true, |ui| {
         dong(ui, "kieu_xem", "Kiểu xem", "", 118.0, |ui| {
             let ds = [(false, "Liên tiếp".to_string()), (true, "Từng trang".to_string())];
             combo(ui, "xg_cfg_kieu", &mut cfg.tung_trang, &ds, "Kiểu xem");
