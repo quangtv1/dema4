@@ -201,7 +201,7 @@ them(batDauChuong('Màn hình chính và thao tác chung'));
 them(H2('2.1 Tên gọi các phần của Trang chủ'), ...hinh('01-trang-chu-chu-thich.png', 'Trang chủ'),
   ...chuThichSo([
     ['Chức năng', 'Menu chuyển giữa các chức năng và về Trang chủ.'],
-    ['Cấu hình', 'Mở hộp Cấu hình (4 tab: Đếm trang A4 / Tách PDF / Sinh mục lục / Bóc tách).'],
+    ['Cấu hình', 'Mở trang Cấu hình (sidebar: Đếm trang A4 / Tách văn bản / Sinh mục lục / Bóc tách dữ liệu / Xóa ghim / Dữ liệu ứng dụng; Lưu trên tiêu đề; nút ⧉ thu thành cửa sổ nhỏ).'],
     ['Trợ giúp', 'Hướng dẫn sử dụng (`F1`), Kiểm tra cập nhật, Thông tin phần mềm.'],
     ['Logo Sao Mai', 'Logo động; bấm để mở website saomaiso.com.'],
     ['Ô chức năng', 'Bấm để mở chức năng. Rê chuột xem tóm tắt mục đích.'],
@@ -218,6 +218,13 @@ them(H2('2.2 Màn giới thiệu của từng chức năng'),
 them(H2('2.3 Hướng dẫn nhanh (F1)'),
   P('Bấm `F1` ở bất kỳ màn nào để mở **Hướng dẫn sử dụng** của chức năng đang dùng: các bước, nhãn, phím tắt.'),
   ...hinh('02-huong-dan-f1.png', 'Hộp Hướng dẫn sử dụng — tab Tách văn bản', 520),
+);
+them(H2('2.4 Trang Cấu hình'),
+  P('Menu **Cấu hình** mở trang Cấu hình thay cho màn đang làm, chọn sẵn mục của màn đó. **Sidebar trái**: Đếm trang A4, Tách văn bản, Sinh mục lục, Bóc tách dữ liệu, Xóa ghim và **Dữ liệu ứng dụng** (thư mục dữ liệu, Xoá cache phân tích, Dọn dữ liệu cũ). Mục còn thay đổi chưa lưu có **chấm cam**.'),
+  P('Hàng tiêu đề: **Khôi phục mặc định** (chỉ mục đang xem) · nhãn số chức năng chưa lưu · **Huỷ thay đổi** · **Lưu** (`Ctrl+S`, lưu xong vẫn ở trang) · nút cửa sổ. **Quay lại** (hoặc `Esc`) về màn trước; còn thay đổi thì hỏi **Không lưu / Ở lại / Lưu và quay lại**.'),
+  ...hinh('02-cau-hinh.png', 'Trang Cấu hình — mục Tách văn bản, 2 chức năng chưa lưu'),
+  ...hop('meo', ['Nút ⧉ cạnh **Lưu** (`Ctrl+M`) thu trang thành **cửa sổ** nổi trên màn đang làm; nút □ trở lại toàn cửa sổ. Nút cạnh **Quay lại** (`Ctrl+B`) thu sidebar thành dải biểu tượng. Hai lựa chọn này được nhớ.']),
+  ...hinh('02-cau-hinh-cua-so.png', 'Trang Cấu hình dạng cửa sổ thu nhỏ'),
 );
 
 // ===== Chương 3: Đếm =====
@@ -327,8 +334,8 @@ them(H2('4.7 Phím tắt'),
   ], [2000, 7026]),
 );
 them(H2('4.8 Cấu hình Tách PDF'),
-  P('Menu **Cấu hình › Tách PDF**: ngưỡng nhận trang trắng, loại mã vạch, độ tin cậy nhận xoay, mẫu tên file kết quả (`{hoso}.{n}`), thư mục kết quả, lưu nhãn tự động hoặc bằng tay.'),
-  ...hinh('04-tach-cau-hinh.png', 'Cấu hình › Tách PDF', 520),
+  P('Menu **Cấu hình › Tách văn bản**: ngưỡng nhận trang trắng, loại mã vạch, độ tin cậy nhận xoay, mẫu tên file kết quả (`{hoso}.{n}`), thư mục kết quả, lưu nhãn tự động hoặc bằng tay.'),
+  ...hinh('04-tach-cau-hinh.png', 'Cấu hình › Tách văn bản', 520),
 );
 
 // ===== Chương 5: Mục lục =====
@@ -371,7 +378,7 @@ them(H2('6.2 Tên gọi các phần — tab Kết quả bóc'), ...hinh('06-boc-
     ['Nguồn văn bản', 'Máy tính (thư mục trên máy, ổ mạng, Google Drive for Desktop) hoặc nguồn khác.'],
     ['Chọn', 'Chọn thư mục PDF (gồm thư mục con).'],
     ['Loại tài liệu', 'Văn bản hành chính, Hồ sơ đất đai, Hợp đồng hoặc loại riêng — quyết định các trường cần đọc.'],
-    ['Mô hình đọc · Kiểm tra', 'Mô hình đã khai ở Cấu hình › Bóc tách; **Kiểm tra** thử kết nối.'],
+    ['Mô hình đọc · Kiểm tra', 'Mô hình đã khai ở Cấu hình › Bóc tách dữ liệu; **Kiểm tra** thử kết nối.'],
     ['Ghi ra', 'Excel (luôn ghi) và Google Sheet (tuỳ chọn); **Mở Sheet**.'],
     ['Tab Trường dữ liệu / Kết quả bóc', 'Cấu hình trường và thử đọc / xem kết quả từng file.'],
     ['Danh sách file', 'Tên file, số trang, số trường đọc được (vd 6/6) hoặc **Lỗi**.'],
@@ -383,8 +390,8 @@ them(H2('6.2 Tên gọi các phần — tab Kết quả bóc'), ...hinh('06-boc-
     ['Bắt đầu / Chạy lại (n)', 'Đọc mọi file / đọc lại các file đang hiện sau khi lọc.'],
   ]),
 );
-them(H2('6.3 Chuẩn bị mô hình đọc (Cấu hình › Bóc tách)'),
-  P('Mở **Cấu hình › Bóc tách › Mô hình đọc**, chọn nhà cung cấp:'),
+them(H2('6.3 Chuẩn bị mô hình đọc (Cấu hình › Bóc tách dữ liệu)'),
+  P('Mở **Cấu hình › Bóc tách dữ liệu › Mô hình đọc**, chọn nhà cung cấp:'),
   ...bang(['Nhà cung cấp', 'Cần khai'], [
     ['Máy chủ nội bộ', 'Địa chỉ chuẩn OpenAI `http://<máy>:<cổng>/v1` (vLLM 8000 · Ollama 11434 · LM Studio 1234) và model.'],
     ['Gemini', 'Kiểu khoá **Vertex AI (express)** hoặc **AI Studio**, dán khoá API. Model mặc định `gemini-3.7-flash`.'],
@@ -413,9 +420,9 @@ them(...buoc('Mở **Chức năng › Bóc tách dữ liệu**. **Nguồn văn b
   ...hinh('06-boc-tach-xong.png', 'Popup Bóc tách xong', 520),
 );
 them(H2('6.5 Ghi Google Sheet'),
-  P('Ở **Cấu hình › Bóc tách › Ghi kết quả**: dán link Google Sheet, tên tab (để trống = tên thư mục nguồn), cách ghi **Khoá service account** hoặc **Apps Script**; bấm **Ghi thử 1 dòng** để kiểm tra quyền. Bật ô **Google Sheet** ở màn chính để ghi.'),
+  P('Ở **Cấu hình › Bóc tách dữ liệu › Ghi kết quả**: dán link Google Sheet, tên tab (để trống = tên thư mục nguồn), cách ghi **Khoá service account** hoặc **Apps Script**; bấm **Ghi thử 1 dòng** để kiểm tra quyền. Bật ô **Google Sheet** ở màn chính để ghi.'),
   P('Tab trên Sheet là bản sao kết quả như file Excel. Có thay đổi (đọc xong file, Lưu, ReOCR) thì phần mềm tự ghi lại cả tab, **tối đa 1 lần mỗi phút**; mất mạng thì tự thử lại.'),
-  ...hinh('06-cau-hinh-ghi.png', 'Cấu hình › Bóc tách › Ghi kết quả', 520),
+  ...hinh('06-cau-hinh-ghi.png', 'Cấu hình › Bóc tách dữ liệu › Ghi kết quả', 520),
   ...hop('luuy', ['Nếu đơn vị đã dán script Apps Script mẫu từ bản trước 2.1.2, cần dán lại script mới (`dema4_rs/apps-script-mau/boc_tach.gs`) để tránh ghi trùng dòng.']),
 );
 
@@ -525,7 +532,7 @@ them(H2('D. Lịch sử sửa đổi'),
     ['1.1', '25/11/2026', '2.3.0', 'Thư mục dữ liệu chung theo người dùng; Làm tiếp trên máy khác (Xuất / Nhập phiên); Trang chủ có Làm tiếp gần đây.'],
     ['1.2', '25/11/2026', '2.4.0', 'Phần đã làm theo nội dung từng PDF: đổi tên / di chuyển / mở thư mục cha-con vẫn thấy lại; Nhập phiên khớp theo nội dung; 1 cửa sổ; Dọn dữ liệu cũ.'],
     ['1.3', NGAY, '2.5.0', 'Chương 7 Xóa ghim; Trang chủ 7 ô / hàng; Xuất / Nhập phiên ở màn Xóa ghim.'],
-    ['1.4', NGAY, PHIEN_BAN, 'Chương 7 theo màn Xóa ghim mới: Danh sách lọc / sắp xếp, File đích, chọn nhiều vùng, Nhận diện layout (AI), Cấu hình › Xóa ghim; menu Tệp tin.'],
+    ['1.4', NGAY, PHIEN_BAN, 'Chương 7 theo màn Xóa ghim mới: Danh sách lọc / sắp xếp, File đích, chọn nhiều vùng, Nhận diện layout (AI), Cấu hình › Xóa ghim; Cấu hình thành trang toàn cửa sổ (sidebar, cửa sổ thu nhỏ, Dữ liệu ứng dụng); menu Tệp tin.'],
   ], [2000, 1700, 2000, 3326]),
 );
 

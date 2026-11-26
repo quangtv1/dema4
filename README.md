@@ -17,7 +17,7 @@ Lần đầu mở (file chưa ký số với Apple / Microsoft):
 - **Windows** (SmartScreen): **More info › Run anyway**.
 - **Windows, mở không lên cửa sổ** (máy card Intel driver cũ): từ v2.2.2 app không còn dò Vulkan nên không còn crash ở `igvk64.dll`. Vẫn không lên → cập nhật driver card đồ hoạ, hoặc thử chạy trong PowerShell: `$env:WGPU_BACKEND="gl"; .\dema4_saomai.exe`.
 
-**Nâng cấp lên v2.6.0**: màn **Xóa ghim** làm lại (Danh sách lọc / sắp xếp, File đích nhân bản / cạnh file gốc / ghi đè, chọn nhiều vùng, Nhận diện layout bằng AI, Cấu hình › Xóa ghim); menu **Tệp tin** đầu mọi chức năng (Mở…, Gần đây, Xuất / Nhập phiên). Kho Xóa ghim của 2.6.0 vẫn mở được ở 2.5.0 (bản cũ bỏ qua phần File đích và cờ Nhận diện layout).
+**Nâng cấp lên v2.6.0**: màn **Xóa ghim** làm lại (Danh sách lọc / sắp xếp, File đích nhân bản / cạnh file gốc / ghi đè, chọn nhiều vùng, Nhận diện layout bằng AI, Cấu hình › Xóa ghim); **Cấu hình** thành trang toàn cửa sổ có sidebar chức năng (hoặc cửa sổ thu nhỏ), Lưu trên tiêu đề, mục **Dữ liệu ứng dụng**; menu **Tệp tin** đầu mọi chức năng (Mở…, Gần đây, Xuất / Nhập phiên). Kho Xóa ghim của 2.6.0 vẫn mở được ở 2.5.0 (bản cũ bỏ qua phần File đích và cờ Nhận diện layout).
 
 **Nâng cấp lên v2.5.0**: thêm chức năng **Xóa ghim** (ô trên Trang chủ, menu Chức năng). Lượt chạy Xóa ghim tính chung hạn mức với các chức năng khác. Phần Xóa ghim lưu ở file kho riêng `kho_xoa_ghim.bin`; dùng song song / quay về bản 2.4.1 không mất dữ liệu của bản này (bản 2.4.0 trở về trước gặp dòng Xóa ghim thì xoá trắng cả danh sách Làm tiếp gần đây và bỏ lượt Xóa ghim chưa gửi trạm — máy nào cần giữ bản cũ thì cập nhật lên 2.4.1 trở lên).
 
@@ -99,13 +99,18 @@ Mở 1 file PDF hoặc cả thư mục (nút giữa màn, **Tệp tin › Mở�
 
 ## Cấu hình
 
-Menu **Cấu hình** (5 tab Đếm trang A4 / Tách PDF / Sinh mục lục / Bóc tách / Xóa ghim), lưu ở file `.dema4_saomai.cfg` trong thư mục dữ liệu.
+Menu **Cấu hình** mở **trang Cấu hình** thay màn đang làm (mở sẵn mục của màn đó), lưu ở file `.dema4_saomai.cfg` trong thư mục dữ liệu.
+
+- **Sidebar trái**: Đếm trang A4 · Tách văn bản · Sinh mục lục · Bóc tách dữ liệu · Xóa ghim, và **Dữ liệu ứng dụng** (thư mục dữ liệu + Mở thư mục, Xoá cache phân tích của thư mục Tách đang mở, Dọn dữ liệu cũ — có hỏi lại). Mục còn thay đổi chưa lưu có chấm cam. Nút cạnh **Quay lại** (Ctrl+B) thu sidebar thành dải biểu tượng.
+- **Hàng tiêu đề**: Khôi phục mặc định (chỉ mục đang xem) · nhãn "n chức năng chưa lưu" · **Huỷ thay đổi** · **Lưu** (Ctrl+S, ở lại trang; ô báo đỏ thì khoá) · nút cửa sổ: ⧉ thu thành **cửa sổ 1120 × 720** nổi trên màn đang làm, □ trở lại toàn cửa sổ (Ctrl+M). Dạng hiển thị được nhớ.
+- **Quay lại <màn>** / Esc (cửa sổ thu nhỏ: ✕, bấm ra ngoài): còn thay đổi thì hỏi **Không lưu · Ở lại · Lưu và quay lại**.
+- Mọi mục cùng cột nội dung cố định — đổi mục không nhảy bố cục.
+
+![Cấu hình Tách văn bản](docs/anh/cau-hinh-tach.png)
+
+![Cấu hình dạng cửa sổ thu nhỏ](docs/anh/cau-hinh-cua-so-nho.png)
 
 ![Cấu hình Đếm trang A4](docs/anh/cau-hinh-dem.png)
-
-![Cấu hình Tách PDF](docs/anh/cau-hinh-tach.png)
-
-![Cấu hình Sinh mục lục](docs/anh/cau-hinh-muc-luc.png)
 
 ![Cấu hình Bóc tách](docs/anh/cau-hinh-boc-tach.png)
 
@@ -116,7 +121,7 @@ Mọi dữ liệu làm việc (cấu hình, khoá API mã hoá, license, nhãn /
 - Windows: `%LOCALAPPDATA%\sm-dema4`
 - macOS: `~/Library/Application Support/sm-dema4`
 
-Phần Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) nằm trong **1 file kho** `kho_tach.bin`, khoá theo **nội dung từng PDF** (64 KB đầu + 64 KB cuối + kích thước) chứ không theo đường dẫn: đổi tên / di chuyển thư mục, mở thư mục cha hay con, chép sang ổ khác vẫn thấy lại phần đã làm của từng file, không phân tích lại. Cùng 1 PDF ở nhiều chỗ dùng chung nhãn. Trước khi **Tách**, app đọc lại nội dung từng file: file đã bị thay bản khác (cùng tên) không bị tách theo nhãn cũ. Vùng + nhật ký Xóa ghim ở file kho riêng `kho_xoa_ghim.bin` (cùng cách ghi). Kết quả Bóc tách vẫn ở `viec/<thư mục>/boc_tach.jsonl`, mỗi kết quả kèm id nội dung nên cũng tìm lại được khi đổi tên / di chuyển. Kho ghi nối từng thay đổi nhỏ (sửa 1 nhãn ghi vài chục byte), tắt máy giữa chừng không hỏng; **Cấu hình › Dọn dữ liệu cũ** bỏ phần đã làm của PDF không mở lại quá 12 tháng. Chỉ mở được 1 cửa sổ app (1 nơi ghi kho).
+Phần Tách (nhãn, góc xoay, cờ duyệt, kết quả phân tích) nằm trong **1 file kho** `kho_tach.bin`, khoá theo **nội dung từng PDF** (64 KB đầu + 64 KB cuối + kích thước) chứ không theo đường dẫn: đổi tên / di chuyển thư mục, mở thư mục cha hay con, chép sang ổ khác vẫn thấy lại phần đã làm của từng file, không phân tích lại. Cùng 1 PDF ở nhiều chỗ dùng chung nhãn. Trước khi **Tách**, app đọc lại nội dung từng file: file đã bị thay bản khác (cùng tên) không bị tách theo nhãn cũ. Vùng + nhật ký Xóa ghim ở file kho riêng `kho_xoa_ghim.bin` (cùng cách ghi). Kết quả Bóc tách vẫn ở `viec/<thư mục>/boc_tach.jsonl`, mỗi kết quả kèm id nội dung nên cũng tìm lại được khi đổi tên / di chuyển. Kho ghi nối từng thay đổi nhỏ (sửa 1 nhãn ghi vài chục byte), tắt máy giữa chừng không hỏng; **Cấu hình › Dữ liệu ứng dụng › Dọn dữ liệu cũ** bỏ phần đã làm của PDF không mở lại quá 12 tháng. Chỉ mở được 1 cửa sổ app (1 nơi ghi kho).
 
 **Làm tiếp trên máy khác** (màn Tách, Bóc tách hoặc Xóa ghim, đã mở thư mục): **Tệp tin › Xuất phiên làm việc…** đóng gói nhãn, góc xoay, cache phân tích, kết quả bóc tách và vùng Xóa ghim của thư mục đó thành `<tên>.sm-dema4.zip` (mặc định vào thư mục Tải về; không có khoá API, license, cấu hình). Ở máy kia mở thư mục chứa các PDF đó — **cấp nào, tên gì cũng được**: khớp theo nội dung file — rồi **Tệp tin › Nhập phiên làm việc…**: hộp xác nhận cho biết % PDF khớp, loại tài liệu mới; mỗi hồ sơ giữ **bản sửa sau cùng** (máy này hoặc gói), kết quả bóc tách đọc được không bị bản lỗi đè; báo cáo liệt kê hồ sơ hai máy cùng sửa. Nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, và để đồng hồ máy đúng giờ.
 
