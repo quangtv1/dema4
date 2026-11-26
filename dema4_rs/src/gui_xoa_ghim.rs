@@ -206,7 +206,6 @@ pub struct ManXoaGhim {
     loc_nc_ap: Option<LocNangCao>,
     /// Lúc áp ô "Trong dải trang" (2 s sau lần gõ cuối).
     han_loc_nc: Option<f64>,
-    loc_nc_bat: bool,
     loc_nc_mo: bool,
     /// `None` = mặc định (mở rộng); `Some(false)` = người dùng đã thu nhỏ.
     ds_mo: Option<bool>,
@@ -298,8 +297,7 @@ impl Default for ManXoaGhim {
             loc_nc: LocNangCao::default(),
             loc_nc_ap: None,
             han_loc_nc: None,
-            loc_nc_bat: true,
-            loc_nc_mo: false,
+            loc_nc_mo: true,
             ds_mo: None,
             chon: 0,
             bo: BoVung::moi(thu_muc_mac_dinh()),
@@ -865,14 +863,28 @@ pub fn khop_nang_cao(tt: &ThongTinFile, l: &LocNangCao, qt: &crate::dem_pdf::Quy
 
 /// Khổ (A0..A7) và chiều (ngang, dọc) **có mặt** trong các file đã đọc — ô lọc không có trang nào thì mờ.
 pub fn co_mat(ds: &[Option<ThongTinFile>], qt: &crate::dem_pdf::QuyTac) -> ([bool; 8], bool, bool) {
-    let (mut kho, mut ngang, mut doc) = ([false; 8], false, false);
-    for (k, n) in ds.iter().flatten().flat_map(|t| t.kho_chieu(qt)) {
-        kho[k] = true;
-        if n {
-            ngang = true;
-        } else {
-            doc = true;
+    let (kho, ngang, doc) = dem_file(ds, qt);
+    (kho.map(|n| n > 0), ngang > 0, doc > 0)
+}
+
+/// Số file có ít nhất 1 trang mỗi khổ (A0..A7), có trang ngang, có trang dọc — hiện cạnh từng ô lọc.
+pub fn dem_file(ds: &[Option<ThongTinFile>], qt: &crate::dem_pdf::QuyTac) -> ([usize; 8], usize, usize) {
+    let (mut kho, mut ngang, mut doc) = ([0usize; 8], 0, 0);
+    for t in ds.iter().flatten() {
+        let (mut k1, mut n1, mut d1) = ([false; 8], false, false);
+        for (k, n) in t.kho_chieu(qt) {
+            k1[k] = true;
+            if n {
+                n1 = true;
+            } else {
+                d1 = true;
+            }
         }
+        for (a, b) in kho.iter_mut().zip(k1) {
+            *a += b as usize;
+        }
+        ngang += n1 as usize;
+        doc += d1 as usize;
     }
     (kho, ngang, doc)
 }

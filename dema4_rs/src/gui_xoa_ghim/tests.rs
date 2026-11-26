@@ -574,13 +574,14 @@ fn loc_nang_cao_mo_thu_o_day_cot() {
         }
         m2.borrow_mut().ve(ui, &mut CauHinhXoaGhim::default());
     });
+    man.borrow_mut().loc_nc_mo = false;
     h.run_steps(4);
     let thu = man.borrow().cao_nc;
     assert!(thu < 40.0, "thu gọn: 1 hàng ({thu})");
     man.borrow_mut().loc_nc_mo = true;
     h.run_steps(4);
     let mo = man.borrow().cao_nc;
-    assert!(mo > 200.0, "mở: đủ cao chứa nút Áp dụng ({mo})");
+    assert!(mo > 120.0, "mở: đủ cao chứa các hàng lọc ({mo})");
     man.borrow_mut().loc_nc_mo = false;
     h.run_steps(4);
     assert_eq!(man.borrow().cao_nc, thu, "thu lại: về đúng 1 hàng ở đáy");
@@ -594,7 +595,7 @@ fn loc_nang_cao_tu_ap_va_reset() {
     let d = thu_muc_mau("tuap", &[("a.pdf", 1), ("b.pdf", 3)]);
     let mut man = ManXoaGhim::default();
     man.mo_thu_muc(d.clone());
-    (man.loc_nc_bat, man.loc_nc_mo) = (true, true);
+    man.loc_nc_mo = true;
     let man = std::rc::Rc::new(std::cell::RefCell::new(man));
     let m2 = man.clone();
     let mut da_cai = false;

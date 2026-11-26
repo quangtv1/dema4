@@ -39,6 +39,33 @@ pub fn ap_kieu(ui: &mut Ui) {
     v.widgets.noninteractive.fg_stroke.color = tk::CHU;
 }
 
+/// Chip bật / tắt (Lọc nâng cao): viên bo tròn cao 22 — bật nền xanh nhạt viền xanh; tắt nền trắng; không dùng được
+/// thì mờ. `so`: số nhỏ màu xám sau chữ (vd số file). Tên trợ năng = `chu`.
+pub fn chip(ui: &mut Ui, bat: bool, chu: &str, so: Option<usize>, duoc: bool) -> Response {
+    let g = ui.painter().layout_no_wrap(chu.to_owned(), if bat { font_dam(tk::CHU_CO) } else { font(tk::CHU_CO) }, Color32::PLACEHOLDER);
+    let gs = so.map(|n| ui.painter().layout_no_wrap(n.to_string(), font(tk::CHU_NHO), Color32::PLACEHOLDER));
+    let rong = 10.0 + g.size().x + gs.as_ref().map_or(0.0, |x| 4.0 + x.size().x) + 10.0;
+    let (o, ph) = ui.allocate_exact_size(egui::vec2(rong, 22.0), if duoc { Sense::click() } else { Sense::hover() });
+    let p = ui.painter();
+    let (nen, vien, mau) = match (duoc, bat) {
+        (false, _) => (tk::NEN_HANG_SAP, tk::VIEN_KHUNG, tk::CHU_MO),
+        (true, true) => (tk::NEN_NUT_VUA_DANG, tk::VIEN_NUT_VUA_DANG, tk::XANH_DAM_CHU),
+        (true, false) => (if ph.hovered() { tk::NEN_NUT_HOVER } else { Color32::WHITE }, tk::VIEN, tk::CHU),
+    };
+    p.rect(o, 11.0, nen, Stroke::new(1.0, vien), StrokeKind::Inside);
+    let y = o.center().y;
+    p.galley(egui::pos2(o.left() + 10.0, y - g.size().y / 2.0), g.clone(), mau);
+    if let Some(gs) = gs {
+        p.galley(egui::pos2(o.left() + 10.0 + g.size().x + 4.0, y - gs.size().y / 2.0), gs, if duoc { tk::CHU_PHU } else { tk::CHU_MO });
+    }
+    ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, duoc, bat, chu));
+    if duoc {
+        ph.on_hover_cursor(egui::CursorIcon::PointingHand)
+    } else {
+        ph
+    }
+}
+
 /// Nút kiểu link (Xóa vùng vẽ, Hoàn tác): nền trắng, chữ xanh, viền xanh nhạt, cao 24.
 pub fn nut_link(ui: &mut Ui, chu: &str, duoc: bool, xanh: bool) -> Response {
     let mau = if xanh { tk::XANH_DAM_CHU } else { tk::CHU };
