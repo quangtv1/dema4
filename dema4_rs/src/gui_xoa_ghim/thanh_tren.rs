@@ -419,7 +419,7 @@ impl ManXoaGhim {
                 }
             }
             let mut nt = self.bo.tm.tuy_chon.nen_trang;
-            if widget::o_tick(ui, &mut nt, "Tô nền trắng", true, "Tô trắng đặc cả vùng xoá, chừa nét được bảo vệ (cùng tuỳ chọn trong Cấu hình)") {
+            if widget::o_tick(ui, &mut nt, "Tô nền trắng", true, "Tô trắng đặc toàn bộ mọi vùng xoá (chỉ chừa vùng Bảo vệ, khối nhận diện) (cùng tuỳ chọn trong Cấu hình)") {
                 self.bo.tm.tuy_chon.nen_trang = nt;
                 self.bo.doi_chung();
             }

@@ -121,7 +121,8 @@ fn phan_duoc_xoa(k: Hcn, bao_ve: &[Hcn]) -> Option<Vec<u8>> {
 /// Cố ý như vậy: lõi vết ghim / lỗ bấm cũng tối như nét chữ, bỏ chúng cả sau giãn thì vết ghim còn
 /// nguyên lõi đen (đã thử trên bộ mẫu 266 trang).
 fn xoa_trong_khung(anh: &mut Anh, v: &Vung, k: Hcn, dpi: f64, tc: &TuyChon, duoc_xoa: Option<&[u8]>) -> bool {
-    // "Tô nền trắng": tô trắng đặc cả vùng, chỉ chừa điểm được bảo vệ (nét đen, đỏ / xanh, vùng bảo vệ / nhận diện).
+    // "Tô nền trắng": tô trắng đặc cả vùng — chỉ chừa vùng Bảo vệ / khối nhận diện (`duoc_xoa`); không chừa theo màu
+    // (lõi ghim tối như nét đen, chừa ra thì vùng trắng còn vệt đen).
     // Không bật: nhận vết so với màu nền đo được rồi tô vết bằng màu nền đó.
     let nen = mau_nen(anh);
     let mau_to = if tc.nen_trang { [255; 3] } else { nen };
@@ -137,7 +138,7 @@ fn xoa_trong_khung(anh: &mut Anh, v: &Vung, k: Hcn, dpi: f64, tc: &TuyChon, duoc
         for (x, p) in anh.du_lieu[dau..dau + w * 3].chunks_exact(3).enumerate() {
             let gx = xam(p[0], p[1], p[2]);
             let i = y * w + x;
-            let bao_ve = (tc.bao_ve_net_den && gx < nguong_den) || (tc.bao_ve_do_xanh && la_do_xanh(p[0], p[1], p[2]));
+            let bao_ve = !tc.nen_trang && ((tc.bao_ve_net_den && gx < nguong_den) || (tc.bao_ve_do_xanh && la_do_xanh(p[0], p[1], p[2])));
             let giu = bao_ve || duoc_xoa.is_some_and(|m| m[i] == 0);
             let la_vet = tc.nen_trang || nen_xam - gx > nguong;
             vet[i] = (la_vet && !giu) as u8;
@@ -321,7 +322,7 @@ mod tests {
         assert_eq!(mau_nen(&a), NEN);
     }
 
-    /// Tô nền trắng: cả vùng trắng đặc (giấy ngả màu cũng trắng), nét đen được bảo vệ giữ nguyên, ngoài vùng giữ nguyên.
+    /// Tô nền trắng: cả vùng trắng đặc (giấy ngả màu, lõi ghim đen cũng trắng); vùng Bảo vệ và ngoài vùng giữ nguyên.
     #[test]
     fn to_nen_trang_to_trang_ca_vung_chua_net_bao_ve() {
         let mut a = trang_trang(200, 200);
@@ -331,7 +332,7 @@ mod tests {
         assert!(xoa_ghim_trang(&mut a, &[v], 0, 120.0, &TuyChon { nen_trang: true, ..Default::default() }, &[]));
         assert_eq!(diem(&a, 15, 15), [255; 3], "vết tô trắng");
         assert_eq!(diem(&a, 50, 50), [255; 3], "giấy trong vùng: trắng đặc");
-        assert_eq!(diem(&a, 42, 42), [10; 3], "nét đen được bảo vệ");
+        assert_eq!(diem(&a, 42, 42), [255; 3], "lõi đen trong vùng cũng trắng");
         assert_eq!(diem(&a, 150, 150), NEN, "ngoài vùng: giữ màu giấy");
     }
 
