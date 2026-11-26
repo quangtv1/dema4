@@ -288,7 +288,7 @@ impl TabXoaGhim {
                 combo(ui, "xg_cfg_nen", &mut tm.xuat.chat_luong, &ds_nen, "Chất lượng nén JPEG");
             }, |_| {});
             dong(ui, "den_trang", "Nén đen trắng", "Trang đen trắng / xám ghi gọn hơn", 30.0, |ui| tick(ui, &mut tm.xuat.nen_den_trang, "Nén đen trắng"), |_| {});
-            dong(ui, "nen_trang", "Tô nền trắng", "Tô vết bằng màu trắng thay màu nền đo được", 30.0, |ui| tick(ui, &mut tm.tc.nen_trang, "Tô nền trắng"), |_| {});
+            dong(ui, "nen_trang", "Tô nền trắng", "Tô trắng đặc cả vùng xoá, chừa nét được bảo vệ", 30.0, |ui| tick(ui, &mut tm.tc.nen_trang, "Tô nền trắng"), |_| {});
             let ghi_de = tm.ghi_de;
             dong(ui, "ghi_de", "Ghi đè file gốc", "Không tạo thư mục _xoaghim, thay thẳng file nguồn", 30.0, |ui| tick(ui, &mut tm.ghi_de, "Ghi đè file gốc"), |ui| {
                 if ghi_de {

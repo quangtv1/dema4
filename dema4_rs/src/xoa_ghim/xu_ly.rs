@@ -121,8 +121,8 @@ fn phan_duoc_xoa(k: Hcn, bao_ve: &[Hcn]) -> Option<Vec<u8>> {
 /// Cố ý như vậy: lõi vết ghim / lỗ bấm cũng tối như nét chữ, bỏ chúng cả sau giãn thì vết ghim còn
 /// nguyên lõi đen (đã thử trên bộ mẫu 266 trang).
 fn xoa_trong_khung(anh: &mut Anh, v: &Vung, k: Hcn, dpi: f64, tc: &TuyChon, duoc_xoa: Option<&[u8]>) -> bool {
-    // Nhận vết luôn so với màu nền đo được; "Tô nền trắng" chỉ đổi màu tô (so với trắng 255 thì giấy hơi ngả màu
-    // cũng thành "vết" → tô trắng cả vùng)
+    // "Tô nền trắng": tô trắng đặc cả vùng, chỉ chừa điểm được bảo vệ (nét đen, đỏ / xanh, vùng bảo vệ / nhận diện).
+    // Không bật: nhận vết so với màu nền đo được rồi tô vết bằng màu nền đó.
     let nen = mau_nen(anh);
     let mau_to = if tc.nen_trang { [255; 3] } else { nen };
     // Python: int(0.114·B + 0.587·G + 0.299·R) trên số thực, cộng theo đúng thứ tự đó
@@ -136,13 +136,14 @@ fn xoa_trong_khung(anh: &mut Anh, v: &Vung, k: Hcn, dpi: f64, tc: &TuyChon, duoc
             let gx = xam(p[0], p[1], p[2]);
             let i = y * w + x;
             let bao_ve = (tc.bao_ve_net_den && gx < nguong_den) || (tc.bao_ve_do_xanh && la_do_xanh(p[0], p[1], p[2]));
-            vet[i] = (nen_xam - gx > v.nguong as i32 && !bao_ve && duoc_xoa.is_none_or(|m| m[i] != 0)) as u8;
+            let la_vet = tc.nen_trang || nen_xam - gx > v.nguong as i32;
+            vet[i] = (la_vet && !bao_ve && duoc_xoa.is_none_or(|m| m[i] != 0)) as u8;
         }
     }
     if vet.iter().all(|&x| x == 0) {
         return false;
     }
-    let vet = dong_roi_gian(vet, w, h, &nhan_elip(co_nhan(dpi)), 2, 3);
+    let vet = if tc.nen_trang { vet } else { dong_roi_gian(vet, w, h, &nhan_elip(co_nhan(dpi)), 2, 3) };
     let mut doi = false;
     for y in 0..h {
         let dau = ((k.y1 as usize + y) * anh.rong + k.x1 as usize) * 3;
@@ -249,15 +250,18 @@ mod tests {
         assert_eq!(mau_nen(&a), NEN);
     }
 
-    /// Tô nền trắng: chỉ vết bị tô trắng, giấy ngả màu quanh vết trong vùng giữ nguyên.
+    /// Tô nền trắng: cả vùng trắng đặc (giấy ngả màu cũng trắng), nét đen được bảo vệ giữ nguyên, ngoài vùng giữ nguyên.
     #[test]
-    fn to_nen_trang_chi_to_vet_khong_to_ca_vung() {
+    fn to_nen_trang_to_trang_ca_vung_chua_net_bao_ve() {
         let mut a = trang_trang(200, 200);
         to(&mut a, 10, 10, 20, 20, [150, 150, 150]);
+        to(&mut a, 40, 40, 44, 44, [10, 10, 10]);
         let v = tay(0.0, 0.0, 0.3, 0.3, LoaiVung::Xoa);
         assert!(xoa_ghim_trang(&mut a, &[v], 0, 120.0, &TuyChon { nen_trang: true, ..Default::default() }, &[]));
         assert_eq!(diem(&a, 15, 15), [255; 3], "vết tô trắng");
-        assert_eq!(diem(&a, 50, 50), NEN, "giấy trong vùng, xa vết: giữ màu giấy");
+        assert_eq!(diem(&a, 50, 50), [255; 3], "giấy trong vùng: trắng đặc");
+        assert_eq!(diem(&a, 42, 42), [10; 3], "nét đen được bảo vệ");
+        assert_eq!(diem(&a, 150, 150), NEN, "ngoài vùng: giữ màu giấy");
     }
 
     #[test]
