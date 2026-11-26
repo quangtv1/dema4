@@ -350,7 +350,7 @@ fn chup_doi_chieu_prototype() {
     chup("doi-chieu-cau-hinh.png", man, true);
 }
 
-/// Cửa sổ mặc định / hẹp: khối Vùng · Rộng · Cao · Ngưỡng không tràn sang nửa phải (Đầu vào); hẹp thì chỉ còn ô số.
+/// Cửa sổ mặc định / hẹp: khối Vùng · Rộng · Cao · Mức xoá không tràn sang nửa phải (Đầu vào); hẹp thì chỉ còn ô số.
 #[test]
 fn khoi_vung_khong_tran_sang_nua_phai() {
     use egui_kittest::kittest::Queryable;
@@ -368,7 +368,7 @@ fn khoi_vung_khong_tran_sang_nua_phai() {
         let dau_vao = h.get_by_label("Đầu vào").rect();
         let vung = h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Vùng:").rect();
         assert!(vung.max.x <= dau_vao.min.x - 20.0, "{rong}: ô Vùng ({vung:?}) tràn");
-        for o in ["Rộng (số)", "Cao (số)", "Ngưỡng (số)"] {
+        for o in ["Rộng (số)", "Cao (số)", "Mức xoá (số)"] {
             let r = h.get_by_label(o).rect();
             assert!(r.max.x <= dau_vao.min.x - 60.0, "{rong}: ô {o} ({r:?}) tràn sang Đầu vào ({dau_vao:?})");
         }

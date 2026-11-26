@@ -501,7 +501,7 @@ mod tests {
     }
 
     fn goc_tren_trai() -> Vung {
-        Vung { vi_tri: ViTri::GocTrenTrai, loai: LoaiVung::Xoa, ap_trang: ApTrang::Le, x: 0.0, y: 0.0, rong: 0.2, cao: 0.2, rong_px: 50, cao_px: 50, nguong: 5 }
+        Vung { vi_tri: ViTri::GocTrenTrai, loai: LoaiVung::Xoa, ap_trang: ApTrang::Le, x: 0.0, y: 0.0, rong: 0.2, cao: 0.2, rong_px: 50, cao_px: 50, muc: 52 }
     }
 
     #[test]

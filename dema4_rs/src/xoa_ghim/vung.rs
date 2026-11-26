@@ -52,12 +52,12 @@ impl ViTri {
 }
 
 /// Vùng có sẵn với kích thước / ngưỡng mặc định như XoaGhim: góc 130 × 130 điểm ảnh @120 dpi (góc trên trái ngưỡng 3,
-/// góc khác 5); cạnh sâu 50 điểm ảnh @120 dpi suốt chiều dài (trái / phải ngưỡng 8, trên / dưới 5).
+/// góc khác 5); cạnh sâu 50 điểm ảnh @120 dpi suốt chiều dài (trái / phải ngưỡng 8, trên / dưới 5) — lưu dạng mức xoá.
 pub fn co_san(vi_tri: ViTri) -> Vung {
-    let v = Vung { vi_tri, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.0, y: 0.0, rong: 0.12, cao: 0.12, rong_px: 130, cao_px: 130, nguong: 5 };
+    let v = Vung { vi_tri, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.0, y: 0.0, rong: 0.12, cao: 0.12, rong_px: 130, cao_px: 130, muc: 52 };
     match vi_tri {
-        ViTri::GocTrenTrai => Vung { nguong: 3, ..v },
-        ViTri::CanhTrai | ViTri::CanhPhai => Vung { rong: 0.08, cao: 1.0, rong_px: 50, cao_px: 0, nguong: 8, ..v },
+        ViTri::GocTrenTrai => Vung { muc: 56, ..v },
+        ViTri::CanhTrai | ViTri::CanhPhai => Vung { rong: 0.08, cao: 1.0, rong_px: 50, cao_px: 0, muc: 46, ..v },
         ViTri::CanhTren | ViTri::CanhDuoi => Vung { rong: 1.0, cao: 0.05, rong_px: 0, cao_px: 50, ..v },
         _ => v,
     }
@@ -125,11 +125,30 @@ pub struct Vung {
     /// Kích thước ở 120 dpi; 0 = theo tỉ lệ. Góc: cả hai; cạnh trái / phải: `rong_px` (độ sâu); trên / dưới: `cao_px`.
     pub rong_px: u32,
     pub cao_px: u32,
-    /// Điểm tối hơn nền quá ngưỡng này là vết.
-    pub nguong: u8,
+    /// Mức xoá 0–100 (cao = mạnh). 0–60: độ nhạy nhận vết (0 ≈ ngưỡng 30 cũ, 60 ≈ ngưỡng 1); 60–100: phủ dần phần
+    /// giấy còn lại trong vùng về màu giấy, 100 = một màu giấy đặc.
+    pub muc: u8,
+}
+
+/// Mức xoá có độ nhạy cao nhất; trên mức này là phủ nền.
+pub const MUC_NHAY_MAX: u8 = 60;
+
+/// Đổi ngưỡng kiểu cũ (1–30: điểm tối hơn nền quá ngưỡng là vết) sang mức xoá — đổi qua đổi lại giữ đúng ngưỡng.
+pub fn muc_tu_nguong(nguong: u8) -> u8 {
+    ((30.0 - nguong.clamp(1, 30) as f64) * MUC_NHAY_MAX as f64 / 29.0).round() as u8
 }
 
 impl Vung {
+    /// Ngưỡng nhận vết (độ tối hơn nền) của mức xoá.
+    pub fn nguong_vet(&self) -> i32 {
+        (30.0 - self.muc.min(MUC_NHAY_MAX) as f64 * 29.0 / MUC_NHAY_MAX as f64).round().clamp(1.0, 30.0) as i32
+    }
+
+    /// Phần phủ màu giấy lên giấy còn lại trong vùng (0 = không phủ, 1 = đặc).
+    pub fn phu_nen(&self) -> f32 {
+        (self.muc.saturating_sub(MUC_NHAY_MAX) as f32 / (100 - MUC_NHAY_MAX) as f32).min(1.0)
+    }
+
     /// Khung điểm ảnh của vùng trên ảnh `w` × `h` vẽ ở `dpi` (chưa nới mép), đã cắt vào ảnh.
     pub fn khung(&self, w: i64, h: i64, dpi: f64) -> Hcn {
         let k = dpi / DPI_GOC;
@@ -213,7 +232,7 @@ mod tests {
     use super::*;
 
     fn goc(vi_tri: ViTri, px: u32) -> Vung {
-        Vung { vi_tri, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.0, y: 0.0, rong: 0.12, cao: 0.12, rong_px: px, cao_px: px, nguong: 5 }
+        Vung { vi_tri, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.0, y: 0.0, rong: 0.12, cao: 0.12, rong_px: px, cao_px: px, muc: 52 }
     }
 
     #[test]

@@ -412,7 +412,7 @@ fn xoa_ghim_vung_nhat_ky_theo_noi_dung_moc_sau_thang_du_lieu_sai_bo() {
     let (a, b) = (thu_muc(&d, "may_a/HS"), thu_muc(&d, "may_b/doi_ten"));
     let (ka, kb) = (may(&d, "a"), may(&d, "b"));
     let (xa, xb) = (Mutex::new(Kho::mo(&d.join("a_xg.kho")).unwrap()), Mutex::new(Kho::mo(&d.join("b_xg.kho")).unwrap()));
-    let vung = |nguong: u8| vec![Vung { vi_tri: ViTri::Tay, loai: LoaiVung::Xoa, ap_trang: ApTrang::MotTrang(1), x: 0.1, y: 0.1, rong: 0.2, cao: 0.2, rong_px: 0, cao_px: 0, nguong }];
+    let vung = |muc: u8| vec![Vung { vi_tri: ViTri::Tay, loai: LoaiVung::Xoa, ap_trang: ApTrang::MotTrang(1), x: 0.1, y: 0.1, rong: 0.2, cao: 0.2, rong_px: 0, cao_px: 0, muc }];
     let (ia, ib, ic) = (id(&ka, &a.join("a.pdf")), id(&ka, &a.join("b.pdf")), id(&ka, &a.join("c.pdf")));
     {
         let mut k = xa.lock().unwrap();

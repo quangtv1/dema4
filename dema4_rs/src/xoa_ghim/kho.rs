@@ -22,7 +22,8 @@ pub const VUNG_THU_MUC: u8 = KHAC_TU + 1;
 pub const NHAT_KY: u8 = KHAC_TU + 2;
 pub const GHI_THU_MUC: u8 = KHAC_TU + 3;
 
-const PHIEN_BAN: u8 = 1;
+/// 2: vùng lưu mức xoá 0–100; 1: ngưỡng 1–30 (đọc được, đổi sang mức xoá).
+const PHIEN_BAN: u8 = 2;
 /// Giới hạn số vùng của 1 bản ghi (chặn dữ liệu hỏng / gói lạ làm phình bộ nhớ).
 pub const TOI_DA_VUNG: usize = 500;
 /// Giới hạn độ dài đường dẫn thư mục ghi (byte UTF-8).
@@ -79,7 +80,7 @@ impl CauHinhGhi {
         g.0
     }
     pub fn giai_ma(b: &[u8]) -> Option<Self> {
-        let mut d = Doc(b);
+        let mut d = Doc(b, 0);
         d.dau()?;
         let kieu = match d.u8()? {
             0 => KieuGhi::NhanBan,
@@ -189,12 +190,13 @@ impl Ghi {
             }
             self.u32(v.rong_px);
             self.u32(v.cao_px);
-            self.u8(v.nguong);
+            self.u8(v.muc);
         }
     }
 }
 
-struct Doc<'a>(&'a [u8]);
+/// Bộ đọc: dữ liệu còn lại + phiên bản (đọc ở `dau`).
+struct Doc<'a>(&'a [u8], u8);
 
 impl Doc<'_> {
     fn lay<const N: usize>(&mut self) -> Option<[u8; N]> {
@@ -219,7 +221,9 @@ impl Doc<'_> {
     }
     /// Phiên bản + mốc sửa.
     fn dau(&mut self) -> Option<u64> {
-        (self.u8()? == PHIEN_BAN).then_some(())?;
+        let pb = self.u8()?;
+        (pb == PHIEN_BAN || pb == 1).then_some(())?;
+        self.1 = pb;
         self.u64()
     }
     fn vung(&mut self) -> Option<Vec<Vung>> {
@@ -244,7 +248,10 @@ impl Doc<'_> {
                 3 => ApTrang::MotTrang(trang),
                 _ => return None,
             };
-            let v = Vung { vi_tri, loai, ap_trang, x: self.f64()?, y: self.f64()?, rong: self.f64()?, cao: self.f64()?, rong_px: self.u32()?, cao_px: self.u32()?, nguong: self.u8()? };
+            let v = Vung { vi_tri, loai, ap_trang, x: self.f64()?, y: self.f64()?, rong: self.f64()?, cao: self.f64()?, rong_px: self.u32()?, cao_px: self.u32()?, muc: {
+                let m = self.u8()?;
+                if self.1 == 1 { crate::xoa_ghim::vung::muc_tu_nguong(m) } else { m }
+            } };
             hop_le(&v).then_some(())?;
             ds.push(v);
         }
@@ -298,7 +305,7 @@ impl VungFile {
         g.0
     }
     pub fn giai_ma(b: &[u8]) -> Option<Self> {
-        let mut d = Doc(b);
+        let mut d = Doc(b, 0);
         let luc = d.dau()?;
         let vung = d.vung()?;
         d.het()?;
@@ -323,7 +330,7 @@ impl ThuMuc {
     }
     /// Ngược `ma_hoa`; `ghi` = mặc định.
     pub fn giai_ma(b: &[u8]) -> Option<Self> {
-        let mut d = Doc(b);
+        let mut d = Doc(b, 0);
         let luc = d.dau()?;
         let vung = d.vung()?;
         let co = d.u8()?;
@@ -358,7 +365,7 @@ impl NhatKy {
         g.0
     }
     pub fn giai_ma(b: &[u8]) -> Option<Self> {
-        let mut d = Doc(b);
+        let mut d = Doc(b, 0);
         let luc = d.dau()?;
         let ket_qua = (d.u64()?, d.u64()?);
         let (ma_cau_hinh, so_trang, dpi, ai) = (d.u64()?, d.u32()?, d.u16()?, d.u8()? != 0);
@@ -378,7 +385,7 @@ impl NhatKy {
 
 /// Mốc sửa của 1 nội dung bản ghi Xóa ghim bất kỳ (gộp giữa máy, dọn dữ liệu cũ).
 pub fn luc_cua(nd: &[u8]) -> Option<u64> {
-    Doc(nd).dau()
+    Doc(nd, 0).dau()
 }
 
 /// Mã cấu hình: băm vùng áp dụng cho file + tuỳ chọn xử lý + cách ghi trang (không gồm nơi ghi).
@@ -466,9 +473,9 @@ mod tests {
 
     fn vung_mau() -> Vec<Vung> {
         vec![
-            Vung { vi_tri: ViTri::GocTrenTrai, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.0, y: 0.0, rong: 0.12, cao: 0.12, rong_px: 130, cao_px: 130, nguong: 3 },
-            Vung { vi_tri: ViTri::Tay, loai: LoaiVung::VoDoi, ap_trang: ApTrang::MotTrang(4), x: 0.1, y: 0.2, rong: 0.3, cao: 0.4, rong_px: 0, cao_px: 0, nguong: 7 },
-            Vung { vi_tri: ViTri::Tay, loai: LoaiVung::BaoVe, ap_trang: ApTrang::Chan, x: 0.5, y: 0.5, rong: 0.5, cao: 0.5, rong_px: 0, cao_px: 0, nguong: 5 },
+            Vung { vi_tri: ViTri::GocTrenTrai, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.0, y: 0.0, rong: 0.12, cao: 0.12, rong_px: 130, cao_px: 130, muc: 56 },
+            Vung { vi_tri: ViTri::Tay, loai: LoaiVung::VoDoi, ap_trang: ApTrang::MotTrang(4), x: 0.1, y: 0.2, rong: 0.3, cao: 0.4, rong_px: 0, cao_px: 0, muc: 48 },
+            Vung { vi_tri: ViTri::Tay, loai: LoaiVung::BaoVe, ap_trang: ApTrang::Chan, x: 0.5, y: 0.5, rong: 0.5, cao: 0.5, rong_px: 0, cao_px: 0, muc: 52 },
         ]
     }
 
@@ -550,7 +557,7 @@ mod tests {
 
         /// (luc, vùng, (nét đen, đỏ/xanh, nền trắng), cách ghi trang)
         pub fn giai_ma(b: &[u8]) -> Option<(u64, Vec<Vung>, (bool, bool, bool), CauHinhXuat)> {
-            let mut d = Doc(b);
+            let mut d = Doc(b, 0);
             let luc = d.dau()?;
             let vung = d.vung()?;
             let co = d.u8()?;

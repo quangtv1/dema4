@@ -1,6 +1,6 @@
 //! Thanh công cụ màn Xóa ghim (như prototype), chia 2 nửa bằng ranh giới 4 px **thẳng** ranh giới Gốc | Đích bên dưới:
 //! - nửa trái: biểu tượng Góc / Cạnh (bấm từng góc / cạnh) / Tùy biến (− vẽ vùng xoá, + vẽ vùng bảo vệ) · cột lọc trang
-//!   (theo vùng đang chọn hoặc phạm vi vùng sắp vẽ) · khối Vùng / Rộng / Cao / Ngưỡng;
+//!   (theo vùng đang chọn hoặc phạm vi vùng sắp vẽ) · khối Vùng / Rộng / Cao / Mức xoá;
 //! - nửa phải: Đầu vào (⊗ · File · Thư mục), File đích (kiểu ghi · đường dẫn mẫu · Thư mục), Nhận diện layout,
 //!   Tô nền trắng, Xóa vùng vẽ, Hoàn tác.
 
@@ -228,7 +228,7 @@ impl ManXoaGhim {
         self.bo.doi_ap_trang(c, ap, l == LocTrang::VoDoi);
     }
 
-    /// Combo Vùng + Rộng / Cao / Ngưỡng (thanh trượt + ô số) trong phần còn lại tới `x_phai` (mép phải nửa trái).
+    /// Combo Vùng + Rộng / Cao / Mức xoá (thanh trượt + ô số) trong phần còn lại tới `x_phai` (mép phải nửa trái).
     /// Hẹp hơn `RONG_CO_THANH`: ẩn thanh trượt, chỉ còn ô số.
     fn khoi_vung(&mut self, ui: &mut egui::Ui, x_phai: f32) {
         const RONG_CO_THANH: f32 = 250.0;
@@ -268,13 +268,13 @@ impl ManXoaGhim {
             // Giá trị % trang + khoá theo loại vùng (cạnh ngang khoá Rộng, cạnh dọc khoá Cao)
             let (mut rong_pt, mut cao_pt, mut nguong, khoa_rong, khoa_cao) = match &z {
                 None => (1.0, 1.0, 1.0, true, true),
-                Some(v) if v.vi_tri == ViTri::Tay => ((v.rong as f32 * 100.0).round(), (v.cao as f32 * 100.0).round(), v.nguong as f32, false, false),
+                Some(v) if v.vi_tri == ViTri::Tay => ((v.rong as f32 * 100.0).round(), (v.cao as f32 * 100.0).round(), v.muc as f32, false, false),
                 Some(v) => {
                     let ngang = matches!(v.vi_tri, ViTri::CanhTren | ViTri::CanhDuoi);
                     let doc = matches!(v.vi_tri, ViTri::CanhTrai | ViTri::CanhPhai);
                     let r = if ngang { 100.0 } else { v.rong_px as f32 / (w_pt * px_pt) * 100.0 };
                     let c = if doc { 100.0 } else { v.cao_px as f32 / (h_pt * px_pt) * 100.0 };
-                    (r.round(), c.round(), v.nguong as f32, ngang, doc)
+                    (r.round(), c.round(), v.muc as f32, ngang, doc)
                 }
             };
             let co_nguong = z.as_ref().is_some_and(|v| v.loai != LoaiVung::BaoVe);
@@ -296,7 +296,8 @@ impl ManXoaGhim {
             };
             let doi_rong = hang(ui, "Rộng:", &mut rong_pt, 60.0, co && !khoa_rong, " %");
             let doi_cao = hang(ui, "Cao:", &mut cao_pt, 60.0, co && !khoa_cao, " %");
-            let doi_nguong = hang(ui, "Ngưỡng:", &mut nguong, 30.0, co_nguong, "");
+            // Mức xoá: cao = mạnh — tới 60 nhận vết nhạy dần, trên 60 phủ dần giấy trong vùng về màu giấy, 100 = đặc
+            let doi_nguong = hang(ui, "Mức xoá:", &mut nguong, 100.0, co_nguong, "");
             if (doi_rong || doi_cao || doi_nguong) && co {
                 self.bo.ghi_buoc();
                 if let Some(v) = self.bo.vung_chon_mut() {
@@ -320,7 +321,7 @@ impl ManXoaGhim {
                         }
                     }
                     if doi_nguong {
-                        v.nguong = nguong.round().clamp(1.0, 30.0) as u8;
+                        v.muc = nguong.round().clamp(1.0, 100.0) as u8;
                     }
                 }
                 self.bo.sua_chon();

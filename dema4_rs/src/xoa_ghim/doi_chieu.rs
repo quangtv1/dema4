@@ -59,7 +59,7 @@ fn vung_tu_json(z: &serde_json::Value) -> Vung {
         cao: f("height"),
         rong_px: z["width_px"].as_u64().unwrap() as u32,
         cao_px: z["height_px"].as_u64().unwrap() as u32,
-        nguong: z["threshold"].as_u64().unwrap() as u8,
+        muc: crate::xoa_ghim::vung::muc_tu_nguong(z["threshold"].as_u64().unwrap() as u8),
     }
 }
 

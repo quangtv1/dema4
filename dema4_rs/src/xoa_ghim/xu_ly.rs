@@ -129,33 +129,104 @@ fn xoa_trong_khung(anh: &mut Anh, v: &Vung, k: Hcn, dpi: f64, tc: &TuyChon, duoc
     let nen_xam = (0.114 * nen[2] as f64 + 0.587 * nen[1] as f64 + 0.299 * nen[0] as f64) as i32;
     let nguong_den = if v.vi_tri.la_goc_canh() { 50 } else { 80 };
     let (w, h) = (k.rong() as usize, k.cao() as usize);
+    let nguong = v.nguong_vet();
     let mut vet = vec![0u8; w * h];
+    let mut giu_lai = vec![0u8; w * h];
     for y in 0..h {
         let dau = ((k.y1 as usize + y) * anh.rong + k.x1 as usize) * 3;
         for (x, p) in anh.du_lieu[dau..dau + w * 3].chunks_exact(3).enumerate() {
             let gx = xam(p[0], p[1], p[2]);
             let i = y * w + x;
             let bao_ve = (tc.bao_ve_net_den && gx < nguong_den) || (tc.bao_ve_do_xanh && la_do_xanh(p[0], p[1], p[2]));
-            let la_vet = tc.nen_trang || nen_xam - gx > v.nguong as i32;
-            vet[i] = (la_vet && !bao_ve && duoc_xoa.is_none_or(|m| m[i] != 0)) as u8;
+            let giu = bao_ve || duoc_xoa.is_some_and(|m| m[i] == 0);
+            let la_vet = tc.nen_trang || nen_xam - gx > nguong;
+            vet[i] = (la_vet && !giu) as u8;
+            giu_lai[i] = giu as u8;
         }
     }
-    if vet.iter().all(|&x| x == 0) {
+    let phu = if tc.nen_trang { 0.0 } else { v.phu_nen() };
+    if vet.iter().all(|&x| x == 0) && phu <= 0.0 {
         return false;
     }
-    let vet = if tc.nen_trang { vet } else { dong_roi_gian(vet, w, h, &nhan_elip(co_nhan(dpi)), 2, 3) };
+    if tc.nen_trang {
+        return to_mat_na(anh, k, &vet, None, 0.0, mau_to);
+    }
+    let vet = dong_roi_gian(vet, w, h, &nhan_elip(co_nhan(dpi)), 2, 3);
+    // Mép chỗ xoá chuyển dần sang màu giấy (bán kính theo dpi) — không gợn khựng
+    let mem = lam_mem(&vet, w, h, ((dpi / 100.0).round() as usize).max(1));
+    let mem: Vec<f32> = mem.iter().zip(&giu_lai).map(|(&a, &g)| if g != 0 { 0.0 } else { a }).collect();
+    let vet: Vec<u8> = vet.iter().zip(duoc_xoa.map_or(&vec![1u8; w * h][..], |m| m)).map(|(&a, &b)| a & (b != 0) as u8).collect();
+    let phu_mat: Vec<u8> = giu_lai.iter().map(|&g| (g == 0) as u8).collect();
+    to_mat_na(anh, k, &vet, Some((&mem, &phu_mat)), phu, mau_to)
+}
+
+/// Tô trong khung `k`: điểm `vet` = màu tô đặc; còn lại (khi có `mem`) trộn về màu tô theo max(độ mềm mép, `phu`)
+/// — chỉ ở điểm `phu_mat` (không bảo vệ). Trả `true` khi có điểm đổi.
+fn to_mat_na(anh: &mut Anh, k: Hcn, vet: &[u8], mem: Option<(&[f32], &[u8])>, phu: f32, mau_to: [u8; 3]) -> bool {
+    let (w, h) = (k.rong() as usize, k.cao() as usize);
     let mut doi = false;
     for y in 0..h {
         let dau = ((k.y1 as usize + y) * anh.rong + k.x1 as usize) * 3;
         for (x, p) in anh.du_lieu[dau..dau + w * 3].chunks_exact_mut(3).enumerate() {
             let i = y * w + x;
-            if vet[i] != 0 && duoc_xoa.is_none_or(|m| m[i] != 0) {
-                p.copy_from_slice(&mau_to);
+            let a = if vet[i] != 0 {
+                1.0
+            } else if let Some((m, duoc)) = mem {
+                if duoc[i] != 0 { m[i].max(phu) } else { 0.0 }
+            } else {
+                0.0
+            };
+            if a <= 0.0 {
+                continue;
+            }
+            let moi = if a >= 0.999 { mau_to } else { std::array::from_fn(|c| (p[c] as f32 + (mau_to[c] as f32 - p[c] as f32) * a).round() as u8) };
+            if moi != [p[0], p[1], p[2]] {
+                p.copy_from_slice(&moi);
                 doi = true;
             }
         }
     }
     doi
+}
+
+/// Mặt nạ mềm 0..1 quanh `vet` (ngoài vết): trung bình hộp bán kính `r`, giảm dần ra xa mép.
+fn lam_mem(vet: &[u8], w: usize, h: usize, r: usize) -> Vec<f32> {
+    // Cộng dồn theo hàng rồi theo cột (hộp (2r+1)²)
+    let mut hang = vec![0u32; w * h];
+    for y in 0..h {
+        let mut tong = 0u32;
+        let dong = &vet[y * w..(y + 1) * w];
+        for x in 0..(r + 1).min(w) {
+            tong += dong[x] as u32;
+        }
+        for x in 0..w {
+            hang[y * w + x] = tong;
+            if x + r + 1 < w {
+                tong += dong[x + r + 1] as u32;
+            }
+            if x >= r {
+                tong -= dong[x - r] as u32;
+            }
+        }
+    }
+    let mut ra = vec![0f32; w * h];
+    let dt = ((2 * r + 1) * (2 * r + 1)) as f32;
+    for x in 0..w {
+        let mut tong = 0u32;
+        for y in 0..(r + 1).min(h) {
+            tong += hang[y * w + x];
+        }
+        for y in 0..h {
+            ra[y * w + x] = (tong as f32 / dt * 2.0).min(1.0);
+            if y + r + 1 < h {
+                tong += hang[(y + r + 1) * w + x];
+            }
+            if y >= r {
+                tong -= hang[(y - r) * w + x];
+            }
+        }
+    }
+    ra
 }
 
 /// Xoá ghim trên ảnh trang RGB (`trang` đếm từ 0, ảnh vẽ ở `dpi`) theo các vùng áp dụng cho trang đó.
@@ -226,7 +297,7 @@ mod tests {
     }
 
     fn tay(x: f64, y: f64, rong: f64, cao: f64, loai: LoaiVung) -> Vung {
-        Vung { vi_tri: ViTri::Tay, loai, ap_trang: ApTrang::TatCa, x, y, rong, cao, rong_px: 0, cao_px: 0, nguong: 5 }
+        Vung { vi_tri: ViTri::Tay, loai, ap_trang: ApTrang::TatCa, x, y, rong, cao, rong_px: 0, cao_px: 0, muc: 52 }
     }
 
     #[test]
@@ -339,5 +410,88 @@ mod tests {
         let v = Vung { ap_trang: ApTrang::Chan, ..tay(0.0, 0.0, 0.3, 0.3, LoaiVung::Xoa) };
         assert!(!xoa_ghim_trang(&mut a, std::slice::from_ref(&v), 0, 120.0, &TuyChon::default(), &[]));
         assert!(xoa_ghim_trang(&mut a, &[v], 1, 120.0, &TuyChon::default(), &[]));
+    }
+}
+
+#[cfg(test)]
+mod tests_muc_xoa {
+    use super::*;
+    use crate::xoa_ghim::vung::{muc_tu_nguong, ApTrang, LoaiVung, ViTri};
+
+    const GIAY: [u8; 3] = [236, 230, 214];
+
+    fn giay(w: usize, h: usize) -> Anh {
+        Anh { rong: w, cao: h, kenh: 3, du_lieu: GIAY.repeat(w * h) }
+    }
+
+    fn vung(muc: u8) -> Vung {
+        Vung { vi_tri: ViTri::Tay, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.0, y: 0.0, rong: 0.5, cao: 0.5, rong_px: 0, cao_px: 0, muc }
+    }
+
+    fn diem(a: &Anh, x: usize, y: usize) -> [u8; 3] {
+        let i = (y * a.rong + x) * 3;
+        [a.du_lieu[i], a.du_lieu[i + 1], a.du_lieu[i + 2]]
+    }
+
+    /// Ngưỡng cũ 1–30 đổi sang mức xoá rồi đổi lại đúng ngưỡng đó.
+    #[test]
+    fn muc_xoa_doi_qua_lai_dung_nguong_cu() {
+        for n in 1..=30u8 {
+            let v = Vung { muc: muc_tu_nguong(n), ..vung(0) };
+            assert_eq!(v.nguong_vet(), n as i32, "ngưỡng {n} → mức {}", v.muc);
+            assert_eq!(v.phu_nen(), 0.0);
+        }
+    }
+
+    /// Mức 100: cả vùng một màu giấy đặc (giấy lốm đốm cũng phẳng); ngoài vùng giữ nguyên.
+    #[test]
+    fn muc_100_phu_dac_mau_giay() {
+        let mut a = giay(200, 200);
+        // Đốm giấy hơi sáng (không phải vết) trong vùng
+        for x in 30..60 {
+            let i = (40 * 200 + x) * 3;
+            a.du_lieu[i..i + 3].copy_from_slice(&[250, 248, 240]);
+        }
+        let mut b = a.clone();
+        assert!(xoa_ghim_trang(&mut a, &[vung(100)], 0, 120.0, &TuyChon::default(), &[]));
+        assert_eq!(diem(&a, 45, 40), GIAY, "mức 100: đốm sáng thành màu giấy");
+        assert_eq!(diem(&a, 150, 150), GIAY, "ngoài vùng giữ nguyên");
+        // Mức 52 (ngưỡng 5 cũ): đốm sáng không phải vết → giữ nguyên
+        xoa_ghim_trang(&mut b, &[vung(52)], 0, 120.0, &TuyChon::default(), &[]);
+        assert_eq!(diem(&b, 45, 40), [250, 248, 240]);
+    }
+
+    /// Mép chỗ xoá chuyển dần: điểm ngay ngoài vết đã giãn được trộn một phần về màu giấy, không đổi đột ngột.
+    #[test]
+    fn mep_cho_xoa_chuyen_dan() {
+        let mut a = giay(200, 200);
+        let toi = [150, 150, 150];
+        let nhat = [228, 222, 206]; // tối hơn giấy ~8: không phải vết ở mức 20 (≈ ngưỡng 20)
+        for y in 40..60 {
+            for x in 40..60 {
+                let i = (y * 200 + x) * 3;
+                a.du_lieu[i..i + 3].copy_from_slice(&toi);
+            }
+        }
+        // Dải nền hơi tối quanh vết (không đủ là vết ở mức 20 ≈ ngưỡng 20)
+        for y in 20..80 {
+            for x in 20..80 {
+                let i = (y * 200 + x) * 3;
+                if a.du_lieu[i] != 150 {
+                    a.du_lieu[i..i + 3].copy_from_slice(&nhat);
+                }
+            }
+        }
+        assert!(xoa_ghim_trang(&mut a, &[vung(20)], 0, 120.0, &TuyChon::default(), &[]));
+        assert_eq!(diem(&a, 50, 50), GIAY, "lõi vết thành màu giấy");
+        // Từ trong ra ngoài: màu tiến dần từ màu giấy về màu nền tối hơn, không nhảy một bước
+        let mut truoc = diem(&a, 50, 50)[0] as i32;
+        let mut buoc_lon = 0;
+        for x in 51..80 {
+            let c = diem(&a, x, 50)[0] as i32;
+            buoc_lon = buoc_lon.max((c - truoc).abs());
+            truoc = c;
+        }
+        assert!(buoc_lon < (GIAY[0] as i32 - nhat[0] as i32), "có chuyển dần ở mép (bước lớn nhất {buoc_lon})");
     }
 }

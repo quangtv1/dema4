@@ -9,8 +9,8 @@ use crate::xoa_ghim::vung::{co_san, ApTrang, Hcn, LoaiVung, ViTri, Vung};
 const BUOC_HOAN_TAC: usize = 100;
 /// Vùng vẽ nhỏ hơn tỉ lệ này (mỗi chiều) coi như bấm nhầm.
 const VE_TOI_THIEU: f64 = 0.005;
-/// Ngưỡng mặc định của vùng vẽ tay.
-pub const NGUONG_VE: u8 = 5;
+/// Mức xoá mặc định của vùng vẽ (= ngưỡng 5 cũ).
+pub const MUC_VE: u8 = 52;
 
 /// Vùng vẽ mới thuộc về đâu.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -141,7 +141,7 @@ impl BoVung {
             return false;
         }
         let ap_trang = if pham_vi == PhamVi::Trang { ApTrang::MotTrang(trang) } else { ap };
-        let v = Vung { vi_tri: ViTri::Tay, loai, ap_trang, x, y, rong, cao, rong_px: 0, cao_px: 0, nguong: NGUONG_VE };
+        let v = Vung { vi_tri: ViTri::Tay, loai, ap_trang, x, y, rong, cao, rong_px: 0, cao_px: 0, muc: MUC_VE };
         self.ghi_buoc();
         let rieng = pham_vi != PhamVi::ThuMuc;
         let ds = if rieng { &mut self.vf.vung } else { &mut self.tm.vung };
@@ -515,7 +515,7 @@ mod tests {
 
     #[test]
     fn keo_than_canh_vung_ve_va_canh_trong_cua_vung_co_san() {
-        let tay = Vung { vi_tri: ViTri::Tay, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.1, y: 0.1, rong: 0.2, cao: 0.2, rong_px: 0, cao_px: 0, nguong: 5 };
+        let tay = Vung { vi_tri: ViTri::Tay, loai: LoaiVung::Xoa, ap_trang: ApTrang::TatCa, x: 0.1, y: 0.1, rong: 0.2, cao: 0.2, rong_px: 0, cao_px: 0, muc: 52 };
         let co = (1000.0, 2000.0);
         let than = keo_vung(&tay, Canh::default(), (100.0, 200.0), co, 300.0);
         assert!((than.x - 0.2).abs() < 1e-9 && (than.y - 0.2).abs() < 1e-9 && than.rong == tay.rong);
