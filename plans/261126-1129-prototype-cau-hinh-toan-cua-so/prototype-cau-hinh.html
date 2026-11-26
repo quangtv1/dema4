@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cấu hình toàn cửa sổ — prototype</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#fff}
+body{font-family:'Segoe UI',Inter,system-ui,-apple-system,sans-serif;font-size:12.5px;color:#1f2328}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select{font:inherit;color:inherit}
+input[type=checkbox],input[type=radio]{accent-color:#2563eb;margin:0;width:14px;height:14px}
+.win{width:100vw;height:100vh;min-width:1280px;min-height:720px;display:flex;flex-direction:column;overflow:hidden}
+.titlebar{height:30px;flex-shrink:0;display:flex;align-items:center;padding:0 10px;gap:8px;border-bottom:1px solid #e5e7ea;font-size:12px}
+.row{display:flex;align-items:center;gap:8px}.col{display:flex;flex-direction:column}.grow{flex-grow:1;min-width:0}
+.muted{color:#6b7280}
+.btn{height:26px;padding:0 12px;border:1px solid #c9ccd1;border-radius:3px;background:#f6f7f8;white-space:nowrap}
+.btn:hover{background:#eceef1}.btn:disabled{opacity:.45;cursor:default}
+.btn.xanh{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}.btn.xanh:hover{background:#1f5fbf}
+.btn.link{background:#fff;border-color:#b6cce9;color:#1f5fbf}
+.btn.do{background:#dc2626;border-color:#dc2626;color:#fff;font-weight:600}
+.fld{height:26px;border:1px solid #c9ccd1;border-radius:3px;background:#fff;padding:0 8px;min-width:0}
+.fld:focus{outline:2px solid #bfdbfe;border-color:#2563eb}
+.fld.num{text-align:right}
+select.fld{padding:0 4px}
+/* Thanh menu chung */
+.menubar{height:30px;flex-shrink:0;display:flex;align-items:stretch;padding:0 6px 0 8px;background:#f7f7f7;border-bottom:1px solid #dcdfe3;font-size:13px;position:relative;z-index:20}
+.mi{position:relative;display:flex}
+.mbtn{border:0;background:transparent;padding:0 12px;display:flex;align-items:center;gap:6px}
+.mbtn:hover,.mbtn.open{background:#e8eaed}.mbtn.on{background:#dcebfa;color:#1f5fbf}
+.drop{position:absolute;top:100%;left:0;min-width:230px;background:#fff;border:1px solid #d6d9de;border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,.14);padding:4px 0;z-index:30}
+.dit{display:flex;width:100%;border:0;background:transparent;padding:6px 14px;text-align:left;gap:10px;font-size:12.5px}
+.dit:hover{background:#eef2f7}.dit .k{margin-left:auto;color:#9aa0a6}.dit.cur{color:#1f5fbf;font-weight:600}
+.dsep{height:1px;background:#eceef1;margin:4px 0}
+/* Khung Cấu hình */
+.cfg{flex:1;display:flex;min-height:0}
+.side{width:240px;flex-shrink:0;background:#f7f8fa;border-right:1px solid #dcdfe3;display:flex;flex-direction:column}
+.back{height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;border:0;border-bottom:1px solid #e3e5e8;background:transparent;text-align:left;color:#1f5fbf}
+.back:hover{background:#eef2f7}
+.side h3{margin:0;padding:16px 16px 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;font-weight:600}
+.nav{position:relative;display:flex;align-items:center;gap:10px;height:40px;margin:1px 8px;padding:0 10px;border:0;border-radius:5px;background:transparent;text-align:left;font-size:13px}
+.nav:hover{background:#eceef1}
+.nav.on{background:#dcebfa;color:#1f5fbf;font-weight:600}
+.nav.on::before{content:'';position:absolute;left:-8px;top:8px;bottom:8px;width:3px;border-radius:2px;background:#2563eb}
+.nav .cham{width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:auto}
+.side .foot{margin-top:auto;padding:12px 16px;font-size:11.5px;color:#6b7280;border-top:1px solid #e3e5e8;line-height:1.5}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:#f3f4f6}
+.wrap{width:880px;margin:0 auto;display:flex;flex-direction:column;min-height:0;flex:1}
+.head{flex-shrink:0;padding:18px 4px 14px;display:flex;align-items:flex-end;gap:12px;border-bottom:1px solid #e3e5e8}
+.head h1{margin:0;font-size:18px;font-weight:600;display:flex;align-items:center;gap:10px}
+.head .mo{font-size:12px;color:#6b7280;margin-top:3px}
+.body{flex:1;overflow-y:auto;padding:16px 4px 24px;display:flex;flex-direction:column;gap:14px}
+.footer{flex-shrink:0;height:56px;display:flex;align-items:center;gap:10px;padding:0 4px;border-top:1px solid #dcdfe3}
+.footbar{background:#fff;border-top:1px solid #dcdfe3}
+/* Thẻ, dòng */
+.the{background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:12px 16px 8px}
+.the .tt{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13.5px;font-weight:600}
+.tag{font-size:11px;font-weight:400;margin-left:auto;padding:1px 8px;border-radius:9px}
+.tag.tm{background:#eff6ff;color:#1d4ed8}.tag.chung{background:#f1f5f9;color:#475569}
+.dong{display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:8px 0;border-top:1px solid #f0f1f3}
+.dong:first-of-type{border-top:0}
+.dong .nh{display:flex;align-items:center;gap:8px}
+.dong .phu{font-size:11.5px;color:#6b7280;grid-column:2}
+.dong2{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid #f0f1f3}
+.dong2 .ic{margin-top:1px}
+.dong2 .ten{display:flex;flex-direction:column;gap:1px}
+.dong2 .ten small{font-size:11.5px;color:#6b7280}
+.dong2 .dk{margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0}
+.i{display:inline-flex;width:14px;height:14px;border:1px solid #9aa0a6;border-radius:50%;font-size:9.5px;align-items:center;justify-content:center;color:#6b7280;cursor:help;font-style:normal}
+.luoi4{display:grid;grid-template-columns:repeat(4, 34px 1fr);gap:8px 10px;align-items:center}
+.hai-cot{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.buoc{display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr;align-items:center}
+.buoc button{display:flex;gap:10px;align-items:center;padding:9px 12px;border:1px solid #dcdfe3;border-radius:6px;background:#fff;text-align:left}
+.buoc button.on{border-color:#2563eb;background:#eff6ff}
+.buoc b{display:block;font-size:13px}.buoc small{color:#6b7280}
+.ncc{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.ncc button,.nguon button{display:flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid #dcdfe3;border-radius:5px;background:#fff;text-align:left;min-width:0}
+.ncc button.on,.nguon button.on{border-color:#2563eb;background:#eff6ff}
+.ncc b,.nguon b{display:block}.ncc small,.nguon small{color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.ncc small.chua,.nguon small.chua{font-style:italic;color:#9aa0a6}
+.nguon{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.so{display:inline-flex;width:20px;height:20px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:600;align-items:center;justify-content:center}
+.canhbao{font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:3px;padding:2px 6px}
+.toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:#1f2937;color:#fff;padding:7px 14px;border-radius:6px;font-size:12.5px;z-index:60}
+.modal{position:fixed;inset:0;background:rgba(17,24,39,.32);display:flex;align-items:center;justify-content:center;z-index:50}
+.dlg{background:#fff;border-radius:6px;box-shadow:0 12px 40px rgba(0,0,0,.25);width:440px}
+.thanh{height:6px;border-radius:3px;background:#e5e7eb;overflow:hidden;flex:1}.thanh span{display:block;height:100%;background:#2563eb}
+svg text{font-family:inherit}
+/* Sidebar thu nhỏ: dải biểu tượng 56 px */
+.side{transition:width .15s}
+.side.thu{width:56px}
+.side .dau{display:flex;align-items:stretch;border-bottom:1px solid #e3e5e8}
+.side .dau .back{flex:1;border-bottom:0;min-width:0}
+.thuBtn{width:40px;flex-shrink:0;border:0;background:transparent;display:flex;align-items:center;justify-content:center;color:#6b7280}
+.thuBtn:hover{background:#eef2f7}
+.side.thu .dau{flex-direction:column}
+.side.thu .back{flex:none;justify-content:center;padding:0;height:40px}
+.side.thu .thuBtn{width:100%;height:36px;border-top:1px solid #e3e5e8}
+.side.thu .nav{justify-content:center;padding:0;margin:2px 8px}
+.side.thu .nav .cham{position:absolute;top:7px;right:7px;margin:0}
+.side.thu h3{height:1px;padding:0;margin:10px 12px;background:#e3e5e8;font-size:0}
+/* Chế độ cửa sổ thu nhỏ: khung 1120 × 720 nổi trên màn chức năng */
+.nen-mo{position:absolute;inset:0;background:rgba(17,24,39,.32);z-index:15}
+.cuaso{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:1120px;height:720px;max-width:calc(100% - 40px);max-height:calc(100% - 40px);background:#fff;border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.3);display:flex;flex-direction:column;overflow:hidden;z-index:16}
+.cuaso .tdcs{height:36px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px 0 14px;border-bottom:1px solid #dcdfe3;background:#f7f8fa;font-weight:600}
+.cuaso .wrap{width:auto;margin:0 20px}
+.icn{width:28px;height:26px;border:1px solid #c9ccd1;border-radius:3px;background:#fff;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.icn:hover{background:#eceef1}
+.icn.tron{border-color:transparent;background:transparent;border-radius:5px}.icn.tron:hover{background:#e8eaed}
+/* Kiểu lưu: nút trên tiêu đề */
+.hdact{display:flex;align-items:center;gap:8px;margin-left:auto;padding-bottom:2px}
+.chip{font-size:11.5px;padding:2px 9px;border-radius:10px;background:#fff7ed;color:#b45309;border:1px solid #fed7aa;white-space:nowrap}
+.chip.ok{background:#f0fdf4;color:#15803d;border-color:#bbf7d0}
+.lnk{border:0;background:transparent;color:#1f5fbf;padding:0 4px;font-size:12px}.lnk:hover{text-decoration:underline}
+/* Kiểu lưu: thanh nổi */
+.noi{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:760px;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 18px;background:#1f2937;color:#fff;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.28);animation:len .18s ease-out;z-index:10}
+.noi .btn{border-color:#4b5563;background:#374151;color:#fff}.noi .btn:hover{background:#4b5563}
+.noi .btn.xanh{background:#16a34a;border-color:#16a34a}.noi .btn.xanh:hover{background:#15803d}
+.noi.rung{animation:rung .45s;background:#991b1b}
+@keyframes len{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+@keyframes rung{0%,100%{transform:translateX(-50%)}20%,60%{transform:translateX(calc(-50% - 8px))}40%,80%{transform:translateX(calc(-50% + 8px))}}
+/* Kiểu lưu: tự lưu */
+.daluu{font-size:12px;color:#15803d;display:inline-flex;align-items:center;gap:4px;animation:mo 2.4s forwards}
+@keyframes mo{0%,70%{opacity:1}100%{opacity:0}}
+.toast .hoan{margin-left:12px;color:#93c5fd;border:0;background:transparent;padding:0;font-weight:600}
+/* Bộ chuyển kiểu (chỉ có trong prototype) */
+.chuyen{position:fixed;right:14px;top:36px;z-index:40;display:flex;align-items:center;gap:2px;padding:3px;background:#fff;border:1px dashed #a78bfa;border-radius:6px;font-size:11.5px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.chuyen span{color:#7c3aed;padding:0 6px}
+.chuyen button{border:0;background:transparent;padding:4px 9px;border-radius:4px}
+.chuyen button.on{background:#ede9fe;color:#5b21b6;font-weight:600}
+.keo{cursor:ew-resize}
+</style>
+</head>
+<body>
+<div class="win" id="app"></div>
+<script>
+// ---------- Biểu tượng ----------
+const CI = (d, c='#4b5563', s=16) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="${c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC = {
+  tep: CI('<path d="M1.5 4h4.5l1.2 1.4h7.3v7.6h-13z"/>','#555',14),
+  cn: CI('<path d="M2 2h4.5v4.5H2zM9.5 2H14v4.5H9.5zM2 9.5h4.5V14H2zM9.5 9.5H14V14H9.5z"/>','#555',14),
+  ch: CI('<circle cx="8" cy="8" r="2.4"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>','#555',14),
+  tg: CI('<circle cx="8" cy="8" r="6.3"/><path d="M6.1 6.1a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.7.6-.7 1.1v.6"/><circle cx="8" cy="11.6" r=".5" fill="#555"/>','#555',14),
+  caret:'<svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 2.5l3 3 3-3" fill="none" stroke="#444" stroke-width="1.3"/></svg>',
+  trai: CI('<path d="M10 3L5 8l5 5"/>','#1f5fbf'),
+};
+const ICM = { // biểu tượng module (sidebar, tiêu đề)
+  dem: c=>CI('<path d="M4 1.8h5.5L13 5.3v8.9H4z"/><path d="M9.5 1.8v3.5H13"/><path d="M6.3 8.5h4.4M6.3 11h4.4"/>',c),
+  tach: c=>CI('<circle cx="4.5" cy="4.5" r="2"/><circle cx="4.5" cy="11.5" r="2"/><path d="M6.1 5.8l7.9 6.4M6.1 10.2l7.9-6.4"/>',c),
+  ml: c=>CI('<path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.8" cy="4" r=".6" fill="'+c+'"/><circle cx="2.8" cy="8" r=".6" fill="'+c+'"/><circle cx="2.8" cy="12" r=".6" fill="'+c+'"/>',c),
+  bt: c=>CI('<rect x="2" y="2" width="12" height="12" rx="1.2"/><path d="M5 5.5h6M5 8h6M5 10.5h3.5"/>',c),
+  xg: c=>CI('<path d="M3.5 12.5l3-3"/><path d="M6 2.5l7.5 7.5M9.5 2l4.5 4.5-2.5 2.5L7 4.5z"/>',c),
+  dl: c=>CI('<ellipse cx="8" cy="3.8" rx="5.5" ry="2"/><path d="M2.5 3.8v8.4c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V3.8M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/>',c),
+};
+const ICF = {
+  khien: CI('<path d="M8 1.5l5.5 2v4c0 3.4-2.4 5.8-5.5 7-3.1-1.2-5.5-3.6-5.5-7v-4z"/><path d="M5.6 8l1.7 1.7L10.6 6.4"/>','#2563eb'),
+  layout: CI('<rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M4.5 5h7M4.5 8h7M4.5 11h4"/>','#dc2626'),
+  netDen: CI('<path d="M3 13l2.2-.6L13 4.6 11.4 3 3.6 10.8z"/><path d="M3 13h10"/>','#111827'),
+  dau: CI('<circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2.6"/>','#dc2626'),
+  xuat: CI('<path d="M9 1.8H4a1 1 0 0 0-1 1v10.4a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.8z"/><path d="M9 1.8v4h4"/><path d="M8 8v4M6.2 10.2L8 12l1.8-1.8"/>','#2563eb'),
+  dpi: CI('<rect x="2" y="2" width="12" height="12" rx="1"/><path d="M6 2v12M10 2v12M2 6h12M2 10h12"/>'),
+  nen: CI('<path d="M2.5 5.5h4v-4M13.5 10.5h-4v4M6.5 5.5L2 1M9.5 10.5L14 15"/>'),
+  denTrang: CI('<circle cx="8" cy="8" r="5.8"/><path d="M8 2.2v11.6a5.8 5.8 0 0 0 0-11.6z" fill="#4b5563"/>'),
+  nenTrang: CI('<path d="M3 9.5L8 4.5l4.5 4.5-5 5z"/><path d="M12.5 9.5c.8 1 1.5 1.9 1.5 2.6a1.3 1.3 0 0 1-2.6 0c0-.7.4-1.4 1.1-2.6z"/>'),
+  ghiDe: CI('<path d="M8 1.8L15 14H1z"/><path d="M8 6.2v3.6"/><circle cx="8" cy="11.8" r=".5" fill="#d97706"/>','#d97706'),
+  hieuNang: CI('<path d="M2.5 11.5a5.5 5.5 0 1 1 11 0"/><path d="M8 11.5l3-4"/><circle cx="8" cy="11.5" r=".8" fill="#2563eb"/>','#2563eb'),
+  lop: CI('<path d="M8 2l6 3-6 3-6-3z"/><path d="M2 8l6 3 6-3M2 11l6 3 6-3"/>'),
+  dongHo: CI('<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.4 1.6"/>'),
+  mat: CI('<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>','#2563eb'),
+  kieuXem: CI('<rect x="4" y="1.5" width="8" height="5.5" rx=".8"/><rect x="4" y="9" width="8" height="5.5" rx=".8"/>'),
+  luoi: CI('<rect x="2" y="2" width="5" height="5" rx=".8"/><rect x="9" y="2" width="5" height="5" rx=".8"/><rect x="2" y="9" width="5" height="5" rx=".8"/><rect x="9" y="9" width="5" height="5" rx=".8"/>'),
+  hai: CI('<rect x="1.5" y="2.5" width="13" height="11" rx="1"/><path d="M8 2.5v11"/>'),
+  noi: CI('<path d="M6.5 9.5l3-3"/><path d="M7.5 4.5l1-1a2.8 2.8 0 0 1 4 4l-1 1M8.5 11.5l-1 1a2.8 2.8 0 0 1-4-4l1-1"/>'),
+  folder: CI('<path d="M1.5 4h4.5l1.2 1.4h7.3v7.6h-13z"/>'),
+  robot: CI('<rect x="2.5" y="5" width="11" height="8" rx="1.5"/><path d="M8 2.5V5M5.5 8.5h.01M10.5 8.5h.01M6 11h4"/>'),
+  bang: CI('<rect x="2" y="2.5" width="12" height="11" rx="1"/><path d="M2 6h12M2 9.5h12M6 2.5v11"/>'),
+  server: CI('<rect x="2.5" y="2.5" width="11" height="4.5" rx="1"/><rect x="2.5" y="9" width="11" height="4.5" rx="1"/><path d="M5 4.8h.01M5 11.2h.01"/>'),
+  sao: CI('<path d="M8 1.5c.6 3.4 1.6 4.6 5 5-3.4.6-4.4 1.6-5 5-.6-3.4-1.6-4.4-5-5 3.4-.4 4.4-1.6 5-5z"/>'),
+  claude: CI('<path d="M8 2v12M2 8h12M3.8 3.8l8.4 8.4M12.2 3.8l-8.4 8.4"/>'),
+  gpt: CI('<circle cx="8" cy="8" r="5.8"/><path d="M5.5 7h5M5.5 9.5h5"/>'),
+  route: CI('<circle cx="3.5" cy="8" r="1.6"/><circle cx="12.5" cy="3.5" r="1.6"/><circle cx="12.5" cy="12.5" r="1.6"/><path d="M5 7.3l6-3M5 8.7l6 3"/>'),
+  drive: CI('<path d="M5.5 2.5h5l4 7-2.5 4h-8l-2.5-4z"/><path d="M5.5 2.5l4 7h5M1.5 9.5l4-7"/>'),
+  cloud: CI('<path d="M4.5 12.5a3 3 0 0 1-.3-6 4 4 0 0 1 7.6-.8 3.4 3.4 0 0 1 .2 6.8z"/>'),
+  s3: CI('<ellipse cx="8" cy="4" rx="5" ry="1.8"/><path d="M3 4v8c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V4"/>'),
+  cache: CI('<path d="M2.5 4.5h11M6 4.5V2.8h4v1.7M4 4.5l.7 9h6.6l.7-9"/>','#b91c1c'),
+  don: CI('<path d="M3 13.5h10M5 13.5l1.5-6h3l1.5 6M7 7.5V2"/>'),
+  moTm: CI('<path d="M1.5 4h4.5l1.2 1.4h7.3v7.6h-13z"/><path d="M8 7.5v4M6 9.5l2 2 2-2"/>'),
+};
+const tip = t => `<i class="i" title="${t}">i</i>`;
+
+// ---------- Dữ liệu ----------
+const MAC_DINH = {
+  dem: { heSo:['16','8','4','2','1','0,5','0,25','0,125'], a0:'dt', a0HeSo:'16', ranh:[126.5,179,253.5,358.5,507,717.5,1015,1399], thu:'' },
+  tach: { trang:true, tMin:'1,00', tMax:'3,20', ma:true, loaiMa:'Code 128', maTach:'NAMSAO-TACH', chieu:true, tinCay:'0,80', luuKQ:'', tenVB:'{hoso}.{n}', luuNhan:'auto' },
+  ml: { thuMuc:'', mauTen:'MLHS_{so_ho_so}', daCo:'ghide', pdf:false },
+  bt: { nguon:'may', ncc:'noibo', kieu:'vertex', diaChi:'', khoa:'', model:'5CD-AI/Vintern-1B-v3_5', excelDir:'', sheet:'', tab:'', cach:'sa', json:'' },
+  xg: { nhanDien:false, netDen:true, doXanh:false, dpi:'Gốc', nen:'90%', denTrang:false, nenTrang:false, ghiDe:false, lo10:true, tuLuu:'0', view:'Liên tiếp', thumbs:true, dich:true, cuon:true },
+};
+const MOD = [
+  { id:'dem', ten:'Đếm trang A4', mo:'Hệ số quy đổi khổ giấy ra A4 và ranh giới nhận khổ theo cạnh dài.' },
+  { id:'tach', ten:'Tách văn bản', mo:'Tự động nhận dạng khi Phân tích và cách ghi kết quả tách.' },
+  { id:'ml', ten:'Sinh mục lục', mo:'Nơi ghi và tên file mục lục.' },
+  { id:'bt', ten:'Bóc tách dữ liệu', mo:'Nguồn văn bản → mô hình đọc → nơi ghi kết quả.' },
+  { id:'xg', ten:'Xóa ghim', mo:'Nhận diện, bảo vệ, xuất file (theo thư mục đang mở) và hiệu năng, hiển thị (chung).' },
+];
+const clone = o => JSON.parse(JSON.stringify(o));
+const S = {
+  mod: 'xg', tu: 'Xóa ghim', menu: null, btBuoc: 'doc',
+  luu: clone(MAC_DINH), nhap: clone(MAC_DINH),
+  model: { st:'chua', p:0 }, toast: null, hoi: null, keo: null, mo: true, kieu: 'dau', thu: false, nho: false, rung: false, daLuu: 0, hoanTac: null,
+};
+S.luu.tach.luuKQ=''; S.nhap = clone(S.luu);
+const doi = id => JSON.stringify(S.nhap[id]) !== JSON.stringify(S.luu[id]);
+const dsDoi = () => MOD.filter(m => doi(m.id));
+
+// ---------- Khung ----------
+function menuBar(){
+  const drop = (id, html) => S.menu===id ? `<div class="drop">${html}</div>` : '';
+  const dit = (t, k, cur) => `<button class="dit ${cur?'cur':''}" data-act="noop">${t}${k?`<span class="k">${k}</span>`:''}</button>`;
+  const mods=['Trang chủ','Đếm trang A4','Tách văn bản','Sinh mục lục','Bóc tách dữ liệu','Xóa ghim','Chuẩn hoá tên','Ký văn bản','Đóng gói AIP'];
+  return `<div class="menubar">
+    <div class="mi"><button class="mbtn ${S.menu==='tep'?'open':''}" data-act="menu" data-v="tep">${IC.tep}<span>Tệp tin</span>${IC.caret}</button>
+      ${drop('tep', dit('Mở file PDF…','Ctrl+O')+dit('Mở thư mục…','Ctrl+Shift+O')+dit('Gần đây','▸')+'<div class="dsep"></div>'+dit('Xuất phiên làm việc…')+dit('Nhập phiên làm việc…'))}</div>
+    <div class="mi"><button class="mbtn ${S.menu==='cn'?'open':''}" data-act="menu" data-v="cn">${IC.cn}<span>Chức năng</span>${IC.caret}</button>
+      ${drop('cn', mods.map(m=>dit(m,'',m===S.tu)).join(''))}</div>
+    <div class="mi"><button class="mbtn ${S.mo?'on':''}" data-act="moCfg">${IC.ch}<span>Cấu hình</span></button></div>
+    <div class="mi"><button class="mbtn ${S.menu==='tg'?'open':''}" data-act="menu" data-v="tg">${IC.tg}<span>Trợ giúp</span>${IC.caret}</button>
+      ${drop('tg', dit('Kiểm tra cập nhật…')+dit('Hướng dẫn sử dụng','F1')+dit('Thông tin'))}</div>
+  </div>`;
+}
+function side(){
+  const nav = (id, ten, icon) => `<button class="nav ${S.mod===id?'on':''}" data-act="mod" data-v="${id}" ${S.thu?`title="${ten}"`:''}>${icon(S.mod===id?'#1f5fbf':'#4b5563')}${S.thu?'':`<span>${ten}</span>`}${id!=='dl'&&S.kieu!=='tu'&&doi(id)?'<span class="cham" title="Có thay đổi chưa lưu"></span>':''}</button>`;
+  // Biểu tượng khung có cột trái (kiểu VS Code / Notion); thu nhỏ → cột tô đặc
+  const mui = `<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6 3v10"/>${S.thu?'<rect x="2.6" y="3.6" width="2.9" height="8.8" rx=".6" fill="#6b7280" stroke="none"/>':''}`;
+  return `<div class="side ${S.thu?'thu':''}">
+    <div class="dau"><button class="back" data-act="quayLai" title="Quay lại ${S.tu} (Esc)">${IC.trai}${S.thu?'':`<span>Quay lại <b>${S.tu}</b></span>`}</button>
+    <button class="thuBtn" data-act="thu" title="${S.thu?'Mở rộng danh sách (Ctrl+B)':'Thu nhỏ danh sách (Ctrl+B)'}">${CI(mui,'#6b7280')}</button></div>
+    <h3>Chức năng</h3>
+    ${MOD.map(m=>nav(m.id, m.ten, ICM[m.id])).join('')}
+    <h3>Ứng dụng</h3>
+    ${nav('dl','Dữ liệu ứng dụng', ICM.dl)}
+    ${S.thu?'':`<div class="foot">Lưu ở file <code>.dema4_saomai.cfg</code> trong thư mục dữ liệu. Tuỳ chọn <span style="color:#1d4ed8">theo thư mục</span> của Xóa ghim lưu cùng vùng của thư mục đang mở.</div>`}
+  </div>`;
+}
+function thanhNoi(){
+  const ds = dsDoi(); if (!ds.length) return '';
+  return `<div class="noi ${S.rung?'rung':''}"><span style="font-size:16px">●</span><span class="grow">${S.rung?'<b>Lưu hoặc huỷ thay đổi trước khi rời Cấu hình</b>':'Có thay đổi chưa lưu'} — ${ds.map(m=>m.ten).join(', ')}</span><button class="btn" data-act="huy">Huỷ</button><button class="btn xanh" data-act="luu">Lưu thay đổi</button></div>`;
+}
+function chuyenKieu(){
+  const k=[['cuoi','Chân trang (cũ)'],['dau','Nút trên tiêu đề'],['noi','Thanh nổi'],['tu','Tự lưu']];
+  return `<div class="chuyen"><span>Prototype · kiểu lưu:</span>${k.map(x=>`<button class="${S.kieu===x[0]?'on':''}" data-act="kieu" data-v="${x[0]}">${x[1]}</button>`).join('')}</div>`;
+}
+function footer(){
+  const ds = dsDoi();
+  const dl = S.mod==='dl';
+  return `<div class="footbar"><div class="wrap" style="flex:0"><div class="footer">
+    ${dl?'':`<button class="btn" data-act="macDinh" title="Chỉ đưa ${tenMod()} về mặc định">Khôi phục mặc định</button>`}
+    <span class="grow" style="font-size:12px;${ds.length?'color:#b45309':'color:#6b7280'}">${ds.length?`● Chưa lưu: ${ds.map(m=>m.ten).join(', ')}`:'Đã lưu mọi thay đổi'}</span>
+    <button class="btn" data-act="huy" ${ds.length?'':'disabled'}>Huỷ thay đổi</button>
+    <button class="btn xanh" data-act="luu" ${ds.length?'':'disabled'}>Lưu</button>
+  </div></div></div>`;
+}
+const tenMod = () => (MOD.find(m=>m.id===S.mod)||{ten:'Dữ liệu ứng dụng'}).ten;
+function head(){
+  const m = MOD.find(x=>x.id===S.mod) || { ten:'Dữ liệu ứng dụng', mo:'Thư mục dữ liệu, cache phân tích và dọn dữ liệu cũ — dùng chung mọi chức năng.' };
+  const ds = dsDoi(), dl = S.mod==='dl';
+  const md = dl ? '' : `<button class="lnk" data-act="macDinh" title="Chỉ đưa ${m.ten} về mặc định">Khôi phục mặc định</button>`;
+  // Như nút cửa sổ của hệ điều hành: ⧉ = thu nhỏ thành cửa sổ, □ = phóng toàn cửa sổ
+  const nutCs = `<button class="icn tron" data-act="nho" title="${S.nho?'Toàn cửa sổ':'Cửa sổ thu nhỏ'} (Ctrl+M)" aria-label="${S.nho?'Toàn cửa sổ':'Cửa sổ thu nhỏ'}">${S.nho
+    ? CI('<rect x="3" y="3" width="10" height="10" rx="1.5"/>','#4b5563')
+    : CI('<rect x="2.5" y="5.5" width="8" height="8" rx="1.3"/><path d="M5.5 5.5V3.8a1.3 1.3 0 0 1 1.3-1.3h5.4a1.3 1.3 0 0 1 1.3 1.3v5.4a1.3 1.3 0 0 1-1.3 1.3h-1.7"/>','#4b5563')}</button>`;
+  let act = '';
+  if (S.kieu==='dau') act = `<div class="hdact">${md}<span class="chip ${ds.length?'':'ok'}" title="${ds.map(x=>x.ten).join(', ')}">${ds.length?`● ${ds.length} chức năng chưa lưu`:'✓ Đã lưu'}</span><button class="btn" data-act="huy" ${ds.length?'':'disabled'}>Huỷ thay đổi</button><button class="btn xanh" data-act="luu" ${ds.length?'':'disabled'}>Lưu</button>${nutCs}</div>`;
+  else if (S.kieu==='noi' || S.kieu==='tu') act = `<div class="hdact">${S.kieu==='tu'&&S.daLuu?`<span class="daluu" data-l="${S.daLuu}">✓ Đã lưu</span>`:''}${md}${nutCs}</div>`;
+  return `<div class="head"><div class="col grow"><h1>${(ICM[S.mod]||ICM.dl)('#2563eb')}${m.ten}</h1><div class="mo">${m.mo}</div></div>${act}</div>`;
+}
+
+// ---------- Từng chức năng ----------
+const N = (id) => S.nhap[S.mod][id];
+const cb = (k, dis) => `<input type="checkbox" data-k="${k}" ${N(k)?'checked':''} ${dis?'disabled':''}>`;
+const rd = (k, v, t) => `<label class="row" style="gap:6px;cursor:pointer"><input type="radio" name="${S.mod}-${k}" data-k="${k}" value="${v}" ${N(k)===v?'checked':''}>${t}</label>`;
+const ip = (k, w, ph, cls='') => `<input class="fld ${cls}" data-k="${k}" value="${N(k)}" placeholder="${ph||''}" style="width:${w}">`;
+const sel = (k, ds, w) => `<select class="fld" data-k="${k}" style="width:${w||'110px'}">${ds.map(o=>`<option ${N(k)===o?'selected':''}>${o}</option>`).join('')}</select>`;
+const dong = (nhan, noi, phu) => `<div class="dong"><div class="nh">${nhan}</div><div class="row" style="flex-wrap:wrap">${noi}</div>${phu?`<div class="phu">${phu}</div>`:''}</div>`;
+const the = (tt, noi, tag) => `<section class="the"><div class="tt">${tt}${tag?`<span class="tag ${tag==='chung'?'chung':'tm'}">${tag==='chung'?'chung':'theo thư mục'}</span>`:''}</div>${noi}</section>`;
+
+const KHO = ['A7','A6','A5','A4','A3','A2','A1','A0'], CHUAN = [105,148,210,297,420,594,841,1189];
+// Thước khổ: các cạnh chuẩn cách đều; ranh giới nội suy giữa 2 cạnh chuẩn kề (A0 lớn ở cuối)
+const X0=24, BUOC=88;
+const xCua = mm => { if (mm<=CHUAN[0]) return X0 + (mm/CHUAN[0])*BUOC*0.5 - BUOC*0.5 + BUOC*0.5;
+  for (let i=0;i<7;i++) if (mm<=CHUAN[i+1]) return X0 + i*BUOC + (mm-CHUAN[i])/(CHUAN[i+1]-CHUAN[i])*BUOC;
+  return X0 + 7*BUOC + Math.min(1,(mm-CHUAN[7])/(1682-CHUAN[7]))*BUOC; };
+const mmCua = x => { const k=(x-X0)/BUOC; if (k<=0) return CHUAN[0]; if (k>=8) return 1682; const i=Math.floor(k);
+  return i>=7 ? CHUAN[7]+(k-7)*(1682-CHUAN[7]) : CHUAN[i]+(k-i)*(CHUAN[i+1]-CHUAN[i]); };
+const so = v => (Math.round(v*10)/10).toString().replace('.',',');
+function thuoc(){
+  const r=N('ranh'), W=X0+8*BUOC+24;
+  let s=`<svg width="${W}" height="110" style="display:block;user-select:none" id="thuoc">`;
+  CHUAN.forEach((c,i)=>{ const x=X0+i*BUOC; s+=`<text x="${x}" y="14" text-anchor="middle" font-size="11" fill="#6b7280">${KHO[i]} ${c}</text><line x1="${x}" y1="24" x2="${x}" y2="54" stroke="#c4c7cc" stroke-dasharray="2 2"/>`; });
+  s+=`<rect x="${xCua(r[7])}" y="24" width="${X0+8*BUOC-xCua(r[7])}" height="30" fill="url(#gach)"/><text x="${(xCua(r[7])+X0+8*BUOC)/2}" y="43" text-anchor="middle" font-size="11" fill="#6b7280">A0 lớn</text>`;
+  s+=`<defs><pattern id="gach" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#d6d9de" stroke-width="2"/></pattern></defs>`;
+  s+=`<rect x="${X0-12}" y="24" width="${8*BUOC+12}" height="30" fill="none" stroke="#9a9a9a"/>`;
+  r.forEach((v,i)=>{ const x=xCua(v), a0=i===7, m=a0?'#b45309':'#111827';
+    s+=`<g class="keo" data-keo="${i}"><rect x="${x-7}" y="20" width="14" height="70" fill="transparent"/><line x1="${x}" y1="22" x2="${x}" y2="56" stroke="${m}" stroke-width="2"/><path d="M${x-5} 66l5-7 5 7z" fill="${m}"/><text x="${x}" y="84" text-anchor="middle" font-size="12" fill="#1f2328">${so(v)}</text></g>`; });
+  return s+`</svg>`;
+}
+function vDem(){
+  const h = N('heSo');
+  // h[i] = hệ số khổ A{i}; KHO xếp A7..A0 nên A{i} = KHO[7 - i]
+  const o = h.map((v,i)=>`<span class="muted">${KHO[7-i]}</span><input class="fld num" data-hs="${i}" value="${v}" style="width:100%">`);
+  const thu = parseFloat((N('thu')||'').replace(',','.'));
+  const kq = isNaN(thu) ? '' : (()=>{ const r=N('ranh'); let i=r.findIndex(v=>thu<v); if(i<0) return `→ <b>A0 lớn</b>`; return `→ <b>${KHO[i]}</b>`; })();
+  return the(`<span>1. Hệ số quy A4</span> ${tip('Mỗi trang khổ X tính bằng hệ số × 1 trang A4')}`,
+      `<div class="luoi4">${o.join('')}</div>
+       <div style="border-top:1px dashed #e3e5e8;margin:12px 0 4px"></div>`
+      + dong(`Lớn hơn A0 ${tip('Trang có cạnh dài vượt ranh giới A0 lớn')}`, `${rd('a0','dt','Theo diện tích ÷ A4')} ${rd('a0','cd','Hệ số cố định')} <input class="fld num" data-k="a0HeSo" value="${N('a0HeSo')}" style="width:80px" ${N('a0')==='cd'?'':'disabled'}>`, 'Vd trang 1500 × 900 mm = 21,64 trang A4'))
+    + the(`<span>2. Ranh giới khổ theo cạnh dài (mm)</span> ${tip('Kéo vạch đen để đổi ranh giới giữa 2 khổ')}`,
+      `<div style="padding:6px 0 2px">${thuoc()}</div>
+       <div class="row muted" style="gap:18px;font-size:11.5px;padding:4px 0 8px"><span><span style="border-left:1px dashed #9aa0a6;margin-right:6px"></span>cạnh dài chuẩn</span><span><span style="border-left:2px solid #111827;margin-right:6px"></span>ranh giới (kéo được)</span><span><span style="display:inline-block;width:14px;height:10px;background:repeating-linear-gradient(45deg,#d6d9de 0 2px,transparent 2px 5px);border:1px solid #c4c7cc;margin-right:6px;vertical-align:-1px"></span>A0 lớn: cách quy A4 chọn ở mục 1</span></div>`
+      + dong('Thử cạnh dài', `<input class="fld num" data-k="thu" value="${N('thu')}" placeholder="mm" style="width:120px"> <span>${kq}</span>`));
+}
+function vTach(){
+  const lo = parseFloat(N('tMin').replace(',','.'))||0, hi = parseFloat(N('tMax').replace(',','.'))||0;
+  const sx = v => { const m=[[0,0],[0.5,.22],[1,.32],[2,.45],[3,.56],[5,.72],[10,1]]; for(let i=0;i<m.length-1;i++) if(v<=m[i+1][0]) return (m[i][1]+(v-m[i][0])/(m[i+1][0]-m[i][0])*(m[i+1][1]-m[i][1])); return 1; };
+  const W=520, bar = `<svg width="${W+20}" height="52"><g transform="translate(10,0)">${[0,0.5,1,2,3,5,10].map(v=>`<text x="${sx(v)*W}" y="10" font-size="10" text-anchor="middle" fill="#6b7280">${String(v).replace('.',',')}</text><line x1="${sx(v)*W}" y1="13" x2="${sx(v)*W}" y2="16" stroke="#9aa0a6"/>`).join('')}
+    <rect x="0" y="17" width="${W}" height="14" fill="#fff" stroke="#c4c7cc"/><rect x="${sx(lo)*W}" y="17" width="${(sx(hi)-sx(lo))*W}" height="14" fill="url(#caro)" stroke="#555"/><rect x="${sx(hi)*W}" y="17" width="${(1-sx(hi))*W}" height="14" fill="#8b8b8b"/>
+    <text x="${sx(lo)*W}" y="45" font-size="11" text-anchor="middle">${N('tMin')}</text><text x="${sx(hi)*W}" y="45" font-size="11" text-anchor="middle">${N('tMax')} %</text></g>
+    <defs><pattern id="caro" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="3" height="3" fill="#c4c7cc"/><rect x="3" y="3" width="3" height="3" fill="#c4c7cc"/></pattern></defs></svg>`;
+  return the(`<span>1. Tự động nhận dạng khi Phân tích</span> ${tip('Phân tích lại để áp dụng ngưỡng mới')}`,
+      dong(`${cb('trang')} Trang trắng ${tip('Tỉ lệ điểm tối trên trang')}`, `${ip('tMin','80px','','num')} – ${ip('tMax','80px','','num')} % <span class="muted" style="margin-left:10px">□ Trắng · ▦ Nghi trắng · ■ Có chữ</span><div style="width:100%">${bar}</div>`)
+    + dong(`${cb('ma')} Mã index ${tip('Trang có mã này là trang đầu văn bản mới')}`, `${sel('loaiMa',['Code 128','QR','Data Matrix'],'130px')} ${ip('maTach','360px')}`)
+    + dong(`${cb('chieu')} Chiều trang ${tip('Tự xoay trang nằm ngang / ngược')}`, `<span class="muted">Độ tin cậy ≥</span> ${ip('tinCay','80px','','num')}`, 'Quét cả hai: ~120 ms/trang/lõi (100.000 trang ≈ 25 phút trên 8 lõi) · chiều trang +~15 ms/trang'))
+    + the('<span>2. Kết quả tách</span>',
+      dong('Lưu kết quả', `<input class="fld grow" data-k="luuKQ" value="${N('luuKQ')}" placeholder="cạnh thư mục gốc"><button class="btn">…</button>`)
+    + dong(`Tên văn bản ${tip('{hoso} tên hồ sơ, {n} số thứ tự')}`, `${ip('tenVB','100%')}`)
+    + dong(`Lưu nhãn ${tip('Tự động: lưu mỗi khi gán nhãn')}`, `${rd('luuNhan','auto','Tự động')} ${rd('luuNhan','tay','Bằng tay (Ctrl+S)')}`));
+}
+function vMl(){
+  return the('<span>File kết quả</span>',
+      dong('Thư mục ra', `<input class="fld grow" data-k="thuMuc" value="${N('thuMuc')}" placeholder="trống = thư mục dữ liệu cạnh app"><button class="btn">…</button>`, 'Trống: .sm-dema4/muc_luc/&lt;tên file biên mục&gt; cạnh file ứng dụng — mở bằng nút Mở thư mục sau khi sinh')
+    + dong(`Mẫu tên file ${tip('Dùng biến của mẫu mục lục, vd {so_ho_so}')}`, ip('mauTen','100%'), `Vd: ${N('mauTen').replace('{so_ho_so}','HS-01')}.docx`)
+    + dong('File đã có', `${rd('daCo','ghide','Ghi đè')} ${rd('daCo','boqua','Bỏ qua')}`)
+    + dong('Định dạng', `<label class="row muted" style="gap:6px"><input type="checkbox" checked disabled>DOCX</label> <label class="row" style="gap:6px;margin-left:10px">${cb('pdf')}Kèm PDF</label>`));
+}
+const NCC = [['noibo','Nội bộ','5CD-AI/Vintern-1B-v3_5','server'],['gemini','Gemini','gemini-2.5-flash','sao'],['claude','Claude','','claude'],['gpt','GPT','','gpt'],['or','OpenRouter','','route']];
+function vBt(){
+  const b=S.nhap.bt, ncc=NCC.find(x=>x[0]===b.ncc);
+  const buoc = [['nguon','Nguồn văn bản','Máy tính','folder'],['doc','Mô hình đọc',`${ncc[1]} · ${b.model}`,'robot'],['ghi','Ghi kết quả','Excel'+(b.sheet?' + Google Sheet':''),'bang']];
+  let noi='';
+  if (S.btBuoc==='nguon') noi = the('<span class="so">1</span><span>Chọn nguồn</span>', `<div class="nguon">${[['may','Máy tính','Luôn dùng được','folder'],['drive','Google Drive','Sắp có','drive'],['gcs','Google Cloud Storage','Sắp có','cloud'],['s3','Kho S3','Sắp có','s3']].map(x=>`<button class="${b.nguon===x[0]?'on':''}" ${x[0]==='may'?'':'disabled style="opacity:.6;cursor:default"'}>${ICF[x[3]]}<span class="grow"><b>${x[1]}</b><small class="${x[0]==='may'?'':'chua'}">${x[2]}</small></span></button>`).join('')}</div>`)
+      + the('<span class="so">2</span><span>Thư mục</span>', dong('Thư mục', '<span>Chọn ở màn chính (nút Chọn); gồm cả thư mục con.</span>', 'Thư mục Google Drive for Desktop, ổ mạng cũng chọn như thư mục trên máy.'));
+  if (S.btBuoc==='doc') noi = the(`<span class="so">1</span><span>Chọn nhà cung cấp</span><span class="grow"></span><a href="#" data-act="noop" style="font-size:12px;font-weight:400;color:#1f5fbf">Đặt làm mặc định</a>`,
+      `<div class="ncc">${NCC.map(x=>`<button class="${b.ncc===x[0]?'on':''}" data-act="ncc" data-v="${x[0]}">${ICF[x[3]]}<span class="grow" style="min-width:0"><b>${x[1]}</b><small class="${x[2]?'':'chua'}">${x[2]||'Chưa cài đặt'}</small></span></button>`).join('')}</div>`)
+    + (b.ncc==='noibo'
+      ? the('<span class="so">2</span><span>Máy chủ nội bộ</span>', dong('Địa chỉ', `<input class="fld grow" data-k="diaChi" value="${b.diaChi}" placeholder="http://192.168.1.10:8000/v1">`, 'Máy chủ OpenAI-compatible trong mạng nội bộ (vLLM, Ollama…)'))
+      : the('<span class="so">2</span><span>Dán khoá API</span>', (b.ncc==='gemini'?dong('Kiểu khoá', `${rd('kieu','vertex','Vertex AI (express)')} ${rd('kieu','studio','AI Studio')}`):'')
+          + dong('Địa chỉ', `<input class="fld grow" data-k="diaChi" value="${b.diaChi}" placeholder="Để trống = địa chỉ mặc định của nhà cung cấp">`)
+          + dong('Khoá API', `<input class="fld grow" type="password" data-k="khoa" value="${b.khoa}" placeholder="Dán khoá API">`, '<span style="color:#9a6a00">Bản chạy này không lưu khoá ra đĩa — khoá chỉ dùng trong phiên làm việc</span>')))
+    + the('<span class="so">3</span><span>Chọn model, kiểm tra</span>', dong('Model', `<input class="fld grow" data-k="model" value="${b.model}"><button class="btn">⌄</button><button class="btn">Kiểm tra kết nối</button>`, 'Chưa kiểm tra — bấm Kiểm tra kết nối'));
+  if (S.btBuoc==='ghi') noi = the('<span>File Excel</span> <span class="muted" style="font-weight:400">— luôn tạo</span>', dong('Thư mục ghi', `<input class="fld grow" data-k="excelDir" value="${b.excelDir}" placeholder="Để trống = cạnh thư mục nguồn"><button class="btn">…</button>`))
+    + the('<span>Google Sheet</span> <span class="muted" style="font-weight:400">— ghi thêm 1 dòng sau mỗi file</span>',
+      dong('Link Sheet', `<input class="fld grow" data-k="sheet" value="${b.sheet}" placeholder="https://docs.google.com/spreadsheets/d/…">`)
+      + dong('Tab', `<input class="fld" data-k="tab" value="${b.tab}" placeholder="Trống = tên thư mục nguồn" style="width:260px">`)
+      + dong('Cách ghi', `${rd('cach','sa','Khoá service account')} ${rd('cach','as','Apps Script')}`)
+      + dong('File khoá JSON', `<input class="fld grow" data-k="json" value="${b.json}" placeholder="File khoá service account (.json)"><button class="btn">Chọn</button>`, 'Tạo service account trong Google Cloud, tải khoá JSON, rồi chia sẻ Sheet cho email của nó')
+      + dong('', '<button class="btn">Ghi thử 1 dòng</button>'));
+  return `<div class="buoc">${buoc.map((x,i)=>`${i?'<span style="text-align:center;color:#9aa0a6">→</span>':''}<button class="${S.btBuoc===x[0]?'on':''}" data-act="btBuoc" data-v="${x[0]}">${ICF[x[3]]}<span class="grow" style="min-width:0"><b>${x[1]}</b><small style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x[2]}</small></span></button>`).join('')}</div>${noi}`;
+}
+function nutMoHinh(){
+  const m=S.model;
+  if (m.st==='san') return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:#16a34a">✓ Sẵn sàng</span>`;
+  if (m.st==='tai') return `<button class="btn" data-act="moHinhHuy" style="height:24px">Huỷ</button>`;
+  if (m.st==='kiem') return `<span class="muted" style="font-size:11.5px">Đang kiểm tra…</span>`;
+  return `<button class="btn link" data-act="moHinhTai" style="height:24px">↓ Tải mô hình</button><button class="btn" style="height:24px;padding:0 7px" title="Máy không có mạng: chọn file mô hình đã chép sẵn">…</button>`;
+}
+function vXg(){
+  const d2 = (ic,ten,mo,dk,duoi) => `<div class="dong2"><span class="ic">${ic}</span><span class="ten"><span>${ten}</span>${mo?`<small>${mo}</small>`:''}${duoi||''}</span><span class="dk">${dk}</span></div>`;
+  const san=S.model.st==='san', m=S.model;
+  const tienDo = m.st==='tai' ? `<span class="row" style="gap:6px;margin-top:4px;width:260px"><span class="thanh"><span style="width:${m.p}%"></span></span><span class="muted" style="font-size:11px;width:92px;text-align:right">${(m.p*0.375).toFixed(1).replace('.',',')} / 37,5 MB</span></span>` : m.st==='kiem' ? '<small>Đang kiểm tra tệp (SHA-256)…</small>' : '';
+  return `<div class="row" style="gap:8px;padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;font-size:12px">${ICF.folder}<span>Thư mục đang mở: <b>D:/Ho_so_mau/Lo_01</b> — thẻ <span class="tag tm" style="margin:0">theo thư mục</span> áp cho thư mục này.</span></div>
+  <div class="hai-cot"><div class="col" style="gap:14px">
+    ${the(`${ICF.khien}<span>Nhận diện &amp; bảo vệ</span>`,
+      d2(ICF.layout,'Nhận diện layout', san?'Tìm khối chữ, bảng; không xoá vào nội dung':'Cần tải mô hình AI (37,5 MB)', `${nutMoHinh()}${cb('nhanDien',!san)}`, tienDo)
+      + d2(ICF.netDen,'Bảo vệ nét đen','Không coi điểm rất tối là vết bẩn — giữ nét chữ', cb('netDen'))
+      + d2(ICF.dau,'Bảo vệ dấu đỏ / chữ ký xanh','Giữ con dấu, chữ ký mực màu', cb('doXanh')), 'tm')}
+    ${the(`${ICF.hieuNang}<span>Hiệu năng &amp; lưu</span>`,
+      d2(ICF.lop,'Xử lý theo lô 10 trang','Song song 10 trang — nhanh hơn, tốn RAM hơn', cb('lo10'))
+      + d2(ICF.dongHo,'Tự lưu vùng','0 = lưu ngay khi sửa', `<input class="fld num" data-k="tuLuu" value="${N('tuLuu')}" style="width:56px"> phút`), 'chung')}
+  </div><div class="col" style="gap:14px">
+    ${the(`${ICF.xuat}<span>Xuất file</span>`,
+      d2(ICF.dpi,'Độ phân giải (DPI)','Gốc = giữ như bản quét', sel('dpi',['Gốc','300','200','150'],'92px'))
+      + d2(ICF.nen,'Chất lượng nén JPEG','Thấp hơn = file nhỏ hơn', sel('nen',['95%','90%','80%','70%'],'92px'))
+      + d2(ICF.denTrang,'Nén đen trắng','Trang đen trắng / xám ghi gọn hơn', cb('denTrang'))
+      + d2(ICF.nenTrang,'Tô nền trắng','Tô vết bằng màu trắng thay màu nền đo được', cb('nenTrang'))
+      + d2(ICF.ghiDe,'Ghi đè file gốc','Không tạo thư mục _xoaghim, thay thẳng file nguồn', cb('ghiDe'), N('ghiDe')?'<span class="canhbao" style="margin-top:3px">Không hoàn tác được — nên sao lưu thư mục nguồn trước.</span>':''), 'tm')}
+    ${the(`${ICF.mat}<span>Hiển thị</span>`,
+      d2(ICF.kieuXem,'Kiểu xem','', sel('view',['Liên tiếp','Từng trang'],'110px'))
+      + d2(ICF.luoi,'Cột trang thu nhỏ','', cb('thumbs'))
+      + d2(ICF.hai,'Khung Đích','Xem kết quả bên phải', cb('dich'))
+      + d2(ICF.noi,'Cuộn Gốc | Đích cùng nhau','', cb('cuon')), 'chung')}
+  </div></div>`;
+}
+function vDl(){
+  const d2 = (ic,ten,mo,dk) => `<div class="dong2"><span class="ic">${ic}</span><span class="ten"><span>${ten}</span><small>${mo}</small></span><span class="dk">${dk}</span></div>`;
+  return the('<span>Thư mục dữ liệu</span>',
+      dong('Vị trí', '<input class="fld grow" value="%LOCALAPPDATA%/sm-dema4" readonly style="background:#f8f9fa"><button class="btn">'+ICF.moTm.replace('width="16"','width="13"').replace('height="16"','height="13"')+' Mở thư mục</button>', 'Cấu hình, khoá API mã hoá, license, nhãn / cache Tách, kết quả Bóc tách, vùng Xóa ghim, lịch sử gần đây. Cố định theo người dùng — dời file chạy không mất.'))
+    + the('<span>Dọn dẹp</span>',
+      d2(ICF.cache,'Xoá cache phân tích (Tách)','Thư mục đang mở ở Tách: <b>D:/Ho_so/Lo_01</b> · 182 MB. Nhãn đã gán không mất; lần Phân tích sau phân tích lại mọi trang.', '<button class="btn" data-act="hoi" data-v="cache">Xoá cache…</button>')
+      + d2(ICF.don,'Dọn dữ liệu cũ','Bỏ nhãn, kết quả phân tích, kết quả bóc tách, vùng Xóa ghim của PDF không mở lại quá 12 tháng, rồi thu gọn kho. Không đụng file PDF và file kết quả.', '<button class="btn" data-act="hoi" data-v="don">Dọn dữ liệu cũ…</button>'));
+}
+const VE = { dem:vDem, tach:vTach, ml:vMl, bt:vBt, xg:vXg, dl:vDl };
+
+function hop(){
+  if (!S.hoi) return '';
+  const H = {
+    roi: ['Lưu thay đổi trước khi quay lại?', `Có thay đổi chưa lưu ở: <b>${dsDoi().map(m=>m.ten).join(', ')}</b>.`, `<button class="btn" data-act="khongLuu">Không lưu</button><span class="grow"></span><button class="btn" data-act="dongHoi">Ở lại</button><button class="btn xanh" data-act="luuRoi">Lưu và quay lại</button>`],
+    cache: ['Xoá cache phân tích?', 'Xoá 182 MB kết quả phân tích của <b>D:/Ho_so/Lo_01</b>. Nhãn đã gán không mất.', `<span class="grow"></span><button class="btn" data-act="dongHoi">Huỷ</button><button class="btn do" data-act="xongHoi" data-v="Đã xoá cache phân tích">Xoá cache</button>`],
+    don: ['Dọn dữ liệu cũ?', 'Bỏ phần đã làm của các PDF không mở lại quá 12 tháng (chạy ngầm, vài giây với kho lớn).', `<span class="grow"></span><button class="btn" data-act="dongHoi">Huỷ</button><button class="btn xanh" data-act="xongHoi" data-v="Đang dọn dữ liệu cũ (chạy ngầm)…">Dọn</button>`],
+  }[S.hoi];
+  return `<div class="modal"><div class="dlg"><div style="padding:14px 18px 6px;font-weight:600;font-size:14px">${H[0]}</div><div style="padding:4px 18px 16px;line-height:1.5">${H[1]}</div><div class="row" style="padding:10px 16px;border-top:1px solid #e3e5e8;background:#f8f9fa;border-radius:0 0 6px 6px">${H[2]}</div></div></div>`;
+}
+function manModule(){
+  return `<div class="col grow" style="align-items:center;justify-content:center;background:#e4e6ea;color:#6b7280;gap:10px">
+    <div style="font-size:15px">Màn <b>${S.tu}</b> (không thuộc phạm vi prototype này)</div>
+    <button class="btn xanh" data-act="moCfg">Mở Cấu hình</button></div>`;
+}
+function render(){
+  const ae=document.activeElement, k=ae&&ae.dataset&&(ae.dataset.k||ae.dataset.hs), pos=ae&&ae.selectionStart;
+  const cuon = document.querySelector('.body')?.scrollTop||0;
+  document.getElementById('app').innerHTML = `<div class="titlebar"><span style="width:12px;height:12px;border-radius:2px;background:#2563eb"></span>DEMA4 Sao Mai — ${S.mo?'Cấu hình':S.tu}</div>${menuBar()}
+    ${S.mo && S.nho ? `<div style="position:relative;flex:1;display:flex">${manModule()}<div class="nen-mo" data-act="quayLai"></div><div class="cuaso"><div class="tdcs">${IC.ch}<span>Cấu hình</span><span class="grow"></span><button class="icn tron" data-act="quayLai" title="Đóng (Esc)">${CI('<path d="M4 4l8 8M12 4l-8 8"/>','#4b5563')}</button></div><div class="cfg">${side()}<div class="main" style="position:relative"><div class="wrap">${head()}<div class="body">${VE[S.mod]()}</div></div></div></div></div></div>` : S.mo ? `<div class="cfg">${side()}<div class="main" style="position:relative"><div class="wrap">${head()}<div class="body" style="${S.kieu==='noi'?'padding-bottom:90px':''}">${VE[S.mod]()}</div></div>${S.kieu==='cuoi'?footer():''}${S.kieu==='noi'?thanhNoi():''}</div></div>` : manModule()}
+    ${hop()}${S.toast?`<div class="toast">${S.toast}${S.hoanTac?'<button class="hoan" data-act="hoanTac">Hoàn tác</button>':''}</div>`:''}`;
+  const b=document.querySelector('.body'); if (b) b.scrollTop=cuon;
+  if (k){ const el=document.querySelector(`[data-k="${k}"],[data-hs="${k}"]`); if(el&&el.type!=='checkbox'&&el.type!=='radio'){ el.focus(); try{ el.setSelectionRange(pos,pos);}catch(e){} } }
+}
+function bao(t){ S.toast=t; render(); clearTimeout(bao.t); bao.t=setTimeout(()=>{ S.toast=null; render(); },2200); }
+
+// ---------- Sự kiện ----------
+document.addEventListener('click', e=>{
+  const el=e.target.closest('[data-act]');
+  if (S.menu && !e.target.closest('.mbtn')){ S.menu=null; if(!el){ render(); return; } }
+  if (!el) return;
+  const a=el.dataset.act, v=el.dataset.v;
+  if (a==='noop'){ e.preventDefault(); return; }
+  if (a==='menu'){ S.menu = S.menu===v?null:v; render(); return; }
+  if (a==='moCfg'){ S.mo=true; S.mod={'Đếm trang A4':'dem','Tách văn bản':'tach','Sinh mục lục':'ml','Bóc tách dữ liệu':'bt','Xóa ghim':'xg'}[S.tu]||'xg'; render(); return; }
+  if (a==='mod'){ S.mod=v; render(); return; }
+  if (a==='nho'){ S.nho=!S.nho; render(); return; }
+  if (a==='thu'){ S.thu=!S.thu; render(); return; }
+  if (a==='kieu'){ if (v==='tu'){ S.luu=clone(S.nhap); } S.kieu=v; S.rung=false; history.replaceState(null,'','#'+S.mod+'&kieu='+v); render(); return; }
+  if (a==='hoanTac'){ if (S.hoanTac){ S.nhap=S.hoanTac; S.luu=clone(S.nhap); S.hoanTac=null; } S.toast=null; render(); return; }
+  if (a==='quayLai'){ if (!dsDoi().length){ S.mo=false; render(); return; }
+    if (S.kieu==='noi'){ S.rung=false; render(); requestAnimationFrame(()=>{ S.rung=true; render(); clearTimeout(S.tr); S.tr=setTimeout(()=>{ S.rung=false; render(); },1800); }); return; }
+    S.hoi='roi'; render(); return; }
+  if (a==='khongLuu'){ S.nhap=clone(S.luu); S.hoi=null; S.mo=false; render(); return; }
+  if (a==='luuRoi'){ S.luu=clone(S.nhap); S.hoi=null; S.mo=false; bao('Đã lưu cấu hình'); return; }
+  if (a==='dongHoi'){ S.hoi=null; render(); return; }
+  if (a==='xongHoi'){ S.hoi=null; bao(v); return; }
+  if (a==='hoi'){ S.hoi=v; render(); return; }
+  if (a==='luu'){ const n=dsDoi().length; S.luu=clone(S.nhap); S.rung=false; bao(`Đã lưu ${n} chức năng`); return; }
+  if (a==='huy'){ S.nhap=clone(S.luu); S.rung=false; render(); return; }
+  if (a==='macDinh'){ const truoc=clone(S.nhap); S.nhap[S.mod]=clone(MAC_DINH[S.mod]); if (S.kieu==='tu'){ tuLuu(truoc, `${tenMod()}: đã về mặc định`); return; } bao(`${tenMod()}: đã về mặc định — bấm Lưu để giữ`); return; }
+  if (a==='btBuoc'){ S.btBuoc=v; render(); return; }
+  if (a==='ncc'){ const x=NCC.find(n=>n[0]===v); S.nhap.bt.ncc=v; S.nhap.bt.model=x[2]||''; render(); return; }
+  if (a==='moHinhTai'){ S.model={st:'tai',p:0}; const t=setInterval(()=>{ if(S.model.st!=='tai'){clearInterval(t);return;} S.model.p=Math.min(100,S.model.p+4+Math.random()*4);
+      if (S.model.p>=100){ clearInterval(t); S.model={st:'kiem',p:100}; render(); setTimeout(()=>{ S.model={st:'san',p:100}; render(); },700); return; } render(); },110); render(); return; }
+  if (a==='moHinhHuy'){ S.model={st:'chua',p:0}; render(); return; }
+});
+const ghi = el => {
+  const m=S.nhap[S.mod]; if (!m) return;
+  if (el.dataset.hs!==undefined){ m.heSo[+el.dataset.hs]=el.value; return; }
+  const k=el.dataset.k; if (!k || !(k in m)) return;
+  m[k] = el.type==='checkbox' ? el.checked : el.value;
+};
+// Tự lưu: ghi ngay; ô gõ chữ lưu khi rời ô / Enter (không lưu từng phím); giữ bản trước để Hoàn tác
+function tuLuu(truoc, chu){ S.hoanTac=truoc; S.luu=clone(S.nhap); S.daLuu=Date.now(); S.toast=chu||'Đã lưu'; render(); clearTimeout(bao.t); bao.t=setTimeout(()=>{ S.toast=null; S.hoanTac=null; render(); },4000); }
+let truocGo=null;
+document.addEventListener('focusin', e=>{ if (e.target.matches('input.fld')) truocGo=clone(S.luu); });
+document.addEventListener('input', e=>{ if (e.target.matches('input.fld')){ ghi(e.target); render(); } });
+document.addEventListener('change', e=>{
+  if (e.target.matches('input[type=checkbox],input[type=radio],select')){ const truoc=clone(S.luu); ghi(e.target); if (S.kieu==='tu') tuLuu(truoc); else render(); }
+  else if (e.target.matches('input.fld') && S.kieu==='tu' && dsDoi().length) tuLuu(truocGo||clone(S.luu));
+});
+// Kéo ranh giới trên thước khổ
+document.addEventListener('pointerdown', e=>{ const g=e.target.closest('[data-keo]'); if(!g) return; S.keo=+g.dataset.keo; e.preventDefault(); });
+document.addEventListener('pointermove', e=>{ if (S.keo===null) return; const svg=document.getElementById('thuoc'); if(!svg) return;
+  const x=e.clientX-svg.getBoundingClientRect().left, r=S.nhap.dem.ranh, i=S.keo;
+  const lo = i? xCua(r[i-1])+6 : X0, hi = i<7 ? xCua(r[i+1])-6 : X0+8*BUOC;
+  r[i]=Math.round(mmCua(Math.max(lo,Math.min(hi,x)))*2)/2; render(); });
+document.addEventListener('pointerup', ()=>{ if (S.keo!==null && S.kieu==='tu' && dsDoi().length) tuLuu(clone(S.luu)); S.keo=null; });
+document.addEventListener('keydown', e=>{
+  if (e.key==='Escape'){ if (S.hoi){ S.hoi=null; render(); } else if (S.mo){ document.querySelector('[data-act=quayLai]').click(); } }
+  if ((e.ctrlKey||e.metaKey) && e.key==='m' && S.mo){ e.preventDefault(); S.nho=!S.nho; render(); }
+  if ((e.ctrlKey||e.metaKey) && e.key==='b' && S.mo){ e.preventDefault(); S.thu=!S.thu; render(); }
+  if ((e.ctrlKey||e.metaKey) && e.key==='s' && S.mo){ e.preventDefault(); if (dsDoi().length) document.querySelector('[data-act=luu]').click(); }
+});
+// #dem / #tach / #ml / #bt-doc / #bt-ghi / #xg / #dl / #chua-luu để chụp ảnh từng trạng thái
+const [h, q] = location.hash.slice(1).split('&'); if (q && q.startsWith('kieu=')) S.kieu=q.slice(5); if (q==='thu') S.thu=true; if (q==='nho') S.nho=true;
+if (h.startsWith('bt')){ S.mod='bt'; S.btBuoc=h.split('-')[1]||'doc'; }
+else if (VE[h]) S.mod=h;
+else if (h==='chua-luu'){ S.mod='tach'; S.nhap.tach.tMax='3,50'; S.nhap.xg.ghiDe=true; }
+else if (h==='roi'){ S.nhap.xg.ghiDe=true; S.hoi='roi'; }
+render();
+</script>
+</body>
+</html>

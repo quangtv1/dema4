@@ -28,6 +28,8 @@ mod gan_day;
 mod gui_muc_luc;
 mod gui_phien;
 mod gui_boc_tach;
+#[allow(dead_code)] // tạm trong lúc dựng trang Cấu hình
+mod gui_cau_hinh;
 #[allow(dead_code)] // nối dần vào giao diện
 mod gui_tach;
 mod gui_xoa_ghim;
