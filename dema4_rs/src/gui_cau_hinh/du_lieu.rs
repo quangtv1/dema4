@@ -404,7 +404,7 @@ mod tests {
             hien: u8,
         }
         let ch = cfg.boc_tach.clone();
-        let xg = TabXoaGhim::dang_mo_thu_muc(PathBuf::from("D:/Ho_so_mau/Lo_01"));
+        let xg = TabXoaGhim::dang_mo_thu_muc();
         let trang = Trang { bt: TabBocTach::moi(&ch), ch, khoa, xg, cfg_xg: CauHinhXoaGhim::default(), dl: trang_mau(Some(190_000_000)), hien: 0 };
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1000.0, 900.0)).with_pixels_per_point(1.5).build_ui_state(
             |ui, t: &mut Trang| {
@@ -435,7 +435,7 @@ mod tests {
         }
         // Chưa mở thư mục ở Xóa ghim
         let t = h.state_mut();
-        (t.xg.thu_muc, t.xg.duong_dan, t.hien) = (None, None, 4);
+        (t.xg.thu_muc, t.hien) = (None, 4);
         h.run_steps(3);
         h.render().unwrap().save(thu_muc_anh.join("cau_hinh_moi_xg_chua_mo.png")).unwrap();
     }

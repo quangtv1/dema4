@@ -56,7 +56,7 @@ impl TabCauHinh {
             TabCauHinh::Tach => "Tự động nhận dạng khi Phân tích và cách ghi kết quả tách.",
             TabCauHinh::MucLuc => "Nơi ghi và tên file mục lục.",
             TabCauHinh::BocTach => "Nguồn văn bản → mô hình đọc → nơi ghi kết quả.",
-            TabCauHinh::XoaGhim => "Nhận diện, bảo vệ, xuất file (theo thư mục đang mở) và hiệu năng, hiển thị (chung).",
+            TabCauHinh::XoaGhim => "",
             TabCauHinh::DuLieu => "Thư mục dữ liệu, cache phân tích và dọn dữ liệu cũ — dùng chung mọi chức năng.",
         }
     }

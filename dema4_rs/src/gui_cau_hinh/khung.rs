@@ -299,8 +299,11 @@ impl HopCauHinh {
                 ui.add_space(8.0);
                 ui.label(RichText::new(t.ten()).size(18.0).color(CHU).dam());
             });
-            ui.add_space(3.0);
-            ui.label(RichText::new(t.mo_ta()).size(12.0).color(CHU_PHU));
+            // Mục không có mô tả (Xóa ghim) → không chừa dòng trống
+            if !t.mo_ta().is_empty() {
+                ui.add_space(3.0);
+                ui.label(RichText::new(t.mo_ta()).size(12.0).color(CHU_PHU));
+            }
             ui.add_space(14.0);
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

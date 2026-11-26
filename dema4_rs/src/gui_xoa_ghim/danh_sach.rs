@@ -92,7 +92,7 @@ impl ManXoaGhim {
                 p.rect_filled(o, 0.0, tk::NEN_NUT_HOVER);
             }
             let tren = egui::pos2(o.center().x, o.top() + 6.0 + 11.0);
-            bieu_tuong::ve(ui, "mo_ds", Rect::from_center_size(tren, egui::vec2(12.0, 12.0)));
+            widget::ve_mui_ten(p, tren, widget::Huong::Phai, if ph.hovered() { tk::XANH } else { Color32::from_rgb(0x37, 0x41, 0x51) });
             let g = p.layout_no_wrap("Danh sách".to_owned(), font(tk::CHU_CO), Color32::from_rgb(0x37, 0x41, 0x51));
             let (gw, gh) = (g.size().x, g.size().y);
             // Xoay −90°: đọc từ dưới lên; đỉnh chữ nằm trên đáy khung chữ
@@ -126,7 +126,7 @@ impl ManXoaGhim {
         };
         con.label(egui::RichText::new(tieu_de).font(font(tk::CHU_CO)).color(tk::CHU));
         con.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = widget::nut_bt(ui, "thu_ds", (12.0, 12.0), 22.0, 22.0, true, false, "Thu nhỏ danh sách");
+            let r = widget::nut_mui_ten(ui, widget::Huong::Trai, 22.0, 22.0, "Thu nhỏ danh sách");
             if r.on_hover_text("Thu nhỏ danh sách").clicked() {
                 self.ds_mo = Some(false);
             }
@@ -313,11 +313,8 @@ impl ManXoaGhim {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(6.0);
                 let (o, ph) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), Sense::click());
-                let c = o.center();
-                let d = if self.loc_nc_mo { 1.0 } else { -1.0 };
-                let n = Stroke::new(1.6, Color32::from_rgb(0x44, 0x44, 0x44));
-                ui.painter().line_segment([c + egui::vec2(-3.5, -1.75 * d), c + egui::vec2(0.0, 1.75 * d)], n);
-                ui.painter().line_segment([c + egui::vec2(0.0, 1.75 * d), c + egui::vec2(3.5, -1.75 * d)], n);
+                let mau = if ph.hovered() { tk::XANH } else { Color32::from_rgb(0x37, 0x41, 0x51) };
+                widget::ve_mui_ten(ui.painter(), o.center(), if self.loc_nc_mo { widget::Huong::Xuong } else { widget::Huong::Len }, mau);
                 ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Thu gọn / mở lọc nâng cao"));
                 if ph.on_hover_text(if self.loc_nc_mo { "Thu gọn" } else { "Mở rộng" }).clicked() {
                     self.loc_nc_mo = !self.loc_nc_mo;

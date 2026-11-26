@@ -15,7 +15,7 @@ fn vung_chung_va_rieng_luu_kho_mo_lai_thu_muc_thay_lai() {
     let mut man = ManXoaGhim::default();
     man.mo_thu_muc(nguon.clone());
     assert_eq!(man.ds.len(), 2);
-    assert_eq!(man.bo.tm.vung.len(), 2, "thư mục mới: 2 góc trên mặc định");
+    assert!(man.bo.tm.vung.is_empty(), "thư mục mới: chưa có vùng nào (góc / cạnh / Tùy biến đều tắt)");
     man.bo.bat_tat(ViTri::CanhTrai);
     assert!(man.bo.them_ve((0.2, 0.2, 0.3, 0.1), LoaiVung::BaoVe, PhamVi::Trang, ApTrang::TatCa, 1));
     man.chon_file(1); // đổi file → ghi ngay phần riêng của file trước
@@ -219,8 +219,9 @@ fn chon_nhieu_xoa_vung_ve_can_xac_nhan_va_hoan_tac() {
     let d = thu_muc_mau("xoa", &[("a.pdf", 2)]);
     let mut man = ManXoaGhim::default();
     man.mo_thu_muc(d.clone());
-    man.ve = Some(LoaiVung::Xoa);
     man.loc_trang = LocTrang::TatCa;
+    man.bat_tat_co_san(ViTri::GocTrenTrai);
+    man.ve = Some(LoaiVung::Xoa);
     man.them_ve((0.1, 0.1, 0.2, 0.2), 0);
     man.them_ve((0.5, 0.5, 0.2, 0.2), 0);
     man.ve = None;
@@ -234,7 +235,7 @@ fn chon_nhieu_xoa_vung_ve_can_xac_nhan_va_hoan_tac() {
     assert_eq!(man.bo.moi_vung_ve().len(), 2);
     assert_eq!(man.bo.xoa(&man.xac_nhan_xoa.take().unwrap()), 2);
     assert!(man.bo.moi_vung_ve().is_empty());
-    assert_eq!(man.bo.tm.vung.len(), 2, "góc giữ nguyên");
+    assert_eq!(man.bo.tm.vung.len(), 1, "góc giữ nguyên");
     assert!(man.bo.hoan_tac());
     assert_eq!(man.bo.moi_vung_ve().len(), 2);
     let _ = std::fs::remove_dir_all(&d);
@@ -466,5 +467,32 @@ fn thanh_mini_du_chuc_nang() {
     h.run_steps(2);
     assert!(!man.borrow().an_cong_cu);
     h.get_by_label("Đầu vào");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+/// Vừa bề ngang theo trang đang xem: file trộn A4 dọc + A3 ngang → sang trang A3 thì tỉ lệ nhỏ lại theo trang đó.
+#[test]
+fn vua_ngang_theo_trang_dang_xem() {
+    let d = thu_muc_mau("vua", &[("a.pdf", 1)]);
+    let mut man = ManXoaGhim::default();
+    man.mo_thu_muc(d.clone());
+    let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+    let m2 = man.clone();
+    let mut da_cai = false;
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 800.0)).build_ui(move |ui| {
+        if !std::mem::replace(&mut da_cai, true) {
+            crate::gui::cai_giao_dien(ui.ctx());
+        }
+        m2.borrow_mut().ve(ui, &mut CauHinhXoaGhim::default());
+    });
+    // Khổ giả: trang 1 A4 dọc, trang 2 A3 ngang (rộng gấp ~2)
+    man.borrow_mut().kho_trang = vec![(595.0, 842.0), (1191.0, 842.0)];
+    man.borrow_mut().cfg.tung_trang = true;
+    h.run_steps(2);
+    let ty_a4 = man.borrow().ty_le_cuoi;
+    man.borrow_mut().sang_trang(1);
+    h.run_steps(2);
+    let ty_a3 = man.borrow().ty_le_cuoi;
+    assert!((ty_a4 / ty_a3 - 1191.0 / 595.0).abs() < 0.01, "A4 {ty_a4} vs A3 {ty_a3}: tỉ lệ theo bề rộng trang đang xem");
     let _ = std::fs::remove_dir_all(&d);
 }

@@ -167,13 +167,18 @@ impl ManXoaGhim {
             }
         }
         let rong_max = self.kho_trang.iter().map(|k| k.0).fold(1.0, f32::max);
-        let cao_max = self.kho_trang.iter().map(|k| k.1).fold(1.0, f32::max);
+        // Vừa ngang / vừa cao theo **trang đang xem** (file trộn khổ: trang A4 không bị thu nhỏ theo trang A3)
+        let (w_hien, h_hien) = self.kho_trang.get(self.trang as usize).copied().unwrap_or((rong_max, 1.0));
         let ty = match self.ty_le {
-            TyLe::VuaNgang => (x - tk::LE_VUA) / rong_max,
-            TyLe::VuaCao => (o_goc.height() - tk::DEM_TREN_TRANG - tk::DEM_DUOI_TRANG) / cao_max,
+            TyLe::VuaNgang => (x - tk::LE_VUA) / w_hien.max(1.0),
+            TyLe::VuaCao => (o_goc.height() - tk::DEM_TREN_TRANG - tk::DEM_DUOI_TRANG) / h_hien.max(1.0),
             TyLe::CoDinh(v) => v,
         }
         .max(0.05);
+        // Đổi tỉ lệ khi sang trang khác khổ (cuộn liên tiếp): giữ đầu trang đang xem ở mép trên, không nhảy lệch
+        if (ty - self.ty_le_cuoi).abs() > 1e-3 && self.cuon_toi.is_none() && !matches!(self.ty_le, TyLe::CoDinh(_)) {
+            self.cuon_toi = Some(self.trang);
+        }
         self.ty_le_cuoi = ty;
         let n = self.kho_trang.len() as u32;
         let cac: Vec<u32> = if self.cfg.tung_trang { vec![self.trang.min(n - 1)] } else { (0..n).collect() };
@@ -300,7 +305,7 @@ impl ManXoaGhim {
         if mo_dich {
             let o_nut = Rect::from_min_size(egui::pos2(o.right() - 6.0 - 26.0, o.top() + 4.0), egui::vec2(26.0, 22.0));
             let mut c = ui.new_child(egui::UiBuilder::new().max_rect(o_nut));
-            if widget::nut_bt(&mut c, "mo_dich", (8.0, 10.0), 26.0, 22.0, true, false, "Mở khung Đích").on_hover_text("Mở khung Đích").clicked() {
+            if widget::nut_mui_ten(&mut c, widget::Huong::Trai, 26.0, 22.0, "Mở khung Đích").on_hover_text("Mở khung Đích").clicked() {
                 self.doi_cfg(|c| c.khung_dich = true);
             }
         }
@@ -314,7 +319,7 @@ impl ManXoaGhim {
         tieu_de_giua(ui, o, &format!("Đích: {}", ra.as_ref().map_or(String::new(), |d| d.display().to_string())), 40.0);
         let o_nut = Rect::from_min_size(egui::pos2(o.right() - 6.0 - 26.0, o.top() + 4.0), egui::vec2(26.0, 22.0));
         let mut c = ui.new_child(egui::UiBuilder::new().max_rect(o_nut));
-        if widget::nut_bt(&mut c, "an_dich", (8.0, 10.0), 26.0, 22.0, true, false, "Thu gọn khung Đích").on_hover_text("Thu gọn khung Đích").clicked() {
+        if widget::nut_mui_ten(&mut c, widget::Huong::Phai, 26.0, 22.0, "Thu gọn khung Đích").on_hover_text("Thu gọn khung Đích").clicked() {
             self.doi_cfg(|c| c.khung_dich = false);
         }
     }

@@ -31,7 +31,7 @@ use eframe::egui::{self, Pos2, TextureHandle};
 
 use crate::cau_hinh::CauHinhXoaGhim;
 use crate::xoa_ghim::kho::{self as kho_xg, CauHinhXuat, ThuMuc};
-use crate::xoa_ghim::vung::{co_san, ApTrang, LoaiVung, ViTri, Vung};
+use crate::xoa_ghim::vung::{ApTrang, LoaiVung, ViTri, Vung};
 use crate::xoa_ghim::xuat;
 use sua_vung::{BoVung, Canh, ChonVung};
 use xem_truoc::{CauHinhXem, KetQua, XemTruoc, YeuCau};
@@ -50,9 +50,9 @@ pub fn dang_ky_bieu_tuong(ctx: &egui::Context) {
     bieu_tuong::dang_ky(ctx);
 }
 
-/// Vùng mặc định của thư mục chưa chỉnh lần nào: góc trên trái + góc trên phải (như XoaGhim).
+/// Thư mục chưa chỉnh lần nào: chưa có vùng nào (góc / cạnh / Tùy biến đều tắt) — người dùng tự chọn.
 pub fn thu_muc_mac_dinh() -> ThuMuc {
-    ThuMuc { vung: vec![co_san(ViTri::GocTrenTrai), co_san(ViTri::GocTrenPhai)], ..Default::default() }
+    ThuMuc::default()
 }
 
 /// Lọc trang (cột nút tròn): Tất cả / Lẻ / Chẵn / Từng trang (+ Vô đối khi vẽ / chọn vùng xoá vẽ).
@@ -274,11 +274,7 @@ impl Default for ManXoaGhim {
             loc_nc_mo: false,
             ds_mo: None,
             chon: 0,
-            bo: {
-                let mut bo = BoVung::moi(thu_muc_mac_dinh());
-                bo.chon = vec![(false, 0)];
-                bo
-            },
+            bo: BoVung::moi(thu_muc_mac_dinh()),
             ve: None,
             loc_trang: LocTrang::TatCa,
             an_cong_cu: false,
@@ -584,8 +580,8 @@ impl ManXoaGhim {
 
     /// Nút ^ / v trên thanh menu chung: thu gọn / mở thanh công cụ.
     pub fn nut_thu_gon_cong_cu(&mut self, ui: &mut egui::Ui) {
-        let bt = if self.an_cong_cu { "mo_cong_cu" } else { "thu_gon" };
-        let r = widget::nut_bt(ui, bt, (14.0, 14.0), 26.0, 24.0, true, false, "Thu gọn / mở thanh công cụ");
+        let huong = if self.an_cong_cu { widget::Huong::Xuong } else { widget::Huong::Len };
+        let r = widget::nut_mui_ten(ui, huong, 28.0, 24.0, "Thu gọn / mở thanh công cụ");
         if r.on_hover_text(if self.an_cong_cu { "Mở thanh công cụ đầy đủ" } else { "Thu gọn thành hàng biểu tượng (mini)" }).clicked() {
             self.an_cong_cu = !self.an_cong_cu;
         }

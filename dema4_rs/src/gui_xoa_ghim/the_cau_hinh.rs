@@ -1,8 +1,7 @@
-//! Thân **Xóa ghim** trong trang Cấu hình (như prototype): dải "Thư mục đang mở" rồi 4 thẻ 2 cột — Nhận diện & bảo vệ,
+//! Thân **Xóa ghim** trong trang Cấu hình (như prototype): (chưa mở thư mục: dải cam hướng dẫn) rồi 4 thẻ 2 cột — Nhận diện & bảo vệ,
 //! Hiệu năng & lưu | Xuất file, Hiển thị. Thẻ gắn nhãn **theo thư mục** (lưu cùng vùng của thư mục đang mở, kho Xóa
 //! ghim) hoặc **chung** (cấu hình app). Dòng Nhận diện layout có nút tải / nhập mô hình AI và tiến độ tải.
 
-use std::path::PathBuf;
 
 use eframe::egui::{self, Color32, Rect, Sense, Stroke};
 
@@ -31,8 +30,6 @@ pub struct CauHinhThuMuc {
 pub struct TabXoaGhim {
     /// `None` = chưa mở thư mục (thẻ "theo thư mục" mờ).
     pub thu_muc: Option<CauHinhThuMuc>,
-    /// Đường dẫn thư mục (hoặc file) đang mở ở màn Xóa ghim, hiện ở dải đầu tab; `None` khi chưa mở.
-    pub duong_dan: Option<PathBuf>,
     /// Việc tải / nhập mô hình (mượn của màn Xóa ghim khi mở hộp, trả lại khi đóng — tải tiếp sau khi đóng hộp).
     pub mo_hinh: Option<TaiMoHinh>,
 }
@@ -148,38 +145,27 @@ impl TabXoaGhim {
         });
     }
 
-    /// Dải đầu tab: xanh nhạt "Thư mục đang mở: <đường dẫn>"; chưa mở → dải cam hướng dẫn mở ở màn Xóa ghim.
+    /// Chưa mở thư mục ở màn Xóa ghim: dải cam hướng dẫn (thẻ "theo thư mục" đang mờ). Đã mở: không hiện gì.
     fn dai_thu_muc(&self, ui: &mut egui::Ui) {
-        let (nen, vien) = if self.thu_muc.is_some() { (Color32::from_rgb(0xEF, 0xF6, 0xFF), Color32::from_rgb(0xBF, 0xDB, 0xFE)) } else { (gc::CAM_NEN, gc::CAM_VIEN) };
-        egui::Frame::new().fill(nen).stroke(Stroke::new(1.0, vien)).corner_radius(5).inner_margin(egui::Margin::symmetric(12, 8)).show(ui, |ui| {
+        if self.thu_muc.is_some() {
+            return;
+        }
+        egui::Frame::new().fill(gc::CAM_NEN).stroke(Stroke::new(1.0, gc::CAM_VIEN)).corner_radius(5).inner_margin(egui::Margin::symmetric(12, 8)).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 let (o, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), Sense::hover());
                 bieu_tuong::ve(ui, "thu_muc", o);
-                match (&self.thu_muc, &self.duong_dan) {
-                    (Some(_), duong_dan) => {
-                        ui.label(egui::RichText::new("Thư mục đang mở:").font(font(12.0)).color(tk::CHU));
-                        if let Some(p) = duong_dan {
-                            ui.label(egui::RichText::new(p.display().to_string()).font(font_dam(12.0)).color(tk::CHU));
-                        }
-                        ui.label(egui::RichText::new("— thẻ").font(font(12.0)).color(tk::CHU));
-                        gc::nhan_pham(ui, Pham::ThuMuc);
-                        ui.label(egui::RichText::new("áp cho thư mục này.").font(font(12.0)).color(tk::CHU));
-                    }
-                    (None, _) => {
-                        ui.label(egui::RichText::new("Mở 1 file hoặc thư mục ở màn Xóa ghim để chỉnh phần theo thư mục").font(font(12.0)).color(gc::CAM_CHU));
-                    }
-                }
+                ui.label(egui::RichText::new("Mở 1 file hoặc thư mục ở màn Xóa ghim để chỉnh phần theo thư mục").font(font(12.0)).color(gc::CAM_CHU));
             });
         });
     }
 
-    /// Test / chụp ảnh: tab như khi màn Xóa ghim đang mở thư mục `duong_dan` với tuỳ chọn mặc định.
+    /// Test / chụp ảnh: tab như khi màn Xóa ghim đang mở 1 thư mục với tuỳ chọn mặc định.
     #[cfg(test)]
-    pub fn dang_mo_thu_muc(duong_dan: PathBuf) -> Self {
+    pub fn dang_mo_thu_muc() -> Self {
         let thu_muc = CauHinhThuMuc { tc: TuyChon::default(), xuat: CauHinhXuat::default(), ghi_de: false };
-        Self { thu_muc: Some(thu_muc), duong_dan: Some(duong_dan), mo_hinh: None }
+        Self { thu_muc: Some(thu_muc), mo_hinh: None }
     }
 
     /// Mặc định: tuỳ chọn thư mục + cấu hình chung về giá trị đầu.

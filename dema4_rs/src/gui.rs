@@ -607,7 +607,6 @@ impl UngDungChinh {
         hop.khoa = self.khoa_bt.clone();
         hop.xg.thu_muc = self.xoa_ghim.cau_hinh_thu_muc();
         hop.xg.mo_hinh = self.xoa_ghim.mo_hinh.take();
-        hop.xg.duong_dan = self.xoa_ghim.thu_muc.clone();
         hop.du_lieu = Some(crate::gui_cau_hinh::du_lieu::TrangDuLieu::moi(ctx, crate::tach_vb::du_lieu_an::goc_du_lieu().to_path_buf(), self.tach.cache_dang_mo()));
         hop.tu = self.man.ten_ngan();
         hop.chot_goc();
