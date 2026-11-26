@@ -21,6 +21,15 @@ const PHONG_MAX: f32 = 1.5;
 /// Bố cục trang trong 1 khung xem: (trang, đỉnh y, cỡ màn hình).
 type BoCuc = Vec<(u32, f32, egui::Vec2)>;
 
+/// Khoảng cách dọc từ `y` tới trang (0 khi nằm trong trang).
+fn khoang(y: f32, &(_, y0, co): &(u32, f32, egui::Vec2)) -> f32 {
+    if y < y0 {
+        y0 - y
+    } else {
+        (y - y0 - co.y).max(0.0)
+    }
+}
+
 impl ManXoaGhim {
     // ---------------- Thanh đáy ----------------
 
@@ -178,7 +187,6 @@ impl ManXoaGhim {
         // Đổi tỉ lệ (phóng / thu, vừa ngang, sang trang khác khổ): trục giữa khung xem trùng trục giữa trang giấy
         // theo chiều ngang; chiều dọc giữ điểm đang ở giữa khung
         let doi_ty = (ty - self.ty_le_cuoi).abs() > 1e-4 && self.ty_le_cuoi > 0.0;
-        let ty_cu = self.ty_le_cuoi;
         self.ty_le_cuoi = ty;
         let n = self.kho_trang.len() as u32;
         let cac: Vec<u32> = if self.cfg.tung_trang { vec![self.trang.min(n - 1)] } else { (0..n).collect() };
@@ -200,12 +208,21 @@ impl ManXoaGhim {
         if ui.rect_contains_pointer(vung_xem) && ui.input(|i| i.smooth_scroll_delta.x != 0.0) {
             self.neo_ngang = false;
         }
-        // Neo dọc: điểm đang ở giữa khung giữ ở giữa sau khi đổi tỉ lệ (áp vài khung hình cho qua kẹp của ScrollArea)
+        // Neo dọc: điểm giữa khung = (trang, tỉ lệ theo chiều cao trang) đo trên bố cục cũ, đặt lại đúng chỗ đó trên
+        // bố cục mới (khoảng cách giữa trang không co giãn theo tỉ lệ nên không nhân thẳng offset). Đang neo (phóng liên
+        // tục) thì giữ điểm neo cũ, không đo lại từ offset có thể đã bị ScrollArea kẹp → không trôi.
+        let cao_xem = o_goc.height();
         if doi_ty && self.cuon_toi.is_none() {
-            let cao_xem = o_goc.height();
-            let doc = |c: f32| ((c + cao_xem / 2.0) * ty / ty_cu - cao_xem / 2.0).max(0.0);
-            self.neo_doc = Some((doc(self.cuon_goc.y), doc(self.cuon_dich.y), 3));
+            let tam = self.cuon_goc.y + cao_xem / 2.0;
+            let diem = self.neo_doc.map(|(t, f, _)| (t, f)).or_else(|| {
+                self.bo_cuc_cu
+                    .iter()
+                    .min_by(|a, b| khoang(tam, a).total_cmp(&khoang(tam, b)))
+                    .map(|&(t, y0, co)| (t, ((tam - y0) / co.y.max(1.0)).clamp(0.0, 1.0)))
+            });
+            self.neo_doc = diem.map(|(t, f)| (t, f, 4));
         }
+        self.bo_cuc_cu = bo_cuc.clone();
         let x_neo = ((noi.x - rong_xem) / 2.0).max(0.0);
         // Ép cuộn: tới trang (chuyển trang / file) hoặc theo khung kia (cuộn đồng bộ)
         let toi = self.cuon_toi.take().and_then(|t| bo_cuc.iter().find(|(x, _, _)| *x == t).map(|(_, y0, _)| (y0 - tk::DEM_TREN_TRANG).max(0.0)));
@@ -213,13 +230,14 @@ impl ManXoaGhim {
         let mut ep_goc = toi.map(|y| egui::vec2(self.cuon_goc.x, y)).or(ep.filter(|e| e.0).map(|e| e.1));
         let mut ep_dich = toi.map(|y| egui::vec2(self.cuon_dich.x, y)).or(ep.filter(|e| !e.0).map(|e| e.1));
         let neo_doc = self.neo_doc.take();
-        if let Some((_, _, n)) = neo_doc {
+        if let Some((t, f, n)) = neo_doc {
             if n > 1 {
-                self.neo_doc = neo_doc.map(|(g, d, n)| (g, d, n - 1));
+                self.neo_doc = Some((t, f, n - 1));
                 ui.ctx().request_repaint();
             }
         }
-        for (ep, cu, y_neo) in [(&mut ep_goc, self.cuon_goc, neo_doc.map(|n| n.0)), (&mut ep_dich, self.cuon_dich, neo_doc.map(|n| n.1))] {
+        let y_neo = neo_doc.and_then(|(t, f, _)| bo_cuc.iter().find(|b| b.0 == t).map(|&(_, y0, co)| (y0 + f * co.y - cao_xem / 2.0).max(0.0)));
+        for (ep, cu, y_neo) in [(&mut ep_goc, self.cuon_goc, y_neo), (&mut ep_dich, self.cuon_dich, y_neo)] {
             let mut v = ep.unwrap_or(cu);
             if let Some(y) = y_neo.filter(|_| toi.is_none()) {
                 v.y = y;
@@ -279,7 +297,7 @@ impl ManXoaGhim {
             // điểm gần nhất trên mép trang gần nhất. Đăng ký trước các trang nên trên trang thì trang nhận chuột.
             if la_goc {
                 let nen = ui.interact(nhin, ui.scope_id().with("xg_nen_keo"), Sense::drag());
-                if nen.drag_started() && self.keo.is_none() {
+                if nen.drag_started() {
                     if let Some(q) = ctx.input(|i| i.pointer.press_origin()) {
                         let gan = bo_cuc.iter().map(|&(t, y0, co)| (t, o_cua(y0, co))).min_by(|a, b| a.1.distance_sq_to_pos(q).total_cmp(&b.1.distance_sq_to_pos(q)));
                         if let Some((t, o)) = gan {

@@ -632,3 +632,41 @@ fn loc_nang_cao_tu_ap_va_reset() {
     assert_eq!(man.borrow().loc_nc_ap.as_ref().map(|l| l.dai.as_str()), Some("2-3"), "sau 2 s: áp dải trang");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// Phóng / thu nhiều bước liên tiếp rồi về tỉ lệ cũ: khung xem quay lại đúng chỗ (không trôi dọc, ngang).
+#[test]
+fn phong_thu_lien_tuc_khong_troi() {
+    let d = thu_muc_mau("troi", &[("a.pdf", 5)]);
+    let mut man = ManXoaGhim::default();
+    man.mo_thu_muc(d.clone());
+    let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+    let m2 = man.clone();
+    let mut da_cai = false;
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 800.0)).build_ui(move |ui| {
+        if !std::mem::replace(&mut da_cai, true) {
+            crate::gui::cai_giao_dien(ui.ctx());
+        }
+        m2.borrow_mut().ve(ui, &mut CauHinhXoaGhim::default());
+    });
+    man.borrow_mut().kho_trang = vec![(595.0, 842.0); 5];
+    man.borrow_mut().ty_le = TyLe::CoDinh(0.8);
+    h.run_steps(4);
+    man.borrow_mut().cuon_toi = Some(2);
+    h.run_steps(4);
+    let dau = man.borrow().cuon_goc;
+    assert!(dau.y > 100.0, "đã cuộn tới trang 3: {dau:?}");
+    // Mỗi khung hình 1 bước như Ctrl + cuộn chuột
+    for i in 1..=10 {
+        man.borrow_mut().ty_le = TyLe::CoDinh(0.8 + 0.1 * i as f32);
+        h.run_steps(1);
+    }
+    for i in (0..10).rev() {
+        man.borrow_mut().ty_le = TyLe::CoDinh(0.8 + 0.1 * i as f32);
+        h.run_steps(1);
+    }
+    h.run_steps(5);
+    let cuoi = man.borrow().cuon_goc;
+    assert!((cuoi.y - dau.y).abs() < 2.0, "dọc trôi: {dau:?} → {cuoi:?}");
+    assert!((cuoi.x - dau.x).abs() < 1.0, "ngang trôi: {dau:?} → {cuoi:?}");
+    let _ = std::fs::remove_dir_all(&d);
+}

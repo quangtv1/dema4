@@ -159,7 +159,13 @@ impl Vung {
                 let kh = (self.cao * hf) as i64;
                 (if self.vi_tri == ViTri::CanhTrai { 0 } else { w - kw }, 0, kw, kh)
             }
-            ViTri::Tay => ((self.x * wf) as i64, (self.y * hf) as i64, (self.rong * wf) as i64, (self.cao * hf) as i64),
+            // Vùng vẽ chạm mép phải / dưới (x + rộng = 1): tới đúng cạnh ảnh — cắt phần lẻ riêng x và rộng làm hở 1–2 điểm ảnh
+            ViTri::Tay => {
+                let (x, y) = ((self.x * wf) as i64, (self.y * hf) as i64);
+                let kw = if self.x + self.rong >= 1.0 - 1e-9 { w - x } else { (self.rong * wf) as i64 };
+                let kh = if self.y + self.cao >= 1.0 - 1e-9 { h - y } else { (self.cao * hf) as i64 };
+                (x, y, kw, kh)
+            }
         };
         let x = x.min(w - 1).max(0);
         let y = y.min(h - 1).max(0);
@@ -241,5 +247,21 @@ mod tests {
         assert!(ApTrang::Chan.ap_dung(1) && !ApTrang::Chan.ap_dung(2));
         assert!(ApTrang::MotTrang(3).ap_dung(3) && !ApTrang::MotTrang(3).ap_dung(2));
         assert!(ApTrang::TatCa.ap_dung(7));
+    }
+}
+
+#[cfg(test)]
+mod tests_sat_mep {
+    use super::*;
+
+    /// Vùng vẽ kéo tới mép phải / dưới: khung tới đúng cạnh ảnh, không hở vì cắt phần lẻ.
+    #[test]
+    fn vung_ve_cham_mep_toi_dung_canh_anh() {
+        let z = Vung { vi_tri: ViTri::Tay, x: 0.3, y: 0.37, rong: 0.7, cao: 0.63, ..co_san(ViTri::GocTrenTrai) };
+        let k = z.khung(2479, 3508, 300.0);
+        assert_eq!((k.x2, k.y2), (2479, 3508));
+        let giua = Vung { rong: 0.4, cao: 0.2, ..z.clone() };
+        let k = giua.khung(2479, 3508, 300.0);
+        assert!(k.x2 < 2479 && k.y2 < 3508, "chưa chạm mép thì giữ cách tính cũ");
     }
 }

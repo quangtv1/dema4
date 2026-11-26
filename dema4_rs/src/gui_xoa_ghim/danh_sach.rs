@@ -320,7 +320,8 @@ impl ManXoaGhim {
             let dang_loc = self.loc_nc_bat && self.loc_nc_ap.is_some();
             let mut job = egui::text::LayoutJob::default();
             job.append("Lọc nâng cao", 0.0, egui::TextFormat::simple(font_dam(tk::CHU_CO), tk::CHU));
-            if dang_loc {
+            // Mở rộng: trạng thái "đang lọc" nằm ở dòng Kết quả dưới đáy; thu gọn thì hiện ngay tiêu đề
+            if dang_loc && !self.loc_nc_mo {
                 job.append(" · đang lọc", 0.0, egui::TextFormat::simple(font(tk::CHU_CO), tk::XANH_DAM_CHU));
             }
             let r = ui.add(egui::Label::new(job).sense(Sense::click()));
@@ -335,6 +336,16 @@ impl ManXoaGhim {
                 ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Thu gọn / mở lọc nâng cao"));
                 if ph.on_hover_text(if self.loc_nc_mo { "Thu gọn" } else { "Mở rộng" }).clicked() {
                     self.loc_nc_mo = !self.loc_nc_mo;
+                }
+                // Reset: về chọn hết, bỏ lọc
+                if self.loc_nc_mo {
+                    ui.add_space(4.0);
+                    let r = ui.add_enabled(self.loc_nc_bat, egui::Label::new(egui::RichText::new("Reset").font(font(tk::CHU_CO)).color(if self.loc_nc_bat { tk::XANH } else { tk::CHU_MO }).underline()).sense(Sense::click()));
+                    r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, self.loc_nc_bat, "Reset"));
+                    if r.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Chọn lại tất cả, xoá dải trang — bỏ lọc").clicked() {
+                        self.loc_nc = LocNangCao::default();
+                        self.ap_loc_nc();
+                    }
                 }
             });
         });
@@ -384,16 +395,18 @@ impl ManXoaGhim {
                 if o.lost_focus() && self.han_loc_nc.is_some() {
                     self.han_loc_nc = Some(0.0);
                 }
-                // Reset: về chọn hết, bỏ lọc
-                ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 18.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let r = ui.add(egui::Label::new(egui::RichText::new("Reset").font(font(tk::CHU_CO)).color(tk::XANH).underline()).sense(Sense::click()));
-                    r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, true, "Reset"));
-                    if r.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Chọn lại tất cả, xoá dải trang — bỏ lọc").clicked() {
-                        self.loc_nc = LocNangCao::default();
-                        self.han_loc_nc = None;
-                        self.ap_loc_nc();
-                    }
-                });
+            });
+            // Dòng cuối: số file sau khi lọc (mọi bộ lọc của Danh sách) + trạng thái đang lọc
+            let (con, tong) = (self.thu_tu_hien().len(), self.ds.len());
+            let dang_loc = self.loc_nc_bat && self.loc_nc_ap.is_some();
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(format!("Kết quả: {con} / {tong} file")).font(font_dam(tk::CHU_CO)).color(tk::CHU));
+                if dang_loc {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(egui::RichText::new("đang lọc").font(font(tk::CHU_CO)).color(tk::XANH_DAM_CHU));
+                    });
+                }
             });
         });
         if self.loc_nc.dai != truoc.dai {

@@ -267,7 +267,9 @@ pub struct ManXoaGhim {
     /// Bề rộng khung xem ở khung hình trước (đổi → neo lại).
     rong_xem_cu: f32,
     /// Cuộn dọc cần giữ sau khi đổi tỉ lệ: (Gốc, Đích, số khung hình còn áp).
-    neo_doc: Option<(f32, f32, u8)>,
+    neo_doc: Option<(u32, f32, u8)>,
+    /// Bố cục trang khung hình trước (đo điểm neo dọc khi đổi tỉ lệ).
+    bo_cuc_cu: Vec<(u32, f32, egui::Vec2)>,
     /// Cao khối Lọc nâng cao đo ở khung trước (danh sách file chừa chỗ đúng bằng nó).
     cao_nc: f32,
     cfg_doi: bool,
@@ -339,6 +341,7 @@ impl Default for ManXoaGhim {
             neo_ngang: true,
             rong_xem_cu: 0.0,
             neo_doc: None,
+            bo_cuc_cu: Vec::new(),
             cfg_doi: false,
             mo_hinh: None,
             mo_cau_hinh: false,

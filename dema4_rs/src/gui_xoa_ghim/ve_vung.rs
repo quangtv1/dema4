@@ -18,6 +18,8 @@ use crate::xoa_ghim::vung::{ApTrang, Hcn, LoaiVung, ViTri, Vung};
 const BAT_CANH: f32 = 6.0;
 /// Khung quét nhỏ hơn chừng này (điểm màn hình) coi như bấm.
 const QUET_TOI_THIEU: f32 = 4.0;
+/// Khoảng (điểm màn) hút điểm vẽ vào mép trang.
+const HUT_MEP: f32 = 4.0;
 
 /// (nền, viền, nét đứt) của vùng.
 fn mau_vung(z: &Vung, chon: bool) -> (Color32, Color32, bool) {
@@ -33,6 +35,21 @@ fn mau_vung(z: &Vung, chon: bool) -> (Color32, Color32, bool) {
 fn mau_ve_moi(loai: LoaiVung) -> (Color32, Color32, bool) {
     let z = Vung { loai, ..crate::xoa_ghim::vung::co_san(ViTri::GocTrenTrai) };
     mau_vung(&Vung { vi_tri: ViTri::Tay, ..z }, true)
+}
+
+/// Điểm kéo về trong trang `o`; cách mép ≤ `HUT_MEP` điểm màn thì hút đúng vào mép (vùng sát mép, không hở).
+fn trong_trang(q: Pos2, o: Rect) -> Pos2 {
+    let hut = |v: f32, a: f32, b: f32| {
+        let v = v.clamp(a, b);
+        if v - a <= HUT_MEP {
+            a
+        } else if b - v <= HUT_MEP {
+            b
+        } else {
+            v
+        }
+    };
+    egui::pos2(hut(q.x, o.left(), o.right()), hut(q.y, o.top(), o.bottom()))
 }
 
 fn vien_dut(p: &egui::Painter, r: Rect, s: Stroke) {
@@ -77,7 +94,7 @@ impl ManXoaGhim {
             let dang = self.bo.dang_chon(c);
             let (nen, vien, dut) = mau_vung(z, dang);
             p.rect_filled(r, 0.0, nen);
-            let s = Stroke::new(if dang { 2.0 } else { 1.2 }, vien);
+            let s = Stroke::new(if dang { 1.2 } else { 0.8 }, vien);
             if dut {
                 vien_dut(&p, r, s);
             } else {
@@ -124,25 +141,27 @@ impl ManXoaGhim {
         if let Some(loai) = self.ve {
             if ph.drag_started() {
                 if let Some(q) = diem_dau().or(ph.interact_pointer_pos()) {
-                    self.keo = Some(Keo::Moi { trang: t, dau: q });
+                    self.keo = Some(Keo::Moi { trang: t, dau: trong_trang(q, o_goc) });
                 }
             }
             if let (Some(Keo::Moi { trang, dau }), Some(q)) = (self.keo.clone(), ctx.pointer_latest_pos()) {
                 if trang == t {
-                    let r = Rect::from_two_pos(dau.clamp(o_goc.min, o_goc.max), q.clamp(o_goc.min, o_goc.max));
+                    let r = Rect::from_two_pos(trong_trang(dau, o_goc), trong_trang(q, o_goc));
                     let loai_hien = if loai == LoaiVung::Xoa && self.loc_trang == LocTrang::VoDoi { LoaiVung::VoDoi } else { loai };
                     let (nen, vien, dut) = mau_ve_moi(loai_hien);
                     p.rect_filled(r, 0.0, nen);
                     if dut {
-                        vien_dut(&p, r, Stroke::new(1.5, vien));
+                        vien_dut(&p, r, Stroke::new(1.0, vien));
                     } else {
-                        p.rect_stroke(r, 0.0, Stroke::new(1.5, vien), StrokeKind::Inside);
+                        p.rect_stroke(r, 0.0, Stroke::new(1.0, vien), StrokeKind::Inside);
                     }
                     self.goi_y_co(ctx, q, r.width() / o_goc.width(), r.height() / o_goc.height());
                     if ph.drag_stopped() || !ctx.input(|i| i.pointer.primary_down()) {
                         self.keo = None;
-                        let ((x1, y1), (x2, y2)) = (anh(r.min), anh(r.max));
-                        self.them_ve((x1 / w as f64, y1 / h as f64, (x2 - x1) / w as f64, (y2 - y1) / h as f64), t);
+                        // Tỉ lệ theo ô trang trên màn (mép trang = đúng 0 / 1; đổi qua điểm ảnh rồi chia lại lệch chút ở mép dưới)
+                        let ti = |q: Pos2| (((q.x - o_goc.left()) / o_goc.width()) as f64, ((q.y - o_goc.top()) / o_goc.height()) as f64);
+                        let ((x1, y1), (x2, y2)) = (ti(r.min), ti(r.max));
+                        self.them_ve((x1, y1, x2 - x1, y2 - y1), t);
                     }
                 }
             }
@@ -221,14 +240,14 @@ impl ManXoaGhim {
             }
             Some(Keo::Quet { trang, dau, them }) if trang == t => {
                 if let Some(q) = ctx.pointer_latest_pos() {
-                    let r = Rect::from_two_pos(dau, q.clamp(o_goc.min, o_goc.max));
+                    let r = Rect::from_two_pos(dau.clamp(o_goc.min, o_goc.max), q.clamp(o_goc.min, o_goc.max));
                     let cat = q.x < dau.x;
                     if cat {
                         p.rect_filled(r, 0.0, tk::QUET_CROSSING_NEN);
-                        vien_dut(&p, r, Stroke::new(1.2, tk::QUET_CROSSING_VIEN));
+                        vien_dut(&p, r, Stroke::new(1.0, tk::QUET_CROSSING_VIEN));
                     } else {
                         p.rect_filled(r, 0.0, tk::QUET_WINDOW_NEN);
-                        p.rect_stroke(r, 0.0, Stroke::new(1.2, tk::QUET_WINDOW_VIEN), StrokeKind::Inside);
+                        p.rect_stroke(r, 0.0, Stroke::new(1.0, tk::QUET_WINDOW_VIEN), StrokeKind::Inside);
                     }
                     if ph.drag_stopped() || !ctx.input(|i| i.pointer.primary_down()) {
                         self.keo = None;
