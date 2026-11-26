@@ -65,12 +65,16 @@ pub fn nut_bt_chu(ui: &mut Ui, bt: &str, kich: (f32, f32), chu: &str, duoc: bool
         let nen = if duoc && ph.hovered() { tk::NEN_NUT_HOVER } else { tk::NEN_NUT };
         p.rect(o, 3.0, nen, Stroke::new(1.0, tk::VIEN), StrokeKind::Inside);
         let g = p.layout_no_wrap(chu.to_owned(), font(tk::CHU_CO), tk::CHU);
-        let rong = kich.0 + 5.0 + g.size().x;
-        let x0 = o.center().x - rong / 2.0;
+        // `bt` trống → chỉ chữ, căn giữa
+        let co_bt = !bt.is_empty();
+        let (w_bt, cach) = if co_bt { (kich.0, 5.0) } else { (0.0, 0.0) };
+        let x0 = o.center().x - (w_bt + cach + g.size().x) / 2.0;
         let mo = if duoc { 1.0 } else { 0.45 };
-        let o_bt = Rect::from_center_size(egui::pos2(x0 + kich.0 / 2.0, o.center().y), egui::vec2(kich.0, kich.1));
-        bieu_tuong::anh(bt, kich.0, kich.1).tint(Color32::WHITE.gamma_multiply(mo)).paint_at(ui, o_bt);
-        p.galley(egui::pos2(x0 + kich.0 + 5.0, o.center().y - g.size().y / 2.0), g, tk::CHU.gamma_multiply(mo));
+        if co_bt {
+            let o_bt = Rect::from_center_size(egui::pos2(x0 + kich.0 / 2.0, o.center().y), egui::vec2(kich.0, kich.1));
+            bieu_tuong::anh(bt, kich.0, kich.1).tint(Color32::WHITE.gamma_multiply(mo)).paint_at(ui, o_bt);
+        }
+        p.galley(egui::pos2(x0 + w_bt + cach, o.center().y - g.size().y / 2.0), g, tk::CHU.gamma_multiply(mo));
     }
     ph.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, duoc, chu));
     ph

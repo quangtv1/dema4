@@ -380,6 +380,7 @@ impl UngDungChinh {
     fn ap_cau_hinh(&mut self, moi: crate::cau_hinh::CauHinh, ghi: bool) {
         self.tach.ap_cau_hinh(&self.cfg, &moi);
         self.dem.quy_tac = moi.quy_tac();
+        self.xoa_ghim.quy_tac = moi.quy_tac();
         self.cfg = moi;
         if ghi {
             let _ = crate::cau_hinh::ghi(&self.cfg);

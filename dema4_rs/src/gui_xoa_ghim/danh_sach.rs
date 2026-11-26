@@ -32,7 +32,7 @@ impl ManXoaGhim {
                 Some(f) => self.thong_tin.get(i).and_then(Option::as_ref).is_some_and(|t| f(t.so_trang)),
                 None => self.loc_so.trim().is_empty() && self.khop_trang_thai(i),
             })
-            .filter(|&i| nc.is_none_or(|l| self.thong_tin.get(i).and_then(Option::as_ref).is_some_and(|t| khop_nang_cao(t, l))))
+            .filter(|&i| nc.is_none_or(|l| self.thong_tin.get(i).and_then(Option::as_ref).is_some_and(|t| khop_nang_cao(t, l, &self.quy_tac))))
             .collect();
         match self.sap_theo {
             SapTheo::Ten => ds.sort_by(|&a, &b| crate::tach_vb::phien::so_ten_tu_nhien(&ten(a), &ten(b))),
@@ -62,8 +62,8 @@ impl ManXoaGhim {
             return;
         }
         let rong = self.cfg.rong_ds.clamp(tk::DS_RONG_MIN, tk::DS_RONG_MAX);
-        egui::Panel::left("xg_ds").resizable(false).exact_size(rong).frame(egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, tk::VIEN_KHUNG))).show(ui, |ui| {
-            let khung = ui.max_rect();
+        // Kéo mép phải đổi bề rộng: dùng tay nắm có sẵn của Panel (nằm trên màn trang, không bị vùng trang che mất)
+        let kq = egui::Panel::left("xg_ds").resizable(true).default_size(rong).size_range(tk::DS_RONG_MIN..=tk::DS_RONG_MAX).frame(egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, tk::VIEN_KHUNG))).show(ui, |ui| {
             // Các hàng (tiêu đề 32, sắp xếp 28, lọc, danh sách) nối liền như prototype
             ui.spacing_mut().item_spacing.y = 0.0;
             self.tieu_de_ds(ui);
@@ -73,13 +73,27 @@ impl ManXoaGhim {
             } else {
                 self.hang_sap_xep(ui);
                 self.hang_loc(ui);
-                let cao_nc = if self.loc_nc_mo { 250.0 } else { 31.0 };
-                let cao_ds = (ui.available_height() - cao_nc).max(40.0);
+                // Khối Lọc nâng cao đo ở khung trước → danh sách chừa đúng chỗ, nút Áp dụng không bị cắt
+                let cao_ds = (ui.available_height() - self.cao_nc).max(40.0);
                 ui.allocate_ui(egui::vec2(ui.available_width(), cao_ds), |ui| self.cac_dong(ui));
+                let tren = ui.cursor().top();
                 self.loc_nang_cao(ui);
+                let cao = ui.min_rect().bottom() - tren;
+                if (cao - self.cao_nc).abs() > 0.5 {
+                    self.cao_nc = cao;
+                    ui.ctx().request_repaint();
+                }
             }
-            self.keo_mep(ui, khung);
         });
+        // Ghi bề rộng vào cấu hình khi thả chuột (đang kéo chỉ nhớ tạm)
+        let w = kq.response.rect.width();
+        if ui.input(|i| i.pointer.any_down()) {
+            if (w - self.cfg.rong_ds).abs() > 0.5 {
+                self.rong_keo = Some(w);
+            }
+        } else if let Some(w) = self.rong_keo.take() {
+            self.doi_cfg(|c| c.rong_ds = w);
+        }
     }
 
     /// Dải thu nhỏ: ▸| · "Danh sách" dọc · số file; bấm bất kỳ đâu → mở rộng.
@@ -324,6 +338,8 @@ impl ManXoaGhim {
         if !self.loc_nc_mo {
             return;
         }
+        // Khổ / chiều không có trang nào trong các file đang mở → ô mờ, không bấm được (khổ xếp theo quy tắc Đếm trang A4)
+        let (co_kho, co_ngang, co_doc) = super::co_mat(&self.thong_tin, &self.quy_tac);
         egui::Frame::new().inner_margin(egui::Margin { left: 12, right: 12, top: 2, bottom: 10 }).show(ui, |ui| {
             ui.add_enabled_ui(self.loc_nc_bat, |ui| {
                 ui.spacing_mut().item_spacing.y = 6.0;
@@ -331,9 +347,12 @@ impl ManXoaGhim {
                 phu(ui, "Có trang khổ:");
                 egui::Grid::new("xg_kho").num_columns(4).spacing(egui::vec2(8.0, 4.0)).show(ui, |ui| {
                     for (i, k) in KHO.iter().enumerate() {
-                        let mut b = self.loc_nc.kho[i];
+                        let mut b = self.loc_nc.kho[i] && co_kho[i];
                         let mau = if b { tk::CHU } else { tk::CHU_MO };
-                        if widget::tick(ui, &mut b, egui::RichText::new(*k).font(font(tk::CHU_CO)).color(mau)).changed() {
+                        let r = ui.add_enabled_ui(co_kho[i], |ui| widget::tick(ui, &mut b, egui::RichText::new(*k).font(font(tk::CHU_CO)).color(mau))).inner;
+                        if !co_kho[i] {
+                            r.on_disabled_hover_text(format!("Không có trang {k} trong các file đang mở"));
+                        } else if r.changed() {
                             self.loc_nc.kho[i] = b;
                         }
                         if i % 4 == 3 {
@@ -344,14 +363,21 @@ impl ManXoaGhim {
                 phu(ui, "Chiều trang:");
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 16.0;
-                    widget::tick(ui, &mut self.loc_nc.ngang, egui::RichText::new("Ngang").font(font(tk::CHU_CO)));
-                    widget::tick(ui, &mut self.loc_nc.doc, egui::RichText::new("Dọc").font(font(tk::CHU_CO)));
+                    for (co, gt, ten) in [(co_ngang, &mut self.loc_nc.ngang, "Ngang"), (co_doc, &mut self.loc_nc.doc, "Dọc")] {
+                        let mut b = *gt && co;
+                        let r = ui.add_enabled_ui(co, |ui| widget::tick(ui, &mut b, egui::RichText::new(ten).font(font(tk::CHU_CO)))).inner;
+                        if !co {
+                            r.on_disabled_hover_text(format!("Không có trang {} trong các file đang mở", ten.to_lowercase()));
+                        } else if r.changed() {
+                            *gt = b;
+                        }
+                    }
                 });
                 phu(ui, "Trong dải trang:");
                 ui.add(egui::TextEdit::singleline(&mut self.loc_nc.dai).hint_text("tất cả (vd: 1-5, 7, 10-15)").desired_width(f32::INFINITY).min_size(egui::vec2(0.0, tk::CAO_NUT)).align(egui::Align2::LEFT_CENTER))
                     .widget_info(|| egui::WidgetInfo::labeled(egui::Role::TextInput, true, "Trong dải trang"));
                 ui.label(egui::RichText::new("Giữ file có ít nhất 1 trang khớp các điều kiện trên.").font(font(tk::CHU_NHO)).color(tk::CHU_PHU));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), tk::CAO_NUT), egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if widget::nut_xanh(ui, "Áp dụng", true).clicked() {
                         self.loc_nc_ap = Some(self.loc_nc.clone());
                         self.loc_nc_bat = true;
@@ -364,26 +390,4 @@ impl ManXoaGhim {
         });
     }
 
-    /// Tay nắm 6 px ở mép phải cột: kéo đổi rộng 200–520, bấm đúp về 282.
-    fn keo_mep(&mut self, ui: &mut egui::Ui, khung: Rect) {
-        let o = Rect::from_min_max(egui::pos2(khung.right() - 3.0, khung.top()), egui::pos2(khung.right() + 3.0, khung.bottom()));
-        let ph = ui.interact(o, ui.scope_id().with("xg_keo_mep"), Sense::click_and_drag());
-        if ph.hovered() || ph.dragged() {
-            ui.painter().rect_filled(o, 0.0, Color32::from_rgba_unmultiplied(37, 99, 235, 89));
-            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeColumn);
-        }
-        if ph.dragged() {
-            let moi = (self.cfg.rong_ds + ph.drag_delta().x).clamp(tk::DS_RONG_MIN, tk::DS_RONG_MAX);
-            if moi != self.cfg.rong_ds {
-                self.cfg.rong_ds = moi;
-            }
-        }
-        if ph.drag_stopped() {
-            self.doi_cfg(|_| {});
-        }
-        if ph.double_clicked() {
-            self.doi_cfg(|c| c.rong_ds = tk::DS_RONG_MAC_DINH);
-        }
-        ph.on_hover_text("Kéo để đổi độ rộng · bấm đúp: về mặc định");
-    }
 }

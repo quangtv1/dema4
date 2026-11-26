@@ -136,11 +136,19 @@ impl Default for LocNangCao {
     }
 }
 
-/// Số trang + khổ (chỉ số A0..A7) và chiều (ngang?) từng trang — đọc ở luồng nền.
+/// Số trang + cỡ (rộng, cao — điểm PDF, như màn Đếm) từng trang — đọc ở luồng nền. Khổ tính lúc lọc theo quy tắc
+/// Cấu hình › Đếm trang A4 đang dùng (đổi ranh giới không phải đọc lại file).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ThongTinFile {
     pub so_trang: u32,
-    pub trang: Vec<(u8, bool)>,
+    pub trang: Vec<(f64, f64)>,
+}
+
+impl ThongTinFile {
+    /// (khổ A0..A7, ngang?) từng trang theo quy tắc `qt` — như màn Đếm: khổ theo cạnh dài, ngang khi rộng > cao.
+    pub fn kho_chieu<'a>(&'a self, qt: &'a crate::dem_pdf::QuyTac) -> impl Iterator<Item = (usize, bool)> + 'a {
+        self.trang.iter().map(move |&(w, h)| (qt.kho(w, h), w > h))
+    }
 }
 
 /// Tỉ lệ hiển thị: vừa bề ngang / vừa chiều cao khung (tính lại theo khung) hoặc cố định (điểm màn / 1 điểm PDF).
@@ -247,6 +255,12 @@ pub struct ManXoaGhim {
     toast: Option<(String, Instant)>,
     /// Tuỳ chọn chung (cấu hình app) — đồng bộ ra ngoài khi đổi.
     pub cfg: CauHinhXoaGhim,
+    /// Quy tắc xếp khổ của Cấu hình › Đếm trang A4 (Lọc nâng cao xếp khổ giống màn Đếm); app cập nhật khi lưu cấu hình.
+    pub quy_tac: crate::dem_pdf::QuyTac,
+    /// Bề rộng Danh sách đang kéo (chưa ghi cấu hình tới khi thả chuột).
+    rong_keo: Option<f32>,
+    /// Cao khối Lọc nâng cao đo ở khung trước (danh sách file chừa chỗ đúng bằng nó).
+    cao_nc: f32,
     cfg_doi: bool,
     /// Việc tải / nhập mô hình AI đang chạy (nhận diện layout); `None` = không có việc.
     pub mo_hinh: Option<crate::xoa_ghim::mo_hinh::TaiMoHinh>,
@@ -309,6 +323,9 @@ impl Default for ManXoaGhim {
             tro_giup: false,
             toast: None,
             cfg: CauHinhXoaGhim::default(),
+            quy_tac: crate::dem_pdf::QuyTac::default(),
+            rong_keo: None,
+            cao_nc: 31.0,
             cfg_doi: false,
             mo_hinh: None,
             mo_cau_hinh: false,
@@ -404,8 +421,8 @@ impl ManXoaGhim {
         if let Some(c) = &self.chay {
             c.dung.store(true, std::sync::atomic::Ordering::Relaxed);
         }
-        let (license, cfg, mo_hinh) = (self.license.clone(), self.cfg.clone(), std::mem::take(&mut self.mo_hinh));
-        *self = ManXoaGhim { license, cfg, mo_hinh, ..Default::default() };
+        let (license, cfg, mo_hinh, quy_tac) = (self.license.clone(), self.cfg.clone(), std::mem::take(&mut self.mo_hinh), self.quy_tac);
+        *self = ManXoaGhim { license, cfg, mo_hinh, quy_tac, ..Default::default() };
     }
 
     /// Thư mục kết quả hiện tại (theo kiểu ghi; ghi cạnh file / ghi đè = thư mục nguồn).
@@ -767,7 +784,7 @@ fn ten_pham_vi(ap: ApTrang) -> String {
     }
 }
 
-/// Số trang + khổ (A0..A7) + chiều từng trang của 1 PDF (lỗi → 0 trang).
+/// Số trang + cỡ từng trang của 1 PDF (lỗi → 0 trang).
 fn doc_thong_tin_file(p: &Path) -> ThongTinFile {
     let Ok(d) = mupdf::Document::open(p.to_string_lossy().as_ref()) else { return ThongTinFile::default() };
     let n = d.page_count().unwrap_or(0).max(0);
@@ -775,11 +792,9 @@ fn doc_thong_tin_file(p: &Path) -> ThongTinFile {
         .map(|i| {
             d.load_page(i)
                 .and_then(|pg| pg.bounds())
-                .map(|b| {
-                    let (w, h) = (((b.x1 - b.x0) as f64).abs() * 25.4 / 72.0, ((b.y1 - b.y0) as f64).abs() * 25.4 / 72.0);
-                    (crate::dem_pdf::xac_dinh_kho_a(w, h) as u8, w > h)
-                })
-                .unwrap_or((4, false))
+                // Cùng cách đo với màn Đếm: điểm PDF, làm tròn 3 số lẻ
+                .map(|b| (((b.x1 - b.x0) as f64 * 1000.0).round() / 1000.0, ((b.y1 - b.y0) as f64 * 1000.0).round() / 1000.0))
+                .unwrap_or((595.276, 841.89))
         })
         .collect();
     ThongTinFile { so_trang: n as u32, trang }
@@ -821,10 +836,24 @@ pub fn khop_so(txt: &str) -> Option<Box<dyn Fn(u32) -> bool>> {
     }
 }
 
-/// File có ≥ 1 trang (trong dải) khớp khổ + chiều đã chọn.
-pub fn khop_nang_cao(tt: &ThongTinFile, l: &LocNangCao) -> bool {
+/// File có ≥ 1 trang (trong dải) khớp khổ + chiều đã chọn; khổ theo quy tắc Đếm trang A4 `qt`.
+pub fn khop_nang_cao(tt: &ThongTinFile, l: &LocNangCao, qt: &crate::dem_pdf::QuyTac) -> bool {
     let trong = khop_so(&l.dai);
-    tt.trang.iter().enumerate().any(|(i, &(kho, ngang))| trong.as_ref().is_none_or(|f| f(i as u32 + 1)) && l.kho.get(kho as usize).copied().unwrap_or(false) && if ngang { l.ngang } else { l.doc })
+    tt.kho_chieu(qt).enumerate().any(|(i, (kho, ngang))| trong.as_ref().is_none_or(|f| f(i as u32 + 1)) && l.kho.get(kho).copied().unwrap_or(false) && if ngang { l.ngang } else { l.doc })
+}
+
+/// Khổ (A0..A7) và chiều (ngang, dọc) **có mặt** trong các file đã đọc — ô lọc không có trang nào thì mờ.
+pub fn co_mat(ds: &[Option<ThongTinFile>], qt: &crate::dem_pdf::QuyTac) -> ([bool; 8], bool, bool) {
+    let (mut kho, mut ngang, mut doc) = ([false; 8], false, false);
+    for (k, n) in ds.iter().flatten().flat_map(|t| t.kho_chieu(qt)) {
+        kho[k] = true;
+        if n {
+            ngang = true;
+        } else {
+            doc = true;
+        }
+    }
+    (kho, ngang, doc)
 }
 
 #[cfg(test)]

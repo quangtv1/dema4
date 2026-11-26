@@ -449,8 +449,8 @@ them(H2('7.3 Danh sách, đầu vào và file đích'),
   ...bang(['Mục', 'Lựa chọn', 'Ý nghĩa'], [
     ['Danh sách', 'Sắp xếp', 'Bấm **Tên file** hoặc **Trang** (bấm lại đảo chiều). Ô tick: file được chạy.'],
     ['', 'Lọc', 'Ô lọc tên; ô lọc gộp chọn trạng thái (**Cần chạy**, **Chưa xóa**, **Đã xóa**, **Đã đổi vùng**, **Mất kết quả**) hoặc gõ số trang `1-3, 7, >10`. **Lọc nâng cao** (bấm để mở): khổ A0–A7, chiều, dải trang.'],
-    ['File đích', '**Nhân bản thư mục**', '`<nguồn>_xoaghim/` hoặc thư mục chọn bằng nút **Thư mục**; giữ thư mục con và tên file. ⊗ về mặc định.'],
-    ['', '**Cạnh file gốc**', '`<tên>_xoaghim.pdf` cùng thư mục với file gốc (danh sách tự ẩn các file này).'],
+    ['File đích', '**Thư mục mới**', '`<nguồn>_xoaghim/` hoặc thư mục chọn bằng nút **Chọn**; giữ thư mục con và tên file. ⊗ về mặc định.'],
+    ['', '**Cạnh gốc**', '`<tên>_xoaghim.pdf` cùng thư mục với file gốc (danh sách tự ẩn các file này).'],
     ['', '**Ghi đè** (Cấu hình)', 'Thay thẳng file gốc — không hoàn tác được, nên sao lưu trước.'],
   ], [1600, 2200, 5226]),
 );

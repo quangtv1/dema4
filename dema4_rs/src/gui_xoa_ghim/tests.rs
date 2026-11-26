@@ -176,18 +176,33 @@ fn loc_so_trang_va_nang_cao() {
     let f = khop_so("1-3, 7, >10, <=0").unwrap();
     assert!(f(2) && f(7) && f(11) && f(0) && !f(5) && !f(10));
     assert!(khop_so("  ").is_none() && khop_so("abc").is_none());
-    let tt = ThongTinFile { so_trang: 3, trang: vec![(4, false), (3, true), (4, false)] };
+    // Cỡ trang theo điểm PDF như màn Đếm: A4 dọc, A3 ngang, A4 dọc
+    let tt = ThongTinFile { so_trang: 3, trang: vec![(595.276, 841.89), (1190.551, 841.89), (595.276, 841.89)] };
+    let qt = crate::dem_pdf::QuyTac::default();
+    let khop = |tt: &ThongTinFile, l: &LocNangCao| khop_nang_cao(tt, l, &qt);
     let mut l = LocNangCao::default();
-    assert!(khop_nang_cao(&tt, &l), "mặc định A3 + A4, 2 chiều");
+    assert!(khop(&tt, &l), "mặc định A3 + A4, 2 chiều");
     l.kho = [false; 8];
     l.kho[3] = true;
     l.ngang = false;
-    assert!(!khop_nang_cao(&tt, &l), "A3 chỉ có trang ngang");
+    assert!(!khop(&tt, &l), "A3 chỉ có trang ngang");
     l.ngang = true;
     l.dai = "1, 3".into();
-    assert!(!khop_nang_cao(&tt, &l), "A3 ngang ở trang 2 — ngoài dải");
+    assert!(!khop(&tt, &l), "A3 ngang ở trang 2 — ngoài dải");
     l.dai = "2".into();
-    assert!(khop_nang_cao(&tt, &l));
+    assert!(khop(&tt, &l));
+    // Ô có mặt: chỉ A3, A4; có cả ngang lẫn dọc. File chỉ A4 dọc → không có ngang
+    let (kho, ngang, doc) = co_mat(&[Some(tt.clone()), None], &qt);
+    assert_eq!((kho, ngang, doc), ([false, false, false, true, true, false, false, false], true, true));
+    let chi_doc = ThongTinFile { so_trang: 1, trang: vec![(595.276, 841.89)] };
+    assert_eq!(co_mat(&[Some(chi_doc)], &qt).1, false);
+    // Ranh giới khổ tuỳ chỉnh của Đếm: A4 dài 297 mm, đặt ranh A3|A4 = 290 mm → xếp A3
+    let mut rg = [0.0; 7];
+    for (i, r) in rg.iter_mut().enumerate() {
+        *r = [1000.0, 700.0, 500.0, 290.0, 250.0, 180.0, 120.0][i];
+    }
+    let qt2 = crate::dem_pdf::QuyTac { ranh_gioi_mm: Some(rg), ..Default::default() };
+    assert!(co_mat(&[Some(tt)], &qt2).0[3] && !co_mat(&[Some(ThongTinFile { so_trang: 1, trang: vec![(595.276, 841.89)] })], &qt2).0[4]);
 }
 
 #[test]

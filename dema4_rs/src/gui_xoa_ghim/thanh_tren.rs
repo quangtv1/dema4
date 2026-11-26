@@ -363,11 +363,11 @@ impl ManXoaGhim {
                 let mut kieu = ghi.kieu;
                 egui::ComboBox::from_id_salt("xg_kieu_ghi")
                     .icon(widget::mui_ten)
-                    .width(150.0)
-                    .selected_text(egui::RichText::new(if kieu == KieuGhi::CanhFile { "Cạnh file gốc" } else { "Nhân bản thư mục" }).font(font(tk::CHU_CO)))
+                    .width(110.0)
+                    .selected_text(egui::RichText::new(if kieu == KieuGhi::CanhFile { "Cạnh gốc" } else { "Thư mục mới" }).font(font(tk::CHU_CO)))
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut kieu, KieuGhi::NhanBan, egui::RichText::new("Nhân bản thư mục").font(font(tk::CHU_CO)));
-                        ui.selectable_value(&mut kieu, KieuGhi::CanhFile, egui::RichText::new("Cạnh file gốc").font(font(tk::CHU_CO)));
+                        ui.selectable_value(&mut kieu, KieuGhi::NhanBan, egui::RichText::new("Thư mục mới").font(font(tk::CHU_CO))).on_hover_text("Nhân bản cây thư mục sang thư mục đích (mặc định <nguồn>_xoaghim)");
+                        ui.selectable_value(&mut kieu, KieuGhi::CanhFile, egui::RichText::new("Cạnh gốc").font(font(tk::CHU_CO))).on_hover_text("Ghi <tên>_xoaghim.pdf cùng thư mục với file gốc");
                     })
                     .response
                     .on_hover_text(if ghi.ghi_de { "Đang bật Ghi đè file gốc (Cấu hình)" } else { "Cách ghi file kết quả" })
@@ -387,7 +387,7 @@ impl ManXoaGhim {
             } else if ghi.thu_muc.is_some() {
                 (rut_gon(&mau), tk::CHU, DuoiO::XoaTron("Về thư mục mặc định (<nguồn>_xoaghim)"), mau.clone())
             } else {
-                (rut_gon(&mau), tk::CHU, DuoiO::Nhan("mặc định", tk::NEN_NHAN, tk::CHU_PHU), mau.clone())
+                (rut_gon(&mau), tk::CHU, DuoiO::Khong, mau.clone())
             };
             if widget::o_duong_dan(ui, rong, &chu, "", &tip, mau_chu, duoi, "File đích") {
                 self.bo.tm.ghi.thu_muc = None;
@@ -395,7 +395,7 @@ impl ManXoaGhim {
                 self.lap_ds_giu_chon();
             }
             let duoc = !ghi.ghi_de && ghi.kieu != KieuGhi::CanhFile;
-            let r = widget::nut_bt_chu(ui, "thu_muc", (15.0, 13.0), "Thư mục", duoc);
+            let r = widget::nut_bt_chu(ui, "", (0.0, 0.0), "Chọn", duoc);
             let r = r.on_hover_text(if duoc { "Chọn thư mục đích khác (mặc định: _xoaghim cạnh nguồn)" } else { "Ghi cạnh file gốc / ghi đè — không cần chọn thư mục" });
             if duoc && r.clicked() {
                 self.chon_thu_muc_dich();
