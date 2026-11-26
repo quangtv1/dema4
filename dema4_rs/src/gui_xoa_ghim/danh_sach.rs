@@ -63,7 +63,14 @@ impl ManXoaGhim {
         }
         let rong = self.cfg.rong_ds.clamp(tk::DS_RONG_MIN, tk::DS_RONG_MAX);
         // Kéo mép phải đổi bề rộng: dùng tay nắm có sẵn của Panel (nằm trên màn trang, không bị vùng trang che mất)
-        let kq = egui::Panel::left("xg_ds").resizable(true).default_size(rong).size_range(tk::DS_RONG_MIN..=tk::DS_RONG_MAX).frame(egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, tk::VIEN_KHUNG))).show(ui, |ui| {
+        let kq = egui::Panel::left("xg_ds").resizable(true).default_size(rong).size_range(tk::DS_RONG_MIN..=tk::DS_RONG_MAX).frame(egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, tk::VIEN_KHUNG))).show(ui, |ui_panel| {
+            // Panel lấy bề rộng theo nội dung → nội dung đã trải hết bề rộng thì kéo nhỏ không được. Vẽ trong ô con
+            // giới hạn đúng bề rộng panel (cắt phần thừa) để kéo nhỏ được tới mức tối thiểu.
+            let o_ds = ui_panel.max_rect();
+            let mut con = ui_panel.new_child(egui::UiBuilder::new().max_rect(o_ds).layout(egui::Layout::top_down(egui::Align::Min)));
+            con.set_clip_rect(o_ds.intersect(ui_panel.clip_rect()));
+            ui_panel.expand_to_include_rect(o_ds);
+            let ui = &mut con;
             // Các hàng (tiêu đề 32, sắp xếp 28, lọc, danh sách) nối liền như prototype
             ui.spacing_mut().item_spacing.y = 0.0;
             self.tieu_de_ds(ui);
