@@ -14,8 +14,8 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use eframe::egui;
 
 use crate::tach_vb::anh::Anh;
-use crate::xoa_ghim::vung::Vung;
-use crate::xoa_ghim::xu_ly::{xoa_ghim_trang, TuyChon};
+use crate::xoa_ghim::vung::{Hcn, Vung};
+use crate::xoa_ghim::xu_ly::{khung_ai_anh, xoa_ghim_trang, TuyChon};
 
 /// Cạnh dài tối đa của ảnh trang hiển thị (texture); ảnh lớn hơn thu nhỏ **sau** khi xoá ghim.
 const CANH_HIEN_TOI_DA: usize = 1800;
@@ -42,7 +42,8 @@ pub enum YeuCau {
 pub enum KetQua {
     KhoTrang { the_he: u64, kho: Vec<(f32, f32)> },
     AnhNho { the_he: u64, trang: u32, anh: egui::ColorImage },
-    Trang { the_he: u64, trang: u32, ma: u64, dpi: u16, co_anh: (usize, usize), goc: egui::ColorImage, dich: egui::ColorImage },
+    /// `ai`: khung bảo vệ nhận diện layout (điểm ảnh của ảnh `co_anh`), trống khi tắt nhận diện.
+    Trang { the_he: u64, trang: u32, ma: u64, dpi: u16, co_anh: (usize, usize), goc: egui::ColorImage, dich: egui::ColorImage, ai: Vec<Hcn> },
     Loi { the_he: u64, loi: String },
 }
 
@@ -80,6 +81,8 @@ fn luong(nhan: Receiver<YeuCau>, gui: Sender<KetQua>) {
     let mut doc: Option<(u64, mupdf::pdf::PdfDocument)> = None;
     // (trang, DPI chọn) → (ảnh gốc, DPI đã vẽ); mới dùng ở cuối
     let mut nho: VecDeque<((u32, u16), Anh, u16)> = VecDeque::new();
+    // Khung AI theo (trang, DPI chọn) — nhận diện ~0,25 s/trang nên chỉ chạy 1 lần mỗi ảnh gốc
+    let mut nho_ai: Vec<((u32, u16), Vec<Hcn>)> = Vec::new();
     let mut cho: Vec<YeuCau> = Vec::new();
     loop {
         if cho.is_empty() {
@@ -103,6 +106,7 @@ fn luong(nhan: Receiver<YeuCau>, gui: Sender<KetQua>) {
         match yc {
             YeuCau::Mo { the_he, pdf } => {
                 nho.clear();
+                nho_ai.clear();
                 doc = None;
                 match mupdf::pdf::PdfDocument::open(pdf.to_string_lossy().as_ref()) {
                     Ok(d) => {
@@ -152,8 +156,25 @@ fn luong(nhan: Receiver<YeuCau>, gui: Sender<KetQua>) {
                 match goc {
                     Ok((goc, dpi)) => {
                         let mut dich = goc.clone();
-                        xoa_ghim_trang(&mut dich, &ch.vung, trang, dpi as f64, &ch.tc, &[]);
-                        let _ = gui.send(KetQua::Trang { the_he, trang, ma, dpi, co_anh: (goc.rong, goc.cao), goc: anh_hien(&goc, CANH_HIEN_TOI_DA), dich: anh_hien(&dich, CANH_HIEN_TOI_DA) });
+                        let ai = if ch.tc.nhan_dien {
+                            match nho_ai.iter().find(|(k, _)| *k == khoa) {
+                                Some((_, h)) => h.clone(),
+                                None => {
+                                    // Mọi trang (không chỉ trang có vùng xoá) để hiện khung trên Gốc
+                                    let h = khung_ai_anh(&goc);
+                                    nho_ai.push((khoa, h.clone()));
+                                    if nho_ai.len() > 4 * NHO_TRANG {
+                                        nho_ai.remove(0);
+                                    }
+                                    h
+                                }
+                            }
+                        } else {
+                            Vec::new()
+                        };
+                        let co_xoa = ch.vung.iter().any(|v| v.loai == crate::xoa_ghim::vung::LoaiVung::Xoa && v.ap_trang.ap_dung(trang));
+                        xoa_ghim_trang(&mut dich, &ch.vung, trang, dpi as f64, &ch.tc, if co_xoa { &ai } else { &[] });
+                        let _ = gui.send(KetQua::Trang { the_he, trang, ma, dpi, co_anh: (goc.rong, goc.cao), goc: anh_hien(&goc, CANH_HIEN_TOI_DA), dich: anh_hien(&dich, CANH_HIEN_TOI_DA), ai });
                     }
                     Err(e) => {
                         let _ = gui.send(KetQua::Loi { the_he, loi: e });

@@ -81,13 +81,49 @@ impl ManXoaGhim {
         self.chay.is_some()
     }
 
+    /// Nút **▶ Xóa ghim (n)** góc dưới phải (n = file đã tick cần chạy) + ▾ "Chạy lại mọi file đã tick (k)".
+    pub(super) fn nut_chay(&mut self, ui: &mut egui::Ui) {
+        use super::thiet_ke as tk;
+        use super::widget::font_dam;
+        let n = if self.thu_muc.is_some() { self.can_chay().len() } else { 0 };
+        let k = self.chon_chay.iter().filter(|&&c| c).count();
+        let duoc = n > 0 && self.chay.is_none();
+        let (o, ph) = ui.allocate_exact_size(egui::vec2(126.0, 28.0), egui::Sense::click());
+        let (o_chinh, o_mui) = (egui::Rect::from_min_max(o.min, egui::pos2(o.right() - 24.0, o.bottom())), egui::Rect::from_min_max(egui::pos2(o.right() - 24.0, o.top()), o.max));
+        let ph_chinh = ui.interact(o_chinh, ui.scope_id().with("xg_chay"), if duoc { egui::Sense::click() } else { egui::Sense::hover() });
+        let _ = ph;
+        let p = ui.painter();
+        let nen = if !duoc { tk::XANH_NUT_MO } else if ph_chinh.hovered() { tk::XANH_DAM_CHU } else { tk::XANH };
+        p.rect_filled(o, 4.0, nen);
+        p.vline(o_mui.left(), o.y_range().shrink(5.0), egui::Stroke::new(1.0, egui::Color32::from_white_alpha(110)));
+        super::bieu_tuong::ve(ui, "chay", egui::Rect::from_center_size(egui::pos2(o.left() + 15.0, o.center().y), egui::vec2(11.0, 11.0)));
+        let chu = if self.thu_muc.is_some() { format!("Xóa ghim ({n})") } else { "Xóa ghim".to_string() };
+        p.text(egui::pos2(o.left() + 26.0, o.center().y), egui::Align2::LEFT_CENTER, chu, font_dam(tk::CHU_CO), egui::Color32::WHITE);
+        ph_chinh.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, duoc, format!("Xóa ghim ({n})")));
+        let goi_y = if self.thu_muc.is_none() { "Mở file hoặc thư mục trước".to_string() } else if n == 0 { "Mọi file đã tick đều đã xoá đúng vùng hiện tại".to_string() } else { format!("Xoá ghim {n} file đã tick chưa xoá / đã đổi vùng / mất kết quả") };
+        if ph_chinh.on_hover_text(goi_y).clicked() {
+            self.bam_chay(false);
+        }
+        let mut con = ui.new_child(egui::UiBuilder::new().max_rect(o_mui));
+        let nut = egui::Button::image(super::bieu_tuong::anh("caret_trang", 8.0, 8.0)).frame(false).min_size(o_mui.size());
+        let (r, _) = egui::containers::menu::MenuButton::from_button(nut).ui(&mut con, |ui| {
+            ui.set_min_width(230.0);
+            let duoc_lai = k > 0 && self.chay.is_none();
+            if ui.add_enabled(duoc_lai, egui::Button::new(egui::RichText::new(format!("Chạy lại mọi file đã tick ({k})")).font(super::widget::font(tk::CHU_CO))).frame(false)).clicked() {
+                self.bam_chay(true);
+                ui.close();
+            }
+        });
+        r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Tuỳ chọn chạy"));
+    }
+
     /// Bấm Xóa ghim: `tat_ca` = cả thư mục, không thì chỉ file cần chạy.
     pub(super) fn bam_chay(&mut self, tat_ca: bool) {
         let viec = if tat_ca { (0..self.ds.len()).filter(|&i| self.chon_chay.get(i).copied().unwrap_or(false)).collect() } else { self.can_chay() };
         if viec.is_empty() || self.chay.is_some() {
             return;
         }
-        let Ok(ra) = super::thu_muc_ket_qua(self.thu_muc.as_deref().unwrap_or(std::path::Path::new(""))) else { return };
+        let Some(ra) = self.thu_muc_ket_qua_hien_tai() else { return };
         match self.license.bat_dau(ChucNang::XoaGhim) {
             Ok(lan) => self.bat_dau(lan, viec, ra),
             Err(qd) => {
@@ -101,12 +137,13 @@ impl ManXoaGhim {
         self.ghi_ngay();
         let cap: Vec<(PathBuf, PathBuf)> = viec.iter().map(|&i| self.ds[i].clone()).collect();
         let (chung, tc, xuat) = (self.bo.tm.vung.clone(), self.bo.tm.tuy_chon, self.bo.tm.xuat);
+        let chay_ch = crate::xoa_ghim::xuat::TuyChonChay { lo_10: self.cfg.lo_10 };
         let (gui, nhan) = mpsc::channel();
         let dung = Arc::new(AtomicBool::new(false));
         let dung_nen = dung.clone();
         std::thread::spawn(move || {
             let gui = std::sync::Mutex::new(gui);
-            lo::chay(crate::tach_vb::kho::chung(), crate::xoa_ghim::kho::chung(), &cap, &chung, &tc, &xuat, &dung_nen, |i, kq| {
+            lo::chay_voi(crate::tach_vb::kho::chung(), crate::xoa_ghim::kho::chung(), &cap, &chung, &tc, &xuat, chay_ch, &dung_nen, |i, kq| {
                 let _ = gui.lock().unwrap().send((i, kq));
             });
         });

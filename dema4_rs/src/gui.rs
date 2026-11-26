@@ -129,7 +129,7 @@ struct UngDungChinh {
     hop_phien: crate::gui_phien::HopPhien,
     /// Lúc nhập, màn Tách đang mở đúng thư mục → nhập xong mở lại từ đĩa.
     mo_lai_tach_sau_nhap: bool,
-    /// Làm tiếp gần đây (Trang chủ, menu Chức năng › Gần đây).
+    /// Làm tiếp gần đây (Trang chủ, menu Tệp tin › Gần đây).
     gan_day: crate::gan_day::DanhSach,
     /// "Chọn lại…" dòng gần đây đang mở hộp chọn: (dòng, kết quả).
     chon_lai: Option<(crate::gan_day::MucGanDay, std::sync::mpsc::Receiver<Option<PathBuf>>)>,
@@ -527,6 +527,11 @@ impl UngDungChinh {
                 ui.spacing_mut().item_spacing.x = 24.0;
                 ui.add_space(12.0);
                 ui.add_enabled_ui(!khoa, |ui| {
+                    egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::ThuMuc, 14.0, xam), "Tệp tin", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| self.menu_tep_tin(ui));
+                })
+                .response
+                .on_disabled_hover_text("Đang chạy — dừng hoặc chờ xong");
+                ui.add_enabled_ui(!khoa, |ui| {
                     egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::MenuLuoi, 14.0, xam), "Chức năng", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                         use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
                         for (man, ten, icon) in [(Man::TrangChu, "Trang chủ", BieuTuong::TrangChu), (Man::Dem, "Đếm trang A4", BieuTuong::TaiLieu), (Man::Tach, "Tách văn bản", BieuTuong::Keo), (Man::MucLuc, "Sinh mục lục", BieuTuong::DanhSachSo), (Man::BocTach, "Bóc tách dữ liệu", BieuTuong::BocTach), (Man::XoaGhim, "Xóa ghim", BieuTuong::TaiLieu), (Man::ChuanTen, "Chuẩn hoá tên", BieuTuong::ChuanTen), (Man::Ky, "Ký văn bản", BieuTuong::But), (Man::Aip, "Đóng gói AIP", BieuTuong::GoiAip)] {
@@ -535,59 +540,6 @@ impl UngDungChinh {
                                 ui.close();
                             }
                         }
-                        // Làm tiếp gần đây: cùng danh sách Trang chủ
-                        ui.separator();
-                        let mut chon_gd = None;
-                        ui.add_enabled_ui(!self.gan_day.ds.is_empty(), |ui| {
-                            ui.menu_button("Gần đây", |ui| {
-                                for (i, m) in self.gan_day.ds.iter().enumerate() {
-                                    let cn = match m.cn {
-                                        crate::gan_day::ChucNang::Dem => "Đếm",
-                                        crate::gan_day::ChucNang::Tach => "Tách",
-                                        crate::gan_day::ChucNang::MucLuc => "Mục lục",
-                                        crate::gan_day::ChucNang::BocTach => "Bóc tách",
-                                        crate::gan_day::ChucNang::XoaGhim => "Xóa ghim",
-                                    };
-                                    let nut = ui.add_enabled(!self.gan_day.mat(i), egui::Button::new(format!("{cn} · {}", m.ten())).frame(false)).on_hover_text(&m.duong_dan).on_disabled_hover_text("Không tìm thấy — chọn lại ở Trang chủ");
-                                    if nut.clicked() {
-                                        chon_gd = Some(crate::trang_chu::ChonTrangChu::GanDay(i));
-                                        ui.close();
-                                    }
-                                }
-                                ui.separator();
-                                if ui.add(egui::Button::new("Xoá lịch sử").frame(false)).clicked() {
-                                    chon_gd = Some(crate::trang_chu::ChonTrangChu::XoaHet);
-                                    ui.close();
-                                }
-                            });
-                        })
-                        .response
-                        .on_disabled_hover_text("Chưa có thư mục / file nào làm gần đây");
-                        if let Some(c) = chon_gd {
-                            self.chon_trang_chu(c, &ui.ctx().clone());
-                        }
-                        // Mang phần đang làm dở của thư mục đang mở (Tách / Bóc tách / Xóa ghim) sang máy khác
-                        ui.separator();
-                        let goc = self.thu_muc_phien();
-                        let ly_do = "Mở thư mục ở màn Tách văn bản, Bóc tách dữ liệu hoặc Xóa ghim trước";
-                        ui.add_enabled_ui(goc.is_some(), |ui| {
-                            if muc_menu_day(ui, BieuTuong::TaiLieu, "Xuất phiên làm việc…", false, None, 190.0).on_disabled_hover_text(ly_do).clicked() {
-                                if let Some(g) = goc.clone() {
-                                    if self.ghi_xuong_dia_neu_dang_mo(&g) {
-                                        self.hop_phien.xuat(g, ui.ctx());
-                                    } else {
-                                        self.hop_phien.bao_loi(format!("Không lưu được nhãn đang sửa ({}) — chưa xuất. Sửa lỗi ghi rồi xuất lại.", self.tach.trang_thai));
-                                    }
-                                }
-                                ui.close();
-                            }
-                            if muc_menu_day(ui, BieuTuong::TaiLieu, "Nhập phiên làm việc…", false, None, 190.0).on_disabled_hover_text(ly_do).clicked() {
-                                if let Some(g) = goc.clone() {
-                                    self.hop_phien.chon_goi(g, ui.ctx());
-                                }
-                                ui.close();
-                            }
-                        });
                     });
                 })
                 .response
@@ -599,12 +551,10 @@ impl UngDungChinh {
                         Man::Dem => TabCauHinh::Dem,
                         Man::MucLuc => TabCauHinh::MucLuc,
                         Man::BocTach => TabCauHinh::BocTach,
+                        Man::XoaGhim => TabCauHinh::XoaGhim,
                         _ => TabCauHinh::Tach,
                     };
-                    let mut hop = HopCauHinh::moi(&self.cfg, tab);
-                    hop.co_cache = self.tach.co_cache();
-                    hop.khoa = self.khoa_bt.clone();
-                    self.hop_cau_hinh = Some(hop);
+                    self.mo_cau_hinh(HopCauHinh::moi(&self.cfg, tab));
                 }
                 egui::containers::menu::MenuButton::from_button(egui::Button::new((atom_mau(BieuTuong::HoiDap, 14.0, xam), "Trợ giúp", atom_mau(BieuTuong::MuiTenXuong, 13.0, CHU)))).ui(ui, |ui| {
                     use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
@@ -622,9 +572,135 @@ impl UngDungChinh {
                         ui.close();
                     }
                 });
+                // Màn Xóa ghim: ^ thu gọn / mở thanh công cụ ở góc phải
+                if self.man == Man::XoaGhim {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(6.0);
+                        self.xoa_ghim.nut_thu_gon_cong_cu(ui);
+                    });
+                }
             });
         });
         ui.painter().hline(r.response.rect.x_range(), r.response.rect.bottom() - 0.5, Stroke::new(1.0, VIEN_NHAT));
+    }
+
+    /// Menu **Tệp tin** (đầu mọi màn): mở file / thư mục theo màn đang mở, Gần đây, thư mục kết quả, Xuất / Nhập phiên,
+    /// đóng thư mục. Mục màn hiện tại chưa hỗ trợ: mờ + lý do khi rê.
+    /// Mở hộp Cấu hình: nạp cache Tách, khoá Bóc tách, tuỳ chọn thư mục + việc tải mô hình của màn Xóa ghim.
+    fn mo_cau_hinh(&mut self, mut hop: crate::gui_tach::hop_cau_hinh::HopCauHinh) {
+        hop.co_cache = self.tach.co_cache();
+        hop.khoa = self.khoa_bt.clone();
+        hop.xg.thu_muc = self.xoa_ghim.cau_hinh_thu_muc();
+        hop.xg.mo_hinh = self.xoa_ghim.mo_hinh.take();
+        self.hop_cau_hinh = Some(hop);
+    }
+
+    fn menu_tep_tin(&mut self, ui: &mut egui::Ui) {
+        use crate::gui_tach::bieu_tuong::{muc_menu_day, BieuTuong};
+        const RONG: f32 = 230.0;
+        let ctx = ui.ctx().clone();
+        let man = self.man;
+        let (ten_file, duoc_file) = match man {
+            Man::XoaGhim => ("Mở file PDF…", true),
+            Man::MucLuc => ("Mở file dữ liệu…", true),
+            _ => ("Mở file PDF…", false),
+        };
+        let ly_do = "Chức năng này làm việc theo thư mục / chưa hỗ trợ mở file";
+        if ui.add_enabled_ui(duoc_file, |ui| muc_menu_day(ui, BieuTuong::TaiLieu, ten_file, false, Some("Ctrl+O"), RONG)).inner.on_disabled_hover_text(ly_do).clicked() {
+            ui.close();
+            match man {
+                Man::XoaGhim => self.xoa_ghim.chon_file_pdf(),
+                Man::MucLuc => {
+                    if let Some(p) = rfd::FileDialog::new().set_title("Chọn file dữ liệu").add_filter("Bảng tính", &["xlsx", "xls", "csv", "ods"]).pick_file() {
+                        self.muc_luc.mo_tu_gan_day(&p.display().to_string(), None, None, None, &ctx);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let duoc_tm = matches!(man, Man::Dem | Man::Tach | Man::BocTach | Man::XoaGhim);
+        if ui.add_enabled_ui(duoc_tm, |ui| muc_menu_day(ui, BieuTuong::ThuMuc, "Mở thư mục…", false, Some("Ctrl+Shift+O"), RONG)).inner.on_disabled_hover_text("Chọn chức năng làm việc theo thư mục trước").clicked() {
+            ui.close();
+            if man == Man::XoaGhim {
+                self.xoa_ghim.chon_thu_muc();
+            } else if let Some(p) = rfd::FileDialog::new().set_title("Chọn thư mục chứa PDF").pick_folder() {
+                let p = p.display().to_string();
+                match man {
+                    Man::Dem => self.dem.chon_thu_muc(p, &ctx),
+                    Man::Tach => {
+                        self.tach.mo_tu_gan_day(&p);
+                    }
+                    Man::BocTach => self.boc_tach.chon_thu_muc(p, &ctx),
+                    _ => {}
+                }
+            }
+        }
+        // Làm tiếp gần đây: cùng danh sách Trang chủ
+        let mut chon_gd = None;
+        ui.add_enabled_ui(!self.gan_day.ds.is_empty(), |ui| {
+            ui.menu_button("      Gần đây", |ui| {
+                for (i, m) in self.gan_day.ds.iter().enumerate() {
+                    let cn = match m.cn {
+                        crate::gan_day::ChucNang::Dem => "Đếm",
+                        crate::gan_day::ChucNang::Tach => "Tách",
+                        crate::gan_day::ChucNang::MucLuc => "Mục lục",
+                        crate::gan_day::ChucNang::BocTach => "Bóc tách",
+                        crate::gan_day::ChucNang::XoaGhim => "Xóa ghim",
+                    };
+                    let nut = ui.add_enabled(!self.gan_day.mat(i), egui::Button::new(format!("{cn} · {}", m.ten())).frame(false)).on_hover_text(&m.duong_dan).on_disabled_hover_text("Không tìm thấy — chọn lại ở Trang chủ");
+                    if nut.clicked() {
+                        chon_gd = Some(crate::trang_chu::ChonTrangChu::GanDay(i));
+                        ui.close();
+                    }
+                }
+                ui.separator();
+                if ui.add(egui::Button::new("Xoá lịch sử").frame(false)).clicked() {
+                    chon_gd = Some(crate::trang_chu::ChonTrangChu::XoaHet);
+                    ui.close();
+                }
+            });
+        })
+        .response
+        .on_disabled_hover_text("Chưa có thư mục / file nào làm gần đây");
+        if let Some(c) = chon_gd {
+            self.chon_trang_chu(c, &ctx);
+        }
+        ui.separator();
+        let ra = if man == Man::XoaGhim { self.xoa_ghim.thu_muc_ket_qua_hien_tai().filter(|p| p.is_dir()) } else { None };
+        if ui.add_enabled_ui(ra.is_some(), |ui| muc_menu_day(ui, BieuTuong::ThuMuc, "Mở thư mục kết quả", false, None, RONG)).inner.on_disabled_hover_text("Chưa có thư mục kết quả").clicked() {
+            ui.close();
+            if let Some(p) = &ra {
+                mo_bang_he_dieu_hanh(p);
+            }
+        }
+        ui.separator();
+        // Mang phần đang làm dở của thư mục đang mở (Tách / Bóc tách / Xóa ghim) sang máy khác
+        let goc = self.thu_muc_phien();
+        let ly_do_phien = "Mở thư mục ở màn Tách văn bản, Bóc tách dữ liệu hoặc Xóa ghim trước";
+        ui.add_enabled_ui(goc.is_some(), |ui| {
+            if muc_menu_day(ui, BieuTuong::TaiLieu, "Xuất phiên làm việc…", false, None, RONG).on_disabled_hover_text(ly_do_phien).clicked() {
+                if let Some(g) = goc.clone() {
+                    if self.ghi_xuong_dia_neu_dang_mo(&g) {
+                        self.hop_phien.xuat(g, ui.ctx());
+                    } else {
+                        self.hop_phien.bao_loi(format!("Không lưu được nhãn đang sửa ({}) — chưa xuất. Sửa lỗi ghi rồi xuất lại.", self.tach.trang_thai));
+                    }
+                }
+                ui.close();
+            }
+            if muc_menu_day(ui, BieuTuong::TaiLieu, "Nhập phiên làm việc…", false, None, RONG).on_disabled_hover_text(ly_do_phien).clicked() {
+                if let Some(g) = goc.clone() {
+                    self.hop_phien.chon_goi(g, ui.ctx());
+                }
+                ui.close();
+            }
+        });
+        ui.separator();
+        let mo = man == Man::XoaGhim && self.xoa_ghim.dang_mo();
+        if ui.add_enabled_ui(mo, |ui| muc_menu_day(ui, BieuTuong::Dong, "Đóng thư mục", false, None, RONG)).inner.on_disabled_hover_text("Chưa mở thư mục").clicked() {
+            ui.close();
+            self.xoa_ghim.dong();
+        }
     }
 }
 
@@ -668,7 +744,15 @@ impl eframe::App for UngDungChinh {
             }
             Man::Dem => self.dem.ve(ui),
             Man::XoaGhim => {
-                self.xoa_ghim.ve(ui);
+                if self.xoa_ghim.ve(ui, &mut self.cfg.xoa_ghim) {
+                    let _ = crate::cau_hinh::ghi(&self.cfg);
+                }
+                if std::mem::take(&mut self.xoa_ghim.mo_cau_hinh) {
+                    self.mo_cau_hinh(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&self.cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::XoaGhim));
+                }
+                if std::mem::take(&mut self.xoa_ghim.ve_trang_chu) && !self.dang_chay() {
+                    self.chuyen_man(Man::TrangChu);
+                }
                 if let Some(ra) = self.xoa_ghim.mo_o_tach.take() {
                     self.chuyen_man(Man::Tach);
                     self.tach.mo_tu_gan_day(&ra.display().to_string());
@@ -696,10 +780,7 @@ impl eframe::App for UngDungChinh {
                     let _ = crate::cau_hinh::ghi(&self.cfg);
                 }
                 if std::mem::take(&mut self.boc_tach.mo_cau_hinh) {
-                    let mut hop = crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&self.cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::BocTach);
-                    hop.co_cache = self.tach.co_cache();
-                    hop.khoa = self.khoa_bt.clone();
-                    self.hop_cau_hinh = Some(hop);
+                    self.mo_cau_hinh(crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&self.cfg, crate::gui_tach::hop_cau_hinh::TabCauHinh::BocTach));
                 }
             }
             // Chức năng đang phát triển: chỉ màn giới thiệu (mờ, nhãn ĐANG PHÁT TRIỂN)
@@ -742,8 +823,19 @@ impl eframe::App for UngDungChinh {
             }
             match kq {
                 KetQuaHop::Mo => {}
-                KetQuaHop::Huy => self.hop_cau_hinh = None,
+                KetQuaHop::Huy => {
+                    if let Some(m) = hop.xg.mo_hinh.take() {
+                        self.xoa_ghim.mo_hinh = Some(m);
+                    }
+                    self.hop_cau_hinh = None;
+                }
                 KetQuaHop::Luu(moi) => {
+                    if let Some(m) = hop.xg.mo_hinh.take() {
+                        self.xoa_ghim.mo_hinh = Some(m);
+                    }
+                    if let Some(c) = hop.xg.thu_muc.take() {
+                        self.xoa_ghim.ap_cau_hinh_thu_muc(c);
+                    }
                     self.khoa_bt = std::mem::take(&mut hop.khoa);
                     self.khoa_bt.retain(|_, v| !v.trim().is_empty());
                     // Bản build không có bí mật: khoá chỉ giữ trong phiên (ô Khoá API đã báo)
@@ -812,6 +904,19 @@ pub(crate) fn cai_giao_dien(ctx: &egui::Context) {
         fonts.font_data.insert("trang".into(), Arc::new(egui::FontData::from_owned(du_lieu)));
         trang.insert(0, "trang".into());
     }
+    // Màn Xóa ghim: Segoe UI như prototype (Windows); máy khác dùng phông giao diện chung
+    let mut xg = fonts.families.get(&egui::FontFamily::Proportional).cloned().unwrap_or_default();
+    if let Some(du_lieu) = doc(&[r"C:\Windows\Fonts\segoeui.ttf"]) {
+        fonts.font_data.insert("xg".into(), Arc::new(egui::FontData::from_owned(du_lieu)));
+        xg.insert(0, "xg".into());
+    }
+    let mut xg_dam = dam.clone();
+    if let Some(du_lieu) = doc(&[r"C:\Windows\Fonts\segoeuisb.ttf", r"C:\Windows\Fonts\segoeuib.ttf"]) {
+        fonts.font_data.insert("xg_dam".into(), Arc::new(egui::FontData::from_owned(du_lieu)));
+        xg_dam.insert(0, "xg_dam".into());
+    }
+    fonts.families.insert(egui::FontFamily::Name(crate::gui_xoa_ghim::HO_FONT_XG.into()), xg);
+    fonts.families.insert(egui::FontFamily::Name(crate::gui_xoa_ghim::HO_FONT_XG_DAM.into()), xg_dam);
     let mut trang_dam = dam;
     if let Some(du_lieu) = doc(&FONT_TRANG_DAM) {
         fonts.font_data.insert("trang_dam".into(), Arc::new(egui::FontData::from_owned(du_lieu)));
@@ -822,6 +927,7 @@ pub(crate) fn cai_giao_dien(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
 
     crate::gui_tach::bieu_tuong::dang_ky_svg(ctx);
+    crate::gui_xoa_ghim::dang_ky_bieu_tuong(ctx);
     ctx.set_theme(egui::ThemePreference::Light);
     ctx.all_styles_mut(|style| {
         use egui::{FontFamily::Proportional, FontId};

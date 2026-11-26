@@ -1,4 +1,4 @@
-//! Hộp Cấu hình (menu Cấu hình): 4 tab (Đếm, Tách PDF, Sinh mục lục, Bóc tách), thân cao cố định để hộp không nhảy khi đổi tab.
+//! Hộp Cấu hình (menu Cấu hình): 5 tab (Đếm, Tách PDF, Sinh mục lục, Bóc tách, Xóa ghim), thân cao cố định để hộp không nhảy khi đổi tab.
 //! Tab Tách PDF: nhóm 1 "Tự động nhận dạng khi Phân tích", nhóm 2 "Kết quả tách".
 
 use eframe::egui::{self, Align, Color32, CornerRadius, Margin, Rect, RichText, Sense, Stroke, StrokeKind};
@@ -24,7 +24,11 @@ macro_rules! dong {
 const RONG_HOP: f32 = 560.0;
 /// Tab Bóc tách rộng hơn: 5 ô nhà cung cấp trên 1 hàng.
 const RONG_HOP_BOC_TACH: f32 = 780.0;
+/// Tab Xóa ghim: 4 thẻ trên 2 cột.
+const RONG_HOP_XOA_GHIM: f32 = 820.0;
 const CAO_THAN: f32 = 470.0;
+/// Tab Xóa ghim: đủ 4 thẻ không cuộn.
+const CAO_THAN_XOA_GHIM: f32 = 612.0;
 /// Cột nhãn tab Tách PDF (vừa "☑ Trang trắng ⓘ"); ô bắt đầu ở `LE_O`.
 const RONG_NHAN: f32 = 118.0;
 const LE_O: f32 = 126.0;
@@ -40,6 +44,7 @@ pub enum TabCauHinh {
     Tach,
     MucLuc,
     BocTach,
+    XoaGhim,
 }
 
 pub enum KetQuaHop {
@@ -77,6 +82,8 @@ pub struct HopCauHinh {
     pub bt: crate::gui_boc_tach::cau_hinh::TabBocTach,
     /// Khoá API / bí mật Bóc tách đang sửa (app nạp vào khi mở, lấy ra khi Lưu; không nằm trong `CauHinh`).
     pub khoa: std::collections::BTreeMap<String, String>,
+    /// Tab Xóa ghim: tuỳ chọn thư mục đang mở + việc tải mô hình AI (app nạp vào khi mở, lấy ra khi đóng).
+    pub xg: crate::gui_xoa_ghim::TabXoaGhim,
 }
 
 fn so_o(v: f32) -> String {
@@ -159,6 +166,7 @@ impl HopCauHinh {
             don_cu: false,
             bt: crate::gui_boc_tach::cau_hinh::TabBocTach::moi(&cfg.boc_tach),
             khoa: Default::default(),
+            xg: Default::default(),
         };
         h.dong_bo_o();
         h
@@ -201,12 +209,16 @@ impl HopCauHinh {
 
     pub fn ve(&mut self, ctx: &egui::Context) -> KetQuaHop {
         let mut kq = KetQuaHop::Mo;
-        let rong = if self.tab == TabCauHinh::BocTach { RONG_HOP_BOC_TACH } else { RONG_HOP };
+        let rong = match self.tab {
+            TabCauHinh::BocTach => RONG_HOP_BOC_TACH,
+            TabCauHinh::XoaGhim => RONG_HOP_XOA_GHIM,
+            _ => RONG_HOP,
+        };
         let phan_hoi = kh::hop(ctx, "hop_cau_hinh", rong, "Cấu hình", |ui| {
             let co_cache = self.co_cache;
             let mut bam_xoa = false;
             let mut bam_don = false;
-            kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF"), (TabCauHinh::MucLuc, "Sinh mục lục"), (TabCauHinh::BocTach, "Bóc tách")], &mut self.tab, |ui| {
+            kh::hang_tab_phai(ui, &[(TabCauHinh::Dem, "Đếm trang A4"), (TabCauHinh::Tach, "Tách PDF"), (TabCauHinh::MucLuc, "Sinh mục lục"), (TabCauHinh::BocTach, "Bóc tách"), (TabCauHinh::XoaGhim, "Xóa ghim")], &mut self.tab, |ui| {
                 let nut_don = egui::Button::new(RichText::new("Dọn dữ liệu cũ").size(12.0)).min_size(egui::vec2(0.0, 22.0));
                 bam_don = ui
                     .add(nut_don)
@@ -226,11 +238,12 @@ impl HopCauHinh {
             if bam_don {
                 self.don_cu = true;
             }
-            kh::than(ui, "than_cau_hinh", CAO_THAN, Margin { left: 20, right: 20, top: 16, bottom: 8 }, |ui| match self.tab {
+            kh::than(ui, "than_cau_hinh", if self.tab == TabCauHinh::XoaGhim { CAO_THAN_XOA_GHIM } else { CAO_THAN }, Margin { left: 20, right: 20, top: 16, bottom: 8 }, |ui| match self.tab {
                 TabCauHinh::Tach => self.tab_tach(ui),
                 TabCauHinh::Dem => self.tab_dem(ui),
                 TabCauHinh::MucLuc => self.tab_muc_luc(ui),
                 TabCauHinh::BocTach => self.bt.ve(ui, &mut self.nhap.boc_tach, &mut self.khoa),
+                TabCauHinh::XoaGhim => self.xg.ve(ui, &mut self.nhap.xoa_ghim),
             });
             let loi = self.loi();
             kh::chan(ui, |ui| {
@@ -240,6 +253,11 @@ impl HopCauHinh {
                         TabCauHinh::Dem => mac_dinh_dem(&self.nhap),
                         TabCauHinh::MucLuc => mac_dinh_muc_luc(&self.nhap),
                         TabCauHinh::BocTach => crate::gui_boc_tach::cau_hinh::mac_dinh(&self.nhap),
+                        TabCauHinh::XoaGhim => {
+                            let mut n = self.nhap.clone();
+                            self.xg.mac_dinh(&mut n.xoa_ghim);
+                            n
+                        }
                     };
                     self.dong_bo_o();
                 }

@@ -39,7 +39,8 @@ pub struct BoVung {
     pub vf: VungFile,
     /// Id nội dung PDF đang xem (`None` = chưa có / không đọc được → không có vùng riêng).
     pub id_file: Option<Id>,
-    pub chon: Option<ChonVung>,
+    /// Vùng đang chọn theo thứ tự chọn; phần tử cuối = vùng chính (thanh trượt / combo Vùng sửa khi chọn đúng 1).
+    pub chon: Vec<ChonVung>,
     lich_su: Vec<Buoc>,
     /// Phần chung / riêng đã đổi, chưa ghi kho.
     pub doi_chung: bool,
@@ -56,7 +57,7 @@ impl BoVung {
     pub fn doi_file(&mut self, id: Option<Id>, vf: VungFile) {
         self.id_file = id;
         self.vf = vf;
-        self.chon = None;
+        self.chon.clear();
         self.doi_rieng = false;
     }
 
@@ -107,14 +108,14 @@ impl BoVung {
             self.vf.vung = b.rieng;
             self.da_doi(true);
         }
-        self.chon = None;
+        self.chon.clear();
         true
     }
 
     /// Bật / tắt vùng có sẵn (giữ thứ tự góc → cạnh như XoaGhim). Trả `true` nếu vừa bật.
     pub fn bat_tat(&mut self, v: ViTri) -> bool {
         self.ghi_buoc();
-        self.chon = None;
+        self.chon.clear();
         let bat = if self.tm.vung.iter().any(|z| z.vi_tri == v) {
             self.tm.vung.retain(|z| z.vi_tri != v);
             false
@@ -125,6 +126,7 @@ impl BoVung {
                 None => self.tm.vung.iter().position(|z| z.vi_tri.la_goc_canh()).unwrap_or(0),
             };
             self.tm.vung.insert(vi, co_san(v));
+            self.chon = vec![(false, vi)];
             true
         };
         self.da_doi(false);
@@ -147,55 +149,161 @@ impl BoVung {
             return false;
         }
         ds.push(v);
-        self.chon = Some((rieng, ds.len() - 1));
+        self.chon = vec![(rieng, ds.len() - 1)];
         self.da_doi(rieng);
         true
     }
 
-    pub fn vung_chon(&self) -> Option<&Vung> {
-        let (rieng, i) = self.chon?;
+    /// Vùng chính đang chọn (phần tử chọn sau cùng).
+    pub fn chinh(&self) -> Option<ChonVung> {
+        self.chon.last().copied()
+    }
+
+    pub fn lay(&self, (rieng, i): ChonVung) -> Option<&Vung> {
         if rieng { self.vf.vung.get(i) } else { self.tm.vung.get(i) }
     }
 
-    pub fn vung_chon_mut(&mut self) -> Option<&mut Vung> {
-        let (rieng, i) = self.chon?;
+    pub fn lay_mut(&mut self, (rieng, i): ChonVung) -> Option<&mut Vung> {
         if rieng { self.vf.vung.get_mut(i) } else { self.tm.vung.get_mut(i) }
+    }
+
+    pub fn vung_chon(&self) -> Option<&Vung> {
+        self.lay(self.chinh()?)
+    }
+
+    pub fn vung_chon_mut(&mut self) -> Option<&mut Vung> {
+        let c = self.chinh()?;
+        self.lay_mut(c)
+    }
+
+    pub fn dang_chon(&self, c: ChonVung) -> bool {
+        self.chon.contains(&c)
+    }
+
+    pub fn chon_mot(&mut self, c: Option<ChonVung>) {
+        self.chon = c.into_iter().collect();
+    }
+
+    /// Shift + bấm: thêm / bỏ khỏi nhóm chọn.
+    pub fn chon_dao(&mut self, c: ChonVung) {
+        if let Some(i) = self.chon.iter().position(|x| *x == c) {
+            self.chon.remove(i);
+        } else {
+            self.chon.push(c);
+        }
+    }
+
+    pub fn chon_them(&mut self, ds: impl IntoIterator<Item = ChonVung>) {
+        for c in ds {
+            if !self.chon.contains(&c) {
+                self.chon.push(c);
+            }
+        }
+    }
+
+    /// Mọi vùng (chung + riêng).
+    pub fn tat_ca(&self) -> Vec<ChonVung> {
+        (0..self.tm.vung.len()).map(|i| (false, i)).chain((0..self.vf.vung.len()).map(|i| (true, i))).collect()
     }
 
     /// Vùng đang chọn đã sửa (ngưỡng, loại…).
     pub fn sua_chon(&mut self) {
-        if let Some((rieng, _)) = self.chon {
+        for (rieng, _) in self.chon.clone() {
             self.da_doi(rieng);
         }
     }
 
-    /// Xoá vùng đang chọn.
-    pub fn xoa_chon(&mut self) -> bool {
-        let Some((rieng, i)) = self.chon.take() else { return false };
+    /// Xoá các vùng `ds` (chỉ số giảm dần từng danh sách để không lệch). Trả số vùng đã xoá.
+    pub fn xoa(&mut self, ds: &[ChonVung]) -> usize {
+        if ds.is_empty() {
+            return 0;
+        }
         self.ghi_buoc();
-        let ds = if rieng { &mut self.vf.vung } else { &mut self.tm.vung };
-        if i >= ds.len() {
+        let mut n = 0;
+        for rieng in [false, true] {
+            let mut cs: Vec<usize> = ds.iter().filter(|c| c.0 == rieng).map(|c| c.1).collect();
+            cs.sort_unstable_by(|a, b| b.cmp(a));
+            cs.dedup();
+            let list = if rieng { &mut self.vf.vung } else { &mut self.tm.vung };
+            let truoc = list.len();
+            for i in cs {
+                if i < list.len() {
+                    list.remove(i);
+                }
+            }
+            if list.len() != truoc {
+                n += truoc - list.len();
+                self.da_doi(rieng);
+            }
+        }
+        self.chon.retain(|c| !ds.contains(c));
+        self.chon.clear();
+        n
+    }
+
+
+    /// Vùng vẽ Tùy biến trong `ds` (bỏ góc / cạnh có sẵn).
+    pub fn chi_vung_ve(&self, ds: &[ChonVung]) -> Vec<ChonVung> {
+        ds.iter().copied().filter(|c| self.lay(*c).is_some_and(|z| z.vi_tri == ViTri::Tay)).collect()
+    }
+
+    /// Mọi vùng vẽ Tùy biến (chung + riêng).
+    pub fn moi_vung_ve(&self) -> Vec<ChonVung> {
+        self.chi_vung_ve(&self.tat_ca())
+    }
+
+
+    /// Đổi Xoá ↔ Bảo vệ (Vô đối → Bảo vệ).
+    pub fn doi_loai(&mut self, c: ChonVung) {
+        self.ghi_buoc();
+        if let Some(z) = self.lay_mut(c) {
+            z.loai = if z.loai == LoaiVung::BaoVe { LoaiVung::Xoa } else { LoaiVung::BaoVe };
+        }
+        self.da_doi(c.0);
+    }
+
+    /// Nhân bản vùng (bản sao là vùng vẽ, lệch 3% trang, cùng danh sách); chọn bản sao.
+    pub fn nhan_ban(&mut self, c: ChonVung, (w, h): (i64, i64), dpi: f64) -> bool {
+        let Some(z) = self.lay(c).cloned() else { return false };
+        // Vùng có sẵn: đổi sang toạ độ tỉ lệ theo khung đang thấy
+        let (x, y, rong, cao) = match z.khung_xoa(w, h, dpi) {
+            Some(k) if z.vi_tri != ViTri::Tay => (k.x1 as f64 / w as f64, k.y1 as f64 / h as f64, k.rong() as f64 / w as f64, k.cao() as f64 / h as f64),
+            _ => (z.x, z.y, z.rong, z.cao),
+        };
+        let (x, y) = ((x + 0.03).min(1.0 - rong).max(0.0), (y + 0.03).min(1.0 - cao).max(0.0));
+        let moi = Vung { vi_tri: ViTri::Tay, x, y, rong, cao, rong_px: 0, cao_px: 0, ..z };
+        let rieng = c.0 || self.id_file.is_some();
+        if rieng && self.id_file.is_none() {
             return false;
         }
-        ds.remove(i);
+        self.ghi_buoc();
+        let ds = if rieng { &mut self.vf.vung } else { &mut self.tm.vung };
+        if ds.len() >= crate::xoa_ghim::kho::TOI_DA_VUNG {
+            return false;
+        }
+        ds.push(moi);
+        self.chon = vec![(rieng, ds.len() - 1)];
         self.da_doi(rieng);
         true
     }
 
-    /// Xoá mọi vùng vẽ tay của phần chung (`rieng = false`) hoặc mọi vùng riêng của PDF đang xem.
-    pub fn xoa_het_ve(&mut self, rieng: bool) -> bool {
-        let co = if rieng { !self.vf.vung.is_empty() } else { self.tm.vung.iter().any(|z| !z.vi_tri.la_goc_canh()) };
-        if !co {
+    /// Đổi phạm vi trang của vùng; `vo_doi` = vùng xoá thành vô đối (chỉ vùng vẽ xoá).
+    pub fn doi_ap_trang(&mut self, c: ChonVung, ap: ApTrang, vo_doi: bool) -> bool {
+        let Some(z) = self.lay(c) else { return false };
+        let la_ve = z.vi_tri == ViTri::Tay;
+        let loai_moi = match z.loai {
+            LoaiVung::Xoa | LoaiVung::VoDoi if la_ve => if vo_doi { LoaiVung::VoDoi } else { LoaiVung::Xoa },
+            l => l,
+        };
+        if z.ap_trang == ap && z.loai == loai_moi {
             return false;
         }
         self.ghi_buoc();
-        if rieng {
-            self.vf.vung.clear();
-        } else {
-            self.tm.vung.retain(|z| z.vi_tri.la_goc_canh());
+        if let Some(z) = self.lay_mut(c) {
+            z.ap_trang = ap;
+            z.loai = loai_moi;
         }
-        self.chon = None;
-        self.da_doi(rieng);
+        self.da_doi(c.0);
         true
     }
 
@@ -206,6 +314,26 @@ impl BoVung {
             return Some((true, i));
         }
         self.tm.vung.iter().rposition(trong).map(|i| (false, i))
+    }
+
+    /// Vùng áp cho trang `trang` có khung (điểm ảnh) cắt `hcn` (`cat = true`, Crossing) hoặc nằm trọn trong (`false`,
+    /// Window).
+    pub fn quet(&self, trang: u32, hcn: Hcn, cat: bool, (w, h): (i64, i64), dpi: f64) -> Vec<ChonVung> {
+        self.tat_ca()
+            .into_iter()
+            .filter(|c| {
+                let Some(z) = self.lay(*c) else { return false };
+                if !z.ap_trang.ap_dung(trang) {
+                    return false;
+                }
+                let Some(k) = z.khung_xoa(w, h, dpi) else { return false };
+                if cat {
+                    k.x1 < hcn.x2 && k.x2 > hcn.x1 && k.y1 < hcn.y2 && k.y2 > hcn.y1
+                } else {
+                    k.x1 >= hcn.x1 && k.y1 >= hcn.y1 && k.x2 <= hcn.x2 && k.y2 <= hcn.y2
+                }
+            })
+            .collect()
     }
 
     /// Số vùng chung / riêng (bộ đếm).
@@ -327,7 +455,7 @@ mod tests {
         let mut b = bo();
         assert!(b.them_ve((0.5, 0.5, 0.2, 0.1), LoaiVung::BaoVe, PhamVi::Trang, ApTrang::TatCa, 3));
         assert_eq!(b.vf.vung[0].ap_trang, ApTrang::MotTrang(3), "riêng trang");
-        assert_eq!(b.chon, Some((true, 0)));
+        assert_eq!(b.chon, vec![(true, 0)]);
         assert!(b.them_ve((0.0, 0.9, 0.3, 0.1), LoaiVung::VoDoi, PhamVi::File, ApTrang::Chan, 3));
         assert_eq!(b.vf.vung[1].ap_trang, ApTrang::Chan);
         assert!(!b.them_ve((0.1, 0.1, 0.001, 0.2), LoaiVung::Xoa, PhamVi::File, ApTrang::TatCa, 0), "quá nhỏ");
@@ -336,14 +464,53 @@ mod tests {
         assert_eq!(b.tim(3, (600, 550), (1000, 1000), 120.0), Some((true, 0)));
         assert_eq!(b.tim(2, (600, 550), (1000, 1000), 120.0), None);
         assert_eq!(b.tim(0, (5, 5), (1000, 1000), 120.0), Some((false, 0)), "góc có sẵn");
-        b.chon = Some((true, 0));
-        assert!(b.xoa_chon());
+        b.chon = vec![(true, 0)];
+        assert_eq!(b.xoa(&b.chon.clone()), 1);
         assert_eq!(b.vf.vung.len(), 1);
         assert!(b.doi_rieng);
         assert!(b.hoan_tac());
         assert_eq!(b.vf.vung.len(), 2);
-        assert!(b.xoa_het_ve(true));
+        assert_eq!(b.xoa(&b.moi_vung_ve()), 2);
         assert!(b.vf.vung.is_empty());
+    }
+
+    #[test]
+    fn chon_nhieu_quet_xoa_vung_ve_giu_goc_canh() {
+        let mut b = bo();
+        assert!(b.them_ve((0.4, 0.4, 0.1, 0.1), LoaiVung::Xoa, PhamVi::File, ApTrang::TatCa, 0));
+        assert!(b.them_ve((0.6, 0.6, 0.1, 0.1), LoaiVung::BaoVe, PhamVi::File, ApTrang::TatCa, 0));
+        // Window bao trọn 2 vùng vẽ; Crossing chạm 1
+        let w = b.quet(0, Hcn { x1: 350, y1: 350, x2: 800, y2: 800 }, false, (1000, 1000), 120.0);
+        assert_eq!(w, vec![(true, 0), (true, 1)]);
+        let c = b.quet(0, Hcn { x1: 450, y1: 450, x2: 460, y2: 460 }, true, (1000, 1000), 120.0);
+        assert_eq!(c, vec![(true, 0)]);
+        b.chon = b.tat_ca();
+        let ve = b.chi_vung_ve(&b.chon.clone());
+        assert_eq!(ve.len(), 2, "góc có sẵn không tính");
+        assert_eq!(b.xoa(&ve), 2);
+        assert_eq!(b.tm.vung.len(), 2, "góc giữ nguyên");
+        assert!(b.hoan_tac());
+        assert_eq!(b.vf.vung.len(), 2);
+        b.chon_dao((true, 1));
+        b.chon_dao((true, 0));
+        b.chon_dao((true, 1));
+        assert_eq!(b.chon, vec![(true, 0)]);
+    }
+
+    #[test]
+    fn doi_loai_pham_vi_vo_doi_va_nhan_ban() {
+        let mut b = bo();
+        assert!(b.them_ve((0.4, 0.4, 0.1, 0.1), LoaiVung::Xoa, PhamVi::File, ApTrang::TatCa, 0));
+        assert!(b.doi_ap_trang((true, 0), ApTrang::MotTrang(2), true));
+        assert_eq!((b.vf.vung[0].loai, b.vf.vung[0].ap_trang), (LoaiVung::VoDoi, ApTrang::MotTrang(2)));
+        assert!(b.doi_ap_trang((true, 0), ApTrang::Le, false));
+        assert_eq!(b.vf.vung[0].loai, LoaiVung::Xoa);
+        assert!(!b.doi_ap_trang((false, 0), ApTrang::TatCa, true), "góc: không đổi gì");
+        b.doi_loai((true, 0));
+        assert_eq!(b.vf.vung[0].loai, LoaiVung::BaoVe);
+        assert!(b.nhan_ban((false, 0), (1000, 1000), 120.0), "nhân bản góc → vùng vẽ");
+        assert_eq!(b.vf.vung.last().unwrap().vi_tri, ViTri::Tay);
+        assert_eq!(b.chon, vec![(true, 1)]);
     }
 
     #[test]

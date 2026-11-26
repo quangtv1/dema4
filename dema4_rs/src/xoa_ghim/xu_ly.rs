@@ -155,6 +155,23 @@ fn xoa_trong_khung(anh: &mut Anh, v: &Vung, k: Hcn, dpi: f64, tc: &TuyChon, duoc
 }
 
 /// Xoá ghim trên ảnh trang RGB (`trang` đếm từ 0, ảnh vẽ ở `dpi`) theo các vùng áp dụng cho trang đó.
+/// Khung bảo vệ từ nhận diện layout (khối chữ, bảng…) cho trang `trang`: chỉ khi bật `nhan_dien`, có mô hình và trang có
+/// vùng xoá áp dụng. Mô hình lỗi → không khung nào (xoá như khi tắt nhận diện).
+pub fn khung_ai(anh: &Anh, vung: &[Vung], trang: u32, tc: &TuyChon) -> Vec<Hcn> {
+    if !tc.nhan_dien || !vung.iter().any(|v| v.loai == LoaiVung::Xoa && v.ap_trang.ap_dung(trang)) {
+        return Vec::new();
+    }
+    khung_ai_anh(anh)
+}
+
+/// Khung bảo vệ nhận diện layout của cả ảnh (chưa có mô hình / lỗi → trống).
+pub fn khung_ai_anh(anh: &Anh) -> Vec<Hcn> {
+    if !super::mo_hinh::co_san() {
+        return Vec::new();
+    }
+    super::ai::nhan_dien(anh).map(|h| super::ai::hop_bao_ve(&h)).unwrap_or_default()
+}
+
 /// `bao_ve_them`: khung cần giữ ngoài vùng bảo vệ vẽ tay (vd vùng chữ AI), toạ độ điểm ảnh.
 /// Thứ tự như XoaGhim: vô đối trước (không xét vùng bảo vệ), rồi từng vùng xoá theo thứ tự danh sách,
 /// mỗi vùng thấy kết quả của vùng trước. Trả về `true` nếu có điểm bị đổi.

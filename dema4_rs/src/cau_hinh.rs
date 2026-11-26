@@ -84,6 +84,28 @@ pub struct CauHinh {
     pub an_dong_thu_muc: bool,
     pub muc_luc: CauHinhMucLuc,
     pub boc_tach: CauHinhBocTach,
+    pub xoa_ghim: CauHinhXoaGhim,
+}
+
+/// Tuỳ chọn **chung** của màn Xóa ghim (mọi thư mục): hiệu năng, tự lưu, hiển thị. Tuỳ chọn theo thư mục (vùng,
+/// bảo vệ, xuất file, kiểu ghi) nằm trong kho Xóa ghim.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CauHinhXoaGhim {
+    /// Xử lý song song tối đa 10 trang / file (nhanh hơn, tốn RAM hơn).
+    pub lo_10: bool,
+    /// Gom thay đổi vùng, ghi kho mỗi N phút (0 = ghi ngay).
+    pub tu_luu_phut: u16,
+    pub tung_trang: bool,
+    pub thu_nho: bool,
+    pub khung_dich: bool,
+    pub cuon_cung: bool,
+    pub rong_ds: f32,
+}
+
+impl Default for CauHinhXoaGhim {
+    fn default() -> Self {
+        CauHinhXoaGhim { lo_10: true, tu_luu_phut: 0, tung_trang: false, thu_nho: true, khung_dich: true, cuon_cung: true, rong_ds: 282.0 }
+    }
 }
 
 /// Cấu hình + lựa chọn gần nhất của màn Sinh mục lục (khoá `ml_*` trong file).
@@ -266,6 +288,7 @@ impl Default for CauHinh {
             an_dong_thu_muc: false,
             muc_luc: CauHinhMucLuc::default(),
             boc_tach: CauHinhBocTach::default(),
+            xoa_ghim: CauHinhXoaGhim::default(),
         }
     }
 }
@@ -440,6 +463,13 @@ impl CauHinh {
                     _ => {}
                 },
                 "an_dong_thu_muc" => c.an_dong_thu_muc = bool_().unwrap_or(c.an_dong_thu_muc),
+                "xg_lo_10" => c.xoa_ghim.lo_10 = bool_().unwrap_or(c.xoa_ghim.lo_10),
+                "xg_tu_luu" => c.xoa_ghim.tu_luu_phut = so().map_or(c.xoa_ghim.tu_luu_phut, |x| (x as u16).min(120)),
+                "xg_tung_trang" => c.xoa_ghim.tung_trang = bool_().unwrap_or(c.xoa_ghim.tung_trang),
+                "xg_thu_nho" => c.xoa_ghim.thu_nho = bool_().unwrap_or(c.xoa_ghim.thu_nho),
+                "xg_khung_dich" => c.xoa_ghim.khung_dich = bool_().unwrap_or(c.xoa_ghim.khung_dich),
+                "xg_cuon_cung" => c.xoa_ghim.cuon_cung = bool_().unwrap_or(c.xoa_ghim.cuon_cung),
+                "xg_rong_ds" => c.xoa_ghim.rong_ds = so().map_or(c.xoa_ghim.rong_ds, |x| (x as f32).clamp(200.0, 520.0)),
                 "ml_thu_muc_ra" => c.muc_luc.thu_muc_ra = v.to_string(),
                 "ml_mau_ten" => c.muc_luc.mau_ten = v.to_string(),
                 "ml_ghi_de" => c.muc_luc.ghi_de = bool_().unwrap_or(c.muc_luc.ghi_de),
@@ -504,6 +534,17 @@ impl CauHinh {
             }
         );
         s += &format!("an_dong_thu_muc={}\n", bool_(self.an_dong_thu_muc));
+        let x = &self.xoa_ghim;
+        s += &format!(
+            "xg_lo_10={}\nxg_tu_luu={}\nxg_tung_trang={}\nxg_thu_nho={}\nxg_khung_dich={}\nxg_cuon_cung={}\nxg_rong_ds={}\n",
+            bool_(x.lo_10),
+            x.tu_luu_phut,
+            bool_(x.tung_trang),
+            bool_(x.thu_nho),
+            bool_(x.khung_dich),
+            bool_(x.cuon_cung),
+            x.rong_ds
+        );
         let m = &self.muc_luc;
         s += &format!("ml_thu_muc_ra={}\nml_mau_ten={}\nml_ghi_de={}\nml_rong_trai={}\n", m.thu_muc_ra, m.mau_ten, bool_(m.ghi_de), m.rong_trai);
         s += &format!("ml_file={}\nml_sheet={}\nml_dong_tieu_de={}\nml_mau={}\nml_bien={}\n", m.file, m.sheet, m.dong_tieu_de, m.mau, m.bien);
@@ -705,6 +746,7 @@ mod tests {
                 (b.ghi_sheet, b.sheet_file_khoa) = (true, r"D:\khoa=1.json".into());
                 b
             },
+            xoa_ghim: CauHinhXoaGhim { lo_10: false, tu_luu_phut: 5, tung_trang: true, thu_nho: false, khung_dich: false, cuon_cung: false, rong_ds: 360.0 },
         };
         assert!(c.kiem_tra().is_empty(), "{:?}", c.kiem_tra());
         assert_eq!(CauHinh::phan_tich(&c.noi_dung()), c);

@@ -181,7 +181,8 @@ struct TrangXong {
 
 fn xu_ly_trang(doc: &PdfDocument, so: usize, vung: &[Vung], tc: &TuyChon, xuat: &CauHinhXuat) -> Result<TrangXong, String> {
     let (mut anh, dpi, kho) = ve_trang(doc, so, xuat.dpi)?;
-    xoa_ghim_trang(&mut anh, vung, so as u32, dpi as f64, tc, &[]);
+    let ai = super::xu_ly::khung_ai(&anh, vung, so as u32, tc);
+    xoa_ghim_trang(&mut anh, vung, so as u32, dpi as f64, tc, &ai);
     Ok(TrangXong { anh: ma_hoa_anh(&anh, xuat)?, dpi, kho })
 }
 

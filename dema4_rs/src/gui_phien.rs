@@ -235,7 +235,7 @@ impl HopPhien {
             Some(TrangThai::DaXuat { zip, tt }) => {
                 let mut mo = false;
                 let ph = kh::hop(ctx, "phien_da_xuat", 420.0, "Đã xuất phiên làm việc", |ui| {
-                    kh::than_chu(ui, &format!("Đã xuất {} hồ sơ, {} kết quả bóc tách ({:.1} MB) vào {}. Mang file này sang máy khác, mở cùng thư mục rồi chọn Chức năng › Nhập phiên làm việc….", tt.so_ho_so, tt.so_ban_ghi_boc, tt.dung_luong as f64 / 1_048_576.0, zip.display()));
+                    kh::than_chu(ui, &format!("Đã xuất {} hồ sơ, {} kết quả bóc tách ({:.1} MB) vào {}. Mang file này sang máy khác, mở cùng thư mục rồi chọn Tệp tin › Nhập phiên làm việc….", tt.so_ho_so, tt.so_ban_ghi_boc, tt.dung_luong as f64 / 1_048_576.0, zip.display()));
                     kh::chan(ui, |ui| {
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if ui.add(kh::nut_chan("Đóng")).clicked() {

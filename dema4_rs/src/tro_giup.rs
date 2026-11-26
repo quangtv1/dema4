@@ -192,7 +192,7 @@ const HD_DEM: &[Khoi] = &[
         ("Ranh giới khổ", "Kéo vạch trên thước (mặc định ở giữa 2 khổ, vd A3|A4 = 358,5 mm). Gõ *Thử cạnh dài* để xem trang thuộc khổ nào."),
         ("Lưu · Mặc định", "Áp cho lần Đếm sau (file `.dema4_saomai.cfg` trong thư mục dữ liệu của ứng dụng). Ranh giới khác mặc định được ghi trong `_dem.txt`."),
     ]),    Khoi::Muc("Trang chủ › Làm tiếp gần đây"),
-    Khoi::Ghi("Trang chủ giữ 5 thư mục / file vừa làm (Đếm, Tách, Mục lục, Bóc tách) kèm tình trạng lúc rời màn — bấm 1 dòng là mở lại đúng chức năng, đúng thư mục (Bóc tách: cả loại tài liệu; Mục lục: cả sheet, dòng tiêu đề, mẫu). Cùng danh sách ở *Chức năng › Gần đây*. Thư mục đã đổi chỗ → *Chọn lại…*; dấu × cuối dòng bỏ 1 dòng, *Xoá lịch sử* bỏ hết. Danh sách lưu riêng từng máy, không nằm trong gói Xuất phiên."),
+    Khoi::Ghi("Trang chủ giữ 5 thư mục / file vừa làm (Đếm, Tách, Mục lục, Bóc tách) kèm tình trạng lúc rời màn — bấm 1 dòng là mở lại đúng chức năng, đúng thư mục (Bóc tách: cả loại tài liệu; Mục lục: cả sheet, dòng tiêu đề, mẫu). Cùng danh sách ở *Tệp tin › Gần đây*. Thư mục đã đổi chỗ → *Chọn lại…*; dấu × cuối dòng bỏ 1 dòng, *Xoá lịch sử* bỏ hết. Danh sách lưu riêng từng máy, không nằm trong gói Xuất phiên."),
 ];
 
 const HD_TACH: &[Khoi] = &[
@@ -230,7 +230,7 @@ const HD_TACH: &[Khoi] = &[
         ("Khác", "[Ctrl+S] lưu nhãn · [Ctrl] + cuộn hoặc nút − / + cỡ ảnh · [PgUp] [PgDn] văn bản trước/sau · [F1] hướng dẫn"),
     ]),
     Khoi::Ghi("Nhãn, góc xoay, cờ duyệt và kết quả phân tích lưu trong kho dữ liệu của ứng dụng (Windows `%LOCALAPPDATA%\\sm-dema4`, macOS `~/Library/Application Support/sm-dema4`), **theo nội dung từng PDF** — đổi tên / di chuyển thư mục, mở thư mục cha hay con vẫn thấy lại, không phân tích lại; cùng 1 PDF ở nhiều chỗ dùng chung nhãn. Thư mục đầu vào và file PDF gốc không bị sửa. Trước khi Tách, file đã bị thay bản khác không tách theo nhãn cũ. *Phân tích lại* = làm lại từ đầu (cả các bản chép của cùng PDF)."),
-    Khoi::Ghi("*Làm tiếp trên máy khác*: *Chức năng › Xuất phiên làm việc…* đóng gói nhãn, góc xoay, cache phân tích và kết quả bóc tách của thư mục đang mở thành `<tên>.sm-dema4.zip` (không có khoá API, license, cấu hình). Ở máy kia mở thư mục chứa các PDF đó (cấp nào, tên gì cũng được — khớp theo nội dung file) rồi *Nhập phiên làm việc…*: mỗi hồ sơ giữ bản sửa sau cùng — nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, để đồng hồ máy đúng giờ."),
+    Khoi::Ghi("*Làm tiếp trên máy khác*: *Tệp tin › Xuất phiên làm việc…* đóng gói nhãn, góc xoay, cache phân tích và kết quả bóc tách của thư mục đang mở thành `<tên>.sm-dema4.zip` (không có khoá API, license, cấu hình). Ở máy kia mở thư mục chứa các PDF đó (cấp nào, tên gì cũng được — khớp theo nội dung file) rồi *Nhập phiên làm việc…*: mỗi hồ sơ giữ bản sửa sau cùng — nên chia hồ sơ cho từng người, không đổi ngưỡng / Phân tích lại giữa chừng, để đồng hồ máy đúng giờ."),
 ];
 
 const HD_MUC_LUC: &[Khoi] = &[
