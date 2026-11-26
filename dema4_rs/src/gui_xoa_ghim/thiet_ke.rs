@@ -66,7 +66,6 @@ pub const NHAN_DIEN_NEN: Color32 = rgba(232, 84, 96, 0.30);
 pub const NHAN_DIEN_VIEN: Color32 = rgba(200, 40, 55, 0.75);
 // Biểu tượng trang giấy
 pub const ICON_VIEN: Color32 = rgb(0xB3, 0xB7, 0xBD);
-pub const ICON_VIEN_SAU: Color32 = rgb(0xC4, 0xC7, 0xCC);
 pub const ICON_DONG: Color32 = rgb(0xD3, 0xD6, 0xDA);
 pub const ICON_HOVER: Color32 = rgb(0xCF, 0xE0, 0xFB);
 pub const ICON_VE_XOA_NEN: Color32 = rgb(0xDB, 0xEA, 0xFE);

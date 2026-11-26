@@ -306,22 +306,23 @@ impl ManXoaGhim {
         let o = ui.available_rect_before_wrap();
         ui.painter().rect_filled(o, 0.0, tk::NEN_HANG_SAP);
         ui.painter().hline(o.x_range(), o.top(), Stroke::new(1.0, tk::VIEN_KHUNG));
-        // Áp tự động: chip đổi → áp ngay; gõ dải trang → áp sau 2 s
-        if self.han_loc_nc.is_some_and(|t| ui.input(|i| i.time) >= t) {
-            self.ap_loc_nc();
-        }
-        let dang_loc = self.loc_nc_ap.is_some();
-        let (con, tong) = (self.thu_tu_hien().len(), self.ds.len());
-        // Tiêu đề: "Lọc nâng cao" · (thu gọn: số file) · Reset (khi đã chỉnh) · mũi tên thu / mở
         ui.horizontal(|ui| {
             ui.set_height(30.0);
             ui.add_space(12.0);
-            let r = ui.add(egui::Label::new(egui::RichText::new("Lọc nâng cao").font(font_dam(tk::CHU_CO)).color(tk::CHU)).sense(Sense::click()));
+            // Áp tự động: tick đổi → áp ngay; gõ dải trang → áp sau 2 s
+            if self.han_loc_nc.is_some_and(|t| ui.input(|i| i.time) >= t) {
+                self.ap_loc_nc();
+            }
+            let dang_loc = self.loc_nc_ap.is_some();
+            let mut job = egui::text::LayoutJob::default();
+            job.append("Lọc nâng cao", 0.0, egui::TextFormat::simple(font_dam(tk::CHU_CO), tk::CHU));
+            // Mở rộng: trạng thái "đang lọc" nằm ở dòng Kết quả dưới đáy; thu gọn thì hiện ngay tiêu đề
+            if dang_loc && !self.loc_nc_mo {
+                job.append(" · đang lọc", 0.0, egui::TextFormat::simple(font(tk::CHU_CO), tk::XANH_DAM_CHU));
+            }
+            let r = ui.add(egui::Label::new(job).sense(Sense::click()));
             if r.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                 self.loc_nc_mo = !self.loc_nc_mo;
-            }
-            if dang_loc && !self.loc_nc_mo {
-                ui.label(egui::RichText::new(format!("· {con} / {tong} file")).font(font(tk::CHU_CO)).color(tk::XANH_DAM_CHU));
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(6.0);
@@ -332,9 +333,9 @@ impl ManXoaGhim {
                 if ph.on_hover_text(if self.loc_nc_mo { "Thu gọn" } else { "Mở rộng" }).clicked() {
                     self.loc_nc_mo = !self.loc_nc_mo;
                 }
-                // Reset chỉ hiện khi đã chỉnh khác mặc định
-                if self.loc_nc != LocNangCao::default() {
-                    ui.add_space(6.0);
+                // Reset: về chọn hết, bỏ lọc
+                if self.loc_nc_mo {
+                    ui.add_space(4.0);
                     let r = ui.add(egui::Label::new(egui::RichText::new("Reset").font(font(tk::CHU_CO)).color(tk::XANH).underline()).sense(Sense::click()));
                     r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, true, "Reset"));
                     if r.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Chọn lại tất cả, xoá dải trang — bỏ lọc").clicked() {
@@ -347,79 +348,59 @@ impl ManXoaGhim {
         if !self.loc_nc_mo {
             return;
         }
-        // Số file có từng khổ / chiều (khổ xếp theo quy tắc Đếm trang A4); 0 file → chip mờ, không bấm được
-        let (so_kho, so_ngang, so_doc) = super::dem_file(&self.thong_tin, &self.quy_tac);
+        // Khổ / chiều không có trang nào trong các file đang mở → ô mờ, không bấm được (khổ xếp theo quy tắc Đếm trang A4)
+        let (co_kho, co_ngang, co_doc) = super::co_mat(&self.thong_tin, &self.quy_tac);
         let truoc = self.loc_nc.clone();
-        const RONG_NHAN: f32 = 40.0;
-        let nhan = |ui: &mut egui::Ui, t: &str| {
-            ui.add_sized(egui::vec2(RONG_NHAN, 22.0), egui::Label::new(egui::RichText::new(t).font(font(tk::CHU_CO)).color(tk::CHU_PHU)));
-        };
-        egui::Frame::new().inner_margin(egui::Margin { left: 12, right: 12, top: 0, bottom: 8 }).show(ui, |ui| {
-            ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-            // Khổ: 2 hàng chip A0–A3 / A4–A7 kèm số file
-            ui.horizontal_top(|ui| {
-                nhan(ui, "Khổ");
-                ui.vertical(|ui| {
-                    for hang in [0..4, 4..8] {
-                        ui.horizontal(|ui| {
-                            for i in hang {
-                                let co = so_kho[i] > 0;
-                                let r = widget::chip(ui, self.loc_nc.kho[i] && co, KHO[i], Some(so_kho[i]), co);
-                                if !co {
-                                    r.on_hover_text(format!("Không có trang {} trong các file đang mở", KHO[i]));
-                                } else if r.on_hover_text(format!("{} file có trang {}", so_kho[i], KHO[i])).clicked() {
-                                    self.loc_nc.kho[i] = !self.loc_nc.kho[i];
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-            // Chiều
-            ui.horizontal(|ui| {
-                nhan(ui, "Chiều");
-                for (so, ten, la_doc) in [(so_doc, "Dọc", true), (so_ngang, "Ngang", false)] {
-                    let co = so > 0;
-                    let gt = if la_doc { self.loc_nc.doc } else { self.loc_nc.ngang };
-                    let r = widget::chip(ui, gt && co, ten, Some(so), co);
-                    if !co {
-                        r.on_hover_text(format!("Không có trang {} trong các file đang mở", ten.to_lowercase()));
-                    } else if r.on_hover_text(format!("{so} file có trang {}", ten.to_lowercase())).clicked() {
-                        if la_doc {
-                            self.loc_nc.doc = !self.loc_nc.doc;
-                        } else {
-                            self.loc_nc.ngang = !self.loc_nc.ngang;
+        egui::Frame::new().inner_margin(egui::Margin { left: 12, right: 12, top: 2, bottom: 10 }).show(ui, |ui| {
+            ui.scope(|ui| {
+                ui.spacing_mut().item_spacing.y = 6.0;
+                let phu = |ui: &mut egui::Ui, t: &str| ui.label(egui::RichText::new(t).font(font(tk::CHU_CO)).color(tk::CHU_PHU));
+                phu(ui, "Có trang khổ:");
+                egui::Grid::new("xg_kho").num_columns(4).spacing(egui::vec2(8.0, 4.0)).show(ui, |ui| {
+                    for (i, k) in KHO.iter().enumerate() {
+                        let mut b = self.loc_nc.kho[i] && co_kho[i];
+                        let mau = if b { tk::CHU } else { tk::CHU_MO };
+                        let r = ui.add_enabled_ui(co_kho[i], |ui| widget::tick(ui, &mut b, egui::RichText::new(*k).font(font(tk::CHU_CO)).color(mau))).inner;
+                        if !co_kho[i] {
+                            r.on_disabled_hover_text(format!("Không có trang {k} trong các file đang mở"));
+                        } else if r.changed() {
+                            self.loc_nc.kho[i] = b;
+                        }
+                        if i % 4 == 3 {
+                            ui.end_row();
                         }
                     }
-                }
-            });
-            // Dải trang
-            ui.horizontal(|ui| {
-                nhan(ui, "Trang");
-                let o = ui.add(egui::TextEdit::singleline(&mut self.loc_nc.dai).hint_text("tất cả · vd 1-5, 7").desired_width(f32::INFINITY).min_size(egui::vec2(0.0, 24.0)).align(egui::Align2::LEFT_CENTER));
+                });
+                phu(ui, "Chiều trang:");
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 16.0;
+                    for (co, gt, ten) in [(co_ngang, &mut self.loc_nc.ngang, "Ngang"), (co_doc, &mut self.loc_nc.doc, "Dọc")] {
+                        let mut b = *gt && co;
+                        let r = ui.add_enabled_ui(co, |ui| widget::tick(ui, &mut b, egui::RichText::new(ten).font(font(tk::CHU_CO)))).inner;
+                        if !co {
+                            r.on_disabled_hover_text(format!("Không có trang {} trong các file đang mở", ten.to_lowercase()));
+                        } else if r.changed() {
+                            *gt = b;
+                        }
+                    }
+                });
+                phu(ui, "Trong dải trang:");
+                let o = ui.add(egui::TextEdit::singleline(&mut self.loc_nc.dai).hint_text("tất cả (vd: 1-5, 7, 10-15)").desired_width(f32::INFINITY).min_size(egui::vec2(0.0, tk::CAO_NUT)).align(egui::Align2::LEFT_CENTER));
                 o.widget_info(|| egui::WidgetInfo::labeled(egui::Role::TextInput, true, "Trong dải trang"));
                 // Enter / rời ô: áp ngay, không chờ 2 s
                 if o.lost_focus() && self.han_loc_nc.is_some() {
                     self.han_loc_nc = Some(0.0);
                 }
             });
-            // Dòng kết quả: số file còn lại sau mọi bộ lọc + nhãn Đang lọc
-            let o = ui.available_rect_before_wrap();
-            ui.painter().hline(o.x_range(), o.top(), Stroke::new(1.0, tk::VIEN_KHUNG));
-            ui.add_space(2.0);
+            // Dòng cuối: số file sau khi lọc (mọi bộ lọc của Danh sách) + trạng thái đang lọc
+            let (con, tong) = (self.thu_tu_hien().len(), self.ds.len());
+            let dang_loc = self.loc_nc_ap.is_some();
+            ui.add_space(4.0);
             ui.horizontal(|ui| {
-                ui.set_height(20.0);
-                let mut job = egui::text::LayoutJob::default();
-                job.append("Hiện ", 0.0, egui::TextFormat::simple(font(tk::CHU_CO), tk::CHU_PHU));
-                job.append(&format!("{con} / {tong}"), 0.0, egui::TextFormat::simple(font_dam(tk::CHU_CO), tk::CHU));
-                job.append(" file", 0.0, egui::TextFormat::simple(font(tk::CHU_CO), tk::CHU_PHU));
-                ui.label(job);
+                ui.label(egui::RichText::new(format!("Kết quả: {con} / {tong} file")).font(font_dam(tk::CHU_CO)).color(tk::CHU));
                 if dang_loc {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let g = ui.painter().layout_no_wrap("Đang lọc".into(), font(tk::CHU_NHO), tk::XANH_DAM_CHU);
-                        let (o, _) = ui.allocate_exact_size(g.size() + egui::vec2(14.0, 4.0), Sense::hover());
-                        ui.painter().rect_filled(o, 9.0, tk::NEN_NUT_VUA_DANG);
-                        ui.painter().galley(o.center() - g.size() / 2.0, g, tk::XANH_DAM_CHU);
+                        ui.label(egui::RichText::new("đang lọc").font(font(tk::CHU_CO)).color(tk::XANH_DAM_CHU));
                     });
                 }
             });

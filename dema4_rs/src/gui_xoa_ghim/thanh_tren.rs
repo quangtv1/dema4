@@ -97,8 +97,6 @@ impl ManXoaGhim {
         let goc = o_tong.min + egui::vec2(4.0, 2.0);
         let o = |x: f32, y: f32, w: f32, h: f32| Rect::from_min_size(goc + egui::vec2(x, y), egui::vec2(w, h));
         let p = ui.painter().clone();
-        // Tờ phía sau lệch 2 px — sát tờ trước
-        p.rect(o(4.0, 4.0, 50.0, 70.0), 0.0, Color32::WHITE, Stroke::new(1.0, tk::ICON_VIEN_SAU), StrokeKind::Middle);
         let mut bat_bat_ky = false;
         let duong = |p: &egui::Painter, x0: f32, dx: f32, cuoi: f32| {
             for (i, y) in [24.0, 31.0, 38.0, 45.0, 52.0].into_iter().enumerate() {
