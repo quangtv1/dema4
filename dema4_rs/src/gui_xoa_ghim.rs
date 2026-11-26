@@ -14,6 +14,7 @@ mod danh_sach;
 mod hop;
 mod khung_trang;
 mod sua_vung;
+mod thanh_mini;
 mod thanh_tren;
 mod the_cau_hinh;
 mod thiet_ke;
@@ -554,7 +555,10 @@ impl ManXoaGhim {
         self.danh_sach(ui);
         egui::Panel::bottom("xg_duoi").exact_size(thiet_ke::CAO_DAY).frame(egui::Frame::new().fill(thiet_ke::NEN_DAY).stroke(egui::Stroke::new(1.0, thiet_ke::VIEN_KHUNG)).inner_margin(egui::Margin::symmetric(12, 0))).show(ui, |ui| self.thanh_duoi(ui));
         egui::CentralPanel::default().frame(egui::Frame::new().fill(egui::Color32::WHITE)).show(ui, |ui| {
-            if !self.an_cong_cu {
+            // Thu gọn (^): hàng biểu tượng mini thay thanh công cụ đầy đủ
+            if self.an_cong_cu {
+                self.thanh_mini(ui);
+            } else {
                 self.thanh_tren(ui);
             }
             self.khung_trang(ui);
@@ -582,7 +586,7 @@ impl ManXoaGhim {
     pub fn nut_thu_gon_cong_cu(&mut self, ui: &mut egui::Ui) {
         let bt = if self.an_cong_cu { "mo_cong_cu" } else { "thu_gon" };
         let r = widget::nut_bt(ui, bt, (14.0, 14.0), 26.0, 24.0, true, false, "Thu gọn / mở thanh công cụ");
-        if r.on_hover_text(if self.an_cong_cu { "Mở thanh công cụ" } else { "Thu gọn thanh công cụ" }).clicked() {
+        if r.on_hover_text(if self.an_cong_cu { "Mở thanh công cụ đầy đủ" } else { "Thu gọn thành hàng biểu tượng (mini)" }).clicked() {
             self.an_cong_cu = !self.an_cong_cu;
         }
     }

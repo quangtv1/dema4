@@ -394,3 +394,77 @@ fn o_to_nen_trang_bat_tat_duoc() {
     assert_eq!(man.borrow().bo.tm.tuy_chon.nen_trang, truoc, "bấm lần 2 → về như cũ");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// Thu gọn (^) → hàng mini: bấm góc / cạnh bật-tắt vùng, − / + vẽ vùng, phạm vi trang đổi vùng đang chọn,
+/// Xóa vùng vẽ hỏi lại, AI mờ khi chưa có mô hình; bấm ^ lần nữa về thanh đầy đủ.
+#[test]
+fn thanh_mini_du_chuc_nang() {
+    use egui_kittest::kittest::{NodeT, Queryable};
+    let d = thu_muc_mau("mini", &[("a.pdf", 2)]);
+    let mut man = ManXoaGhim::default();
+    man.mo_thu_muc(d.clone());
+    let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+    let m2 = man.clone();
+    let mut da_cai = false;
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 800.0)).build_ui(move |ui| {
+        if !std::mem::replace(&mut da_cai, true) {
+            crate::gui::cai_giao_dien(ui.ctx());
+        }
+        let mut m = m2.borrow_mut();
+        egui::Panel::top("menu").show(ui, |ui| m.nut_thu_gon_cong_cu(ui));
+        m.ve(ui, &mut CauHinhXoaGhim::default());
+    });
+    h.run_steps(3);
+    h.get_by_label("Thu gọn / mở thanh công cụ").click();
+    h.run_steps(2);
+    assert!(man.borrow().an_cong_cu);
+    assert!(h.query_by_label("Đầu vào").is_none(), "thanh đầy đủ đã ẩn");
+    // Góc dưới phải: bật rồi tắt
+    h.get_by_label("Góc dưới phải").click();
+    h.run_steps(2);
+    assert!(man.borrow().bo.tm.vung.iter().any(|z| z.vi_tri == ViTri::GocDuoiPhai));
+    // Cạnh trái bật; phạm vi "Trang lẻ" áp cho vùng vừa bật (đang chọn)
+    h.get_by_label("Cạnh trái").click();
+    h.run_steps(2);
+    h.get_by_label("Trang lẻ").click();
+    h.run_steps(2);
+    let z = man.borrow().bo.tm.vung.iter().find(|z| z.vi_tri == ViTri::CanhTrai).cloned().unwrap();
+    assert_eq!(z.ap_trang, ApTrang::Le);
+    h.get_by_label("Góc dưới phải").click();
+    h.run_steps(2);
+    assert!(!man.borrow().bo.tm.vung.iter().any(|z| z.vi_tri == ViTri::GocDuoiPhai));
+    // − vẽ vùng xoá → có thêm "Vô đối"; bấm lại thôi vẽ
+    h.get_by_label("Vẽ vùng xoá").click();
+    h.run_steps(2);
+    assert_eq!(man.borrow().ve, Some(LoaiVung::Xoa));
+    h.get_by_label("Vô đối");
+    h.get_by_label("Vẽ vùng bảo vệ").click();
+    h.run_steps(2);
+    assert_eq!(man.borrow().ve, Some(LoaiVung::BaoVe));
+    // Xóa vùng vẽ mờ khi chưa có vùng vẽ; có vùng vẽ → mở hộp hỏi
+    assert!(h.get_by_label("Xóa vùng vẽ").accesskit_node().is_disabled());
+    man.borrow_mut().loc_trang = LocTrang::TatCa;
+    man.borrow_mut().them_ve((0.4, 0.4, 0.1, 0.1), 0);
+    man.borrow_mut().ve = None;
+    h.run_steps(2);
+    h.get_by_label("Xóa vùng vẽ").click();
+    h.run_steps(2);
+    assert!(man.borrow().xac_nhan_xoa.is_some());
+    man.borrow_mut().xac_nhan_xoa = None;
+    h.run_steps(1);
+    // AI: chưa có mô hình → mờ
+    if !crate::xoa_ghim::mo_hinh::co_san() {
+        assert!(h.get_by_label("Nhận diện layout").accesskit_node().is_disabled());
+    }
+    if let Some(dd) = std::env::var_os("DEMA4_ANH") {
+        if let Ok(anh) = h.render() {
+            let _ = anh.save(PathBuf::from(dd).join("xoa-ghim-mini.png"));
+        }
+    }
+    // ^ lần nữa → thanh đầy đủ
+    h.get_by_label("Thu gọn / mở thanh công cụ").click();
+    h.run_steps(2);
+    assert!(!man.borrow().an_cong_cu);
+    h.get_by_label("Đầu vào");
+    let _ = std::fs::remove_dir_all(&d);
+}

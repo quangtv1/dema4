@@ -54,10 +54,13 @@ impl ManXoaGhim {
             })
             .collect();
         let (mut huy, mut xoa) = (false, false);
-        let ph = kh::hop(ctx, "xg_xac_nhan_xoa", 420.0, egui::RichText::new(format!("⚠  Xóa {n} vùng vẽ?")).font(font_dam(13.0)), |ui| {
+        let ph = kh::hop(ctx, "xg_xac_nhan_xoa", 420.0, egui::RichText::new(format!("Xóa {n} vùng vẽ?")).font(font_dam(13.0)), |ui| {
             egui::Frame::new().inner_margin(egui::Margin { left: 18, right: 18, top: 14, bottom: 10 }).show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 6.0;
                 let mut job = egui::text::LayoutJob::default();
+                // Biểu tượng cảnh báo vẽ bằng SVG (phông chữ không có ⚠)
+                let (o_cb, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
+                super::bieu_tuong::ve(ui, "canh_bao", o_cb);
                 job.append("Sẽ xoá ", 0.0, egui::TextFormat::simple(font(tk::CHU_CO), tk::CHU));
                 job.append("tất cả ", 0.0, egui::TextFormat::simple(font_dam(tk::CHU_CO), tk::CHU));
                 job.append(&n.to_string(), 0.0, egui::TextFormat::simple(font_dam(tk::CHU_CO), tk::CHU));

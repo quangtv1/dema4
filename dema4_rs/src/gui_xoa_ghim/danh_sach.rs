@@ -207,7 +207,9 @@ impl ManXoaGhim {
                 ui.set_min_width(200.0);
                 for l in LocTrangThai::DS {
                     let dang = self.loc_tt == l && self.loc_so.trim().is_empty();
-                    if ui.add(egui::Button::new(egui::RichText::new(format!("{}{}", if dang { "✓ " } else { "    " }, l.ten())).font(font(tk::CHU_CO)).color(if dang { tk::XANH_DAM_CHU } else { tk::CHU })).frame(false)).clicked() {
+                    // Mục đang lọc: nền chọn + dấu tích vẽ (phông màn Xóa ghim không có ✓)
+                    let anh = bieu_tuong::anh("m_chon", 12.0, 12.0).tint(if dang { Color32::WHITE } else { Color32::TRANSPARENT });
+                    if ui.add(egui::Button::image_and_text(anh, egui::RichText::new(l.ten()).font(font(tk::CHU_CO)).color(if dang { tk::XANH_DAM_CHU } else { tk::CHU })).selected(dang).frame(false)).clicked() {
                         self.loc_tt = l;
                         self.loc_so.clear();
                         ui.close();

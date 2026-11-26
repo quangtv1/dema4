@@ -160,7 +160,7 @@ impl ManXoaGhim {
     }
 
     /// Bật / tắt chế độ vẽ: bỏ chọn vùng; phạm vi vùng sắp vẽ mặc định Từng trang (giữ Vô đối khi vẽ xoá).
-    fn bat_ve(&mut self, loai: LoaiVung) {
+    pub(super) fn bat_ve(&mut self, loai: LoaiVung) {
         if self.ve == Some(loai) {
             self.ve = None;
             return;
@@ -173,7 +173,7 @@ impl ManXoaGhim {
     }
 
     /// Lựa chọn đang hiện ở cột lọc trang: đang vẽ → phạm vi sắp vẽ; chọn đúng 1 vùng → phạm vi vùng đó.
-    fn loc_hien(&self) -> LocTrang {
+    pub(super) fn loc_hien(&self) -> LocTrang {
         if self.ve.is_some() {
             return self.loc_trang;
         }
@@ -183,10 +183,15 @@ impl ManXoaGhim {
         }
     }
 
-    fn cot_loc_trang(&mut self, ui: &mut egui::Ui) {
+    /// Có lựa chọn "Vô đối": đang vẽ vùng xoá, hoặc chọn đúng 1 vùng vẽ xoá / vô đối.
+    pub(super) fn co_vo_doi(&self) -> bool {
         let chon1 = (self.bo.chon.len() == 1).then(|| self.bo.chinh()).flatten();
         let vung_ve_xoa = chon1.and_then(|c| self.bo.lay(c)).is_some_and(|z| z.vi_tri == ViTri::Tay && z.loai != LoaiVung::BaoVe);
-        let co_vo_doi = self.ve == Some(LoaiVung::Xoa) || (self.ve.is_none() && vung_ve_xoa);
+        self.ve == Some(LoaiVung::Xoa) || (self.ve.is_none() && vung_ve_xoa)
+    }
+
+    fn cot_loc_trang(&mut self, ui: &mut egui::Ui) {
+        let co_vo_doi = self.co_vo_doi();
         let hien = self.loc_hien();
         ui.vertical(|ui| {
             // Dòng 21 px liền nhau như prototype
@@ -204,7 +209,7 @@ impl ManXoaGhim {
     }
 
     /// Bấm 1 lựa chọn lọc trang: đang chọn đúng 1 vùng (không vẽ) → đổi phạm vi / loại vùng đó (hoàn tác được).
-    fn chon_loc_trang(&mut self, l: LocTrang) {
+    pub(super) fn chon_loc_trang(&mut self, l: LocTrang) {
         self.loc_trang = l;
         if self.ve.is_some() {
             return;
