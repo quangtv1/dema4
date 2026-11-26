@@ -122,6 +122,11 @@ pub struct HopCauHinh {
     pub(crate) toast: Option<(String, std::time::Instant)>,
 }
 
+/// Khoá có giá trị (ô khoá trống thân Bóc tách tự thêm khi vẽ không tính là thay đổi; app cũng bỏ chúng khi lưu).
+fn khoa_co_gia_tri(k: &std::collections::BTreeMap<String, String>) -> Vec<(&String, &String)> {
+    k.iter().filter(|(_, v)| !v.trim().is_empty()).collect()
+}
+
 fn so_o(v: f32) -> String {
     format!("{v:.2}").replace('.', ",")
 }
@@ -227,7 +232,7 @@ impl HopCauHinh {
     /// Chức năng `tab` còn thay đổi chưa lưu.
     pub fn doi(&self, tab: TabCauHinh) -> bool {
         crate::gui_cau_hinh::phan::khac(tab, &self.nhap, &self.goc)
-            || (tab == TabCauHinh::BocTach && self.khoa != self.khoa_goc)
+            || (tab == TabCauHinh::BocTach && khoa_co_gia_tri(&self.khoa) != khoa_co_gia_tri(&self.khoa_goc))
             || (tab == TabCauHinh::XoaGhim && self.xg.thu_muc != self.xg_goc)
     }
 

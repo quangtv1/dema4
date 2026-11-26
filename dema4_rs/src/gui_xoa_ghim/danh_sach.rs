@@ -13,9 +13,10 @@ use crate::xoa_ghim::xuat::TrangThai;
 const KHO: [&str; 8] = ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7"];
 
 impl ManXoaGhim {
-    /// Đang mở rộng: mặc định có; người dùng bấm thu nhỏ thì giữ tới khi mở lại / đóng thư mục.
+    /// Đang mở rộng: chưa mở file / thư mục → thu nhỏ; đã mở → mở rộng. Người dùng bấm thu / mở thì giữ tới khi mở
+    /// file / thư mục khác hoặc đóng.
     fn ds_mo_rong(&self) -> bool {
-        self.ds_mo.unwrap_or(true)
+        self.ds_mo.unwrap_or(self.thu_muc.is_some())
     }
 
     /// Thứ tự hiện: lọc tên (NFC, không phân biệt hoa thường) + lọc gộp + Lọc nâng cao; sắp tên tự nhiên / số trang.

@@ -365,3 +365,32 @@ fn khoi_vung_khong_tran_sang_nua_phai() {
         }
     }
 }
+
+/// Bấm ô "Tô nền trắng" ở thanh công cụ → đổi tuỳ chọn thư mục (bật / tắt), ảnh Đích làm lại (mã cấu hình đổi).
+#[test]
+fn o_to_nen_trang_bat_tat_duoc() {
+    use egui_kittest::kittest::Queryable;
+    let d = thu_muc_mau("nen", &[("a.pdf", 1)]);
+    let mut man = ManXoaGhim::default();
+    man.mo_thu_muc(d.clone());
+    let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+    let m2 = man.clone();
+    let mut da_cai = false;
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1600.0, 900.0)).build_ui(move |ui| {
+        if !std::mem::replace(&mut da_cai, true) {
+            crate::gui::cai_giao_dien(ui.ctx());
+        }
+        m2.borrow_mut().ve(ui, &mut CauHinhXoaGhim::default());
+    });
+    h.run_steps(3);
+    let truoc = man.borrow().bo.tm.tuy_chon.nen_trang;
+    let ma_truoc = man.borrow().cau_hinh_xem().1;
+    h.get_by_label("Tô nền trắng").click();
+    h.run_steps(2);
+    assert_eq!(man.borrow().bo.tm.tuy_chon.nen_trang, !truoc, "bấm 1 lần → đổi");
+    assert_ne!(man.borrow().cau_hinh_xem().1, ma_truoc, "ảnh Đích phải làm lại");
+    h.get_by_label("Tô nền trắng").click();
+    h.run_steps(2);
+    assert_eq!(man.borrow().bo.tm.tuy_chon.nen_trang, truoc, "bấm lần 2 → về như cũ");
+    let _ = std::fs::remove_dir_all(&d);
+}

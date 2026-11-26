@@ -320,20 +320,24 @@ impl ManXoaGhim {
         });
     }
 
-    /// Menu chuột phải trên trang Gốc.
+    /// Menu chuột phải trên trang Gốc: mỗi dòng có biểu tượng đầu dòng.
     fn menu_vung(&mut self, ui: &mut egui::Ui, t: u32, kich: (i64, i64), dpi: f64) {
-        ui.set_min_width(210.0);
-        let muc = |ui: &mut egui::Ui, chu: &str, duoc: bool| ui.add_enabled(duoc, egui::Button::new(egui::RichText::new(chu).font(font(tk::CHU_CO))).frame(false)).clicked();
+        ui.set_min_width(230.0);
+        let muc = |ui: &mut egui::Ui, bt: &str, chu: &str, duoc: bool| {
+            let anh = super::bieu_tuong::anh(bt, 14.0, 14.0);
+            let anh = if duoc { anh } else { anh.tint(Color32::from_white_alpha(110)) };
+            ui.add_enabled(duoc, egui::Button::image_and_text(anh, egui::RichText::new(chu).font(font(tk::CHU_CO))).frame(false).min_size(egui::vec2(0.0, 24.0))).clicked()
+        };
         if self.bo.chon.is_empty() {
-            if muc(ui, "Vẽ vùng xoá", true) {
+            if muc(ui, "m_ve_xoa", "Vẽ vùng xoá", true) {
                 self.ve = Some(LoaiVung::Xoa);
                 ui.close();
             }
-            if muc(ui, "Vẽ vùng bảo vệ", true) {
+            if muc(ui, "m_ve_bao", "Vẽ vùng bảo vệ", true) {
                 self.ve = Some(LoaiVung::BaoVe);
                 ui.close();
             }
-            if muc(ui, "Chọn tất cả (Ctrl+A)", !self.bo.tat_ca().is_empty()) {
+            if muc(ui, "m_chon_het", "Chọn tất cả (Ctrl+A)", !self.bo.tat_ca().is_empty()) {
                 self.bo.chon = self.bo.tat_ca();
                 ui.close();
             }
@@ -342,7 +346,7 @@ impl ManXoaGhim {
             ui.label(egui::RichText::new(tieu_de).font(super::widget::font_dam(tk::CHU_CO)).color(tk::CHU_PHU));
             ui.separator();
             let ve = self.bo.chi_vung_ve(&self.bo.chon.clone());
-            if muc(ui, &format!("Xóa vùng{} (Delete)", if ve.len() > 1 { format!(" ({})", ve.len()) } else { String::new() }), !ve.is_empty()) {
+            if muc(ui, "m_xoa", &format!("Xóa vùng{} (Delete)", if ve.len() > 1 { format!(" ({})", ve.len()) } else { String::new() }), !ve.is_empty()) {
                 let n = self.bo.xoa(&ve);
                 self.bao(format!("Đã xoá {n} vùng · Ctrl+Z để hoàn tác"));
                 ui.close();
@@ -352,11 +356,11 @@ impl ManXoaGhim {
                 let z = self.bo.lay(c).cloned();
                 if let Some(z) = z {
                     let doi = if z.loai == LoaiVung::BaoVe { "Đổi thành vùng xoá" } else { "Đổi thành vùng bảo vệ" };
-                    if muc(ui, doi, z.vi_tri == ViTri::Tay) {
+                    if muc(ui, "m_doi", doi, z.vi_tri == ViTri::Tay) {
                         self.bo.doi_loai(c);
                         ui.close();
                     }
-                    if muc(ui, "Nhân bản", true) {
+                    if muc(ui, "m_nhan_ban", "Nhân bản", true) {
                         if !self.bo.nhan_ban(c, kich, dpi) {
                             self.bao("Không nhân bản được (PDF chưa đọc được hoặc đã đủ số vùng)");
                         }
@@ -367,7 +371,7 @@ impl ManXoaGhim {
                     let vo_doi = z.loai == LoaiVung::VoDoi;
                     for (ap, ten) in [(ApTrang::TatCa, "Mọi trang"), (ApTrang::Le, "Trang lẻ"), (ApTrang::Chan, "Trang chẵn"), (ApTrang::MotTrang(t), "Chỉ trang này")] {
                         let dang = z.ap_trang == ap;
-                        if muc(ui, &format!("{}{ten}", if dang { "✓ " } else { "    " }), !dang) {
+                        if muc(ui, if dang { "m_chon" } else { "m_trang" }, ten, !dang) {
                             self.bo.doi_ap_trang(c, ap, vo_doi);
                             ui.close();
                         }
@@ -376,7 +380,7 @@ impl ManXoaGhim {
             }
         }
         ui.separator();
-        if muc(ui, "Hoàn tác (Ctrl+Z)", self.bo.co_hoan_tac()) {
+        if muc(ui, "m_hoan_tac", "Hoàn tác (Ctrl+Z)", self.bo.co_hoan_tac()) {
             self.bo.hoan_tac();
             ui.close();
         }

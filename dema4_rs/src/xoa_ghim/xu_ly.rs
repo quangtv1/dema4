@@ -60,11 +60,11 @@ fn la_do_xanh(r: u8, g: u8, b: u8) -> bool {
 
 /// Màu nền [R, G, B]: trung vị từng kênh của dải giữa-phải trang (dòng 1/3–2/3, cột 1/2–3/4),
 /// trung vị chẵn lấy trung bình 2 giữa rồi cắt nguyên như `int(np.median(...))`.
-fn mau_nen(anh: &Anh, nen_trang: bool) -> [u8; 3] {
+fn mau_nen(anh: &Anh) -> [u8; 3] {
     let (w, h) = (anh.rong, anh.cao);
     let (y1, y2, x1, x2) = (h / 3, 2 * h / 3, w / 2, 3 * w / 4);
     let n = (y2 - y1) * (x2 - x1);
-    if nen_trang || n == 0 {
+    if n == 0 {
         return [255; 3];
     }
     let mut dem = [[0u32; 256]; 3];
@@ -121,7 +121,10 @@ fn phan_duoc_xoa(k: Hcn, bao_ve: &[Hcn]) -> Option<Vec<u8>> {
 /// Cố ý như vậy: lõi vết ghim / lỗ bấm cũng tối như nét chữ, bỏ chúng cả sau giãn thì vết ghim còn
 /// nguyên lõi đen (đã thử trên bộ mẫu 266 trang).
 fn xoa_trong_khung(anh: &mut Anh, v: &Vung, k: Hcn, dpi: f64, tc: &TuyChon, duoc_xoa: Option<&[u8]>) -> bool {
-    let nen = mau_nen(anh, tc.nen_trang);
+    // Nhận vết luôn so với màu nền đo được; "Tô nền trắng" chỉ đổi màu tô (so với trắng 255 thì giấy hơi ngả màu
+    // cũng thành "vết" → tô trắng cả vùng)
+    let nen = mau_nen(anh);
+    let mau_to = if tc.nen_trang { [255; 3] } else { nen };
     // Python: int(0.114·B + 0.587·G + 0.299·R) trên số thực, cộng theo đúng thứ tự đó
     let nen_xam = (0.114 * nen[2] as f64 + 0.587 * nen[1] as f64 + 0.299 * nen[0] as f64) as i32;
     let nguong_den = if v.vi_tri.la_goc_canh() { 50 } else { 80 };
@@ -146,7 +149,7 @@ fn xoa_trong_khung(anh: &mut Anh, v: &Vung, k: Hcn, dpi: f64, tc: &TuyChon, duoc
         for (x, p) in anh.du_lieu[dau..dau + w * 3].chunks_exact_mut(3).enumerate() {
             let i = y * w + x;
             if vet[i] != 0 && duoc_xoa.is_none_or(|m| m[i] != 0) {
-                p.copy_from_slice(&nen);
+                p.copy_from_slice(&mau_to);
                 doi = true;
             }
         }
@@ -243,8 +246,18 @@ mod tests {
     fn trung_vi_nen_lay_dai_giua_phai_bo_qua_vet_o_goc() {
         let mut a = trang_trang(40, 30);
         to(&mut a, 0, 0, 10, 10, [0, 0, 0]);
-        assert_eq!(mau_nen(&a, false), NEN);
-        assert_eq!(mau_nen(&a, true), [255; 3]);
+        assert_eq!(mau_nen(&a), NEN);
+    }
+
+    /// Tô nền trắng: chỉ vết bị tô trắng, giấy ngả màu quanh vết trong vùng giữ nguyên.
+    #[test]
+    fn to_nen_trang_chi_to_vet_khong_to_ca_vung() {
+        let mut a = trang_trang(200, 200);
+        to(&mut a, 10, 10, 20, 20, [150, 150, 150]);
+        let v = tay(0.0, 0.0, 0.3, 0.3, LoaiVung::Xoa);
+        assert!(xoa_ghim_trang(&mut a, &[v], 0, 120.0, &TuyChon { nen_trang: true, ..Default::default() }, &[]));
+        assert_eq!(diem(&a, 15, 15), [255; 3], "vết tô trắng");
+        assert_eq!(diem(&a, 50, 50), NEN, "giấy trong vùng, xa vết: giữ màu giấy");
     }
 
     #[test]

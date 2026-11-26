@@ -2484,6 +2484,28 @@ mod tests {
         assert!(!h.state().cfg.xoa_ghim.lo_10, "Không lưu → giữ bản đã lưu");
     }
 
+    /// Chỉ xem từng mục (không sửa gì) → không mục nào báo chưa lưu; Quay lại đóng ngay, không hỏi.
+    #[test]
+    fn cau_hinh_xem_khong_sua_quay_lai_khong_hoi() {
+        use crate::gui_tach::hop_cau_hinh::TabCauHinh;
+        use egui_kittest::kittest::Queryable;
+        for man in [Man::Tach, Man::XoaGhim, Man::BocTach] {
+            let mut h = harness_chinh(man);
+            h.run();
+            h.get_by_label("Cấu hình").click();
+            h.run();
+            for t in TabCauHinh::CHUC_NANG.into_iter().chain([TabCauHinh::DuLieu]) {
+                h.get_by_role_and_label(egui::accesskit::Role::Tab, t.ten()).click();
+                h.run_steps(3);
+                let ds = h.state().hop_cau_hinh.as_ref().unwrap().ds_doi();
+                assert!(ds.is_empty(), "{man:?}: xem mục {} → báo đổi {ds:?}", t.ten());
+            }
+            h.get_by_label("Quay lại").click();
+            h.run();
+            assert!(h.state().hop_cau_hinh.is_none(), "{man:?}: không đổi gì → đóng ngay");
+        }
+    }
+
     /// Mở từ từng màn → đúng chức năng; "Quay lại <màn>".
     #[test]
     fn cau_hinh_mo_dung_chuc_nang_cua_man() {

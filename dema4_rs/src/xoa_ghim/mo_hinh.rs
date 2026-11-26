@@ -17,7 +17,8 @@ use sha2::{Digest, Sha256};
 pub const TEN_FILE: &str = "yolov12s-doclaynet.onnx";
 pub const CO_FILE: u64 = 37_544_909;
 pub const SHA256: &str = "b5c0defaf2748d3a02438311be854a12a4b47698633ba7f91a08567197fe927a";
-pub const DIA_CHI: &str = "https://github.com/quangtv1/dema4/releases/download/mo-hinh-xoa-ghim-1/yolov12s-doclaynet.onnx";
+/// Bản công khai trong kho XoaGhim (cùng file, cùng SHA-256) — tải thẳng, không cần bản phát hành riêng.
+pub const DIA_CHI: &str = "https://raw.githubusercontent.com/quangtv1/xoaghim/main/resources/models/yolov12s-doclaynet.onnx";
 
 const HUY: &str = "Đã huỷ";
 
@@ -214,6 +215,20 @@ impl TaiMoHinh {
 
 #[cfg(test)]
 mod tests {
+    /// Tải thật từ `DIA_CHI` (cần mạng): đúng cỡ + SHA-256, ghi xong mới đổi tên. Chạy:
+    /// `cargo test --release -- --ignored tai_that_tu_dia_chi`
+    #[test]
+    #[ignore = "cần mạng"]
+    fn tai_that_tu_dia_chi() {
+        let d = std::env::temp_dir().join(format!("dema4_tai_mo_hinh_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let dich = d.join(TEN_FILE);
+        tai(DIA_CHI, &dich, |_, _| {}, &AtomicBool::new(false)).expect("tải mô hình");
+        assert_eq!(std::fs::metadata(&dich).unwrap().len(), CO_FILE);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
     use super::*;
     use std::net::TcpListener;
 
