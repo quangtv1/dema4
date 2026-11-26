@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Xóa ghim + Dữ liệu ứng dụng"
-status: pending
+status: completed
 priority: P2
 dependencies: [1, 2]
 ---

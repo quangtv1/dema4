@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Khung trang Cấu hình"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 ---

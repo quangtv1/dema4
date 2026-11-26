@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Kiểm thử, đối chiếu prototype, tài liệu"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 2, 3, 4]
 ---

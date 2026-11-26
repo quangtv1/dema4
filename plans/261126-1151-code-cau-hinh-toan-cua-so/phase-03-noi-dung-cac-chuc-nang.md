@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Nội dung Đếm, Tách, Mục lục, Bóc tách"
-status: pending
+status: completed
 priority: P2
 dependencies: [1]
 ---

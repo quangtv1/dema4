@@ -2546,16 +2546,15 @@ mod tests {
     fn chup_trang_cau_hinh() {
         use crate::gui_tach::hop_cau_hinh::TabCauHinh;
         let thu_muc_anh = PathBuf::from(std::env::var("DEMA4_ANH").expect("DEMA4_ANH"));
-        let chup = |ten: &str, man: Man, tab: TabCauHinh, nho: bool, thu: bool, sua: bool| {
+        type Sua = fn(&mut crate::gui_tach::hop_cau_hinh::HopCauHinh);
+        let chup = |ten: &str, man: Man, tab: TabCauHinh, nho: bool, thu: bool, sua: Option<Sua>| {
             let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1600.0, 900.0)).with_pixels_per_point(1.0).build_eframe(move |cc| {
                 cai_giao_dien(&cc.egui_ctx);
                 let cfg = crate::cau_hinh::CauHinh { ch_cua_so_nho: nho, ch_thu_ds: thu, ..Default::default() };
                 let mut app = UngDungChinh { man, cfg: cfg.clone(), ..Default::default() };
                 app.mo_cau_hinh(&cc.egui_ctx, crate::gui_tach::hop_cau_hinh::HopCauHinh::moi(&cfg, tab));
-                if sua {
-                    let hop = app.hop_cau_hinh.as_mut().unwrap();
-                    hop.nhap.nguong_nghi = 3.5;
-                    hop.nhap.xoa_ghim.lo_10 = false;
+                if let Some(f) = sua {
+                    f(app.hop_cau_hinh.as_mut().unwrap());
                 }
                 app
             });
@@ -2565,15 +2564,22 @@ mod tests {
             }
             h.render().unwrap().save(thu_muc_anh.join(ten)).unwrap();
         };
-        chup("ch-dem.png", Man::Dem, TabCauHinh::Dem, false, false, false);
-        chup("ch-tach.png", Man::Tach, TabCauHinh::Tach, false, false, false);
-        chup("ch-ml.png", Man::MucLuc, TabCauHinh::MucLuc, false, false, false);
-        chup("ch-bt.png", Man::BocTach, TabCauHinh::BocTach, false, false, false);
-        chup("ch-xg.png", Man::XoaGhim, TabCauHinh::XoaGhim, false, false, false);
-        chup("ch-dl.png", Man::Tach, TabCauHinh::DuLieu, false, false, false);
-        chup("ch-chua-luu.png", Man::Tach, TabCauHinh::Tach, false, false, true);
-        chup("ch-cua-so-nho.png", Man::Tach, TabCauHinh::Tach, true, false, true);
-        chup("ch-thu-nho.png", Man::Tach, TabCauHinh::Tach, false, true, true);
+        // 2 chức năng chưa lưu (Tách, Xóa ghim)
+        let sua: Sua = |h| {
+            h.nhap.nguong_nghi = 3.5;
+            h.nhap.xoa_ghim.lo_10 = false;
+        };
+        chup("ch-dem.png", Man::Dem, TabCauHinh::Dem, false, false, None);
+        chup("ch-tach.png", Man::Tach, TabCauHinh::Tach, false, false, None);
+        chup("ch-ml.png", Man::MucLuc, TabCauHinh::MucLuc, false, false, None);
+        chup("ch-bt.png", Man::BocTach, TabCauHinh::BocTach, false, false, None);
+        chup("ch-bt-gemini.png", Man::BocTach, TabCauHinh::BocTach, false, false, Some(|h| h.bt.ncc = NhaCungCap::Gemini));
+        chup("ch-bt-ghi.png", Man::BocTach, TabCauHinh::BocTach, false, false, Some(|h| h.bt.muc = crate::gui_boc_tach::cau_hinh::Muc::Ghi));
+        chup("ch-xg.png", Man::XoaGhim, TabCauHinh::XoaGhim, false, false, None);
+        chup("ch-dl.png", Man::Tach, TabCauHinh::DuLieu, false, false, None);
+        chup("ch-chua-luu.png", Man::Tach, TabCauHinh::Tach, false, false, Some(sua));
+        chup("ch-cua-so-nho.png", Man::Tach, TabCauHinh::Tach, true, false, Some(sua));
+        chup("ch-thu-nho.png", Man::Tach, TabCauHinh::Tach, false, true, Some(sua));
     }
 
     /// Cửa sổ thấp (980×600) hay mặc định: nút Lưu / Huỷ thay đổi trên tiêu đề vẫn nằm trong cửa sổ, cả 2 dạng hiển thị.

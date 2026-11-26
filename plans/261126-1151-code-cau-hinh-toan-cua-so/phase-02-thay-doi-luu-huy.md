@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Thay đổi, Lưu / Huỷ / Mặc định, hỏi khi rời"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 ---

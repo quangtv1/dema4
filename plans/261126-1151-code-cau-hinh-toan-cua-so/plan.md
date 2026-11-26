@@ -1,7 +1,7 @@
 ---
 title: "Code Cấu hình toàn cửa sổ theo prototype đã chốt"
 description: "Đổi hộp Cấu hình (popup, tab trên) thành trang toàn cửa sổ có sidebar chức năng bên trái, cột nội dung cố định 880 px, nút Lưu trên tiêu đề, chế độ cửa sổ thu nhỏ, sidebar thu nhỏ"
-status: pending
+status: completed
 priority: P1
 effort: ~3,5 ngày công
 branch: main
@@ -36,11 +36,11 @@ created: 2026-11-26
 
 | # | Giai đoạn | Effort | Phụ thuộc | Trạng thái |
 |---|-----------|--------|-----------|------------|
-| 1 | [Khung trang Cấu hình: toàn cửa sổ / cửa sổ thu nhỏ, sidebar, tiêu đề, gắn vào app](./phase-01-khung-trang-cau-hinh.md) | 1 ngày | — | Pending |
-| 2 | [Theo dõi thay đổi theo chức năng, Lưu / Huỷ / Mặc định, hỏi khi rời](./phase-02-thay-doi-luu-huy.md) | 0,5 ngày | 1 | Pending |
-| 3 | [Nội dung Đếm, Tách, Mục lục, Bóc tách trong cột 880](./phase-03-noi-dung-cac-chuc-nang.md) | 0,75 ngày | 1 | Pending |
-| 4 | [Xóa ghim + Dữ liệu ứng dụng](./phase-04-xoa-ghim-va-du-lieu.md) | 0,5 ngày | 1, 2 | Pending |
-| 5 | [Kiểm thử, đối chiếu prototype, tài liệu](./phase-05-kiem-thu-doi-chieu-tai-lieu.md) | 0,75 ngày | 1–4 | Pending |
+| 1 | [Khung trang Cấu hình: toàn cửa sổ / cửa sổ thu nhỏ, sidebar, tiêu đề, gắn vào app](./phase-01-khung-trang-cau-hinh.md) | 1 ngày | — | Xong |
+| 2 | [Theo dõi thay đổi theo chức năng, Lưu / Huỷ / Mặc định, hỏi khi rời](./phase-02-thay-doi-luu-huy.md) | 0,5 ngày | 1 | Xong |
+| 3 | [Nội dung Đếm, Tách, Mục lục, Bóc tách trong cột 880](./phase-03-noi-dung-cac-chuc-nang.md) | 0,75 ngày | 1 | Xong |
+| 4 | [Xóa ghim + Dữ liệu ứng dụng](./phase-04-xoa-ghim-va-du-lieu.md) | 0,5 ngày | 1, 2 | Xong |
+| 5 | [Kiểm thử, đối chiếu prototype, tài liệu](./phase-05-kiem-thu-doi-chieu-tai-lieu.md) | 0,75 ngày | 1–4 | Xong |
 
 ## Kiến trúc tóm tắt
 
