@@ -111,21 +111,16 @@ pub fn nut_mui_ten(ui: &mut Ui, huong: Huong, rong: f32, cao: f32, ten: &str) ->
     ph.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
-/// Mũi tên mảnh rộng 12 × cao 6 (hoặc 6 × 12 khi trái / phải), nét 1,6 đầu tròn — vẽ quanh tâm `c`.
+/// Mũi tên mảnh rộng 8 × cao 4 (hoặc 4 × 8 khi trái / phải), nét 1,1 — vẽ quanh tâm `c`.
 pub fn ve_mui_ten(p: &egui::Painter, c: egui::Pos2, huong: Huong, mau: Color32) {
-    let (a, b) = (6.0, 3.2);
+    let (a, b) = (4.0, 2.0);
     let diem = match huong {
         Huong::Xuong => [c + egui::vec2(-a, -b), c + egui::vec2(0.0, b), c + egui::vec2(a, -b)],
         Huong::Len => [c + egui::vec2(-a, b), c + egui::vec2(0.0, -b), c + egui::vec2(a, b)],
         Huong::Phai => [c + egui::vec2(-b, -a), c + egui::vec2(b, 0.0), c + egui::vec2(-b, a)],
         Huong::Trai => [c + egui::vec2(b, -a), c + egui::vec2(-b, 0.0), c + egui::vec2(b, a)],
     };
-    let net = Stroke::new(1.6, mau);
-    p.line_segment([diem[0], diem[1]], net);
-    p.line_segment([diem[1], diem[2]], net);
-    for d in diem {
-        p.circle_filled(d, 0.8, mau);
-    }
+    p.add(egui::Shape::line(diem.to_vec(), Stroke::new(1.1, mau)));
 }
 
 /// Phần cuối ô đường dẫn.

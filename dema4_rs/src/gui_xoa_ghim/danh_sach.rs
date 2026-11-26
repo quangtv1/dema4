@@ -76,9 +76,8 @@ impl ManXoaGhim {
                 // Khối Lọc nâng cao đo ở khung trước → danh sách chừa đúng chỗ, nút Áp dụng không bị cắt
                 let cao_ds = (ui.available_height() - self.cao_nc).max(40.0);
                 ui.allocate_ui(egui::vec2(ui.available_width(), cao_ds), |ui| self.cac_dong(ui));
-                let tren = ui.cursor().top();
-                self.loc_nang_cao(ui);
-                let cao = ui.min_rect().bottom() - tren;
+                // Đo đúng phần khối chiếm (scope riêng) — min_rect của cả cột luôn chạm đáy nên không co lại được
+                let cao = ui.scope(|ui| self.loc_nang_cao(ui)).response.rect.height();
                 if (cao - self.cao_nc).abs() > 0.5 {
                     self.cao_nc = cao;
                     ui.ctx().request_repaint();

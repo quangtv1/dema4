@@ -175,10 +175,10 @@ impl ManXoaGhim {
             TyLe::CoDinh(v) => v,
         }
         .max(0.05);
-        // Đổi tỉ lệ khi sang trang khác khổ (cuộn liên tiếp): giữ đầu trang đang xem ở mép trên, không nhảy lệch
-        if (ty - self.ty_le_cuoi).abs() > 1e-3 && self.cuon_toi.is_none() && !matches!(self.ty_le, TyLe::CoDinh(_)) {
-            self.cuon_toi = Some(self.trang);
-        }
+        // Đổi tỉ lệ (phóng / thu, vừa ngang, sang trang khác khổ): trục giữa khung xem trùng trục giữa trang giấy
+        // theo chiều ngang; chiều dọc giữ điểm đang ở giữa khung
+        let doi_ty = (ty - self.ty_le_cuoi).abs() > 1e-4 && self.ty_le_cuoi > 0.0;
+        let ty_cu = self.ty_le_cuoi;
         self.ty_le_cuoi = ty;
         let n = self.kho_trang.len() as u32;
         let cac: Vec<u32> = if self.cfg.tung_trang { vec![self.trang.min(n - 1)] } else { (0..n).collect() };
@@ -190,11 +190,18 @@ impl ManXoaGhim {
             y += h * ty + tk::DEM_DUOI_TRANG.min(tk::KHE_TRANG + 12.0);
         }
         let noi = egui::vec2((rong_max * ty + tk::LE_VUA).max(x), y + tk::DEM_DUOI_TRANG);
+        if doi_ty && self.cuon_toi.is_none() && self.ep_cuon.is_none() {
+            let cao_xem = o_goc.height();
+            let giua = |c: egui::Vec2| egui::vec2(((noi.x - x) / 2.0).max(0.0), ((c.y + cao_xem / 2.0) * ty / ty_cu - cao_xem / 2.0).max(0.0));
+            let (g, d) = (giua(self.cuon_goc), giua(self.cuon_dich));
+            self.ep_cuon_ca = Some((g, d));
+        }
         // Ép cuộn: tới trang (chuyển trang / file) hoặc theo khung kia (cuộn đồng bộ)
         let toi = self.cuon_toi.take().and_then(|t| bo_cuc.iter().find(|(x, _, _)| *x == t).map(|(_, y0, _)| (y0 - tk::DEM_TREN_TRANG).max(0.0)));
         let ep = self.ep_cuon.take();
-        let ep_goc = toi.map(|y| egui::vec2(self.cuon_goc.x, y)).or(ep.filter(|e| e.0).map(|e| e.1));
-        let ep_dich = toi.map(|y| egui::vec2(self.cuon_dich.x, y)).or(ep.filter(|e| !e.0).map(|e| e.1));
+        let ca = self.ep_cuon_ca.take();
+        let ep_goc = toi.map(|y| egui::vec2(self.cuon_goc.x, y)).or(ca.map(|c| c.0)).or(ep.filter(|e| e.0).map(|e| e.1));
+        let ep_dich = toi.map(|y| egui::vec2(self.cuon_dich.x, y)).or(ca.map(|c| c.1)).or(ep.filter(|e| !e.0).map(|e| e.1));
         let (og, trang_tren) = self.khung_xem(ui, o_goc, true, &bo_cuc, noi, ep_goc);
         let od = if co_dich { self.khung_xem(ui, o_dich, false, &bo_cuc, noi, ep_dich).0 } else { og };
         if self.cfg.cuon_cung && co_dich {

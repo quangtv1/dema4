@@ -93,7 +93,9 @@ fn nut(ui: &mut egui::Ui, h: Hinh, dang: bool, duoc: bool, ten: &str, tip: &str)
     let mau = if !duoc { tk::CHU_MO } else if dang { tk::XANH_DAM_CHU } else { NET };
     ve_hinh(p, o, h, mau);
     ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, duoc, dang, ten));
-    ph.on_hover_text(tip)
+    // Mô tả hiện ngay khi rê chuột (kể cả nút mờ) — nút chỉ có hình nên cần biết chức năng
+    widget::tooltip_ngay(ui, &ph, tip);
+    ph
 }
 
 fn vach(ui: &mut egui::Ui) {
