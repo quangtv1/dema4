@@ -37,7 +37,8 @@ pub enum ChonTrangChu {
 }
 
 const TIEU_DE: &str = "Hỗ trợ nghiệp vụ số hóa tài liệu";
-const CAO_DAU: f32 = 160.0;
+/// Cao dải đầu (logo + tên) — gọn để cửa sổ mặc định còn thấy khối Gần đây.
+const CAO_DAU: f32 = 116.0;
 const CAO_DAY: f32 = 30.0;
 /// Số ô hàng đầu khi đủ chỗ; ô chia đều bề ngang khối (tên chức năng 1 dòng), không hẹp hơn `RONG_O_MIN`.
 const O_MOI_HANG: usize = 7;
@@ -107,7 +108,7 @@ impl TrangChu {
             let vung = ui.max_rect();
             let dau = Rect::from_min_size(vung.min, egui::vec2(vung.width(), CAO_DAU));
             dai_dau(ui, dau);
-            let y_o = dau.bottom() + 30.0;
+            let y_o = dau.bottom() + 20.0;
             let rong = RONG_KHOI.min(vung.width() - 40.0);
             let x0 = vung.center().x - rong / 2.0;
             let mut tom = None;
@@ -128,8 +129,8 @@ impl TrangChu {
                 }
             }
             if gan.is_empty() {
-                luoi_thong_tin(ui, x0, rong, day + 30.0, license);
-            } else if let Some(c) = khoi_gan_day(ui, x0, rong, day + 30.0, gan, mat) {
+                luoi_thong_tin(ui, x0, rong, day + 20.0, license);
+            } else if let Some(c) = khoi_gan_day(ui, x0, rong, day + 20.0, gan, mat) {
                 chon = Some(c);
             }
             if let Some((r, chu)) = tom {
@@ -198,10 +199,10 @@ fn dai_dau(ui: &egui::Ui, r: Rect) {
         y += 18.0;
     }
     p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, Color32::from_rgb(0xE1, 0xE7, 0xF0)));
-    let kich = crate::logo_sao_mai::kich(60.0);
+    let kich = crate::logo_sao_mai::kich(44.0);
     let ten = p.layout_no_wrap(TIEU_DE.into(), font(19.0, true), CHU);
     let moi = p.layout_no_wrap("Chọn chức năng để bắt đầu".into(), font(12.5, false), CHU_PHU);
-    let cao = kich.y + 8.0 + ten.size().y + 4.0 + moi.size().y;
+    let cao = kich.y + 6.0 + ten.size().y + 2.0 + moi.size().y;
     let mut y = r.center().y - cao / 2.0;
     let o_logo = Rect::from_center_size(egui::pos2(r.center().x, y + kich.y / 2.0), kich);
     crate::logo_sao_mai::ve(&p, o_logo);
@@ -209,9 +210,9 @@ fn dai_dau(ui: &egui::Ui, r: Rect) {
     if ph.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
         ui.ctx().open_url(egui::OpenUrl::new_tab(crate::tro_giup::WEBSITE));
     }
-    y += kich.y + 8.0;
+    y += kich.y + 6.0;
     p.galley(egui::pos2(r.center().x - ten.size().x / 2.0, y), ten.clone(), CHU);
-    y += ten.size().y + 4.0;
+    y += ten.size().y + 2.0;
     p.galley(egui::pos2(r.center().x - moi.size().x / 2.0, y), moi, CHU_PHU);
 }
 
