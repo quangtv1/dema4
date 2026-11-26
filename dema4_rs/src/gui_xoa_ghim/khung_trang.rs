@@ -25,77 +25,88 @@ impl ManXoaGhim {
     // ---------------- Thanh đáy ----------------
 
     pub(super) fn thanh_duoi(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal_centered(|ui| {
-            let (chung, rieng) = self.bo.dem();
-            ui.label(egui::RichText::new(format!("Zone chung: {chung}; Zone riêng: {rieng}")).font(font(tk::CHU_CO)).color(tk::CHU_PHU));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
-                self.nut_chay(ui);
-                ui.add_space(10.0);
-                let co = !self.kho_trang.is_empty();
-                if widget::nut_bt(ui, "cong", (12.0, 12.0), 26.0, 24.0, co, false, "Phóng to").on_hover_text("Phóng to (+) · Ctrl + cuộn chuột").clicked() {
-                    self.phong(10.0);
-                }
-                if widget::nut_bt(ui, "tru", (12.0, 12.0), 26.0, 24.0, co, false, "Thu nhỏ").on_hover_text("Thu nhỏ (−)").clicked() {
-                    self.phong(-10.0);
-                }
-                let hien = (self.ty_le_cuoi * 100.0).round() as u16;
-                ui.add_enabled_ui(co, |ui| {
-                    egui::ComboBox::from_id_salt("xg_phong")
-                        .width(64.0)
-                        .selected_text(egui::RichText::new(format!("{hien}%")).font(font(tk::CHU_CO)))
-                        .show_ui(ui, |ui| {
-                            for p in CAC_PHONG {
-                                if ui.selectable_label(p == hien && matches!(self.ty_le, TyLe::CoDinh(_)), egui::RichText::new(format!("{p}%")).font(font(tk::CHU_CO))).clicked() {
-                                    self.ty_le = TyLe::CoDinh(p as f32 / 100.0);
-                                    self.cuon_toi = Some(self.trang);
-                                }
-                            }
-                        })
-                        .response
-                        .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, "Tỉ lệ"));
-                });
-                if widget::nut_bt(ui, "vua_cao", (12.0, 16.0), 28.0, 24.0, co, self.ty_le == TyLe::VuaCao, "Vừa chiều cao").on_hover_text("Vừa chiều cao khung").clicked() {
-                    self.ty_le = TyLe::VuaCao;
-                    self.cuon_toi = Some(self.trang);
-                }
-                if widget::nut_bt(ui, "vua_ngang", (16.0, 12.0), 28.0, 24.0, co, self.ty_le == TyLe::VuaNgang, "Vừa bề ngang").on_hover_text("Vừa bề ngang khung (=)").clicked() {
-                    self.ty_le = TyLe::VuaNgang;
-                    self.cuon_toi = Some(self.trang);
-                }
-                widget::vach_doc(ui, 20.0);
-                let tung = self.cfg.tung_trang;
-                ui.add_enabled_ui(co, |ui| {
-                    egui::ComboBox::from_id_salt("xg_kieu_xem")
-                        .width(92.0)
-                        .selected_text(egui::RichText::new(if tung { "Từng trang" } else { "Liên tiếp" }).font(font(tk::CHU_CO)))
-                        .show_ui(ui, |ui| {
-                            if ui.selectable_label(!tung, egui::RichText::new("Liên tiếp").font(font(tk::CHU_CO))).clicked() && tung {
-                                self.doi_cfg(|c| c.tung_trang = false);
-                                self.cuon_toi = Some(self.trang);
-                            }
-                            if ui.selectable_label(tung, egui::RichText::new("Từng trang").font(font(tk::CHU_CO))).clicked() && !tung {
-                                self.doi_cfg(|c| c.tung_trang = true);
-                            }
-                        })
-                        .response
-                        .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, "Kiểu xem"));
-                });
-                widget::vach_doc(ui, 20.0);
-                let n = self.so_trang_xem();
-                if widget::nut_bt(ui, "phai", (8.0, 8.0), 26.0, 24.0, self.trang + 1 < n, false, "Trang sau").on_hover_text("Trang sau (PageDown)").clicked() {
-                    self.sang_trang(self.trang + 1);
-                }
-                ui.label(egui::RichText::new(format!("/ {n}")).font(font(tk::CHU_CO)).color(tk::CHU_PHU));
-                let mut so = (self.trang + 1) as f32;
-                if widget::o_so(ui, &mut so, 1.0, n.max(1) as f32, "", co, "Trang") {
-                    self.sang_trang(so as u32 - 1);
-                }
-                if widget::nut_bt(ui, "trai", (8.0, 8.0), 26.0, 24.0, self.trang > 0, false, "Trang trước").on_hover_text("Trang trước (PageUp)").clicked() {
-                    self.sang_trang(self.trang.saturating_sub(1));
-                }
-            });
+        // Như prototype: trái = đếm vùng · giữa vùng xem = nhóm chuyển trang / kiểu xem / tỉ lệ · phải = Xóa ghim (n)
+        let o = ui.max_rect();
+        let (chung, rieng) = self.bo.dem();
+        ui.painter().text(egui::pos2(o.left(), o.center().y), egui::Align2::LEFT_CENTER, format!("Zone chung: {chung}; Zone riêng: {rieng}"), font(tk::CHU_CO), tk::CHU_PHU);
+        let mut phai = ui.new_child(egui::UiBuilder::new().max_rect(o).layout(egui::Layout::right_to_left(egui::Align::Center)));
+        self.nut_chay(&mut phai);
+        // Nhóm giữa: canh giữa theo bề rộng đo được ở khung trước
+        let id = ui.scope_id().with("xg_nhom_giua");
+        let rong = ui.data(|d| d.get_temp::<f32>(id)).unwrap_or(560.0);
+        let x0 = (o.center().x - rong / 2.0).max(o.left() + 170.0);
+        let mut giua = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_max(egui::pos2(x0, o.top()), o.max)).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        giua.spacing_mut().item_spacing.x = 6.0;
+        let co = !self.kho_trang.is_empty();
+        let n = self.so_trang_xem();
+        if widget::nut_bt(&mut giua, "trai", (8.0, 8.0), 26.0, 24.0, self.trang > 0, false, "Trang trước").on_hover_text("Trang trước (PageUp)").clicked() {
+            self.sang_trang(self.trang.saturating_sub(1));
+        }
+        if widget::nut_bt(&mut giua, "phai", (8.0, 8.0), 26.0, 24.0, self.trang + 1 < n, false, "Trang sau").on_hover_text("Trang sau (PageDown)").clicked() {
+            self.sang_trang(self.trang + 1);
+        }
+        let mut so = (self.trang + 1) as f32;
+        if widget::o_so_canh(&mut giua, &mut so, 1.0, n.max(1) as f32, "", co, "Trang", egui::Align2::CENTER_CENTER) {
+            self.sang_trang(so as u32 - 1);
+        }
+        giua.label(egui::RichText::new(format!("/ {n}")).font(font(tk::CHU_CO)).color(tk::CHU_PHU));
+        giua.add_space(8.0);
+        let tung = self.cfg.tung_trang;
+        giua.add_enabled_ui(co, |ui| {
+            egui::ComboBox::from_id_salt("xg_kieu_xem")
+                .icon(widget::mui_ten)
+                .width(110.0)
+                .selected_text(egui::RichText::new(if tung { "Từng trang" } else { "Liên tiếp" }).font(font(tk::CHU_CO)))
+                .show_ui(ui, |ui| {
+                    if ui.selectable_label(!tung, egui::RichText::new("Liên tiếp").font(font(tk::CHU_CO))).clicked() && tung {
+                        self.doi_cfg(|c| c.tung_trang = false);
+                        self.cuon_toi = Some(self.trang);
+                    }
+                    if ui.selectable_label(tung, egui::RichText::new("Từng trang").font(font(tk::CHU_CO))).clicked() && !tung {
+                        self.doi_cfg(|c| c.tung_trang = true);
+                    }
+                })
+                .response
+                .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, "Kiểu xem"));
         });
+        giua.add_space(8.0);
+        if widget::nut_bt(&mut giua, "vua_ngang", (16.0, 12.0), 28.0, 24.0, co, self.ty_le == TyLe::VuaNgang, "Vừa bề ngang").on_hover_text("Vừa bề ngang khung (=)").clicked() {
+            self.ty_le = TyLe::VuaNgang;
+            self.cuon_toi = Some(self.trang);
+        }
+        if widget::nut_bt(&mut giua, "vua_cao", (12.0, 16.0), 28.0, 24.0, co, self.ty_le == TyLe::VuaCao, "Vừa chiều cao").on_hover_text("Vừa chiều cao khung").clicked() {
+            self.ty_le = TyLe::VuaCao;
+            self.cuon_toi = Some(self.trang);
+        }
+        giua.add_space(8.0);
+        let hien = (self.ty_le_cuoi * 100.0).round() as u16;
+        giua.add_enabled_ui(co, |ui| {
+            egui::ComboBox::from_id_salt("xg_phong")
+                .icon(widget::mui_ten)
+                .width(84.0)
+                .selected_text(egui::RichText::new(format!("{hien}%")).font(font(tk::CHU_CO)))
+                .show_ui(ui, |ui| {
+                    for p in CAC_PHONG {
+                        if ui.selectable_label(p == hien && matches!(self.ty_le, TyLe::CoDinh(_)), egui::RichText::new(format!("{p}%")).font(font(tk::CHU_CO))).clicked() {
+                            self.ty_le = TyLe::CoDinh(p as f32 / 100.0);
+                            self.cuon_toi = Some(self.trang);
+                        }
+                    }
+                })
+                .response
+                .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, "Tỉ lệ"));
+        });
+        if widget::nut_bt(&mut giua, "tru", (12.0, 12.0), 26.0, 24.0, co, false, "Thu nhỏ").on_hover_text("Thu nhỏ (−)").clicked() {
+            self.phong(-10.0);
+        }
+        if widget::nut_bt(&mut giua, "cong", (12.0, 12.0), 26.0, 24.0, co, false, "Phóng to").on_hover_text("Phóng to (+) · Ctrl + cuộn chuột").clicked() {
+            self.phong(10.0);
+        }
+        let do_duoc = giua.min_rect().width();
+        if (do_duoc - rong).abs() > 0.5 {
+            ui.data_mut(|d| d.insert_temp(id, do_duoc));
+            ui.ctx().request_repaint();
+        }
     }
 
     // ---------------- Khung giữa ----------------

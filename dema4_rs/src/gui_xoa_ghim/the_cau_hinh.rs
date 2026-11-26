@@ -113,6 +113,7 @@ fn combo<T: PartialEq + Copy>(ui: &mut egui::Ui, id: &str, gt: &mut T, ds: &[(T,
     let mut doi = false;
     let hien = ds.iter().find(|(v, _)| v == gt).map_or(String::new(), |(_, t)| t.clone());
     egui::ComboBox::from_id_salt(id)
+        .icon(super::widget::mui_ten)
         .width(92.0)
         .selected_text(egui::RichText::new(hien).font(font(tk::CHU_CO)))
         .show_ui(ui, |ui| {
@@ -129,7 +130,7 @@ fn combo<T: PartialEq + Copy>(ui: &mut egui::Ui, id: &str, gt: &mut T, ds: &[(T,
 }
 
 fn tick(ui: &mut egui::Ui, b: &mut bool, ten: &str) {
-    let r = ui.checkbox(b, "");
+    let r = super::widget::tick(ui, b, "");
     r.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, *b, ten));
 }
 
@@ -208,7 +209,7 @@ impl TabXoaGhim {
                 |ui| {
                     ui.add_enabled_ui(duoc && san, |ui| {
                         let mut b = tm.tc.nhan_dien && san;
-                        let r = ui.checkbox(&mut b, "");
+                        let r = super::widget::tick(ui, &mut b, "");
                         r.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, duoc && san, b, "Nhận diện layout"));
                         if r.on_disabled_hover_text(if san { "Mở thư mục trước" } else { "Tải mô hình trước" }).changed() {
                             tm.tc.nhan_dien = b;

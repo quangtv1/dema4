@@ -63,6 +63,8 @@ impl ManXoaGhim {
         let rong = self.cfg.rong_ds.clamp(tk::DS_RONG_MIN, tk::DS_RONG_MAX);
         egui::Panel::left("xg_ds").resizable(false).exact_size(rong).frame(egui::Frame::new().fill(Color32::WHITE).stroke(Stroke::new(1.0, tk::VIEN_KHUNG))).show(ui, |ui| {
             let khung = ui.max_rect();
+            // Các hàng (tiêu đề 32, sắp xếp 28, lọc, danh sách) nối liền như prototype
+            ui.spacing_mut().item_spacing.y = 0.0;
             self.tieu_de_ds(ui);
             if self.thu_muc.is_none() {
                 ui.add_space(24.0);
@@ -143,7 +145,7 @@ impl ManXoaGhim {
         ui.painter().hline(o.x_range(), o.bottom() - 0.5, Stroke::new(1.0, Color32::from_rgb(0xEC, 0xEE, 0xF1)));
         let mut con = ui.new_child(egui::UiBuilder::new().max_rect(o.shrink2(egui::vec2(10.0, 0.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
         let mut tat_ca = !self.chon_chay.is_empty() && self.chon_chay.iter().all(|&c| c);
-        let r = con.checkbox(&mut tat_ca, "");
+        let r = widget::tick(&mut con, &mut tat_ca, "");
         r.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, tat_ca, "Chọn mọi file"));
         if r.on_hover_text("Chọn / bỏ chọn mọi file").changed() {
             self.chon_chay.iter_mut().for_each(|c| *c = tat_ca);
@@ -224,7 +226,9 @@ impl ManXoaGhim {
         let goc = self.thu_muc.clone().unwrap_or_default();
         let hien = self.thu_tu_hien();
         let mut chon = None;
+        ui.spacing_mut().item_spacing.y = 0.0;
         egui::ScrollArea::vertical().id_salt("xg_ds_cuon").auto_shrink([false, false]).show_rows(ui, tk::DS_CAO_DONG, hien.len().max(1), |ui, hang| {
+            ui.spacing_mut().item_spacing.y = 0.0;
             if hien.is_empty() {
                 ui.add_space(14.0);
                 ui.horizontal(|ui| {
@@ -247,7 +251,7 @@ impl ManXoaGhim {
                 con.spacing_mut().item_spacing.x = 8.0;
                 let ten_file = self.ds[i].0.file_name().map(|t| t.to_string_lossy().into_owned()).unwrap_or_default();
                 if let Some(c) = self.chon_chay.get_mut(i) {
-                    con.checkbox(c, "").widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, *c, format!("Chọn {ten_file}")));
+                    widget::tick(&mut con, c, "").widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, *c, format!("Chọn {ten_file}")));
                 }
                 let ten = self.ds[i].0.strip_prefix(&goc).unwrap_or(&self.ds[i].0).display().to_string();
                 let so = self.thong_tin.get(i).and_then(Option::as_ref).map_or(String::new(), |t| t.so_trang.to_string());
@@ -257,17 +261,17 @@ impl ManXoaGhim {
                     Some(TrangThai::DaXoa { dung_cau_hinh: false }) => ("tt_doi", "Đã xoá nhưng vùng / tuỳ chọn đã đổi — sẽ chạy lại"),
                     Some(TrangThai::KetQuaMat) => ("tt_mat", "File kết quả không còn / bị thay — sẽ chạy lại"),
                 };
-                let rong_ten = (con.available_width() - 14.0 - 26.0 - 16.0).max(20.0);
+                // Cột phải cố định: số trang canh phải (26) · trạng thái (14) — như prototype
+                let x_phai = o.right() - 10.0;
+                let o_tt = Rect::from_center_size(egui::pos2(x_phai - 26.0 - 12.0, o.center().y), egui::vec2(14.0, 14.0));
                 let mau_ten = if i == self.chon { tk::XANH_DAM_CHU } else { tk::CHU };
-                con.allocate_ui_with_layout(egui::vec2(rong_ten, tk::DS_CAO_DONG - 2.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    ui.add(egui::Label::new(egui::RichText::new(&ten).font(font(tk::CHU_CO)).color(mau_ten)).truncate().selectable(false));
-                });
-                let (o_tt, ph_tt) = con.allocate_exact_size(egui::vec2(14.0, 14.0), Sense::hover());
+                let x_ten = con.cursor().min.x;
+                let o_ten = Rect::from_min_max(egui::pos2(x_ten, o.top()), egui::pos2(o_tt.left() - 8.0, o.bottom()));
+                let mut ui_ten = con.new_child(egui::UiBuilder::new().max_rect(o_ten).layout(egui::Layout::left_to_right(egui::Align::Center)));
+                ui_ten.add(egui::Label::new(egui::RichText::new(&ten).font(font(tk::CHU_CO)).color(mau_ten)).truncate().selectable(false));
                 bieu_tuong::ve(&con, bt, Rect::from_center_size(o_tt.center(), egui::vec2(11.0, 11.0)));
-                ph_tt.on_hover_text(goi_y);
-                con.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(egui::RichText::new(so).font(font(tk::CHU_CO)).color(tk::CHU_PHU));
-                });
+                con.interact(o_tt, con.scope_id().with(("xg_tt", i)), Sense::hover()).on_hover_text(goi_y);
+                p.text(egui::pos2(x_phai, o.center().y), egui::Align2::RIGHT_CENTER, so, font(tk::CHU_CO), tk::CHU_PHU);
                 if ph.clicked() {
                     chon = Some(i);
                 }
@@ -290,7 +294,7 @@ impl ManXoaGhim {
             ui.set_height(30.0);
             ui.add_space(10.0);
             let mut bat = self.loc_nc_bat;
-            if ui.checkbox(&mut bat, "").on_hover_text("Bật / tắt lọc nâng cao").changed() {
+            if widget::tick(ui, &mut bat, "").on_hover_text("Bật / tắt lọc nâng cao").changed() {
                 self.loc_nc_bat = bat;
             }
             let dang_loc = self.loc_nc_bat && self.loc_nc_ap.is_some();
@@ -329,7 +333,7 @@ impl ManXoaGhim {
                     for (i, k) in KHO.iter().enumerate() {
                         let mut b = self.loc_nc.kho[i];
                         let mau = if b { tk::CHU } else { tk::CHU_MO };
-                        if ui.checkbox(&mut b, egui::RichText::new(*k).font(font(tk::CHU_CO)).color(mau)).changed() {
+                        if widget::tick(ui, &mut b, egui::RichText::new(*k).font(font(tk::CHU_CO)).color(mau)).changed() {
                             self.loc_nc.kho[i] = b;
                         }
                         if i % 4 == 3 {
@@ -340,8 +344,8 @@ impl ManXoaGhim {
                 phu(ui, "Chiều trang:");
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 16.0;
-                    ui.checkbox(&mut self.loc_nc.ngang, egui::RichText::new("Ngang").font(font(tk::CHU_CO)));
-                    ui.checkbox(&mut self.loc_nc.doc, egui::RichText::new("Dọc").font(font(tk::CHU_CO)));
+                    widget::tick(ui, &mut self.loc_nc.ngang, egui::RichText::new("Ngang").font(font(tk::CHU_CO)));
+                    widget::tick(ui, &mut self.loc_nc.doc, egui::RichText::new("Dọc").font(font(tk::CHU_CO)));
                 });
                 phu(ui, "Trong dải trang:");
                 ui.add(egui::TextEdit::singleline(&mut self.loc_nc.dai).hint_text("tất cả (vd: 1-5, 7, 10-15)").desired_width(f32::INFINITY).min_size(egui::vec2(0.0, tk::CAO_NUT)).align(egui::Align2::LEFT_CENTER))

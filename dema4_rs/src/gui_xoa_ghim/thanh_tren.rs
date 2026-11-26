@@ -189,14 +189,14 @@ impl ManXoaGhim {
         let co_vo_doi = self.ve == Some(LoaiVung::Xoa) || (self.ve.is_none() && vung_ve_xoa);
         let hien = self.loc_hien();
         ui.vertical(|ui| {
-            ui.add_space(2.0);
-            ui.spacing_mut().item_spacing.y = 7.0;
+            // Dòng 21 px liền nhau như prototype
+            ui.spacing_mut().item_spacing.y = 0.0;
             let mut ds = vec![(LocTrang::TatCa, "Tất cả"), (LocTrang::Le, "Trang lẻ"), (LocTrang::Chan, "Trang chẵn"), (LocTrang::TungTrang, "Từng trang")];
             if co_vo_doi {
                 ds.push((LocTrang::VoDoi, "Vô đối"));
             }
             for (l, ten) in ds {
-                if ui.radio(hien == l, egui::RichText::new(ten).font(font(tk::CHU_CO))).clicked() {
+                if widget::tron(ui, hien == l, egui::RichText::new(ten).font(font(tk::CHU_CO))).clicked() {
                     self.chon_loc_trang(l);
                 }
             }
@@ -231,7 +231,8 @@ impl ManXoaGhim {
         let co_thanh = rong >= RONG_CO_THANH;
         ui.vertical(|ui| {
             ui.set_width(rong);
-            ui.spacing_mut().item_spacing.y = 6.0;
+            // Dòng cao 26, cách nhau 2 → 28 px như prototype
+            ui.spacing_mut().item_spacing.y = 2.0;
             ui.horizontal(|ui| {
                 let nhan = ui.add_sized(egui::vec2(tk::RONG_NHAN_VUNG, 20.0), egui::Label::new(egui::RichText::new("Vùng:").font(font(tk::CHU_CO)).color(Color32::from_gray(0x33))));
                 let chu = match self.bo.chon.len() {
@@ -241,7 +242,8 @@ impl ManXoaGhim {
                 };
                 let ds: Vec<_> = self.bo.tat_ca().into_iter().map(|c| (c, format!("{} · {}", self.ten_vung(c), self.bo.lay(c).map_or(String::new(), |z| ten_pham_vi(z.ap_trang))))).collect();
                 egui::ComboBox::from_id_salt("xg_vung")
-                    .width((rong - tk::RONG_NHAN_VUNG - 46.0).max(60.0))
+                    .icon(widget::mui_ten)
+                    .width((rong - tk::RONG_NHAN_VUNG - ui.spacing().item_spacing.x).max(60.0))
                     .wrap_mode(egui::TextWrapMode::Truncate)
                     .height(320.0)
                     .selected_text(egui::RichText::new(chu).font(font(tk::CHU_CO)))
@@ -275,8 +277,9 @@ impl ManXoaGhim {
             let hang = |ui: &mut egui::Ui, ten: &str, gt: &mut f32, max: f32, duoc: bool, don_vi: &str| -> bool {
                 let mut doi = false;
                 ui.horizontal(|ui| {
+                    ui.set_min_height(26.0);
                     ui.add_sized(egui::vec2(tk::RONG_NHAN_VUNG, 20.0), egui::Label::new(egui::RichText::new(ten).font(font(tk::CHU_CO)).color(Color32::from_gray(0x33))));
-                    let w = (rong - tk::RONG_NHAN_VUNG - 58.0 - 16.0).max(40.0);
+                    let w = (rong - tk::RONG_NHAN_VUNG - 58.0 - 2.0 * ui.spacing().item_spacing.x).max(40.0);
                     let max_hien = if !duoc && co { 100.0 } else { max };
                     let ten_gon = ten.trim_end_matches(':');
                     if co_thanh {
@@ -354,7 +357,8 @@ impl ManXoaGhim {
             ui.add_enabled_ui(!ghi.ghi_de, |ui| {
                 let mut kieu = ghi.kieu;
                 egui::ComboBox::from_id_salt("xg_kieu_ghi")
-                    .width(150.0 - 16.0)
+                    .icon(widget::mui_ten)
+                    .width(150.0)
                     .selected_text(egui::RichText::new(if kieu == KieuGhi::CanhFile { "Cạnh file gốc" } else { "Nhân bản thư mục" }).font(font(tk::CHU_CO)))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut kieu, KieuGhi::NhanBan, egui::RichText::new("Nhân bản thư mục").font(font(tk::CHU_CO)));

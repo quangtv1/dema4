@@ -2519,6 +2519,26 @@ mod tests {
         assert!(h.state().hop_cau_hinh.is_none());
     }
 
+    /// Ảnh màn Xóa ghim (thanh menu + màn, đã mở thư mục mẫu) cùng tỉ lệ ảnh prototype chụp ở 1,25×.
+    /// Chạy: DEMA4_MAU_XG=<thư mục PDF mẫu> DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_xoa_ghim_doi_chieu
+    #[test]
+    #[ignore = "cần GPU và thư mục mẫu"]
+    fn chup_xoa_ghim_doi_chieu() {
+        let (Some(mau), Some(anh)) = (std::env::var_os("DEMA4_MAU_XG"), std::env::var_os("DEMA4_ANH")) else { return };
+        let mau = PathBuf::from(mau);
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(2061.0, 1076.0)).with_pixels_per_point(1.25).build_eframe(move |cc| {
+            cai_giao_dien(&cc.egui_ctx);
+            let mut app = UngDungChinh { man: Man::XoaGhim, cfg: crate::cau_hinh::CauHinh::default(), ..Default::default() };
+            app.xoa_ghim.mo_thu_muc(mau.clone());
+            app
+        });
+        for _ in 0..90 {
+            h.run_steps(1);
+            std::thread::sleep(Duration::from_millis(40));
+        }
+        h.render().unwrap().save(PathBuf::from(anh).join("app-xoa-ghim.png")).unwrap();
+    }
+
     /// Ảnh trang Cấu hình 1600 × 900 để đặt cạnh ảnh prototype (`plans/…prototype-cau-hinh-toan-cua-so/assets/`).
     /// Chạy: DEMA4_ANH=<thư mục ảnh> cargo test --release -- --ignored chup_trang_cau_hinh
     #[test]

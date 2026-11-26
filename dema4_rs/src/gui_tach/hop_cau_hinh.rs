@@ -1,7 +1,7 @@
 //! Trạng thái trang Cấu hình (bản nháp, chức năng đang xem, phần gốc để biết thay đổi chưa lưu) + thân từng chức năng.
 //! Khung trang (sidebar, tiêu đề, cửa sổ) ở `crate::gui_cau_hinh::khung`.
 
-use eframe::egui::{self, Align, Color32, CornerRadius, Margin, Rect, RichText, Sense, Stroke, StrokeKind};
+use eframe::egui::{self, Align, Color32, CornerRadius, Rect, RichText, Sense, Stroke, StrokeKind};
 
 use std::cell::Cell;
 
@@ -1030,7 +1030,7 @@ mod tests {
                 if !std::mem::replace(&mut da_cai, true) {
                     crate::gui::cai_giao_dien(ui.ctx());
                 }
-                egui::Frame::new().fill(crate::gui_cau_hinh::NEN_TRANG).inner_margin(Margin::same(20)).show(ui, |ui| {
+                egui::Frame::new().fill(crate::gui_cau_hinh::NEN_TRANG).inner_margin(egui::Margin::same(20)).show(ui, |ui| {
                     ui.set_width(crate::gui_cau_hinh::RONG_COT);
                     match h.tab {
                         TabCauHinh::Dem => h.tab_dem(ui),

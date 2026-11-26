@@ -337,7 +337,7 @@ fn chup_doi_chieu_prototype() {
 /// Cửa sổ mặc định / hẹp: khối Vùng · Rộng · Cao · Ngưỡng không tràn sang nửa phải (Đầu vào); hẹp thì chỉ còn ô số.
 #[test]
 fn khoi_vung_khong_tran_sang_nua_phai() {
-    use egui_kittest::kittest::{NodeT, Queryable};
+    use egui_kittest::kittest::Queryable;
     for (rong, co_thanh) in [(1120.0, false), (1600.0, true), (980.0, false)] {
         let mut man = ManXoaGhim::default();
         man.ds_mo = Some(false);

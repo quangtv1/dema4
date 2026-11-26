@@ -182,26 +182,108 @@ pub fn thanh_truot(ui: &mut Ui, gia_tri: &mut f32, min: f32, max: f32, rong: f32
 
 /// Ô số 58 × 22 có đơn vị (`.num`) — gõ / kéo; trả `true` khi đổi.
 pub fn o_so(ui: &mut Ui, gia_tri: &mut f32, min: f32, max: f32, don_vi: &str, duoc: bool, ten: &str) -> bool {
+    o_so_canh(ui, gia_tri, min, max, don_vi, duoc, ten, egui::Align2::RIGHT_CENTER)
+}
+
+/// Như `o_so`, chữ số canh theo `canh` (ô số trang ở thanh đáy canh giữa).
+#[allow(clippy::too_many_arguments)]
+pub fn o_so_canh(ui: &mut Ui, gia_tri: &mut f32, min: f32, max: f32, don_vi: &str, duoc: bool, ten: &str, canh: egui::Align2) -> bool {
+    // Ô nhập kiểu prototype: 58 × 24, số canh phải, đơn vị xám nhỏ; nhận số khi Enter / rời ô (kẹp trong min..max)
+    let (o, _) = ui.allocate_exact_size(egui::vec2(58.0, 24.0), Sense::hover());
+    let id = ui.make_persistent_id(("xg_o_so", ten));
+    let dang_go = ui.memory(|m| m.has_focus(id));
+    let mut chu = if dang_go { ui.data(|d| d.get_temp::<String>(id)).unwrap_or_default() } else { format!("{}", gia_tri.round() as i64) };
+    let nen = if duoc { Color32::from_rgb(0xF8, 0xF9, 0xFA) } else { Color32::from_rgb(0xF3, 0xF4, 0xF6) };
+    let vien = if dang_go { tk::XANH_THANH } else { Color32::from_rgb(0xD0, 0xD4, 0xD9) };
+    ui.painter().rect(o, 4.0, nen, Stroke::new(1.0, vien), StrokeKind::Inside);
+    let rong_dv = if don_vi.trim().is_empty() { 0.0 } else { ui.painter().layout_no_wrap(don_vi.trim().to_string(), font(11.0), tk::CHU_PHU).size().x + 3.0 };
+    let o_chu = Rect::from_min_max(o.min + egui::vec2(4.0, 0.0), egui::pos2(o.right() - 7.0 - rong_dv, o.bottom()));
+    let mut con = ui.new_child(egui::UiBuilder::new().max_rect(o_chu));
+    let r = con.add_enabled(
+        duoc,
+        egui::TextEdit::singleline(&mut chu).id(id).frame(egui::Frame::NONE).font(font(tk::CHU_CO)).text_color(if duoc { tk::CHU } else { tk::CHU_MO }).align(canh).desired_width(o_chu.width()).min_size(o_chu.size()),
+    );
+    if rong_dv > 0.0 {
+        ui.painter().text(egui::pos2(o.right() - 7.0, o.center().y + 0.5), egui::Align2::RIGHT_CENTER, don_vi.trim(), font(11.0), if duoc { tk::CHU_PHU } else { tk::CHU_MO });
+    }
+    r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::SpinButton, duoc, ten));
     let mut doi = false;
-    ui.scope(|ui| {
-        let v = &mut ui.style_mut().visuals;
-        for w in [&mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active] {
-            w.bg_fill = Color32::from_rgb(0xF8, 0xF9, 0xFA);
-            w.weak_bg_fill = Color32::from_rgb(0xF8, 0xF9, 0xFA);
-            w.bg_stroke = Stroke::new(1.0, Color32::from_rgb(0xD0, 0xD4, 0xD9));
-            w.corner_radius = CornerRadius::same(4);
+    if r.has_focus() {
+        ui.data_mut(|d| d.insert_temp(id, chu.clone()));
+    }
+    if r.lost_focus() {
+        if let Ok(v) = chu.trim().replace(',', ".").parse::<f32>() {
+            let v = v.round().clamp(min, max);
+            if (v - *gia_tri).abs() >= 1.0 {
+                *gia_tri = v;
+                doi = true;
+            }
         }
-        v.widgets.active.bg_stroke = Stroke::new(1.0, tk::XANH_THANH);
-        ui.spacing_mut().interact_size = egui::vec2(58.0, 22.0);
-        let mut x = *gia_tri as f64;
-        let r = ui.add_enabled(duoc, egui::DragValue::new(&mut x).range(min as f64..=max as f64).speed(0.25).max_decimals(0).suffix(don_vi));
-        r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::SpinButton, duoc, ten));
-        if r.changed() && (x as f32 - *gia_tri).abs() >= 1.0 {
-            *gia_tri = x.round() as f32;
-            doi = true;
-        }
-    });
+        ui.data_mut(|d| d.remove::<String>(id));
+    }
     doi
+}
+
+/// Ô tick kiểu trình duyệt: hộp 14 px bo 2,5 — bật = nền xanh + dấu tích trắng, tắt = nền trắng viền xám.
+pub fn tick(ui: &mut Ui, gia_tri: &mut bool, chu: impl Into<egui::WidgetText>) -> Response {
+    let chu: egui::WidgetText = chu.into();
+    let ten = chu.text().to_string();
+    let g = (!ten.is_empty()).then(|| chu.into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Body));
+    let rong = 14.0 + g.as_ref().map_or(0.0, |g| 6.0 + g.size().x);
+    let (o, mut ph) = ui.allocate_exact_size(egui::vec2(rong, 20.0), Sense::click());
+    if ph.clicked() {
+        *gia_tri = !*gia_tri;
+        ph.mark_changed();
+    }
+    let duoc = ui.is_enabled();
+    let bat = *gia_tri;
+    ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, duoc, bat, ten.clone()));
+    let p = ui.painter();
+    let hop = Rect::from_center_size(egui::pos2(o.left() + 7.0, o.center().y), egui::vec2(14.0, 14.0));
+    if bat {
+        p.rect_filled(hop, 2.5, if duoc { tk::XANH } else { tk::XANH_NUT_MO });
+        let c = hop.center();
+        let net = Stroke::new(1.8, Color32::WHITE);
+        p.line_segment([c + egui::vec2(-3.6, 0.2), c + egui::vec2(-1.0, 2.8)], net);
+        p.line_segment([c + egui::vec2(-1.0, 2.8), c + egui::vec2(3.8, -2.6)], net);
+    } else {
+        let vien = if !duoc { Color32::from_rgb(0xC9, 0xCC, 0xD1) } else if ph.hovered() { tk::XANH } else { Color32::from_rgb(0x76, 0x76, 0x76) };
+        p.rect(hop, 2.5, if duoc { Color32::WHITE } else { Color32::from_rgb(0xF3, 0xF4, 0xF6) }, Stroke::new(1.0, vien), StrokeKind::Inside);
+    }
+    if let Some(g) = g {
+        let mau = if duoc { tk::CHU } else { tk::CHU_MO };
+        p.galley(egui::pos2(o.left() + 20.0, o.center().y - g.size().y / 2.0), g, mau);
+    }
+    ph
+}
+
+/// Nút tròn kiểu trình duyệt (14 px): chọn = vòng xanh đặc + chấm xanh giữa vòng trắng; dòng cao 21.
+pub fn tron(ui: &mut Ui, chon: bool, chu: impl Into<egui::WidgetText>) -> Response {
+    let chu: egui::WidgetText = chu.into();
+    let ten = chu.text().to_string();
+    let g = chu.into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Body);
+    let (o, ph) = ui.allocate_exact_size(egui::vec2(20.0 + g.size().x, 21.0), Sense::click());
+    let duoc = ui.is_enabled();
+    ph.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, duoc, chon, ten.clone()));
+    let p = ui.painter();
+    let c = egui::pos2(o.left() + 7.0, o.center().y);
+    if chon {
+        p.circle_filled(c, 7.0, if duoc { tk::XANH } else { tk::XANH_NUT_MO });
+        p.circle_filled(c, 5.0, Color32::WHITE);
+        p.circle_filled(c, 3.3, if duoc { tk::XANH } else { tk::XANH_NUT_MO });
+    } else {
+        let vien = if ph.hovered() && duoc { tk::XANH } else { Color32::from_rgb(0x76, 0x76, 0x76) };
+        p.circle(c, 6.5, Color32::WHITE, Stroke::new(1.0, vien));
+    }
+    p.galley(egui::pos2(o.left() + 20.0, o.center().y - g.size().y / 2.0), g, if duoc { tk::CHU } else { tk::CHU_MO });
+    ph
+}
+
+/// Mũi tên ⌄ mảnh cho ô chọn (như `<select>` của trình duyệt) — dùng `.icon(widget::mui_ten)`.
+pub fn mui_ten(ui: &Ui, r: Rect, _: &egui::style::WidgetVisuals, _: bool) {
+    let c = r.center();
+    let mau = if ui.is_enabled() { Color32::from_rgb(0x44, 0x44, 0x44) } else { tk::CHU_MO };
+    ui.painter().add(egui::Shape::line(vec![c + egui::vec2(-4.0, -2.0), c + egui::vec2(0.0, 2.0), c + egui::vec2(4.0, -2.0)], Stroke::new(1.4, mau)));
 }
 
 /// Tooltip hiện **ngay** dưới widget khi rê chuột (kể cả widget mờ) — nền tối, chữ trắng 11,5.
@@ -234,7 +316,7 @@ pub fn vach_doc(ui: &mut Ui, cao: f32) {
 
 /// Ô tick + chữ (bấm cả chữ); `ghi_chu` = tooltip. Trả `true` khi đổi.
 pub fn o_tick(ui: &mut Ui, gia_tri: &mut bool, chu: &str, duoc: bool, ghi_chu: &str) -> bool {
-    let r = ui.add_enabled(duoc, egui::Checkbox::new(gia_tri, egui::RichText::new(chu).font(font(tk::CHU_CO)).color(if duoc { tk::CHU } else { tk::CHU_MO })));
+    let r = ui.add_enabled_ui(duoc, |ui| tick(ui, gia_tri, egui::RichText::new(chu).font(font(tk::CHU_CO)))).inner;
     let doi = r.changed();
     if !ghi_chu.is_empty() {
         r.on_hover_text(ghi_chu);

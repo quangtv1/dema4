@@ -88,17 +88,19 @@ impl ManXoaGhim {
         let n = if self.thu_muc.is_some() { self.can_chay().len() } else { 0 };
         let k = self.chon_chay.iter().filter(|&&c| c).count();
         let duoc = n > 0 && self.chay.is_none();
-        let (o, ph) = ui.allocate_exact_size(egui::vec2(126.0, 28.0), egui::Sense::click());
-        let (o_chinh, o_mui) = (egui::Rect::from_min_max(o.min, egui::pos2(o.right() - 24.0, o.bottom())), egui::Rect::from_min_max(egui::pos2(o.right() - 24.0, o.top()), o.max));
+        let chu = if self.thu_muc.is_some() { format!("Xóa ghim ({n})") } else { "Xóa ghim".to_string() };
+        // Rộng theo chữ như prototype: đệm trái 36 (biểu tượng ▶) + chữ + đệm 16 + phần ▾ 30
+        let rong_chu = ui.painter().layout_no_wrap(chu.clone(), font_dam(tk::CHU_CO), egui::Color32::WHITE).size().x;
+        let (o, ph) = ui.allocate_exact_size(egui::vec2(36.0 + rong_chu + 16.0 + 30.0, 28.0), egui::Sense::click());
+        let (o_chinh, o_mui) = (egui::Rect::from_min_max(o.min, egui::pos2(o.right() - 30.0, o.bottom())), egui::Rect::from_min_max(egui::pos2(o.right() - 30.0, o.top()), o.max));
         let ph_chinh = ui.interact(o_chinh, ui.scope_id().with("xg_chay"), if duoc { egui::Sense::click() } else { egui::Sense::hover() });
         let _ = ph;
         let p = ui.painter();
         let nen = if !duoc { tk::XANH_NUT_MO } else if ph_chinh.hovered() { tk::XANH_DAM_CHU } else { tk::XANH };
         p.rect_filled(o, 4.0, nen);
         p.vline(o_mui.left(), o.y_range().shrink(5.0), egui::Stroke::new(1.0, egui::Color32::from_white_alpha(110)));
-        super::bieu_tuong::ve(ui, "chay", egui::Rect::from_center_size(egui::pos2(o.left() + 15.0, o.center().y), egui::vec2(11.0, 11.0)));
-        let chu = if self.thu_muc.is_some() { format!("Xóa ghim ({n})") } else { "Xóa ghim".to_string() };
-        p.text(egui::pos2(o.left() + 26.0, o.center().y), egui::Align2::LEFT_CENTER, chu, font_dam(tk::CHU_CO), egui::Color32::WHITE);
+        super::bieu_tuong::ve(ui, "chay", egui::Rect::from_center_size(egui::pos2(o.left() + 22.0, o.center().y), egui::vec2(11.0, 11.0)));
+        p.text(egui::pos2(o.left() + 36.0, o.center().y), egui::Align2::LEFT_CENTER, chu, font_dam(tk::CHU_CO), egui::Color32::WHITE);
         ph_chinh.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, duoc, format!("Xóa ghim ({n})")));
         let goi_y = if self.thu_muc.is_none() { "Mở file hoặc thư mục trước".to_string() } else if n == 0 { "Mọi file đã tick đều đã xoá đúng vùng hiện tại".to_string() } else { format!("Xoá ghim {n} file đã tick chưa xoá / đã đổi vùng / mất kết quả") };
         if ph_chinh.on_hover_text(goi_y).clicked() {
