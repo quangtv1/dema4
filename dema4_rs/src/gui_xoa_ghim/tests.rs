@@ -532,11 +532,29 @@ fn phong_to_giu_truc_giua_trang() {
     assert_eq!(man.borrow().cuon_goc.x, 0.0, "vừa ngang: không cuộn ngang");
     man.borrow_mut().ty_le = TyLe::CoDinh(4.0);
     h.run_steps(3);
+    // Tâm khung xem = tâm trang (nội dung rộng 595 × 4 + lề, trang cân giữa nội dung)
+    let kiem = |m: &ManXoaGhim, khi: &str| {
+        let noi = 595.0 * 4.0 + thiet_ke::LE_VUA;
+        let muon = (noi - m.rong_xem_cu) / 2.0;
+        assert!((m.cuon_goc.x - muon).abs() < 1.0, "{khi}: Gốc cuộn {} ≠ {muon}", m.cuon_goc.x);
+        assert!((m.cuon_dich.x - muon).abs() < 1.0, "{khi}: Đích cùng tâm ({})", m.cuon_dich.x);
+    };
+    kiem(&man.borrow(), "phóng 400%");
+    // Ẩn Danh sách → khung rộng ra, vẫn neo giữa
+    let rong = man.borrow().rong_xem_cu;
+    man.borrow_mut().ds_mo = Some(false);
+    h.run_steps(4);
+    assert!(man.borrow().rong_xem_cu > rong, "khung xem rộng ra khi ẩn Danh sách");
+    kiem(&man.borrow(), "ẩn Danh sách");
+    man.borrow_mut().ds_mo = Some(true);
+    h.run_steps(4);
+    kiem(&man.borrow(), "hiện lại Danh sách");
+    // Thu nhỏ lại 250%
+    man.borrow_mut().ty_le = TyLe::CoDinh(2.5);
+    h.run_steps(4);
     let m = man.borrow();
-    // Bề rộng nội dung = 595 × 4 + lề; khung xem ~ nửa cửa sổ → cuộn ngang ≈ (nội dung − khung) / 2
-    let noi = 595.0 * 4.0 + thiet_ke::LE_VUA;
-    assert!(m.cuon_goc.x > noi / 4.0 && m.cuon_goc.x < noi / 2.0, "cuộn ngang ra giữa: {}", m.cuon_goc.x);
-    assert!((m.cuon_goc.x - m.cuon_dich.x).abs() < 1.0, "Gốc và Đích cùng tâm");
+    let muon = ((595.0 * 2.5 + thiet_ke::LE_VUA) - m.rong_xem_cu) / 2.0;
+    assert!((m.cuon_goc.x - muon.max(0.0)).abs() < 1.0, "250%: {} ≠ {muon}", m.cuon_goc.x);
     drop(m);
     let _ = std::fs::remove_dir_all(&d);
 }

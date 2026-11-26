@@ -190,20 +190,53 @@ impl ManXoaGhim {
             y += h * ty + tk::DEM_DUOI_TRANG.min(tk::KHE_TRANG + 12.0);
         }
         let noi = egui::vec2((rong_max * ty + tk::LE_VUA).max(x), y + tk::DEM_DUOI_TRANG);
-        if doi_ty && self.cuon_toi.is_none() && self.ep_cuon.is_none() {
-            let cao_xem = o_goc.height();
-            let giua = |c: egui::Vec2| egui::vec2(((noi.x - x) / 2.0).max(0.0), ((c.y + cao_xem / 2.0) * ty / ty_cu - cao_xem / 2.0).max(0.0));
-            let (g, d) = (giua(self.cuon_goc), giua(self.cuon_dich));
-            self.ep_cuon_ca = Some((g, d));
+        // Neo ngang: trục đứng trang đang xem ở trục giữa khung — giữ mỗi khung hình (kể cả khi ScrollArea còn kẹp
+        // theo nội dung cũ) tới khi người dùng tự cuộn ngang; đổi tỉ lệ / đổi bề rộng khung (ẩn hiện Danh sách, Đích) neo lại
+        let rong_xem = o_goc.width();
+        if doi_ty || (rong_xem - self.rong_xem_cu).abs() > 0.5 {
+            self.neo_ngang = true;
         }
+        self.rong_xem_cu = rong_xem;
+        if ui.rect_contains_pointer(vung_xem) && ui.input(|i| i.smooth_scroll_delta.x != 0.0) {
+            self.neo_ngang = false;
+        }
+        // Neo dọc: điểm đang ở giữa khung giữ ở giữa sau khi đổi tỉ lệ (áp vài khung hình cho qua kẹp của ScrollArea)
+        if doi_ty && self.cuon_toi.is_none() {
+            let cao_xem = o_goc.height();
+            let doc = |c: f32| ((c + cao_xem / 2.0) * ty / ty_cu - cao_xem / 2.0).max(0.0);
+            self.neo_doc = Some((doc(self.cuon_goc.y), doc(self.cuon_dich.y), 3));
+        }
+        let x_neo = ((noi.x - rong_xem) / 2.0).max(0.0);
         // Ép cuộn: tới trang (chuyển trang / file) hoặc theo khung kia (cuộn đồng bộ)
         let toi = self.cuon_toi.take().and_then(|t| bo_cuc.iter().find(|(x, _, _)| *x == t).map(|(_, y0, _)| (y0 - tk::DEM_TREN_TRANG).max(0.0)));
         let ep = self.ep_cuon.take();
-        let ca = self.ep_cuon_ca.take();
-        let ep_goc = toi.map(|y| egui::vec2(self.cuon_goc.x, y)).or(ca.map(|c| c.0)).or(ep.filter(|e| e.0).map(|e| e.1));
-        let ep_dich = toi.map(|y| egui::vec2(self.cuon_dich.x, y)).or(ca.map(|c| c.1)).or(ep.filter(|e| !e.0).map(|e| e.1));
+        let mut ep_goc = toi.map(|y| egui::vec2(self.cuon_goc.x, y)).or(ep.filter(|e| e.0).map(|e| e.1));
+        let mut ep_dich = toi.map(|y| egui::vec2(self.cuon_dich.x, y)).or(ep.filter(|e| !e.0).map(|e| e.1));
+        let neo_doc = self.neo_doc.take();
+        if let Some((_, _, n)) = neo_doc {
+            if n > 1 {
+                self.neo_doc = neo_doc.map(|(g, d, n)| (g, d, n - 1));
+                ui.ctx().request_repaint();
+            }
+        }
+        for (ep, cu, y_neo) in [(&mut ep_goc, self.cuon_goc, neo_doc.map(|n| n.0)), (&mut ep_dich, self.cuon_dich, neo_doc.map(|n| n.1))] {
+            let mut v = ep.unwrap_or(cu);
+            if let Some(y) = y_neo.filter(|_| toi.is_none()) {
+                v.y = y;
+            }
+            if self.neo_ngang {
+                v.x = x_neo;
+            }
+            if ep.is_some() || (v - cu).length() > 0.5 {
+                *ep = Some(v);
+            }
+        }
         let (og, trang_tren) = self.khung_xem(ui, o_goc, true, &bo_cuc, noi, ep_goc);
         let od = if co_dich { self.khung_xem(ui, o_dich, false, &bo_cuc, noi, ep_dich).0 } else { og };
+        // Kéo thanh cuộn ngang → bỏ neo (người dùng muốn tự xem lệch)
+        if self.neo_ngang && ui.input(|i| i.pointer.any_down()) && ((ep_goc.is_none() && (og.x - self.cuon_goc.x).abs() > 0.5) || (co_dich && ep_dich.is_none() && (od.x - self.cuon_dich.x).abs() > 0.5)) {
+            self.neo_ngang = false;
+        }
         if self.cfg.cuon_cung && co_dich {
             if og != self.cuon_goc && ep_goc.is_none() {
                 self.ep_cuon = Some((false, og));

@@ -259,8 +259,12 @@ pub struct ManXoaGhim {
     pub quy_tac: crate::dem_pdf::QuyTac,
     /// Bề rộng Danh sách đang kéo (chưa ghi cấu hình tới khi thả chuột).
     rong_keo: Option<f32>,
-    /// Cuộn ép cả 2 khung (Gốc, Đích) ở khung hình này — sau khi đổi tỉ lệ để giữ trục giữa.
-    ep_cuon_ca: Option<(egui::Vec2, egui::Vec2)>,
+    /// Neo trục đứng trang đang xem vào trục giữa khung Gốc / Đích (bỏ khi người dùng tự cuộn ngang).
+    neo_ngang: bool,
+    /// Bề rộng khung xem ở khung hình trước (đổi → neo lại).
+    rong_xem_cu: f32,
+    /// Cuộn dọc cần giữ sau khi đổi tỉ lệ: (Gốc, Đích, số khung hình còn áp).
+    neo_doc: Option<(f32, f32, u8)>,
     /// Cao khối Lọc nâng cao đo ở khung trước (danh sách file chừa chỗ đúng bằng nó).
     cao_nc: f32,
     cfg_doi: bool,
@@ -328,7 +332,9 @@ impl Default for ManXoaGhim {
             quy_tac: crate::dem_pdf::QuyTac::default(),
             rong_keo: None,
             cao_nc: 31.0,
-            ep_cuon_ca: None,
+            neo_ngang: true,
+            rong_xem_cu: 0.0,
+            neo_doc: None,
             cfg_doi: false,
             mo_hinh: None,
             mo_cau_hinh: false,
