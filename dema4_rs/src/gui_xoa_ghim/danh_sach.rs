@@ -368,7 +368,7 @@ impl ManXoaGhim {
                     for (i, k) in KHO.iter().enumerate() {
                         let mut b = self.loc_nc.kho[i] && co_kho[i];
                         let mau = if b { tk::CHU } else { tk::CHU_MO };
-                        let r = ui.add_enabled_ui(co_kho[i], |ui| widget::tick(ui, &mut b, egui::RichText::new(*k).font(font(tk::CHU_CO)).color(mau))).inner;
+                        let r = o_tick(ui, co_kho[i], k, |ui| widget::tick(ui, &mut b, egui::RichText::new(*k).font(font(tk::CHU_CO)).color(mau)));
                         if !co_kho[i] {
                             r.on_disabled_hover_text(format!("Không có trang {k} trong các file đang mở"));
                         } else if r.changed() {
@@ -381,7 +381,7 @@ impl ManXoaGhim {
                     ui.spacing_mut().item_spacing = egui::vec2(12.0, 4.0);
                     for (co, gt, ten) in [(co_doc, &mut self.loc_nc.doc, "Dọc"), (co_ngang, &mut self.loc_nc.ngang, "Ngang")] {
                         let mut b = *gt && co;
-                        let r = ui.add_enabled_ui(co, |ui| widget::tick(ui, &mut b, egui::RichText::new(ten).font(font(tk::CHU_CO)))).inner;
+                        let r = o_tick(ui, co, ten, |ui| widget::tick(ui, &mut b, egui::RichText::new(ten).font(font(tk::CHU_CO))));
                         if !co {
                             r.on_disabled_hover_text(format!("Không có trang {} trong các file đang mở", ten.to_lowercase()));
                         } else if r.changed() {
@@ -413,4 +413,17 @@ impl ManXoaGhim {
         self.loc_nc_ap = (self.loc_nc != LocNangCao::default()).then(|| self.loc_nc.clone());
     }
 
+}
+
+/// 1 ô tick trong hàng tự xuống dòng: xin trước đúng bề rộng ô (hộp 14 + 6 + chữ) để hết chỗ thì xuống dòng
+/// (ô con không biết cỡ trước thì `horizontal_wrapped` không xuống dòng được); `duoc` = false → mờ.
+fn o_tick(ui: &mut egui::Ui, duoc: bool, chu: &str, ve: impl FnOnce(&mut egui::Ui) -> egui::Response) -> egui::Response {
+    let rong = 20.0 + ui.painter().layout_no_wrap(chu.to_owned(), font(tk::CHU_CO), Color32::BLACK).size().x;
+    ui.allocate_ui(egui::vec2(rong, 20.0), |ui| {
+        if !duoc {
+            ui.disable();
+        }
+        ve(ui)
+    })
+    .inner
 }
