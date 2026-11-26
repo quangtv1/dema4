@@ -1,5 +1,5 @@
 //! File mô hình nhận diện layout (YOLOv12s-DocLayNet, AGPL-3.0) — không nhúng trong exe:
-//! tải 1 lần từ Release của dema4 (hoặc chọn file có sẵn), kiểm kích thước + SHA-256, lưu vào
+//! tải 1 lần từ kho XoaGhim công khai (hoặc chọn file có sẵn), kiểm kích thước + SHA-256, lưu vào
 //! `<thư mục dữ liệu>/mo_hinh/`; sau đó dùng ngoại tuyến.
 //!
 //! Tải ghi vào `<file>.part` rồi mới đổi tên → không bao giờ để lại file dở; huỷ / lỗi thì xoá `.part`.
@@ -161,7 +161,7 @@ pub struct TaiMoHinh {
 }
 
 impl TaiMoHinh {
-    /// Tải mô hình từ Release của dema4 về `duong_dan()`.
+    /// Tải mô hình từ kho XoaGhim công khai về `duong_dan()`.
     pub fn tai(bao_doi: impl Fn() + Send + 'static) -> Self {
         Self::tai_tu(DIA_CHI.to_string(), duong_dan(), CO_FILE, SHA256.to_string(), bao_doi)
     }

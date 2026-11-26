@@ -222,7 +222,7 @@ impl TabXoaGhim {
                                 nhap = true;
                             }
                             let r = ui.add(egui::Button::image_and_text(bieu_tuong::anh("tai", 12.0, 12.0), egui::RichText::new("Tải mô hình").font(font(tk::CHU_CO)).color(tk::XANH_DAM_CHU)).fill(Color32::WHITE).stroke(Stroke::new(1.0, tk::VIEN_NUT_LINK)).min_size(egui::vec2(0.0, 24.0)));
-                            if r.on_hover_text("Tải 37,5 MB từ Release của dema4, kiểm SHA-256 rồi lưu vào thư mục dữ liệu; dùng ngoại tuyến sau đó").clicked() {
+                            if r.on_hover_text("Tải 37,5 MB từ kho XoaGhim trên GitHub, kiểm SHA-256 rồi lưu vào thư mục dữ liệu; dùng ngoại tuyến sau đó").clicked() {
                                 tai = true;
                             }
                         }
