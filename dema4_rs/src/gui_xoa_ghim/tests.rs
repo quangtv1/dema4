@@ -586,3 +586,49 @@ fn loc_nang_cao_mo_thu_o_day_cot() {
     assert_eq!(man.borrow().cao_nc, thu, "thu lại: về đúng 1 hàng ở đáy");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// Lọc nâng cao tự áp: tick đổi → áp ngay; gõ dải trang → áp sau 2 s; Reset → chọn hết, bỏ lọc.
+#[test]
+fn loc_nang_cao_tu_ap_va_reset() {
+    use egui_kittest::kittest::Queryable;
+    let d = thu_muc_mau("tuap", &[("a.pdf", 1), ("b.pdf", 3)]);
+    let mut man = ManXoaGhim::default();
+    man.mo_thu_muc(d.clone());
+    (man.loc_nc_bat, man.loc_nc_mo) = (true, true);
+    let man = std::rc::Rc::new(std::cell::RefCell::new(man));
+    let m2 = man.clone();
+    let mut da_cai = false;
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui(move |ui| {
+        if !std::mem::replace(&mut da_cai, true) {
+            crate::gui::cai_giao_dien(ui.ctx());
+        }
+        m2.borrow_mut().ve(ui, &mut CauHinhXoaGhim::default());
+    });
+    for _ in 0..200 {
+        h.run_steps(1);
+        if man.borrow().thong_tin.iter().all(Option::is_some) && !man.borrow().thong_tin.is_empty() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    h.run_steps(2);
+    assert!(man.borrow().loc_nc_ap.is_none(), "mặc định chọn hết = không lọc");
+    assert!(h.query_by_label("Áp dụng").is_none(), "không còn nút Áp dụng");
+    // Bỏ tick Dọc → áp ngay
+    h.get_by_label("Dọc").click();
+    h.run_steps(2);
+    assert!(man.borrow().loc_nc_ap.as_ref().is_some_and(|l| !l.doc), "tick đổi: áp ngay");
+    // Gõ dải trang → chưa áp, 2 s sau mới áp
+    h.get_by_label("Reset").click();
+    h.run_steps(2);
+    assert!(man.borrow().loc_nc_ap.is_none() && man.borrow().loc_nc.doc, "Reset: chọn hết, bỏ lọc");
+    h.get_by_label("Trong dải trang").click();
+    h.run_steps(1);
+    h.get_by_label("Trong dải trang").type_text("2-3");
+    h.run_steps(2);
+    assert!(man.borrow().loc_nc_ap.is_none(), "đang gõ: chưa áp");
+    man.borrow_mut().han_loc_nc = Some(0.0); // giả lập đã qua 2 s
+    h.run_steps(2);
+    assert_eq!(man.borrow().loc_nc_ap.as_ref().map(|l| l.dai.as_str()), Some("2-3"), "sau 2 s: áp dải trang");
+    let _ = std::fs::remove_dir_all(&d);
+}

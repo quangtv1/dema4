@@ -132,7 +132,8 @@ pub struct LocNangCao {
 
 impl Default for LocNangCao {
     fn default() -> Self {
-        LocNangCao { kho: [false, false, false, true, true, false, false, false], ngang: true, doc: true, dai: String::new() }
+        // Chọn hết: ô nào có trang trong các file đang mở thì đều được tick (ô không có trang hiện mờ, bỏ tick)
+        LocNangCao { kho: [true; 8], ngang: true, doc: true, dai: String::new() }
     }
 }
 
@@ -203,6 +204,8 @@ pub struct ManXoaGhim {
     loc_so: String,
     loc_nc: LocNangCao,
     loc_nc_ap: Option<LocNangCao>,
+    /// Lúc áp ô "Trong dải trang" (2 s sau lần gõ cuối).
+    han_loc_nc: Option<f64>,
     loc_nc_bat: bool,
     loc_nc_mo: bool,
     /// `None` = mặc định (mở rộng); `Some(false)` = người dùng đã thu nhỏ.
@@ -290,6 +293,7 @@ impl Default for ManXoaGhim {
             loc_so: String::new(),
             loc_nc: LocNangCao::default(),
             loc_nc_ap: None,
+            han_loc_nc: None,
             loc_nc_bat: true,
             loc_nc_mo: false,
             ds_mo: None,
@@ -370,7 +374,9 @@ impl ManXoaGhim {
         self.loc_ten.clear();
         self.loc_so.clear();
         self.loc_tt = LocTrangThai::TatCa;
+        self.loc_nc = LocNangCao::default();
         self.loc_nc_ap = None;
+        self.han_loc_nc = None;
         self.ty_le = TyLe::VuaNgang;
     }
 

@@ -39,16 +39,6 @@ pub fn ap_kieu(ui: &mut Ui) {
     v.widgets.noninteractive.fg_stroke.color = tk::CHU;
 }
 
-/// Nút thường cao 26 (`.btn`).
-pub fn nut(ui: &mut Ui, chu: &str, duoc: bool) -> Response {
-    ui.add_enabled(duoc, egui::Button::new(egui::RichText::new(chu).font(font(tk::CHU_CO))).min_size(egui::vec2(0.0, tk::CAO_NUT)))
-}
-
-/// Nút chính màu xanh (Áp dụng, Xong).
-pub fn nut_xanh(ui: &mut Ui, chu: &str, duoc: bool) -> Response {
-    ui.add_enabled(duoc, egui::Button::new(egui::RichText::new(chu).font(font_dam(tk::CHU_CO)).color(Color32::WHITE)).fill(tk::XANH).stroke(Stroke::new(1.0, tk::XANH)).min_size(egui::vec2(0.0, tk::CAO_NUT)))
-}
-
 /// Nút kiểu link (Xóa vùng vẽ, Hoàn tác): nền trắng, chữ xanh, viền xanh nhạt, cao 24.
 pub fn nut_link(ui: &mut Ui, chu: &str, duoc: bool, xanh: bool) -> Response {
     let mau = if xanh { tk::XANH_DAM_CHU } else { tk::CHU };

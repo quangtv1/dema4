@@ -7,7 +7,7 @@ use eframe::egui::{self, Color32, Rect, Sense, Stroke};
 
 use super::thiet_ke as tk;
 use super::widget::{self, font, font_dam};
-use super::{bieu_tuong, khop_nang_cao, khop_so, LocTrangThai, ManXoaGhim, SapTheo};
+use super::{bieu_tuong, khop_nang_cao, khop_so, LocNangCao, LocTrangThai, ManXoaGhim, SapTheo};
 use crate::xoa_ghim::xuat::TrangThai;
 
 const KHO: [&str; 8] = ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7"];
@@ -313,6 +313,10 @@ impl ManXoaGhim {
             if widget::tick(ui, &mut bat, "").on_hover_text("Bật / tắt lọc nâng cao").changed() {
                 self.loc_nc_bat = bat;
             }
+            // Áp tự động: tick đổi → áp ngay; gõ dải trang → áp sau 2 s
+            if self.han_loc_nc.is_some_and(|t| ui.input(|i| i.time) >= t) {
+                self.ap_loc_nc();
+            }
             let dang_loc = self.loc_nc_bat && self.loc_nc_ap.is_some();
             let mut job = egui::text::LayoutJob::default();
             job.append("Lọc nâng cao", 0.0, egui::TextFormat::simple(font_dam(tk::CHU_CO), tk::CHU));
@@ -339,6 +343,7 @@ impl ManXoaGhim {
         }
         // Khổ / chiều không có trang nào trong các file đang mở → ô mờ, không bấm được (khổ xếp theo quy tắc Đếm trang A4)
         let (co_kho, co_ngang, co_doc) = super::co_mat(&self.thong_tin, &self.quy_tac);
+        let truoc = self.loc_nc.clone();
         egui::Frame::new().inner_margin(egui::Margin { left: 12, right: 12, top: 2, bottom: 10 }).show(ui, |ui| {
             ui.add_enabled_ui(self.loc_nc_bat, |ui| {
                 ui.spacing_mut().item_spacing.y = 6.0;
@@ -373,20 +378,37 @@ impl ManXoaGhim {
                     }
                 });
                 phu(ui, "Trong dải trang:");
-                ui.add(egui::TextEdit::singleline(&mut self.loc_nc.dai).hint_text("tất cả (vd: 1-5, 7, 10-15)").desired_width(f32::INFINITY).min_size(egui::vec2(0.0, tk::CAO_NUT)).align(egui::Align2::LEFT_CENTER))
-                    .widget_info(|| egui::WidgetInfo::labeled(egui::Role::TextInput, true, "Trong dải trang"));
-                ui.label(egui::RichText::new("Giữ file có ít nhất 1 trang khớp các điều kiện trên.").font(font(tk::CHU_NHO)).color(tk::CHU_PHU));
-                ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), tk::CAO_NUT), egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if widget::nut_xanh(ui, "Áp dụng", true).clicked() {
-                        self.loc_nc_ap = Some(self.loc_nc.clone());
-                        self.loc_nc_bat = true;
-                    }
-                    if self.loc_nc_ap.is_some() && widget::nut(ui, "Bỏ lọc", true).clicked() {
-                        self.loc_nc_ap = None;
+                let o = ui.add(egui::TextEdit::singleline(&mut self.loc_nc.dai).hint_text("tất cả (vd: 1-5, 7, 10-15)").desired_width(f32::INFINITY).min_size(egui::vec2(0.0, tk::CAO_NUT)).align(egui::Align2::LEFT_CENTER));
+                o.widget_info(|| egui::WidgetInfo::labeled(egui::Role::TextInput, true, "Trong dải trang"));
+                // Enter / rời ô: áp ngay, không chờ 2 s
+                if o.lost_focus() && self.han_loc_nc.is_some() {
+                    self.han_loc_nc = Some(0.0);
+                }
+                // Reset: về chọn hết, bỏ lọc
+                ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 18.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let r = ui.add(egui::Label::new(egui::RichText::new("Reset").font(font(tk::CHU_CO)).color(tk::XANH).underline()).sense(Sense::click()));
+                    r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, true, "Reset"));
+                    if r.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Chọn lại tất cả, xoá dải trang — bỏ lọc").clicked() {
+                        self.loc_nc = LocNangCao::default();
+                        self.han_loc_nc = None;
+                        self.ap_loc_nc();
                     }
                 });
             });
         });
+        if self.loc_nc.dai != truoc.dai {
+            let t = ui.input(|i| i.time) + 2.0;
+            self.han_loc_nc = Some(t);
+            ui.ctx().request_repaint_after(std::time::Duration::from_secs_f32(2.05));
+        } else if (self.loc_nc.kho, self.loc_nc.ngang, self.loc_nc.doc) != (truoc.kho, truoc.ngang, truoc.doc) {
+            self.ap_loc_nc();
+        }
+    }
+
+    /// Áp điều kiện đang nhập; trùng mặc định (chọn hết, không dải trang) = không lọc.
+    fn ap_loc_nc(&mut self) {
+        self.han_loc_nc = None;
+        self.loc_nc_ap = (self.loc_nc != LocNangCao::default()).then(|| self.loc_nc.clone());
     }
 
 }
