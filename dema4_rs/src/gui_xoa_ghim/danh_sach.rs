@@ -313,13 +313,12 @@ impl ManXoaGhim {
             if self.han_loc_nc.is_some_and(|t| ui.input(|i| i.time) >= t) {
                 self.ap_loc_nc();
             }
+            // Tiêu đề "Lọc nâng cao (x)": x = số file đang hiện sau mọi bộ lọc (xanh khi đang lọc nâng cao)
             let dang_loc = self.loc_nc_ap.is_some();
+            let con = self.thu_tu_hien().len();
             let mut job = egui::text::LayoutJob::default();
             job.append("Lọc nâng cao", 0.0, egui::TextFormat::simple(font_dam(tk::CHU_CO), tk::CHU));
-            // Mở rộng: trạng thái "đang lọc" nằm ở dòng Kết quả dưới đáy; thu gọn thì hiện ngay tiêu đề
-            if dang_loc && !self.loc_nc_mo {
-                job.append(" · đang lọc", 0.0, egui::TextFormat::simple(font(tk::CHU_CO), tk::XANH_DAM_CHU));
-            }
+            job.append(&format!(" ({con})"), 0.0, egui::TextFormat::simple(font(tk::CHU_CO), if dang_loc { tk::XANH_DAM_CHU } else { tk::CHU_PHU }));
             let r = ui.add(egui::Label::new(job).sense(Sense::click()));
             if r.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                 self.loc_nc_mo = !self.loc_nc_mo;
@@ -355,8 +354,10 @@ impl ManXoaGhim {
             ui.scope(|ui| {
                 ui.spacing_mut().item_spacing.y = 6.0;
                 let phu = |ui: &mut egui::Ui, t: &str| ui.label(egui::RichText::new(t).font(font(tk::CHU_CO)).color(tk::CHU_PHU));
-                phu(ui, "Có trang khổ:");
-                egui::Grid::new("xg_kho").num_columns(4).spacing(egui::vec2(8.0, 4.0)).show(ui, |ui| {
+                // Các ô xếp trái → phải, hết chỗ thì xuống dòng
+                phu(ui, "Khổ giấy:");
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(12.0, 4.0);
                     for (i, k) in KHO.iter().enumerate() {
                         let mut b = self.loc_nc.kho[i] && co_kho[i];
                         let mau = if b { tk::CHU } else { tk::CHU_MO };
@@ -366,15 +367,12 @@ impl ManXoaGhim {
                         } else if r.changed() {
                             self.loc_nc.kho[i] = b;
                         }
-                        if i % 4 == 3 {
-                            ui.end_row();
-                        }
                     }
                 });
-                phu(ui, "Chiều trang:");
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 16.0;
-                    for (co, gt, ten) in [(co_ngang, &mut self.loc_nc.ngang, "Ngang"), (co_doc, &mut self.loc_nc.doc, "Dọc")] {
+                phu(ui, "Hướng trang:");
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(12.0, 4.0);
+                    for (co, gt, ten) in [(co_doc, &mut self.loc_nc.doc, "Dọc"), (co_ngang, &mut self.loc_nc.ngang, "Ngang")] {
                         let mut b = *gt && co;
                         let r = ui.add_enabled_ui(co, |ui| widget::tick(ui, &mut b, egui::RichText::new(ten).font(font(tk::CHU_CO)))).inner;
                         if !co {
@@ -390,18 +388,6 @@ impl ManXoaGhim {
                 // Enter / rời ô: áp ngay, không chờ 2 s
                 if o.lost_focus() && self.han_loc_nc.is_some() {
                     self.han_loc_nc = Some(0.0);
-                }
-            });
-            // Dòng cuối: số file sau khi lọc (mọi bộ lọc của Danh sách) + trạng thái đang lọc
-            let (con, tong) = (self.thu_tu_hien().len(), self.ds.len());
-            let dang_loc = self.loc_nc_ap.is_some();
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(format!("Kết quả: {con} / {tong} file")).font(font_dam(tk::CHU_CO)).color(tk::CHU));
-                if dang_loc {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(egui::RichText::new("đang lọc").font(font(tk::CHU_CO)).color(tk::XANH_DAM_CHU));
-                    });
                 }
             });
         });
